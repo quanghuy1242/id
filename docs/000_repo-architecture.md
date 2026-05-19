@@ -79,8 +79,9 @@
   - [8.4 UI Enforcement](#84-ui-enforcement)
 - [9. Data Ownership And Schema Control](#9-data-ownership-and-schema-control)
   - [9.1 Better Auth-Owned Tables](#91-better-auth-owned-tables)
-  - [9.2 Custom Tables](#92-custom-tables)
-  - [9.3 Table Whitelist](#93-table-whitelist)
+  - [9.2 Custom Tables Via Better Auth Plugins](#92-custom-tables-via-better-auth-plugins)
+  - [9.3 Plugin Registration](#93-plugin-registration)
+  - [9.4 KV Caching For Read-Heavy Data](#94-kv-caching-for-read-heavy-data)
 - [10. Enforcement System](#10-enforcement-system)
   - [10.1 Oxlint Architecture Rules](#101-oxlint-architecture-rules)
   - [10.2 Duplicate Code Gate](#102-duplicate-code-gate)
@@ -176,7 +177,6 @@ The root stays minimal. No root `wrangler.jsonc`, no framework config that belon
 ├── pnpm-lock.yaml
 ├── tsconfig.json                   # Base config; workers and packages extend it
 ├── .oxlintrc.json                  # Shared lint rules for all workers and packages
-├── .schema-whitelist.json          # Approved custom table names; CI fails on unlisted tables
 ├── .advise-suppressions.json       # Known advisory noise filtered during pnpm advise
 ├── vitest.workspace.ts             # References workers/core and workers/ui test configs
 ├── .dev.vars.example               # Documents required secret names; no real values
@@ -192,7 +192,6 @@ The root stays minimal. No root `wrangler.jsonc`, no framework config that belon
 │
 ├── scripts/
 │   ├── check-duplication-threshold.mjs
-│   ├── check-schema-whitelist.mjs
 │   ├── check-ui-route-composition.mjs
 │   ├── filter-advise.mjs
 │   └── oxlint-js-plugins/
@@ -979,67 +978,90 @@ The rule/script must fail on:
 
 Tests must include passing and failing fixtures. This is a first-batch quality gate, not future polish.
 
-## 9. Data Ownership And Schema Control
+## 9. Data Ownership And Plugin Strategy
 
 ### 9.1 Better Auth-Owned Tables
 
 Better Auth owns its generated schema:
-
-- users.
-- sessions.
-- accounts.
-- verification/reset state.
+- users, sessions, accounts, verification/reset state.
 - organizations, members, invitations, teams.
 - OAuth clients, tokens, consents, and related OAuth Provider tables.
 - JWT/JWKS tables.
 
-Do not define Better Auth tables in `workers/core/src/infrastructure/db/schema.ts`.
+### 9.2 Custom Tables Via Better Auth Plugins
 
-### 9.2 Custom Tables
+All custom tables are defined through Better Auth plugin `schema` definitions, not standalone Drizzle schemas. This ensures migrations are handled by BA's CLI, tables are accessible through BA's adapter, and schema upgrades remain compatible.
 
-First-batch custom standalone tables are minimal.
+**First-batch plugin:** `idResourceServer` — owns the `resource_servers` table.
 
-Approved starting table:
-
-- `resource_servers`
-
-Likely fields:
-
-- `id`
-- `organization_id`
-- `slug`
-- `name`
-- `audience`
-- `description`
-- `enabled`
-- `created_by`
-- `updated_by`
-- `disabled_at`
-- `disabled_by`
-- `created_at`
-- `updated_at`
-
-Forbidden in first batch:
-
-- `authorization_spaces`
-- ReBAC tuple/model tables
-- ABAC policy tables
-- webhook tables
-- pipeline tables
-- registration-context tables
-
-### 9.3 Table Whitelist
-
-`.schema-whitelist.json` is mandatory.
-
-```json
-{
-  "tables": ["resource_servers"],
-  "note": "Add new custom tables only with explicit architecture-doc approval."
-}
+```ts
+// workers/core/src/auth/plugins/resource-server/index.ts
+const idResourceServer = () => ({
+  id: "id-resource-server",
+  schema: {
+    resourceServer: {
+      fields: {
+        organizationId: { type: "string", required: true, references: { model: "organization", field: "id" } },
+        slug: { type: "string", required: true },
+        name: { type: "string", required: true },
+        audience: { type: "string", required: true, unique: true },
+        description: { type: "string", required: false },
+        enabled: { type: "boolean", required: true },
+        createdBy: { type: "string", required: false },
+        updatedBy: { type: "string", required: false },
+        disabledAt: { type: "number", required: false },
+        disabledBy: { type: "string", required: false },
+        createdAt: { type: "number", required: true },
+        updatedAt: { type: "number", required: true },
+      },
+    },
+  },
+  endpoints: { /* CRUD endpoints via createAuthEndpoint */ },
+});
 ```
 
-`scripts/check-schema-whitelist.mjs` fails CI when `workers/core/src/infrastructure/db/schema.ts` defines an unlisted standalone Drizzle table. Better Auth generated schema is outside this file and outside this whitelist.
+**Why plugins, not standalone Drizzle:**
+- BA's CLI generates migrations for plugin schemas — no separate `drizzle-kit` migration step.
+- BA's adapter handles CRUD — no need for `CrudAdapter` or manual D1 queries on custom tables.
+- Schema upgrades are managed by BA's migration system, not by custom migration scripts that may drift.
+- Plugin endpoints are registered on the BA handler automatically — no manual Hono route registration.
+
+**`workers/core/src/infrastructure/db/schema.ts` remains empty.** All table definitions belong to BA plugins.
+
+### 9.3 Plugin Registration
+
+Custom plugins are registered alongside BA's built-in plugins in the auth factory:
+
+```ts
+plugins: [
+  organization(config.organization),
+  jwt(config.jwt),
+  oauthProvider({ ... }),
+  idResourceServer(),  // ← custom plugin
+]
+```
+
+### 9.4 KV Caching For Read-Heavy Data
+
+Resource server audiences are loaded on every token issuance but change only on admin mutation. Use KV as a read cache:
+
+```
+Token issuance → check KV (id-resource-servers:audiences) → hit: use cached list
+                                                           → miss: query D1 → populate KV → use
+Admin mutation (create/update/disable) → delete KV key → next token issuance reloads from D1
+```
+
+**Cache configuration:**
+- KV key: `id-resource-servers:audiences` — stores `string[]` of enabled audience URLs
+- KV TTL: 5 minutes indefinite (`expirationTtl` not set; key exists until deleted)
+- KV `cacheTtl`: 60 seconds (minimum, acceptable staleness for disable-after-expiry pattern)
+- Invalidation: delete key on any resource server mutation; next read repopulates
+- Fallback: on KV miss or error, query D1 directly — slow but correct
+
+**Why this pattern fits KV:**
+- Resource servers are read-heavy (every token issuance), write-rarely (admin action). Classic KV fit per Cloudflare's design guidance.
+- Staleness of ≤60s on disable is acceptable: existing JWTs remain valid until expiry regardless. The only effect is a newly-disabled resource server may still receive tokens for up to 60 seconds.
+- KV hot-key reads are <1ms. D1 reads are 50-500ms. The cache eliminates a D1 query from every token issuance.
 
 ## 10. Enforcement System
 
@@ -1124,7 +1146,6 @@ Advisory output is not a substitute for hard gates. It is review input for struc
 |---|---|---|
 | Lint | `pnpm lint` | Hard gate |
 | Dup check | `pnpm check:dup` | Hard gate |
-| Schema whitelist | `pnpm check:schema` | Hard gate |
 | UI composition | `pnpm check:ui` | Hard gate |
 | Typecheck | `pnpm typecheck` | Hard gate |
 | Tests | `pnpm test` | Hard gate |
@@ -1211,14 +1232,13 @@ packages:
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
-    "check:schema": "node scripts/check-schema-whitelist.mjs",
     "check:ui": "node scripts/check-ui-route-composition.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm check:dup && pnpm check:schema && pnpm check:ui && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm check:dup && pnpm check:ui && pnpm typecheck && pnpm test",
     "advise": "node scripts/filter-advise.mjs",
-    "db:generate": "auth generate && drizzle-kit generate",
+    "db:generate": "npx @better-auth/cli generate",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
@@ -1227,7 +1247,7 @@ packages:
 }
 ```
 
-The exact `db:generate` command must be finalized after the Better Auth schema-generation spike. The invariant is fixed: Better Auth schema generation and custom Drizzle migration generation must both be represented, repeatable, and documented.
+The exact `db:generate` command must be finalized after the Better Auth schema-generation spike. The invariant is fixed: Better Auth schema generation via CLI must produce migrations for both built-in tables and plugin-owned custom tables in a single repeatable step.
 
 ## 12. Rules Summary
 
@@ -1240,6 +1260,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | UI deps | UI never imports auth/persistence/signing deps | Oxlint `ui-no-auth-deps` |
 | Package isolation | `packages/lib` stays framework-free | Oxlint `packages-lib-isolation` |
 | Auth boundary | Better Auth imports stay in approved files | Oxlint `auth-boundary` |
+| Tables | Custom tables live in BA plugin schema definitions, not standalone Drizzle | Architecture rule (no `infrastructure/db/schema.ts` custom tables) |
 | Layer imports | domain/application/http/infrastructure/composition/shared imports stay directional | Oxlint `layer-imports` |
 | Entity classes | private constructor, create, reconstitute, toSnapshot | Oxlint `entity-class` |
 | Serialization | no raw entity spreading/stringifying | Oxlint `no-raw-entity-serialization` |
@@ -1249,7 +1270,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |
-| Tables | only approved custom tables | `check:schema` |
+| Tables | Custom tables live in BA plugin schemas, not standalone Drizzle | Architecture rule (no custom tables in `infrastructure/db/schema.ts`) |
 | UI route composition | no raw admin route UI | `ui-route-composition` or `check:ui` |
 | Duplication | <3% mild duplication | `check:dup` |
 | Types | strict and no explicit `any` | TypeScript + oxlint |
@@ -1269,17 +1290,7 @@ Acceptance:
 - invalid fixtures fail each rule;
 - all rules are hard errors in `pnpm lint`.
 
-### Spike B: Table Whitelist Script
-
-Purpose: prove custom table control.
-
-Acceptance:
-
-- `resource_servers` passes;
-- an unlisted table fails;
-- Better Auth generated tables are not scanned from custom schema.
-
-### Spike C: Better Auth Contract
+### Spike B: Better Auth Contract
 
 Purpose: prove the installed Better Auth 1.6.11 API shape.
 
@@ -1290,9 +1301,11 @@ Acceptance:
 - JWKS default/custom path is tested;
 - `validAudiences`, custom claims, and resource-bound JWT behavior are tested;
 - key rotation with `kid` and grace period is tested;
+- resource audience loaded from D1, cached in KV, invalidated on mutation;
+- KV cache miss falls back to D1 (correct but slower);
 - schema generation command is finalized.
 
-### Spike D: Two Workers And Service Binding
+### Spike C: Two Workers And Service Binding
 
 Purpose: prove Cloudflare topology.
 
@@ -1303,7 +1316,7 @@ Acceptance:
 - `dev:stack:ui` renders `/admin` and calls `core-id`;
 - deployed service binding order is documented: deploy `id-core` before `id-ui`.
 
-### Spike E: UI Composition Gate
+### Spike D: UI Composition Gate
 
 Purpose: prove admin pages cannot bypass Lumina.
 
@@ -1325,7 +1338,7 @@ Acceptance:
 | Dynamic audiences unsupported | UI-managed resource servers cannot feed provider config | Prove `validAudiences` runtime shape or choose documented static/cached bridge. |
 | Service binding trust bypass | internal UI call skips auth | core admin API authorizes every request. |
 | D1 transaction overreach | multi-step flows assume long-lived transactions | use D1 `batch()` only for bounded atomic writes; add idempotency for multi-call flows. |
-| Legacy scope creep | ReBAC/ABAC/webhooks/pipeline tables appear | schema whitelist and docs review. |
+| Legacy scope creep | ReBAC/ABAC/webhooks/pipeline tables appear | Plugin architecture review and docs review. |
 | UI raw markup drift | LLM writes route pages directly | `check:ui` or oxlint UI rule. |
 | Package leak | `packages/lib` imports runtime frameworks | package isolation lint. |
 | Bundle leak | React/Vinext enters core | `core-no-ui-deps` plus bundle smoke. |
@@ -1337,7 +1350,6 @@ Automated:
 
 - `pnpm lint`
 - `pnpm check:dup`
-- `pnpm check:schema`
 - `pnpm check:ui`
 - `pnpm typecheck`
 - `pnpm test`
@@ -1352,8 +1364,7 @@ Core tests:
 - invalid resource audience rejection.
 - JWKS verification and rotation.
 - admin route auth.
-- `resource_servers` CRUD.
-- schema whitelist passing/failing fixtures.
+- resource audience KV cache hit/cold-fallback/invalidation test.
 - route-handler lint failing fixtures.
 
 UI tests:
@@ -1393,8 +1404,6 @@ Required enforcement outcomes:
 - [ ] 16 content-api architecture rules are ported.
 - [ ] id-specific rules are implemented as hard errors.
 - [ ] UI route composition is mechanically enforced.
-- [ ] `.schema-whitelist.json` exists.
-- [ ] `check:schema` fails on unapproved custom tables.
 - [ ] duplicate-code threshold is <3%.
 - [ ] TypeScript strict mode is enabled.
 - [ ] `pnpm check` passes from a clean checkout.

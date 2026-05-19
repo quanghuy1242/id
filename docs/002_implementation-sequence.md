@@ -9,7 +9,6 @@ Before enforcement, before Better Auth, just structure.
 
 - [ ] Create root: `package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, `.gitignore`
 - [ ] Create `.oxlintrc.json` stub (placeholder, rules arrive in Phase 1)
-- [ ] Create `.schema-whitelist.json` with `{ "tables": ["resource_servers"] }`
 - [ ] Create `.dev.vars.example` listing required secret names only
 - [ ] Create `vitest.workspace.ts` referencing `workers/core/vitest.config.ts` and `workers/ui/vitest.config.ts`
 - [ ] Create `scripts/` directory with placeholder scripts
@@ -27,7 +26,7 @@ Before enforcement, before Better Auth, just structure.
 
 ## Phase 1 — Enforcement Bootstrapped
 
-**This phase is non-negotiable.** Every gate marked below is a hard stop. If any oxlint rule cannot be ported, or any fixture cannot pass, or the whitelist script cannot be written — stop and ask. Do not proceed to Phase 2 with partial enforcement. The purpose is to build the cage before any feature code enters it.
+**This phase is non-negotiable.** Every gate marked below is a hard stop. If any oxlint rule cannot be ported, or any fixture cannot pass, or the duplicate gate cannot be written — stop and ask. Do not proceed to Phase 2 with partial enforcement. The purpose is to build the cage before any feature code enters it.
 
 ### 1.1 Port Oxlint Architecture Rules (000 Spike A)
 
@@ -49,17 +48,7 @@ Before enforcement, before Better Auth, just structure.
 
 **Gate:** `pnpm lint` passes on valid fixture, fails appropriately on each broken fixture.
 
-### 1.2 Table Whitelist Script (000 Spike B)
-
-- [ ] Write `scripts/check-schema-whitelist.mjs`
-- [ ] Prove it passes when `workers/core/src/infrastructure/db/schema.ts` defines only `resource_servers`
-- [ ] Prove it fails when an unlisted table (`metrics`, `audit_logs`, etc.) is defined
-- [ ] Prove it does NOT scan Better Auth generated tables (these live outside our `schema.ts`)
-- [ ] Add to `pnpm check:schema`
-
-**Gate:** `pnpm check:schema` passes on valid schema, fails on unapproved table.
-
-### 1.3 Duplicate Code Gate (000 §10.2)
+### 1.2 Duplicate Code Gate (000 §10.2)
 
 - [ ] Write `scripts/check-duplication-threshold.mjs` (Fallow `<3%` threshold, `--mode mild --min-tokens 50 --min-lines 5`)
 - [ ] Prove it passes on fixture code (small, non-duplicated codebase)
@@ -68,7 +57,7 @@ Before enforcement, before Better Auth, just structure.
 
 **Gate:** `pnpm check:dup` passes on fixtures, fails on duplicated code.
 
-### 1.4 Add ID-Specific Oxlint Rules (000 Spike A continued)
+### 1.3 Add ID-Specific Oxlint Rules (000 Spike A continued)
 
 - [ ] Implement `worker-isolation` — core and UI never cross-import
 - [ ] Implement `core-no-ui-deps` — core never imports react, react-dom, vinext, @vitejs/*
@@ -81,9 +70,9 @@ Before enforcement, before Better Auth, just structure.
 
 **Gate:** rules 17–22 are hard errors in `pnpm lint`, proven by fixtures.
 
-### 1.5 Port AGENTS.md And Architecture Skills
+### 1.4 Port AGENTS.md And Architecture Skills
 
-- [ ] Write `AGENTS.md` — adapted from content-api: commands (`pnpm check`, `pnpm lint`, `pnpm check:dup`, `pnpm check:schema`, `pnpm check:ui`, `pnpm advise`), advisory suppression rules for id-specific architecture patterns (entity getter symmetry, mapper field mapping, create use case pattern, route handler pattern), test conventions, alias rules
+- [ ] Write `AGENTS.md` — adapted from content-api: commands (`pnpm check`, `pnpm lint`, `pnpm check:dup`, `pnpm check:ui`, `pnpm advise`), advisory suppression rules for id-specific architecture patterns (entity getter symmetry, mapper field mapping, create use case pattern, route handler pattern), test conventions, alias rules
 - [ ] Write `.agents/skills/id-architecture/SKILL.md` — references `docs/000_repo-architecture.md`, teaches layer rules, entity class contract, mapper contract, route handler contract, CrudAdapter rules, Better Auth boundary, worker isolation rules
 - [ ] Write `.agents/skills/id-architecture-lint/SKILL.md` — gates oxlint rule maintenance behind explicit intent; teaches rule addition checklist, strictness requirements, negative fixture pattern
 - [ ] If the architecture skill references detailed per-rule documentation, add `references/architecture-rules.md` and `references/rule-contract.md` under the skill directory
@@ -96,22 +85,22 @@ Before enforcement, before Better Auth, just structure.
 
 **This phase is non-negotiable.** The Better Auth 1.6.11 contract must be proven from installed packages, not from docs or memory. If a route does not exist at the expected path, or an option name differs from what the docs suggest, or `validAudiences` cannot accept async values — stop and ask. Do not code around an unverified assumption. Feature implementation (Phase 5) must never depend on a guess.
 
-**Phase 1 enforcement is active.** Every file written in this phase runs under `pnpm lint`, `pnpm check:dup`, `pnpm check:schema`, and all 22 oxlint rules. Phase 2 does not remove any gates — it only adds acceptance criteria for BA contract discovery.
+**Phase 1 enforcement is active.** Every file written in this phase runs under `pnpm lint`, `pnpm check:dup`, and all 22 oxlint rules. Phase 2 does not remove any gates — it only adds acceptance criteria for BA contract discovery.
 
 ### 2.0 D1 Schema Bootstrap (Prerequisite)
 
-Before Better Auth can be tested, D1 needs tables. Write the minimal config and generate the schema.
+Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer` plugin and generate migrations.
 
 - [ ] Write `workers/core/src/auth/config.ts` — pure shared Better Auth plugin config (scopes, pages, plugin options). No runtime bindings. Factored so both `cli-auth.ts` and `get-auth.ts` consume it.
-- [ ] Write `workers/core/src/auth/cli-auth.ts` — static export for CLI/schema generation using `getPlatformProxy()` or a file-based SQLite fallback for local generation.
-- [ ] Generate Better Auth schema from pinned packages into committed SQL migrations.
-- [ ] Add custom `resource_servers` Drizzle table to `workers/core/src/infrastructure/db/schema.ts`.
-- [ ] Generate Drizzle migration for custom table.
+- [ ] Write `workers/core/src/auth/plugins/resource-server/index.ts` — `idResourceServer` plugin with `schema` (resourceServer table definition) and `endpoints` (CRUD via `createAuthEndpoint`).
+- [ ] Register plugin in `getAuth.ts` factory alongside built-in plugins.
+- [ ] Write `workers/core/src/auth/cli-auth.ts` — static export for CLI/schema generation using `getPlatformProxy()`.
+- [ ] Run `npx @better-auth/cli generate` — generates migrations for both BA built-in tables and `idResourceServer` plugin table.
 - [ ] `wrangler d1 migrations apply id --local` succeeds from clean database.
 - [ ] Running migrations twice does not fail.
-- [ ] Smoke: create a `resource_servers` row directly in D1 for later audience tests.
+- [ ] Smoke: create a `resource_servers` row via the plugin endpoint for later audience tests.
 
-**Gate:** D1 is bootstrapped locally with BA tables and custom `resource_servers` table.
+**Gate:** D1 is bootstrapped locally with BA tables and the plugin-owned `resourceServer` table.
 
 ### 2.1 Route Map And API Shape (000 Spike C + 001 Spike 1)
 
@@ -138,7 +127,11 @@ Before Better Auth can be tested, D1 needs tables. Write the minimal config and 
 
 ### 2.3 Resource Audience Validation (001 Spike 2)
 
-- [ ] Prove `getAuth(env, request)` can load `validAudiences` from D1 `resource_servers` rows
+- [ ] Prove `getAuth(env, request)` can load `validAudiences` from the `idResourceServer` plugin's data
+- [ ] Implement KV cache: audience list stored at `id-resource-servers:audiences` key, loaded on cold start
+- [ ] Prove KV hit: audiences served from cache (<1ms), no D1 query
+- [ ] Prove KV miss: audiences loaded from D1 (50-500ms), then populated into KV
+- [ ] Prove KV invalidation: creating/updating/disabling a resource server deletes the KV key; next token issuance repopulates
 - [ ] If `validAudiences` must be synchronous (not async) in the installed BA version:
   - [ ] Option A: static bootstrap config (defeats UI-first goal)
   - [ ] Option B: request-local audience cache with tiny TTL
@@ -146,9 +139,9 @@ Before Better Auth can be tested, D1 needs tables. Write the minimal config and 
 - [ ] Prove token request with a valid `resource` returns JWT with correct `aud`
 - [ ] Prove token request with invalid `resource` is rejected
 - [ ] Prove resource widening at token exchange is rejected
-- [ ] Prove disabling a resource server blocks new token issuance within the cache window
+- [ ] Prove disabling a resource server blocks new token issuance (within KV cacheTtl window of ≤60s)
 
-**Gate:** integration test from UI (D1 insert) through to JWT issuance and audience validation.
+**Gate:** integration test from plugin endpoint (create) through KV cache to JWT issuance and audience validation.
 
 ---
 
@@ -207,7 +200,7 @@ Before Better Auth can be tested, D1 needs tables. Write the minimal config and 
 
 ## Phase 5 — Feature Implementation
 
-**All prior gates are active.** From this point, every line of code enters under `pnpm check` (lint + dup + schema whitelist + UI composition + typecheck + tests). No feature file is exempt.
+**All prior gates are active.** From this point, every line of code enters under `pnpm check` (lint + dup + UI composition + typecheck + tests). No feature file is exempt.
 
 Implementation follows `001_first-batch-plan.md` Section 12. The acceptance bar is the full Definition of Done in both documents:
 
@@ -239,10 +232,11 @@ All must be satisfied before Phase 5 is complete.
 - [ ] Custom claims enrichment (`org_id`, etc.)
 - [ ] Custom token response fields
 
-### 5.3 Custom Admin API
+### 5.3 Custom Admin API (Plugin Endpoints)
 
-- [ ] Resource server CRUD endpoints (custom table from Phase 2.0)
-- [ ] Dashboard aggregate endpoint
+- [ ] `idResourceServer` plugin endpoints: create, read, update, delete, list resource servers
+- [ ] Plugin endpoints use `createAuthEndpoint` — registered on BA handler automatically
+- [ ] Dashboard aggregate endpoint (may be custom Hono route or plugin endpoint)
 - [ ] All endpoints behind `requireActor(c)` with role checks from Phase 4
 
 ### 5.4 Admin UI (Scaffold Only)
@@ -278,8 +272,8 @@ Admin CRUD operations on `core-id` are tested via integration tests and document
 | Phase | Gate | At end of phase |
 |---|---|---|
 | 0 | Directory tree matches 000 Section 3 | — |
-| 1 | `pnpm lint` catches violations; `pnpm check:schema` catches unapproved tables; `pnpm check:dup` catches copy-paste | Enforcement bootstrapped. All subsequent phases inherit these gates. |
-| 2 | BA route map + JWKS + audience tests pass (under Phase 1 enforcement); D1 bootstrapped locally | BA contract known, D1 ready |
+| 1 | `pnpm lint` catches violations; `pnpm check:dup` catches copy-paste | Enforcement bootstrapped. All subsequent phases inherit these gates. |
+| 2 | BA route map + JWKS + audience + KV cache tests pass (under Phase 1 enforcement); D1 bootstrapped locally | BA contract known, D1 ready, KV cache proven |
 | 3 | Two workers run locally; UI composition gate works (under Phase 1 enforcement) | Build system proven; `pnpm check:ui` added to gate |
 | 4 | Admin auth tests pass (under Phase 1+3 enforcement) | Authorization model proven |
 | 5 | All 001 DoD items met | Ship |

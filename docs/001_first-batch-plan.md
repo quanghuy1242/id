@@ -291,14 +291,13 @@ Primary libraries:
 - `better-auth`
 - `@better-auth/oauth-provider`
 - Hono for Worker routing and binding access
-- Drizzle or Kysely only where useful for custom tables
 - Wrangler for D1/KV migrations and deployment
 
 Bindings:
 
 | Binding | Purpose |
 |---|---|
-| `DB` | D1 database for Better Auth and custom tables |
+| `DB` | D1 database for Better Auth tables and plugin-owned custom tables |
 | `KV` | Secondary storage for rate limiting/session cache where Better Auth integration supports it |
 | `BETTER_AUTH_SECRET` | Better Auth secret, rotated non-destructively when supported |
 | `BETTER_AUTH_URL` | Public issuer/base URL |
@@ -355,28 +354,16 @@ Clients are created through the admin UI and Better Auth server APIs. Dynamic re
 
 Better Auth OAuth Provider models resource servers as valid audiences, not as a full management entity.
 
-The first batch adds a custom `resource_servers` table so the admin UI can manage API audiences:
+The first batch adds an `idResourceServer` plugin that defines the `resource_servers` table through Better Auth's schema system, registers CRUD endpoints through BA's endpoint API, and provides a KV-backed audience cache for the OAuth Provider.
 
-- `id`
-- `organization_id`
-- `slug`
-- `name`
-- `audience`
-- `description`
-- `enabled`
-- `created_at`
-- `updated_at`
+**Plugin structure:**
+- `schema.resourceServer` — table definition (organizationId, slug, name, audience, description, enabled, createdBy, updatedBy, disabledAt, disabledBy, createdAt, updatedAt). Migrated via BA CLI.
+- `endpoints` — create, read, update, delete, list via `createAuthEndpoint`.
+- KV cache — audiences loaded once, cached in KV, invalidated on mutation.
 
-Runtime invariant:
-
+**Runtime invariant:**
 - A token request may only receive a JWT for a `resource` value that exists in `resource_servers` and is currently enabled.
-
-Implementation decision:
-
-- Better Auth OAuth Provider 1.6.11 exposes `validAudiences?: string[]` as a plugin configuration option. It does not expose a documented runtime audience-validation callback.
-- To keep resource servers UI-managed and avoid deploy-time audience config, `getAuth(env, request)` must derive `validAudiences` from enabled rows in D1.
-- A short in-isolate cache is acceptable for latency, but the cache window becomes the maximum delay before a disabled resource server stops receiving new tokens.
-- Do not keep API audiences in `wrangler.jsonc`, `.dev.vars`, source constants, or deployment-specific config except for local bootstrap/test fixtures.
+- Audience validation uses cached KV list (`<1ms`) with D1 fallback on cache miss (`50-500ms`).
 
 ### 4.5 Token Model
 
@@ -689,50 +676,51 @@ Implementation rule:
 
 - Generate the schema from the exact package versions pinned in `package.json`, commit generated migrations, and inspect the SQL before applying it to D1.
 
-### 6.2 Custom First-Batch Tables
+### 6.2 Custom Tables Via Better Auth Plugin
 
-Custom tables should be minimal.
+The `resource_servers` table is defined through the `idResourceServer` plugin's `schema` block, not through standalone Drizzle. The plugin owns the full lifecycle: table definition, migrations via BA CLI, CRUD endpoints via `createAuthEndpoint`, and KV-backed audience cache.
 
-#### `resource_servers`
+**Plugin schema fields (resourceServer table):**
 
-| Column | Type | Notes |
+| Field | Type | Notes |
 |---|---|---|
-| `id` | text primary key | UUID or Better Auth-compatible generated ID |
-| `organization_id` | text not null | References `organization.id` |
-| `slug` | text not null | Unique per organization |
-| `name` | text not null | Display name |
-| `audience` | text not null | URI/string used as JWT `aud`; globally unique unless a later design supports per-org duplicate audiences |
-| `description` | text nullable | UI text |
-| `enabled` | integer boolean | Disabled resource servers cannot receive new tokens |
-| `created_by` | text nullable | Admin user who created the row |
-| `updated_by` | text nullable | Last admin user who changed the row |
-| `disabled_at` | integer nullable | Unix timestamp for disable action |
-| `disabled_by` | text nullable | Admin user who disabled the row |
-| `created_at` | integer | Unix timestamp |
-| `updated_at` | integer | Unix timestamp |
+| `id` | string (PK) | UUID, auto-generated |
+| `organizationId` | string (FK → organization.id) | Owning org |
+| `slug` | string | Unique per organization |
+| `name` | string | Display name |
+| `audience` | string (unique) | JWT `aud` value |
+| `description` | string (nullable) | UI text |
+| `enabled` | boolean | Disabled servers cannot receive new tokens |
+| `createdBy` | string (nullable) | Actor who created |
+| `updatedBy` | string (nullable) | Last actor who modified |
+| `disabledAt` | number (nullable) | Unix timestamp |
+| `disabledBy` | string (nullable) | Actor who disabled |
+| `createdAt` | number | Unix timestamp |
+| `updatedAt` | number | Unix timestamp |
 
-Recommended indexes:
+**KV audience cache:**
 
-- unique `audience`;
-- unique `(organization_id, slug)`;
-- index `organization_id`;
-- index `enabled`.
-- index `(organization_id, enabled)`.
+```
+Audience cache key: id-resource-servers:audiences
+Value: string[] of enabled audience URLs
+KV cacheTtl: 60s (minimum, acceptable for disable-after-expiry)
+Invalidation: delete key on any resource server mutation
+Fallback: direct D1 query on KV miss or error
+```
 
 ### 6.3 Schema Extension Rules
 
 Allowed:
-
-- Better Auth `additionalFields` for `user` and organization metadata when supported.
-- Separate custom tables referencing Better Auth IDs.
-- Custom migrations for custom tables.
+- Better Auth `additionalFields` for `user` and organization metadata.
+- Custom BA plugins with `schema` definitions for new tables.
+- BA CLI for all migrations (both built-in and plugin schemas).
 
 Avoid:
-
-- raw SQL changes to Better Auth-owned OAuth/JWKS/token tables;
-- direct writes to Better Auth tables from admin routes;
-- large JSON permission blobs embedded into users/sessions by default;
-- copying prior `auther` ReBAC/pipeline/webhook tables into first batch.
+- Standalone Drizzle table definitions in `infrastructure/db/schema.ts` (this file remains empty).
+- Raw SQL changes to Better Auth-owned tables.
+- Direct writes to Better Auth tables from custom code.
+- Large JSON permission blobs embedded into users/sessions.
+- Copying prior `auther` ReBAC/pipeline/webhook tables into first batch.
 
 ## 7. API Surface
 
@@ -791,21 +779,24 @@ Authorization:
 
 ### 8.1 Worker Topology
 
-One Worker is sufficient for first batch:
+Two Cloudflare Workers (per `000_repo-architecture.md` Section 4):
 
 ```text
-id-worker
+core-id worker (primary — auth, OAuth, admin API)
 ├── /api/auth/*                         Better Auth handler
 ├── /oauth2/* or /api/auth/oauth2/*     OAuth Provider routes, depending on Better Auth base path
 ├── /.well-known/*                      metadata aliases/helpers
 ├── /api/admin/*                        custom admin API
-├── /admin/*                            admin UI
 ├── /sign-in                            sign-in page
 ├── /sign-up                            sign-up page
 ├── /consent                            consent page
 ├── /select-account                     account picker page
 ├── /select-organization                org picker page
 └── /reset-password                     reset page
+
+ui-id worker (admin dashboard scaffold)
+├── /admin/*                            health-check page + future admin UI
+└── CORE_ID service binding ──────────→ core-id (internal)
 ```
 
 Use Hono to route requests and pass Cloudflare bindings into the Better Auth factory.
@@ -853,11 +844,10 @@ Implementation requirement:
 Recommended workflow:
 
 1. Pin package versions in `package.json`.
-2. Generate Better Auth schema/migrations from the pinned config.
-3. Add the custom migration for `resource_servers`.
-4. Apply migrations to local D1 with Wrangler.
-5. Run route smoke tests against `wrangler dev`.
-6. Apply remote migrations through CI/CD before deploying the Worker.
+2. Generate Better Auth schema/migrations from the pinned config (includes both built-in tables and plugin-owned tables like `resourceServer`).
+3. Apply migrations to local D1 with Wrangler.
+4. Run route smoke tests against `wrangler dev`.
+5. Apply remote migrations through CI/CD before deploying the Worker.
 
 Commands should be finalized during implementation, but expected scripts are:
 
@@ -1096,29 +1086,40 @@ Acceptance criteria:
 - Existing JWTs remain valid until expiry and this behavior is documented in the UI.
 - No API audience is required in `wrangler.jsonc`, `.dev.vars`, or source constants for production operation.
 
-### 11.3 D1 Schema And Migration Spike
+### 11.3 D1 Schema And Plugin Migration Spike
 
 Purpose:
-
-- Prove Better Auth schema generation and custom migrations work against local D1 under Wrangler.
+- Prove Better Auth plugin schema generation and BA CLI migrations work against local D1.
 
 Scope:
-
 - `src/auth/get-auth.ts`
+- `src/auth/plugins/resource-server/index.ts`
 - `src/auth/cli-auth.ts` or equivalent CLI-only auth export
-- `src/db/schema.ts`
-- `migrations/*`
 - `wrangler.jsonc`
 
 Acceptance criteria:
-
-- Better Auth-generated schema is committed as migration SQL or a reproducible generated artifact.
-- Custom `resource_servers` migration applies after Better Auth tables.
-- `wrangler d1 migrations apply <db> --local` succeeds from a clean local database.
+- `idResourceServer` plugin schema is generated and committed as migration SQL.
+- `npx @better-auth/cli generate` produces migrations for both BA built-in tables and plugin tables.
+- `wrangler d1 migrations apply id --local` succeeds from a clean local database.
 - Running migrations twice does not fail.
-- A smoke script can create a user, organization, OAuth client, and resource server in local D1.
+- A smoke script can create a user, organization, OAuth client, and resource server via the plugin endpoint.
 
-### 11.4 JWKS And Secret Rotation Spike
+### 11.4 KV Audience Cache Spike
+
+Purpose:
+- Prove the KV-backed audience caching strategy for the OAuth Provider.
+
+Scope:
+- `src/auth/resource-audiences.ts`
+- KV binding in `wrangler.jsonc`
+
+Acceptance criteria:
+- Audience list is read from D1 on cold start, cached in KV, and served from KV on subsequent requests.
+- Creating, updating, or disabling a resource server invalidates the KV cache key.
+- Next token issuance request loads fresh audiences from D1 into KV.
+- Stale reads (≤60s cacheTtl) during disable are documented as acceptable behavior.
+
+### 11.5 JWKS And Secret Rotation Spike
 
 Purpose:
 
@@ -1139,7 +1140,7 @@ Acceptance criteria:
 - Rotation creates a new signing key without immediately invalidating a token signed by the previous key.
 - Metadata advertises the actual JWKS URI used by resource servers.
 
-### 11.5 Admin Authorization Spike
+### 11.6 Admin Authorization Spike
 
 Purpose:
 
@@ -1165,34 +1166,33 @@ This is a sequenced implementation plan, not a work-item tracking list.
 
 ### 12.1 Foundation
 
-Create the Worker project structure:
+Create the Worker project structure (per `000_repo-architecture.md` Section 3):
 
-- `package.json`
-- `pnpm-lock.yaml`
-- `wrangler.jsonc`
+- `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`
+- `workers/core/package.json`, `workers/core/wrangler.jsonc`, `workers/core/tsconfig.json`
+- `workers/ui/package.json`, `workers/ui/wrangler.jsonc`, `workers/ui/tsconfig.json`, `workers/ui/vinext.config.ts`
+- `workers/core/src/index.ts`
+- `workers/core/src/auth/config.ts`
+- `workers/core/src/auth/get-auth.ts`
+- `workers/core/src/auth/plugins/resource-server/index.ts`
+- `workers/ui/src/main.ts`
 - `.dev.vars.example`
-- `src/index.ts`
-- `src/auth/config.ts`
-- `src/auth/get-auth.ts`
-- `src/db/schema.ts`
-- `src/db/migrations/*`
-- `src/routes/*`
-- `src/admin/*` or chosen UI app structure
-- `test/*`
 
-Recommended source ownership:
+Recommended source ownership (core-id only; ui-id follows `000_repo-architecture.md` Section 3):
 
 | Path | Responsibility |
 |---|---|
-| `src/index.ts` | Hono app, route registration, request ID middleware, top-level error handling |
-| `src/auth/get-auth.ts` | Runtime Better Auth factory using Worker bindings |
-| `src/auth/config.ts` | Shared pure config helpers for plugins, scopes, and pages |
-| `src/auth/cli-auth.ts` | CLI/schema-generation auth export, if Better Auth tooling requires a static export |
-| `src/auth/resource-audiences.ts` | Resource-server audience loading/cache strategy |
-| `src/auth/claims.ts` | Custom access-token/ID-token/userinfo claim helpers |
-| `src/db/schema.ts` | Custom table schema only; Better Auth generated schema remains separate if tooling produces it |
-| `src/db/migrations/*` | D1 migrations |
-| `src/routes/admin/*` | Custom admin APIs for resource servers/dashboard |
+| `workers/core/src/index.ts` | Hono app, route registration, request ID middleware, top-level error handling |
+| `workers/core/src/auth/get-auth.ts` | Runtime Better Auth factory using Worker bindings |
+| `workers/core/src/auth/config.ts` | Shared pure config helpers for plugins, scopes, and pages |
+| `workers/core/src/auth/cli-auth.ts` | CLI/schema-generation auth export |
+| `workers/core/src/auth/resource-audiences.ts` | KV-backed audience loading and cache invalidation |
+| `workers/core/src/auth/claims.ts` | Custom access-token/ID-token/userinfo claim helpers |
+| `workers/core/src/auth/plugins/resource-server/index.ts` | `idResourceServer` plugin — schema, endpoints, KV cache |
+| `workers/core/src/infrastructure/db/schema.ts` | Empty — all custom tables live in BA plugin schemas |
+| `workers/core/src/domain/` | Domain entities, repository interfaces, policies |
+| `workers/core/src/application/` | Use cases |
+| `workers/core/src/http/routes/admin/` | Custom admin API routes for non-plugin endpoints (dashboard) |
 | `src/admin/*` | Admin UI routes/components if UI is bundled into the Worker project |
 | `src/resource-server/verify.ts` | Downstream JWT verification helper |
 | `test/*` | Worker, OAuth, admin authorization, D1, and JWKS tests |
@@ -1544,7 +1544,7 @@ Static checks:
 
 ### Required implementation outcomes:
 
-- [ ] Auth Worker deployed on Cloudflare Workers with D1 database
+- [ ] `core-id` Worker deployed on Cloudflare Workers with D1 database
 - [ ] User can sign up with email/password and verify email
 - [ ] User can sign in and receive a session
 - [ ] User can create an organization and becomes its owner
@@ -1580,7 +1580,7 @@ Static checks:
 - [ ] JWKS URI advertised by metadata returns signing keys
 - [ ] Section 11 spikes are complete and their outcomes are reflected in implementation docs or tests
 - [ ] Runtime resource server audience strategy is proven and documented
-- [ ] Admin mutation audit fields are written for custom tables
+- [ ] Admin mutation audit fields are written for plugin-owned tables
 - [ ] Secrets are configured through Cloudflare secret bindings, not committed config
 - [ ] Runbooks exist for deploy, secret rotation, OAuth client disable, resource server disable, JWKS incident, and D1 migration failure
 - [ ] First downstream app integration can be disabled or reverted without involving `auther`
@@ -1615,13 +1615,13 @@ Static checks:
 
 ## 19. Final Model
 
-The new `id` service is a Cloudflare Worker backed by D1 and Better Auth 1.6.x. It uses:
+The new `id` service is deployed as two Cloudflare Workers backed by D1 and Better Auth 1.6.x. It uses:
 
 - Better Auth core for users and sessions;
 - organization plugin for tenants;
 - OAuth Provider for authorization code, client credentials, refresh, consent, revocation, introspection, and userinfo;
 - JWT/JWKS support for locally verifiable API access tokens;
-- one small custom table for resource server metadata;
+- an `idResourceServer` plugin providing resource server management through Better Auth's plugin system;
 - an admin API as the primary management surface; a scaffolded admin UI Worker with service binding is prepared for the next batch.
 
 What it deliberately does differently from `auther`:
