@@ -1,40 +1,56 @@
 # id
 
-Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAuth2.1/OIDC authentication, multi-tenant organizations, JWT token issuance, and an admin UI. Replaces `pjs/auther`.
+Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAuth2.1/OIDC authentication, multi-tenant organizations, JWT token issuance, and an admin API. Replaces `pjs/auther`.
 
 This repo implements the first-batch documented scope:
 
-- email/password sign-up, sign-in, session management
-- multi-tenant organizations (members, roles, invitations, teams)
-- OAuth2.1 / OIDC authorization server (authorization_code with PKCE S256, client_credentials, refresh_token)
-- JWKS-signed JWT access tokens with audience binding
-- token introspection (RFC 7662) and revocation (RFC 7009)
-- pairwise subject identifiers
-- admin UI for organizations, OAuth2 clients, resource servers, users, and consents
+- `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens, admin API
+- `ui-id` Worker — admin UI scaffold with service binding to `core-id` (full admin pages deferred)
 
 ## Contracts
 
-Architecture and implementation follow:
+This implementation follows the planning and architecture documents:
 
 - [docs/000_repo-architecture.md](docs/000_repo-architecture.md) — layer architecture, design patterns, enforcement rules, two-worker topology
 - [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done
+- [docs/002_implementation-sequence.md](docs/002_implementation-sequence.md) — merged phased execution order (spikes → enforcement → features)
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
-Two Cloudflare Workers:
+## Future Implementation
 
-- `core-id` — auth, OAuth2.1/OIDC, JWKS, D1-backed (Better Auth)
-- `ui-id` — admin dashboard, Vinext/React, communicates with `core-id` via service binding
+Intentionally deferred to later batches:
 
-Designed to replace the legacy `~/pjs/auther` IdP. Downstream resource servers (e.g., `content-api`) validate JWTs against this service's JWKS endpoint.
+- full admin UI pages (scaffold only in first batch; admin operations are API-first)
+- ReBAC (Zanzibar graph authorization)
+- ABAC / Lua policy engine
+- webhook delivery
+- custom onboarding flows and registration contexts
+- pipeline/hook scripting engine
 
 ## Stack
 
-- `better-auth` (latest stable)
-- `@better-auth/oauth-provider`
+- `better-auth@1.6.11`
+- `@better-auth/oauth-provider@1.6.11`
 - `hono`
+- `drizzle-orm`
 - `wrangler`
+- `vinext` (ui-id only)
+- `react` / `react-dom` (ui-id only)
+- `jose`
+- `vitest`
 
-Versions to be pinned at start of implementation.
+Versions will be pinned at start of implementation. Verified package metadata on May 19, 2026.
+
+## Architecture Notes
+
+- Hexagonal layers enforced by oxlint: `domain/`, `application/`, `http/`, `infrastructure/`, `composition/`, `shared/`, `auth/`.
+- `src/auth/` is a Better Auth integration boundary — never imported by domain or application code.
+- `src/composition/create-container.ts` is the only file that wires infrastructure implementations to application use cases.
+- `src/infrastructure/persistence/crud-adapter.ts` owns shared CRUD row access and cursor pagination.
+- `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
+- Better Auth-owned tables are never defined in `src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
+- Custom tables are gated by `.schema-whitelist.json`; unapproved tables fail CI.
+- Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
 
 ## Local Setup
 
@@ -49,14 +65,14 @@ pnpm install
 ```bash
 # D1 database
 wrangler d1 create id
-# → copy the returned UUID into wrangler.jsonc database_id
+# → copy the returned UUID into workers/core/wrangler.jsonc database_id
 
 # KV namespace for secondary storage (rate limiting, session cache)
 wrangler kv:namespace create id-kv
-# → copy the returned ID into wrangler.jsonc kv_namespaces
+# → copy the returned ID into workers/core/wrangler.jsonc kv_namespaces
 ```
 
-3. Keep non-secret Worker vars in `wrangler.jsonc`. Secret bindings used by local `wrangler dev` belong in `.dev.vars`:
+3. Keep non-secret Worker vars in each worker's `wrangler.jsonc`. Secret bindings used by local `wrangler dev` belong in `.dev.vars` so they do not collide with CI-managed Cloudflare secrets:
 
 ```jsonc
 {
@@ -81,8 +97,12 @@ pnpm db:migrate:local
 5. Start local development:
 
 ```bash
-pnpm dev
+pnpm dev:core                    # core-id Worker
+pnpm dev:ui                      # ui-id Worker (Vinext dev)
+pnpm dev:stack:ui                # both Workers with service binding (UI primary)
 ```
+
+`dev:stack:ui` runs `core-id` and `ui-id` together locally with a service binding so `/admin` can call `core-id` through `CORE_ID`.
 
 ## Migrations
 
@@ -94,17 +114,38 @@ Generate BA schema and Drizzle migrations:
 pnpm db:generate
 ```
 
+Apply to local D1:
+
+```bash
+pnpm db:migrate:local
+```
+
 Apply to remote D1:
 
 ```bash
 pnpm db:migrate:remote
 ```
 
+## Quality Checks
+
+```bash
+pnpm lint
+pnpm check:dup
+pnpm check:schema
+pnpm check:ui
+pnpm typecheck
+pnpm test
+pnpm check
+pnpm advise
+```
+
+`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 6 id-specific), Fallow mild duplicate threshold (<3%), schema whitelist, UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
+
 ## Deployment
 
 CI/CD is handled by `.github/workflows/ci-deploy.yml`. On every push to `main`:
 
-1. `pnpm check` — lint, dup gate, schema whitelist, typecheck, tests
+1. `pnpm check` — lint, dup gate, schema whitelist, UI composition, typecheck, tests
 2. `wrangler d1 migrations apply id --remote`
 3. `wrangler deploy --config workers/core/wrangler.jsonc`
 4. `vinext deploy --cwd workers/ui`
@@ -114,13 +155,4 @@ Required GitHub secrets:
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with Workers and D1:Edit permissions
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
 - `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret
-
-## Not Implemented
-
-Intentionally excluded from the first batch:
-
-- ReBAC (Zanzibar graph authorization)
-- ABAC / Lua policy engine
-- webhook delivery
-- custom onboarding flows and registration contexts
-- pipeline/hook scripting engine
+- Email provider secrets (verification and password reset)

@@ -141,11 +141,11 @@ The new service should run on Cloudflare Workers with D1, use Better Auth as the
 - OAuth 2.x/OIDC authorization flows for apps;
 - JWKS-verifiable JWT access tokens for API/resource-server access;
 - machine-to-machine authentication through `client_credentials`;
-- admin UI management of users, organizations, OAuth clients, resource servers, and consents.
+- admin UI management of users, organizations, OAuth clients, resource servers, and consents (admin API exists; full UI deferred to a later batch).
 
 This document is the first-batch architecture plan. It intentionally does not plan ReBAC, ABAC/Lua, webhooks, pipeline scripting, or custom onboarding flows beyond the integration points needed to avoid blocking later batches.
 
-First-batch success means a new downstream app can perform an OAuth authorization-code flow, receive a resource-bound access token, verify that token locally through JWKS, and enforce tenant access using `aud`, `scope`, and `org_id` without depending on `auther`.
+First-batch success means a new downstream app can perform an OAuth authorization-code flow, receive a resource-bound access token, verify that token locally through JWKS, enforce tenant access using `aud`, `scope`, and `org_id`, and admins can manage tenants/clients/resource-servers through the admin API — without depending on `auther` and without requiring a full admin UI.
 
 ## 2. Review Verdict
 
@@ -284,7 +284,7 @@ The first batch can run on Workers/D1/KV, but implementation should keep databas
 
 ### 4.1 Runtime Shape
 
-The target service is one Cloudflare Worker that serves auth APIs, OAuth/OIDC endpoints, metadata routes, custom admin APIs, and admin UI assets/pages.
+The target service is one Cloudflare Worker that serves auth APIs, OAuth/OIDC endpoints, metadata routes, and custom admin APIs. A second admin UI Worker is scaffolded but its full UI is deferred (see `docs/002_implementation-sequence.md`).
 
 Primary libraries:
 
@@ -1031,30 +1031,13 @@ Failure behavior:
 
 ## 10. Admin UI Requirements
 
-The admin UI is an authenticated operational app. It should be dense, reliable, and task-focused.
+The admin UI is an authenticated operational app. Full UI implementation is deferred. First batch delivers:
 
-First-batch pages:
+- A scaffolded `ui-id` Worker with Vinext App Router, Lumina component stubs, and a health-check page.
+- The admin API on `core-id` supports all CRUD operations for organizations, OAuth clients, resource servers, users, and consents. These APIs are tested and documented so an admin UI can be built on them without rework.
+- Admin API authorization is enforced server-side (platform role + org role).
 
-| Page | Route | Capabilities |
-|---|---|---|
-| Dashboard | `/admin` | user/org/client/resource counts and metadata/JWKS health |
-| Organizations | `/admin/organizations` | list/create/update/delete where authorized |
-| Organization detail | `/admin/organizations/:id` | members, invitations, roles, settings |
-| OAuth clients | `/admin/clients` | list/create/update/disable |
-| OAuth client detail | `/admin/clients/:id` | redirect URIs, scopes, grants, secret rotation, consent settings |
-| Resource servers | `/admin/resource-servers` | list/create/update/disable audiences |
-| Users | `/admin/users` | list users, view sessions, ban/unban if enabled |
-| User detail | `/admin/users/:id` | profile, sessions, org memberships, linked accounts |
-| Consents | `/admin/consents` | list/revoke user-client consents |
-| Settings | `/admin/settings` | issuer URL, metadata health, JWKS status, package/runtime versions |
-
-Admin UI implementation requirements:
-
-- All mutations call server actions/routes that re-check authorization.
-- Secret values are shown once at creation/rotation and never persisted in plaintext in UI state.
-- Deleting an organization/resource/client should be disable-first unless a hard delete is explicitly safe.
-- Lists must be paginated from the start.
-- The UI should expose IDs and audience strings in copyable fields for integration work.
+Full admin UI pages (dashboard, organization management, client management, resource server CRUD, user management, consent management, settings) are deferred. The admin API surface is the first-batch deliverable; the visual shell is the integration target for the next batch.
 
 ## 11. Pre-Implementation Spikes And Quality Gates
 
@@ -1263,22 +1246,17 @@ Acceptance criteria:
 
 ### 12.4 Admin UI
 
-Implement UI pages in the order required by dependent flows:
+Scaffold the UI Worker with minimal content:
 
-1. sign-in/sign-up/reset/verification pages;
-2. admin shell and route protection;
-3. organizations and members;
-4. OAuth clients;
-5. resource servers;
-6. users and sessions;
-7. consents;
-8. dashboard/settings.
+- Vinext App Router project skeleton with Lumina component stubs.
+- A health-check page at `/admin` that confirms the worker is running and can reach `core-id` via service binding.
+- No full admin pages implemented.
 
 Acceptance criteria:
 
-- A platform admin can bootstrap and operate the service without editing config for normal org/client/resource changes.
-- Organization owners can manage only their own organization resources.
-- Members cannot access admin pages unless explicitly authorized.
+- `ui-id` Worker deploys and serves `/admin`.
+- `/admin` can call `core-id`'s admin API through the `CORE_ID` service binding and display a successful response.
+- All admin CRUD operations on `core-id` are documented and testable via API (curl, integration tests) without the UI.
 
 ### 12.5 Resource Server Integration
 
@@ -1571,9 +1549,9 @@ Static checks:
 - [ ] User can sign in and receive a session
 - [ ] User can create an organization and becomes its owner
 - [ ] Organization members can be invited and accept invitations
-- [ ] Admin can create an OAuth2 confidential client via admin UI
-- [ ] Admin can create an OAuth2 public client (SPA/mobile) via admin UI
-- [ ] Admin can rotate an OAuth client's secret via admin UI
+- [ ] Admin can create an OAuth2 confidential client via admin API (curl/tests/integration)
+- [ ] Admin can create an OAuth2 public client (SPA/mobile) via admin API
+- [ ] Admin can rotate an OAuth client's secret via admin API
 - [ ] Third-party SPA can complete authorization_code flow with PKCE S256
 - [ ] SPA receives JWKS-signed JWT access token when `resource` param is provided
 - [ ] SPA receives opaque access token or server-validated token when `resource` param is not provided
@@ -1588,10 +1566,10 @@ Static checks:
 - [ ] `prompt=create` redirects to sign-up page and resumes flow
 - [ ] Post-login org selection flow works for org-scoped scopes
 - [ ] `org_id` is injected into JWT claims for org-scoped tokens
-- [ ] Admin UI is protected by platform role (`superadmin`/`admin`) and org role checks
-- [ ] Admin UI shows dashboard with user/org/client/resource counts
-- [ ] Admin UI allows CRUD of organizations, OAuth clients, and resource servers
-- [ ] Admin UI allows viewing and revoking consents
+- [ ] Admin UI Worker is scaffolded with a health-check page and service binding to `core-id`
+- [ ] Admin API is protected by platform role (`superadmin`/`admin`) and org role checks
+- [ ] Admin API allows CRUD of organizations, OAuth clients, and resource servers (testable via API)
+- [ ] Admin API allows viewing and revoking consents (testable via API)
 - [ ] UserInfo endpoint returns correct user data with `openid` scope
 - [ ] Token introspection returns valid/invalid for supported token types
 - [ ] Token revocation invalidates supported token types immediately
@@ -1629,7 +1607,7 @@ Static checks:
 - [ ] API reference for custom admin endpoints
 - [ ] OAuth2/OIDC integration guide for apps
 - [ ] Resource server JWT verification guide
-- [ ] Admin UI operator guide
+- [ ] Admin API reference and operation guide
 - [ ] Cloudflare Workers/D1/KV deployment guide
 - [ ] Design-context notes explaining which `auther` ideas were intentionally not carried forward
 - [ ] Operational runbooks from Section 14.2
@@ -1644,7 +1622,7 @@ The new `id` service is a Cloudflare Worker backed by D1 and Better Auth 1.6.x. 
 - OAuth Provider for authorization code, client credentials, refresh, consent, revocation, introspection, and userinfo;
 - JWT/JWKS support for locally verifiable API access tokens;
 - one small custom table for resource server metadata;
-- an admin UI as the primary management surface.
+- an admin API as the primary management surface; a scaffolded admin UI Worker with service binding is prepared for the next batch.
 
 What it deliberately does differently from `auther`:
 

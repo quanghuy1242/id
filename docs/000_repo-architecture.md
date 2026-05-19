@@ -916,7 +916,7 @@ Core rules:
 
 ### 8.2 Route File Rules
 
-Admin pages in `workers/ui/src/app/admin/**` are composition files.
+Admin pages in `workers/ui/src/app/admin/**` are composition files. Full admin pages are deferred (see `001_first-batch-plan.md` Section 10), but the composition rules apply from the first page committed.
 
 Allowed:
 
