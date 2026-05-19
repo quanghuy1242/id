@@ -233,11 +233,37 @@ The first batch scaffolds `ui-id` with a health-check page and service binding t
 **Architecture note (2026-05-20):** The inline `GET /api/admin/dashboard` endpoint was removed during the Phase 5.7 architecture cleanup (see `002_implementation-sequence.md`). When the dashboard is reimplemented, it must follow the clean-architecture pattern: domain entity/interface, application use case, infrastructure repository (via BA adapter), http route handler with `requireActor(c)`. `app.ts` no longer exists; route registration goes through `composition/create-app.ts` and `http/routes/*.routes.ts`.
 
 **Other deferred architecture layers:**
-- `domain/` — Hono-owned entities and repository interfaces (currently only `domain/admin/` exists and is empty)
-- `application/` — use-case classes (currently only `application/admin/authorization.ts` with pure function)
-- `infrastructure/` — currently only `persistence/resource-server-store.ts`; needs repositories/mappers for any future Hono-owned resources
-- `composition/` — request-scoped DI container (currently only `create-app.ts` with Hono wiring)
-- `auth/admin/actor.ts` — `loadAdminActor` is implemented but unused; will be called by future admin routes
+- `domain/admin/` — empty directory for future Hono-owned domain entities and repository interfaces.
+- `application/admin/authorization.ts` — `authorizeAdminAction(actor, action, orgId?)` is implemented and tested but has zero production callers after the dashboard was removed. The four `AdminAction` values (`listAnyOrganization`, `mutateAnyOrganization`, `manageOwnOrganization`, `delegateOwnOrganization`) map to the authorization model from Phase 4 and will be wired in Phase 7 when Hono admin routes call `requireActor(c)` → `authorizeAdminAction(actor, action, orgId)` before use cases.
+- `auth/admin/actor.ts` — `loadAdminActor(env, adapter, headers)` loads an `AuthenticatedAdminActor` from session + membership data via Better Auth adapter. Implemented but unused after dashboard removal. Phase 7 admin routes will call this inside `requireActor(c)`.
+- `infrastructure/` — currently only `persistence/resource-server-store.ts` (legitimate raw-D1 audience loader for Better Auth factory). Future Hono-owned resources will need repositories/mappers under `infrastructure/repositories/`.
+- `composition/` — currently only `create-app.ts` with Hono wiring. Phase 7 will add a request-scoped DI container (`create-request-container.ts`) that wires repositories into use cases and sets `c.set('container', container)` via Hono middleware.
+
+### Deferred Admin Code Catalog (Phase 7)
+
+These files exist and are tested but have no production callers. They are preserved as ready-made infrastructure for Phase 7 admin routes.
+
+| File | Export | Purpose | Status |
+|---|---|---|---|
+| `application/admin/authorization.ts` | `authorizeAdminAction`, `AdminActor`, `AdminAction`, `PlatformRole`, `OrganizationRole` | Server-side authorization decisions per actor+action+org | Tested |
+| `auth/admin/actor.ts` | `loadAdminActor`, `AuthenticatedAdminActor` | Load actor from session + membership data via BA adapter | Implemented |
+| `shared/http-status.ts` | `HTTP_UNAUTHORIZED` (401), `HTTP_FORBIDDEN` (403), `HTTP_OK` (200) | Named HTTP status constants | In use by health route |
+| `domain/admin/` | (empty) | Future domain entities and repository interfaces | Scaffold only |
+
+**Phase 7 wiring target:**
+
+```ts
+// http/routes/admin/dashboard.routes.ts (future)
+export function registerAdminRoutes(app: Hono<{ Bindings: CoreEnv; Variables: { container: AppContainer } }>) {
+  app.get("/api/admin/dashboard", async (c) => {
+    const actor = requireActor(c);            // calls loadAdminActor
+    const decision = authorizeAdminAction(actor, "listAnyOrganization");  // checks platform role
+    if (!decision.allowed) return c.json({ error: decision.reason }, decision.status);
+    const result = await c.var.container.dashboard.summarize.execute();
+    return c.json(result, 200);
+  });
+}
+```
 
 **Pages to build:**
 
