@@ -1,8 +1,14 @@
+import { Page, PageBody, PageHeader, Panel, Stack } from "@id/ui";
+
 export default function AdminPage() {
   return (
-    <main>
-      <h1>id admin</h1>
-      <p>Scaffold — full admin UI deferred to later batch.</p>
-    </main>
+    <Page>
+      <PageHeader>id admin</PageHeader>
+      <PageBody>
+        <Stack>
+          <Panel>Scaffold. Full admin UI deferred to later batch.</Panel>
+        </Stack>
+      </PageBody>
+    </Page>
   );
 }

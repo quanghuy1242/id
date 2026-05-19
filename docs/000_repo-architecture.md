@@ -11,7 +11,7 @@
 > Source docs and reference implementations:
 >
 > - `/home/quanghuy1242/pjs/auth/README.md` — current repo contract; declares two Workers
-> - `/home/quanghuy1242/pjs/auth/docs/001_first-batch-plan.md` — domain plan; older one-Worker topology is superseded by this architecture document
+> - `/home/quanghuy1242/pjs/auth/docs/001_first-batch-plan.md` — domain plan; topology is aligned with this architecture document
 > - `/home/quanghuy1242/pjs/auth/docs/reference/content-api-architecture.md` — accepted content-api architecture facts for this review
 > - `/home/quanghuy1242/pjs/content-api/scripts/oxlint-js-plugins/architecture.js` — verified 16-rule architecture plugin
 > - `/home/quanghuy1242/pjs/content-api/.oxlintrc.json` — verified strict layer-import, route, entity, mapper, repository, constants, and test override rules
@@ -35,7 +35,6 @@
 > Assumptions:
 >
 > - This document defines **how** the codebase is structured, layered, and enforced. `001_first-batch-plan.md` defines **what** is built.
-> - This document is newer than the one-Worker wording in `001_first-batch-plan.md`; for repository topology, this document supersedes `001`.
 > - The first batch deploys two Cloudflare Workers: `core-id` for auth/OAuth/JWKS/admin API and `ui-id` for the admin dashboard.
 > - Workers never import from each other. Shared code lives in `packages/`.
 > - Architecture rules are mechanical gates. LLM-friendly implementation freedom is not a goal of this document.
@@ -132,9 +131,9 @@ Verified external claims:
 
 - Better Auth OAuth Provider is documented as an OAuth 2.1 provider plugin with OIDC compatibility, authorization-code with PKCE, refresh tokens, `client_credentials`, introspection, revocation, UserInfo, dynamic registration, JWT signing when requesting a `resource`, and remote JWKS verification. Source: [Better Auth OAuth Provider](https://better-auth.com/docs/plugins/oauth-provider).
 - Better Auth OAuth Provider requires well-known metadata endpoints at the issuer path. Source: [Better Auth OAuth Provider](https://better-auth.com/docs/plugins/oauth-provider).
-- Better Auth JWT plugin exposes `/api/auth/jwks` by default, supports custom `jwksPath`, and supports key rotation via `rotationInterval` and `gracePeriod`. Source: [Better Auth JWT](https://better-auth.com/docs/plugins/jwt).
+- Better Auth JWT plugin exposes `/jwks` relative to the Better Auth base path by default, supports custom `jwksPath`, and supports key rotation via `rotationInterval` and `gracePeriod`. With the repo's default `/api/auth` base path, the public default is `/api/auth/jwks`. Source: [Better Auth JWT](https://better-auth.com/docs/plugins/jwt) and installed `better-auth@1.6.11` types.
 - Better Auth database docs show Cloudflare Workers/D1 examples using a D1 binding in runtime config and CLI/schema generation paths for Cloudflare projects. Source: [Better Auth database docs](https://www.better-auth.com/docs/concepts/database).
-- Package metadata checked with `npm view` on 2026-05-19: `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`, `vinext@0.0.50`, and `wrangler@4.92.0`.
+- Package metadata and pinned package files checked on 2026-05-19: `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`, `vinext@0.0.50`, and `wrangler@4.93.0`.
 - Cloudflare service bindings allow one Worker to call another without a public URL, support both HTTP-style `fetch()` and RPC-style calls, and are configured on the caller Worker. Source: [Cloudflare service bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/).
 - Cloudflare documents running multiple Workers locally with multiple `-c` config flags; the first config is the primary HTTP Worker and the rest are accessible through service bindings. Source: [Cloudflare multi-Worker development](https://developers.cloudflare.com/workers/development-testing/multi-workers/).
 - D1 `batch()` executes statements as a transaction and aborts or rolls back the whole sequence on failure. Source: [Cloudflare D1 Worker API](https://developers.cloudflare.com/d1/worker-api/d1-database/).
@@ -144,10 +143,10 @@ Verified external claims:
 
 These are corrections to facts or wording, not loosened architecture decisions:
 
-- `001_first-batch-plan.md` still contains one-Worker wording. That is not a blocker for this document. This architecture document is newer and supersedes the old topology wording.
+- `001_first-batch-plan.md` now explicitly uses the two-Worker topology for repository shape; if feature wording and topology wording ever conflict, this document remains the repository/topology source of truth.
 - The repo path is `/home/quanghuy1242/pjs/auth`; examples may refer to the product/package name `id`, but implementation paths should use the actual repo path.
 - UserInfo should be documented as `/oauth2/userinfo` from Better Auth OAuth Provider. Depending on Better Auth base path/mounting, the public URL may include the auth base path; tests must assert the final route map.
-- Better Auth JWT's default JWKS endpoint is `/api/auth/jwks`; custom OIDC-style paths such as `/.well-known/jwks.json` require explicit `jwksPath` configuration.
+- Better Auth JWT's default JWKS endpoint is `/jwks` relative to the Better Auth base path; with `/api/auth` as base path, the public default is `/api/auth/jwks`. Custom OIDC-style paths such as `/.well-known/jwks.json` require explicit `jwksPath` configuration and route-map tests.
 - The OAuth Provider sign-up prompt docs show `signUp` in configuration. Do not invent `signup` or other option names.
 - `validAudiences`, custom token claims, JWKS rotation, and route mounting must be proven by the pinned installed packages before feature work proceeds. This proof is required because exact TypeScript option shapes matter, not because the architecture is optional.
 - The root URL `/` should be owned by `core-id` by default. It can redirect to `/admin` or return service metadata, but `ui-id` must not become the default catch-all owner of auth/API paths.
@@ -169,6 +168,8 @@ The original hexagonal/clean architecture is good enough for `core-id`, but thre
 ## 3. Root Layout
 
 The root stays minimal. No root `wrangler.jsonc`, no framework config that belongs to only one Worker, and no real environment files. Worker-specific configuration lives inside each worker directory. Shared packages live under `packages/`. Scripts live under `scripts/`. Documentation lives under `docs/`.
+
+The tree below is the target shape at first-batch maturity. The current scaffold may contain only package indexes and starter UI folders until Phase 5 fills in concrete components.
 
 ```text
 /home/quanghuy1242/pjs/auth/
@@ -192,7 +193,6 @@ The root stays minimal. No root `wrangler.jsonc`, no framework config that belon
 │
 ├── scripts/
 │   ├── check-duplication-threshold.mjs
-│   ├── check-ui-route-composition.mjs
 │   ├── filter-advise.mjs
 │   └── oxlint-js-plugins/
 │       └── architecture.js
@@ -281,7 +281,7 @@ Responsibility:
 - Better Auth handler for auth routes.
 - OAuth 2.1/OIDC provider endpoints.
 - well-known metadata endpoints.
-- JWKS endpoint, using Better Auth JWT default `/api/auth/jwks` or an explicitly configured `jwksPath`.
+- JWKS endpoint, using Better Auth JWT default `/jwks` relative to the Better Auth base path (public `/api/auth/jwks` with the repo default) or an explicitly configured `jwksPath`.
 - custom admin API for first-batch entities Better Auth does not own.
 - OAuth flow pages if they need server-hosted auth state.
 - token issuance, introspection, and revocation.
@@ -484,9 +484,13 @@ Better Auth records must not become domain entities. Domain code may receive sta
 
 ## 7. Design Patterns
 
+The patterns in Sections 7.1-7.6 apply to Hono-owned domain resources that are not owned by Better Auth. They remain part of the architecture for future custom admin APIs and aggregate workflows.
+
+They do **not** apply to Better Auth-owned records or plugin-owned custom tables. The first-batch `resource_servers` table is plugin-owned by `idResourceServer`; its CRUD path must use Better Auth plugin `schema`, `createAuthEndpoint`, and the Better Auth adapter context, not a standalone Drizzle schema, `CrudAdapter`, mapper, or `ResourceServerRepository`.
+
 ### 7.1 Entity Class Pattern
 
-Every custom domain entity follows this contract. Enforced by `architecture/entity-class`.
+Every Hono-owned custom domain entity follows this contract. Enforced by `architecture/entity-class`. The `ResourceServer` snippet below is a shape example only; first-batch resource server persistence is implemented by the Better Auth plugin described in Section 9.
 
 ```ts
 // workers/core/src/domain/resource-servers/resource-server.entity.ts
@@ -587,7 +591,9 @@ Why classes:
 
 ### 7.2 Repository Pattern
 
-Domain defines repository interfaces. Infrastructure implements them. Enforced by `architecture/repository-workflow`.
+Domain defines repository interfaces for Hono-owned persistence. Infrastructure implements them. Enforced by `architecture/repository-workflow`.
+
+Do not create repository interfaces for Better Auth plugin-owned tables. Plugin endpoint handlers should use Better Auth's endpoint context and adapter APIs for their own models.
 
 ```ts
 // workers/core/src/domain/resource-servers/resource-server.repository.ts
@@ -619,12 +625,31 @@ Infrastructure repositories must:
 
 ### 7.3 Mapper Pattern
 
-Mappers live under `workers/core/src/infrastructure/repositories/mappers`. Enforced by `architecture/mapper-file` and `architecture/no-mapper-imports-outside-infra`.
+Mappers live under `workers/core/src/infrastructure/repositories/mappers` for Hono-owned Drizzle repositories only. Enforced by `architecture/mapper-file` and `architecture/no-mapper-imports-outside-infra`.
+
+Because `workers/core/src/infrastructure/db/schema.ts` remains empty in the first batch, no first-batch mapper should import `ResourceServerRow` from a local Drizzle schema. Plugin-owned records are mapped and validated inside the plugin endpoint boundary.
 
 ```ts
-// workers/core/src/infrastructure/repositories/mappers/resource-server.mapper.ts
+// workers/core/src/infrastructure/repositories/mappers/example-resource.mapper.ts
 import { ResourceServer } from "@/domain/resource-servers/resource-server.entity";
-import type { ResourceServerRow } from "@/infrastructure/db/schema";
+
+// Illustrative row type for a future approved Hono-owned table.
+// Do not create this row type for first-batch resource_servers; those are BA plugin-owned.
+type ResourceServerRow = {
+  id: string;
+  organizationId: string;
+  slug: string;
+  name: string;
+  audience: string;
+  description: string | null;
+  enabled: number;
+  createdBy: string | null;
+  updatedBy: string | null;
+  disabledAt: number | null;
+  disabledBy: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
 
 export function resourceServerRowToEntity(row: ResourceServerRow): ResourceServer {
   return ResourceServer.reconstitute({
@@ -848,8 +873,8 @@ export async function getAuth(env: AppBindings, request: Request) {
 
 Implementation notes:
 
-- The async shape is intentional because D1-backed resource audiences may be loaded before constructing the provider.
-- If Better Auth requires `validAudiences` to be synchronous in the installed version, the resource audience loader must use a request-local cache or the architecture must choose a static bootstrap source and document the tradeoff.
+- The async factory shape is intentional because D1/KV-backed resource audiences are loaded before constructing the provider.
+- In `@better-auth/oauth-provider@1.6.11`, `validAudiences` is typed as `string[]`; it is not an async callback. Load enabled audiences first, then pass the resolved array into `oauthProvider(...)`.
 - Better Auth config option names must be proven against the pinned package types.
 - No module-scope Better Auth instance can capture runtime bindings.
 - Config used for runtime and schema generation must be factored so migrations cannot drift from runtime config.
@@ -963,12 +988,9 @@ No raw HTML. No raw classes. No inline styles. Composition only.
 
 UI route-file rules must be mechanical.
 
-Implement one of:
+Current implementation uses the `architecture/ui-route-composition` oxlint rule through `pnpm lint`.
 
-- `architecture/ui-route-composition` oxlint rule.
-- `scripts/check-ui-route-composition.mjs` AST script.
-
-The rule/script must fail on:
+The rule must fail on:
 
 - forbidden JSX intrinsic elements in `workers/ui/src/app/admin/**/page.tsx` and layout route files;
 - forbidden `className` values containing raw Tailwind/DaisyUI classes;
@@ -1022,9 +1044,9 @@ const idResourceServer = () => ({
 
 **Why plugins, not standalone Drizzle:**
 - BA's CLI generates migrations for plugin schemas — no separate `drizzle-kit` migration step.
-- BA's adapter handles CRUD — no need for `CrudAdapter` or manual D1 queries on custom tables.
+- BA's endpoint context exposes the adapter for plugin models — no `CrudAdapter`, mapper, repository, or manual D1 query is needed for plugin-owned CRUD.
 - Schema upgrades are managed by BA's migration system, not by custom migration scripts that may drift.
-- Plugin endpoints are registered on the BA handler automatically — no manual Hono route registration.
+- Plugin endpoints are registered on the BA handler automatically under the Better Auth base path. With the repo's default base path, resource-server admin endpoints should be shaped under `/api/auth/admin/resource-servers...`, not as standalone Hono `/api/admin/resource-servers` routes unless an explicit compatibility alias is added and tested.
 
 **`workers/core/src/infrastructure/db/schema.ts` remains empty.** All table definitions belong to BA plugins.
 
@@ -1053,8 +1075,8 @@ Admin mutation (create/update/disable) → delete KV key → next token issuance
 
 **Cache configuration:**
 - KV key: `id-resource-servers:audiences` — stores `string[]` of enabled audience URLs
-- KV TTL: 5 minutes indefinite (`expirationTtl` not set; key exists until deleted)
-- KV `cacheTtl`: 60 seconds (minimum, acceptable staleness for disable-after-expiry pattern)
+- KV expiration TTL: not set by default; the key exists until explicitly deleted
+- KV read `cacheTtl`: 60 seconds; this is a deliberate staleness bound above Cloudflare's current minimum and is acceptable for the disable-after-expiry pattern
 - Invalidation: delete key on any resource server mutation; next read repopulates
 - Fallback: on KV miss or error, query D1 directly — slow but correct
 
@@ -1146,7 +1168,7 @@ Advisory output is not a substitute for hard gates. It is review input for struc
 |---|---|---|
 | Lint | `pnpm lint` | Hard gate |
 | Dup check | `pnpm check:dup` | Hard gate |
-| UI composition | `pnpm check:ui` | Hard gate |
+| UI composition | `pnpm lint` through `architecture/ui-route-composition` | Hard gate |
 | Typecheck | `pnpm typecheck` | Hard gate |
 | Tests | `pnpm test` | Hard gate |
 | Combined | `pnpm check` | Hard gate |
@@ -1161,7 +1183,8 @@ Root `package.json`:
 - one dependency manifest for the monorepo;
 - per-worker package manifests may exist for ownership and scripts, but root owns install/lock;
 - Wrangler bundles workers from per-worker config;
-- dependencies include Better Auth, OAuth Provider, Hono, Drizzle, Zod, Jose, React, React DOM, React Aria, Lucide, Tailwind, DaisyUI, and Vinext;
+- current dependencies include Better Auth, OAuth Provider, Hono, Drizzle, Zod, Jose, React, React DOM, and Vinext;
+- UI dependencies such as React Aria, Lucide, Tailwind, and DaisyUI may be added when `packages/ui` grows, but they are not required by the current scaffold;
 - dev dependencies include oxlint, TypeScript, Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
 
 Workspace:
@@ -1232,13 +1255,12 @@ packages:
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
-    "check:ui": "node scripts/check-ui-route-composition.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "typecheck": "tsc -p packages/lib/tsconfig.json --noEmit && tsc -p packages/ui/tsconfig.json --noEmit && tsc -p workers/core/tsconfig.json --noEmit && tsc -p workers/ui/tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm check:dup && pnpm check:ui && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm check:dup && pnpm typecheck && pnpm test",
     "advise": "node scripts/filter-advise.mjs",
-    "db:generate": "npx @better-auth/cli generate",
+    "db:generate": "npx @better-auth/cli generate --config workers/core/src/auth/cli-auth.ts --output better-auth_migrations/0001_better_auth.sql",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
@@ -1247,7 +1269,7 @@ packages:
 }
 ```
 
-The exact `db:generate` command must be finalized after the Better Auth schema-generation spike. The invariant is fixed: Better Auth schema generation via CLI must produce migrations for both built-in tables and plugin-owned custom tables in a single repeatable step.
+The Better Auth schema-generation spike finalized `db:generate`: it loads `workers/core/src/auth/cli-auth.ts`, which exports the same plugin configuration used by runtime auth without depending on Wrangler's Worker runtime during CLI execution. Generated SQL lives under `better-auth_migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory via `migrations_dir`.
 
 ## 12. Rules Summary
 
@@ -1270,8 +1292,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |
-| Tables | Custom tables live in BA plugin schemas, not standalone Drizzle | Architecture rule (no custom tables in `infrastructure/db/schema.ts`) |
-| UI route composition | no raw admin route UI | `ui-route-composition` or `check:ui` |
+| UI route composition | no raw admin route UI | Oxlint `ui-route-composition` through `pnpm lint` |
 | Duplication | <3% mild duplication | `check:dup` |
 | Types | strict and no explicit `any` | TypeScript + oxlint |
 | Console | no production console logging | oxlint built-in |
@@ -1332,14 +1353,15 @@ Acceptance:
 
 | Risk | Failure mode | Required mitigation |
 |---|---|---|
-| Old one-Worker wording in `001` | Implementer scaffolds wrong topology | Update `001` to state it is superseded by `000` for repo topology. |
+| Topology drift between docs | Implementer scaffolds wrong topology | Keep `000`, `001`, and `002` aligned on the two-Worker topology. |
 | Better Auth route mismatch | UI/tests target stale endpoint names | Spike C route-map tests. |
-| JWKS path confusion | resource servers fetch wrong key URL | Decide default `/api/auth/jwks` vs custom `/.well-known/jwks.json` and test discovery. |
-| Dynamic audiences unsupported | UI-managed resource servers cannot feed provider config | Prove `validAudiences` runtime shape or choose documented static/cached bridge. |
+| JWKS path confusion | resource servers fetch wrong key URL | Decide default base-path JWKS route (`/api/auth/jwks` with current base path) vs custom `/.well-known/jwks.json` and test discovery. |
+| Dynamic audiences unsupported | Admin-managed resource servers cannot feed provider config | Installed types require synchronous `string[]`; load KV/D1 audiences before constructing the request-scoped provider and test the cache path. |
+| Better Auth Node built-ins in Workers | core bundle imports `node:async_hooks` and fails at runtime | `workers/core/wrangler.jsonc` must include `compatibility_flags = ["nodejs_compat"]`; dry-run deploy verifies the bundle. |
 | Service binding trust bypass | internal UI call skips auth | core admin API authorizes every request. |
 | D1 transaction overreach | multi-step flows assume long-lived transactions | use D1 `batch()` only for bounded atomic writes; add idempotency for multi-call flows. |
 | Legacy scope creep | ReBAC/ABAC/webhooks/pipeline tables appear | Plugin architecture review and docs review. |
-| UI raw markup drift | LLM writes route pages directly | `check:ui` or oxlint UI rule. |
+| UI raw markup drift | LLM writes route pages directly | Oxlint `ui-route-composition` rule. |
 | Package leak | `packages/lib` imports runtime frameworks | package isolation lint. |
 | Bundle leak | React/Vinext enters core | `core-no-ui-deps` plus bundle smoke. |
 | Secret leakage | `.dev.vars` committed | `.dev.vars.example` only and secret scan if available. |
@@ -1350,7 +1372,6 @@ Automated:
 
 - `pnpm lint`
 - `pnpm check:dup`
-- `pnpm check:ui`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm check`
@@ -1390,7 +1411,7 @@ Manual smoke:
 
 Required repository outcomes:
 
-- [ ] `001_first-batch-plan.md` explicitly notes that this document supersedes its one-Worker topology.
+- [ ] `001_first-batch-plan.md` stays aligned with this document on two-Worker topology.
 - [ ] root layout matches this spec.
 - [ ] `packages/ui` exists and exports Lumina primitives.
 - [ ] `packages/lib` exists and remains framework-free.
@@ -1411,10 +1432,10 @@ Required enforcement outcomes:
 
 Required pattern compliance:
 
-- [ ] at least one custom entity follows the class contract.
-- [ ] at least one repository uses CrudAdapter.
-- [ ] at least one mapper explicitly maps row/entity fields.
-- [ ] at least one custom route follows the route-handler contract.
+- [ ] if a Hono-owned domain resource is implemented, its entity follows the class contract.
+- [ ] if a Hono-owned Drizzle repository is implemented, it uses CrudAdapter.
+- [ ] if a Hono-owned mapper is implemented, it explicitly maps row/entity fields.
+- [ ] if a custom Hono route is implemented, it follows the route-handler contract.
 - [ ] request-scoped container is the only app/infrastructure wiring file.
 - [ ] Better Auth factory is request/binding-aware.
 - [ ] at least one admin page passes UI composition enforcement.

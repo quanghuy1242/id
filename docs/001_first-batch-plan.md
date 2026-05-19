@@ -40,11 +40,11 @@
 > Assumptions:
 >
 > - Cloudflare Workers is the deployment target, not Vercel.
-> - Repository topology in this document is superseded by `docs/000_repo-architecture.md`: first-batch implementation uses two Workers, `core-id` and `ui-id`.
+> - Repository topology in this document follows `docs/000_repo-architecture.md`: first-batch implementation uses two Workers, `core-id` and `ui-id`.
 > - D1 is the primary database and must be treated as SQLite-compatible but not equivalent to a long-lived Node database connection.
 > - Better Auth remains the auth foundation for the first batch.
 > - The first batch excludes ReBAC, ABAC/Lua, custom pipeline scripting, webhooks, and custom onboarding flows. Those exclusions are deliberate architecture decisions in Section 5 and should not be re-opened in this batch.
-> - The first batch should be UI-first for runtime management, with code/config reserved for bootstrapping and platform-level invariants.
+> - The product direction is UI-first runtime management, but this first batch ships the admin API plus an admin UI scaffold; full CRUD pages are deferred.
 > - Work-item tracking sections are intentionally omitted from this document.
 
 ## Table Of Contents
@@ -74,7 +74,7 @@
   - [5.3 Decision: Use `organization` Plugin For Tenants](#53-decision-use-organization-plugin-for-tenants)
   - [5.4 Decision: JWT Access Tokens Via `resource` Parameter](#54-decision-jwt-access-tokens-via-resource-parameter)
   - [5.5 Decision: M2M Via `client_credentials`, Not `apiKey`](#55-decision-m2m-via-client_credentials-not-apikey)
-  - [5.6 Decision: UI-First Management, Not Config-First](#56-decision-ui-first-management-not-config-first)
+  - [5.6 Decision: Admin-API First, UI-Ready, Not Config-First](#56-decision-admin-api-first-ui-ready-not-config-first)
   - [5.7 Decision: Defer ReBAC And ABAC](#57-decision-defer-rebac-and-abac)
   - [5.8 Decision: Defer Custom Pipeline/Lua Engine](#58-decision-defer-custom-pipelinelua-engine)
   - [5.9 Decision: Defer Webhooks To Later Batch](#59-decision-defer-webhooks-to-later-batch)
@@ -180,7 +180,7 @@ This plan is implementation-ready after the Section 11 spikes are completed. Unt
 | Seam | Why it matters | Required proof |
 |---|---|---|
 | OAuth Provider route map and server API names | Prevents building UI and tests against stale endpoint names | Generated route map or type-level proof from installed packages |
-| Runtime resource audience validation | Determines whether UI-managed resource servers can feed Better Auth `validAudiences` without deploy-time config | Minimal Worker proof that `getAuth(env, request)` can derive `validAudiences` from enabled D1 rows |
+| Runtime resource audience validation | Determines whether admin-managed resource servers can feed Better Auth `validAudiences` without deploy-time config | Minimal Worker proof that `getAuth(env, request)` can derive `validAudiences` from enabled D1 rows |
 | JWKS rotation option names and behavior | Prevents broken token verification and key churn | Test that signs, verifies, rotates, and verifies old/new `kid` values |
 | D1 migration path for Better Auth schema | Prevents schema drift between CLI, local D1, and remote D1 | Local D1 migration generated from pinned config and applied cleanly under Wrangler |
 
@@ -190,22 +190,25 @@ These are not scope questions. They are integration proofs that must happen befo
 
 ### 3.1 New `auth` Repo State
 
-`/home/quanghuy1242/pjs/auth` currently contains:
+`/home/quanghuy1242/pjs/auth` now has the Phase 0 scaffold and Phase 1 enforcement wiring in place:
 
-- `README.md`
-- `docs/001_first-batch-plan.md`
-- git metadata
+- root workspace files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.json`, `.oxlintrc.json`, `.dev.vars.example`, `vitest.workspace.ts`;
+- shared packages: `packages/lib` and `packages/ui`;
+- workers: `workers/core` and `workers/ui` with Worker configs, TypeScript configs, Vitest configs, and scaffold source;
+- enforcement scripts: `scripts/oxlint-js-plugins/architecture.js`, `scripts/check-duplication-threshold.mjs`, and `scripts/filter-advise.mjs`;
+- first Better Auth plugin scaffold: `workers/core/src/auth/plugins/resource-server/index.ts`.
 
-There is not yet an application skeleton, package manifest, Worker config, source tree, migrations, or tests. The README already declares the intended stack:
+The pinned package versions in `package.json` are `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`, `wrangler@4.93.0`, `vinext@0.0.50`, and `oxlint@1.66.0`.
 
-- Better Auth latest stable;
-- `@better-auth/oauth-provider`;
-- Hono;
-- Wrangler;
-- Cloudflare Workers, D1, and KV;
-- first-batch exclusions for ReBAC, ABAC/Lua, webhooks, custom onboarding, and pipeline scripting.
+Verification on 2026-05-19:
 
-This means the plan can choose the clean target shape without fighting existing implementation drift in the new repo.
+- `pnpm lint` passes with the architecture plugin loaded through `.oxlintrc.json`.
+- `pnpm check:dup` passes with `Fallow mild duplication: 0.0%`.
+- `pnpm typecheck` passes.
+- `pnpm test` passes, including Better Auth contract, JWKS proof, resource-audience cache, resource-server plugin smoke, service-binding, and admin authorization tests.
+- `pnpm check` passes. There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint` and therefore by `pnpm check`.
+
+That means Phase 0 and Phase 1 are clean. Phase 2-4 proof code is present, while the full OAuth token exchange and full admin API/UI implementation remain Phase 5 feature work.
 
 ### 3.2 Prior `auther` State
 
@@ -285,7 +288,7 @@ The first batch can run on Workers/D1/KV, but implementation should keep databas
 
 ### 4.1 Runtime Shape
 
-The target service is one Cloudflare Worker that serves auth APIs, OAuth/OIDC endpoints, metadata routes, and custom admin APIs. A second admin UI Worker is scaffolded but its full UI is deferred (see `docs/002_implementation-sequence.md`).
+The target service uses two Cloudflare Workers. `core-id` serves auth APIs, OAuth/OIDC endpoints, metadata routes, Better Auth plugin endpoints, and any custom Hono admin APIs. `ui-id` serves the admin UI scaffold and calls `core-id` through the `CORE_ID` service binding; full admin UI pages are deferred (see `docs/002_implementation-sequence.md`).
 
 Primary libraries:
 
@@ -558,9 +561,9 @@ Implementation requirement:
 - OIDC user scopes such as `openid`, `profile`, `email`, and `offline_access` must be rejected for `client_credentials`.
 - M2M tokens must not contain user context.
 
-### 5.6 Decision: UI-First Management, Not Config-First
+### 5.6 Decision: Admin-API First, UI-Ready, Not Config-First
 
-Recommended: organizations, clients, users, resource servers, and consents are managed through the admin UI.
+Recommended target state: organizations, clients, users, resource servers, and consents are managed through the admin UI. First-batch deliverable: the management APIs and UI scaffold exist so those pages can be built without changing the core API model.
 
 Rationale:
 
@@ -580,7 +583,7 @@ What remains in config:
 
 Important implementation note:
 
-- Better Auth OAuth Provider 1.6.11 accepts `validAudiences` as plugin config. To keep resource servers UI-first, construct the Better Auth instance per request or per short cache window with `validAudiences` loaded from enabled `resource_servers` rows in D1. Do not hard-code resource audiences in deploy config.
+- Better Auth OAuth Provider 1.6.11 accepts `validAudiences` as a synchronous `string[]` plugin config. To keep resource servers runtime-managed, load the enabled audience list from KV/D1 before constructing the request-scoped Better Auth instance, then pass the resolved array to `oauthProvider(...)`. Do not hard-code resource audiences in deploy config. Current code proves this injection point with `getAuth(env, validAudiences)` and KV cache tests; full token-exchange validation remains with the Phase 5 OAuth flow.
 
 ### 5.7 Decision: Defer ReBAC And ABAC
 
@@ -675,7 +678,7 @@ Expected table groups:
 
 Implementation rule:
 
-- Generate the schema from the exact package versions pinned in `package.json`, commit generated migrations, and inspect the SQL before applying it to D1.
+- Generate the schema from the exact package versions pinned in `package.json`, commit generated migrations from `better-auth_migrations/`, and inspect the SQL before applying it to D1.
 
 ### 6.2 Custom Tables Via Better Auth Plugin
 
@@ -685,7 +688,7 @@ The `resource_servers` table is defined through the `idResourceServer` plugin's 
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string (PK) | UUID, auto-generated |
+| `id` | string (PK) | Better Auth adapter-generated model ID; not listed in the plugin `fields` block |
 | `organizationId` | string (FK → organization.id) | Owning org |
 | `slug` | string | Unique per organization |
 | `name` | string | Display name |
@@ -699,12 +702,14 @@ The `resource_servers` table is defined through the `idResourceServer` plugin's 
 | `createdAt` | number | Unix timestamp |
 | `updatedAt` | number | Unix timestamp |
 
+The plugin `schema.resourceServer.fields` block defines the non-ID fields. Better Auth adds the model ID and uses the plugin schema when generating migrations.
+
 **KV audience cache:**
 
 ```
 Audience cache key: id-resource-servers:audiences
 Value: string[] of enabled audience URLs
-KV cacheTtl: 60s (minimum, acceptable for disable-after-expiry)
+KV cacheTtl: 60s (chosen staleness bound above the current Cloudflare minimum; acceptable for disable-after-expiry)
 Invalidation: delete key on any resource server mutation
 Fallback: direct D1 query on KV miss or error
 ```
@@ -714,7 +719,7 @@ Fallback: direct D1 query on KV miss or error
 Allowed:
 - Better Auth `additionalFields` for `user` and organization metadata.
 - Custom BA plugins with `schema` definitions for new tables.
-- BA CLI for all migrations (both built-in and plugin schemas).
+- BA CLI for all migrations (both built-in and plugin schemas). The current command is `pnpm db:generate --yes`, backed by `workers/core/src/auth/cli-auth.ts`.
 
 Avoid:
 - Standalone Drizzle table definitions in `infrastructure/db/schema.ts` (this file remains empty).
@@ -755,24 +760,33 @@ Implementation requirement:
 - Discovery metadata must advertise the actual issuer, authorization endpoint, token endpoint, JWKS URI, supported grants, supported response types, supported auth methods, supported scopes, and resource-indicator behavior.
 - If Better Auth serves JWKS under `/api/auth/jwks`, metadata must point there or the Worker must provide a compatible alias at `/.well-known/jwks.json`.
 
-### 7.3 Custom Admin Routes
+### 7.3 Custom Admin APIs
 
 Custom admin APIs exist only for entities Better Auth does not own or for aggregate dashboard reads.
 
-Expected custom routes:
+`resource_servers` is the first-batch custom table, but it is owned by the `idResourceServer` Better Auth plugin. Its CRUD endpoints should be implemented with `createAuthEndpoint` and served through the Better Auth handler. With the repo's default Better Auth base path, the expected public shape is under `/api/auth/admin/resource-servers...`.
+
+Expected plugin endpoint shape:
 
 | Method | Route | Purpose |
 |---|---|---|
-| `GET` | `/api/admin/resource-servers` | List resource servers visible to current admin |
-| `POST` | `/api/admin/resource-servers` | Create resource server |
-| `GET` | `/api/admin/resource-servers/:id` | Read resource server |
-| `PATCH` | `/api/admin/resource-servers/:id` | Update metadata or enabled state |
-| `DELETE` | `/api/admin/resource-servers/:id` | Soft-delete or disable |
+| `GET` | `/api/auth/admin/resource-servers` | List resource servers visible to current admin |
+| `POST` | `/api/auth/admin/resource-servers` | Create resource server |
+| `GET` | `/api/auth/admin/resource-servers/:id` | Read resource server |
+| `PATCH` | `/api/auth/admin/resource-servers/:id` | Update metadata or enabled state |
+| `DELETE` | `/api/auth/admin/resource-servers/:id` | Soft-delete or disable |
+
+Standalone Hono `/api/admin/*` routes are reserved for aggregate reads or non-BA-owned workflows. Those routes must use OpenAPI validation and `requireActor(c)`. Plugin endpoints must enforce the same authorization semantics through Better Auth endpoint context/session middleware and role checks.
+
+Expected Hono aggregate route shape:
+
+| Method | Route | Purpose |
+|---|---|---|
 | `GET` | `/api/admin/dashboard` | Aggregate user, organization, client, and resource-server counts |
 
 Authorization:
 
-- Every custom admin route must validate a Better Auth session.
+- Every custom admin API, whether Hono or Better Auth plugin endpoint, must validate a Better Auth session.
 - Cross-org access requires `platformRole=superadmin`.
 - Org-scoped access requires membership and appropriate role.
 
@@ -845,7 +859,7 @@ Implementation requirement:
 Recommended workflow:
 
 1. Pin package versions in `package.json`.
-2. Generate Better Auth schema/migrations from the pinned config (includes both built-in tables and plugin-owned tables like `resourceServer`).
+2. Generate Better Auth schema/migrations from the pinned config (includes both built-in tables and plugin-owned tables like `resourceServer`) into `better-auth_migrations/`.
 3. Apply migrations to local D1 with Wrangler.
 4. Run route smoke tests against `wrangler dev`.
 5. Apply remote migrations through CI/CD before deploying the Worker.
@@ -856,7 +870,8 @@ Commands should be finalized during implementation, but expected scripts are:
 pnpm db:generate
 pnpm db:migrate:local
 pnpm db:migrate:remote
-pnpm dev
+pnpm dev:core
+pnpm dev:stack:ui
 pnpm test
 pnpm lint
 ```
@@ -1078,7 +1093,7 @@ Chosen design:
 
 - `getAuth(env, request)` loads enabled `resource_servers.audience` values from D1 and passes them to `oauthProvider({ validAudiences })`.
 - A small per-isolate cache may be used, but it must have a documented maximum TTL.
-- Static `validAudiences` in source or deployment config is rejected because resource servers must be managed through the UI.
+- Static `validAudiences` in source or deployment config is rejected because resource servers must be managed through the admin API and later UI pages.
 
 Acceptance criteria:
 
@@ -1100,10 +1115,10 @@ Scope:
 
 Acceptance criteria:
 - `idResourceServer` plugin schema is generated and committed as migration SQL.
-- `npx @better-auth/cli generate` produces migrations for both BA built-in tables and plugin tables.
-- `wrangler d1 migrations apply id --local` succeeds from a clean local database.
+- `pnpm db:generate --yes` produces migrations for both BA built-in tables and plugin tables.
+- `pnpm db:migrate:local` succeeds from a clean local database.
 - Running migrations twice does not fail.
-- A smoke script can create a user, organization, OAuth client, and resource server via the plugin endpoint.
+- A smoke test creates an organization directly in the local schema and creates a resource server via the Better Auth plugin endpoint. Full user and OAuth-client smoke belongs with Phase 5 auth flows.
 
 ### 11.4 KV Audience Cache Spike
 
@@ -1642,4 +1657,4 @@ What it intentionally does not include in first batch:
 - webhook delivery;
 - registration contexts and automatic grant workflows.
 
-The first batch succeeds when downstream apps can use `id` as a reliable OAuth/OIDC issuer, admins can manage tenants/clients/resources through UI, and resource servers can verify API tokens locally through JWKS without depending on `auther`.
+The first batch succeeds when downstream apps can use `id` as a reliable OAuth/OIDC issuer, admins can manage tenants/clients/resources through documented admin APIs, the admin UI Worker is scaffolded against those APIs, and resource servers can verify API tokens locally through JWKS without depending on `auther`.

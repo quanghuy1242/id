@@ -1,3 +1,16 @@
 {
-  "suppressions": []
+  "suppressions": [
+    {
+      "tool": "aislop",
+      "file": "scripts/oxlint-js-plugins/architecture.js",
+      "rule": "complexity/file-too-large",
+      "reason": "Architecture plugin is intentionally centralized so all custom oxlint rules are loaded as one JS plugin."
+    },
+    {
+      "tool": "aislop",
+      "file": "package.json",
+      "rule": "security/vulnerable-dependency",
+      "reason": "Current pnpm audit reports transitive ws moderate advisory; note and avoid dependency upgrades until compatibility is reviewed."
+    }
+  ]
 }

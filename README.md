@@ -40,7 +40,7 @@ Intentionally deferred to later batches:
 - `jose`
 - `vitest`
 
-Versions will be pinned at start of implementation. Verified package metadata on May 19, 2026.
+Versions are pinned in `package.json`. Verified package metadata on May 19, 2026.
 
 ## Architecture Notes
 
@@ -89,9 +89,10 @@ Create `.dev.vars` from the committed example:
 cp .dev.vars.example .dev.vars
 ```
 
-4. Apply local migrations:
+4. Generate and apply local migrations:
 
 ```bash
+pnpm db:generate --yes
 pnpm db:migrate:local
 ```
 
@@ -107,7 +108,7 @@ pnpm dev:stack:ui                # both Workers with service binding (UI primary
 
 ## Migrations
 
-Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `drizzle/`.
+Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `better-auth_migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
 
 Generate BA schema (built-in + plugin tables):
 
@@ -138,7 +139,8 @@ pnpm check
 pnpm advise
 ```
 
-`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 6 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
+`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
+There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
 
 ## Deployment
 

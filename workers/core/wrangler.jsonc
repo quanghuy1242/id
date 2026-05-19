@@ -2,11 +2,13 @@
   "name": "id-core",
   "main": "src/main.ts",
   "compatibility_date": "2026-05-19",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "id",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../better-auth_migrations"
     }
   ],
   "kv_namespaces": [

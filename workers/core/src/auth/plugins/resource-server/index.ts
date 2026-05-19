@@ -1,6 +1,37 @@
+import { createAuthEndpoint } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
+import { z } from "zod";
 
-export const idResourceServer = (): BetterAuthPlugin => ({
+type ResourceServerPluginOptions = {
+  readonly invalidateAudienceCache?: () => Promise<void>;
+};
+
+type ResourceServerRow = {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly audience: string;
+  readonly description?: string;
+  readonly enabled: boolean;
+  readonly createdBy?: string;
+  readonly updatedBy?: string;
+  readonly disabledAt?: number;
+  readonly disabledBy?: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+};
+
+const createResourceServerBody = z.object({
+  organizationId: z.string().min(1),
+  slug: z.string().min(1),
+  name: z.string().min(1),
+  audience: z.url(),
+  description: z.string().optional(),
+  createdBy: z.string().optional(),
+});
+
+export const idResourceServer = (options: ResourceServerPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-resource-server",
   schema: {
     resourceServer: {
@@ -20,5 +51,40 @@ export const idResourceServer = (): BetterAuthPlugin => ({
       },
     },
   },
-  // endpoints added in Phase 5.3
+  endpoints: {
+    createResourceServer: createAuthEndpoint(
+      "/admin/resource-servers",
+      {
+        method: "POST",
+        body: createResourceServerBody,
+      },
+      async (ctx) => {
+        const now = Date.now();
+        const row = await ctx.context.adapter.create<ResourceServerRow>({
+          model: "resourceServer",
+          data: {
+            ...ctx.body,
+            enabled: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        await options.invalidateAudienceCache?.();
+        return ctx.json(row);
+      },
+    ),
+    listResourceServers: createAuthEndpoint(
+      "/admin/resource-servers",
+      {
+        method: "GET",
+      },
+      async (ctx) => {
+        const rows = await ctx.context.adapter.findMany<ResourceServerRow>({
+          model: "resourceServer",
+          sortBy: { field: "createdAt", direction: "desc" },
+        });
+        return ctx.json({ resourceServers: rows });
+      },
+    ),
+  },
 });
