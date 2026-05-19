@@ -4,6 +4,7 @@ packages:
   - "workers/*"
 allowBuilds:
   aislop: true
+  better-sqlite3: true
   esbuild: true
   fallow: true
   sharp: true

@@ -6,7 +6,7 @@ import {
   signProofJwt,
   tokenKid,
   verifyProofJwt,
-} from "../../src/auth/jwks/proof";
+} from "./jwks/proof";
 
 describe("JWKS signing and rotation proof", () => {
   it("signs, publishes, verifies, rotates, and keeps old keys valid during grace", async () => {

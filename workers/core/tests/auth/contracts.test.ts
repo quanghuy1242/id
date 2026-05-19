@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { authRouteMap } from "../../src/auth/contracts";
 import { authPluginConfig } from "../../src/auth/config";
+import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthKvStorage } from "../../src/auth/secondary-storage";
 import { getAuthOptions } from "../../src/auth/get-auth";
 
 const oauthProviderTypeSource = readFileSync(
@@ -58,8 +60,8 @@ describe("Better Auth installed contract", () => {
       {
         BETTER_AUTH_SECRET: "test-secret",
         BETTER_AUTH_URL: "https://id.example.test",
-        DB: {} as D1Database,
-        KV: {} as KVNamespace,
+        DB: {} as unknown as BetterAuthOptions["database"],
+        KV: {} as unknown as BetterAuthKvStorage,
       },
       ["https://api.example.test"],
     );

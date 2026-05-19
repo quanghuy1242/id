@@ -7,14 +7,14 @@ import { idResourceServer } from "./plugins/resource-server";
 import { kvSecondaryStorage, type BetterAuthKvStorage } from "./secondary-storage";
 import type { CoreEnv } from "../config/env";
 
+export function getAuth(env: CoreEnv, validAudiences: readonly string[] = []) {
+  return betterAuth(getAuthOptions(env, validAudiences));
+}
+
 type AuthOptionsEnv = Omit<CoreEnv, "DB" | "KV"> & {
   readonly DB: BetterAuthOptions["database"];
   readonly KV: BetterAuthKvStorage;
 };
-
-export function getAuth(env: AuthOptionsEnv, validAudiences: readonly string[] = []) {
-  return betterAuth(getAuthOptions(env, validAudiences));
-}
 
 export function getAuthOptions(env: AuthOptionsEnv, validAudiences: readonly string[] = []) {
   return {

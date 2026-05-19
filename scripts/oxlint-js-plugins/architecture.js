@@ -1346,9 +1346,14 @@ var packagesLibIsolationRule = {
 // ─── Rule 21: auth-boundary ───────────────────────────────────────────────
 function isApprovedAuthBoundaryFile(filename) {
   if (filename.includes("/workers/core/src/auth/")) return true;
-  if (filename.endsWith("/workers/core/src/main.ts")) return true;
+  if (endsWithSegment(filename, "workers/core/src/main.ts")) return true;
+  if (endsWithSegment(filename, "workers/core/src/app.ts")) return true;
   if (filename.includes("/workers/core/tests/")) return true;
   return false;
+}
+
+function endsWithSegment(filename, segment) {
+  return filename === segment || filename.endsWith("/" + segment);
 }
 
 function isBetterAuthImport(spec) {
