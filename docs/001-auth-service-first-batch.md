@@ -1,455 +1,442 @@
 # id — First Batch Architecture And Planning
 
-> Status: implementation-grade research and proposal
+> Status: implementation-grade research and proposal, rewritten after source review
 >
 > Date: 2026-05-19
 >
 > Scope:
 >
-> - `pjs/id` (new repo — replacing `pjs/auther`)
+> - `/home/quanghuy1242/pjs/auth` — new IdP repo, package name and public product name still expected to be `id`
+> - `/home/quanghuy1242/pjs/auther` — prior IdP used only as local evidence and design context; `id` does not need to be compatible with it
 >
-> Source docs:
+> Source docs and verification inputs:
 >
-> - Better Auth v1.6.x — `https://better-auth.com/docs`
-> - Better Auth OAuth 2.1 Provider — `https://better-auth.com/docs/plugins/oauth-provider`
-> - Better Auth Organization Plugin — `https://better-auth.com/docs/plugins/organization`
-> - Better Auth JWT Plugin — `https://better-auth.com/docs/plugins/jwt`
-> - Cloudflare Workers + D1 — `https://developers.cloudflare.com/workers/`
+> - Better Auth docs — `https://better-auth.com/docs`
+> - Better Auth OAuth Provider plugin — `https://better-auth.com/docs/plugins/oauth-provider`
+> - Better Auth Organization plugin — `https://better-auth.com/docs/plugins/organization`
+> - Better Auth JWT plugin — `https://better-auth.com/docs/plugins/jwt`
+> - Better Auth npm package metadata checked on 2026-05-19: `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`
+> - Cloudflare D1 Worker API docs — `https://developers.cloudflare.com/d1/worker-api/d1-database/`
+> - Cloudflare Workers limits — `https://developers.cloudflare.com/workers/platform/limits/`
+> - Cloudflare KV API docs — `https://developers.cloudflare.com/kv/api/read-key-value-pairs/`
+> - Cloudflare KV write limits — `https://developers.cloudflare.com/kv/platform/limits/`
+> - OAuth 2.0 Resource Indicators, RFC 8707 — `https://www.rfc-editor.org/rfc/rfc8707`
 >
-> Related docs:
+> Related local files:
 >
-> - Auther (legacy) at `~/pjs/auther` — previous IdP built on Better Auth 1.3 + `oidcProvider`
+> - `/home/quanghuy1242/pjs/auth/README.md`
+> - `/home/quanghuy1242/pjs/auther/package.json`
+> - `/home/quanghuy1242/pjs/auther/src/lib/auth.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/app-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/rebac-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/pipeline-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/abac-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/platform-access-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/lib/auth/permission-service.ts`
+> - `/home/quanghuy1242/pjs/auther/src/lib/auth/lua-engine-pool.ts`
+> - `/home/quanghuy1242/pjs/auther/src/lib/webhooks/delivery-service.ts`
+> - `/home/quanghuy1242/pjs/auther/src/lib/constants.ts`
 >
 > Assumptions:
 >
-> - Cloudflare Workers is the deployment target (not Vercel).
-> - D1 is the primary database (SQLite-compatible, no interactive transactions).
-> - Better Auth will be the auth foundation (not a custom-built OAuth2 server).
-> - The first batch excludes webhooks, pipeline scripting, Lua ABAC, and full ReBAC/Zanzibar. These are planned for later batches and are noted explicitly throughout.
-> - This document is for review and discussion; backlog IDs and ticket granularity are deferred.
+> - Cloudflare Workers is the deployment target, not Vercel.
+> - D1 is the primary database and must be treated as SQLite-compatible but not equivalent to a long-lived Node database connection.
+> - Better Auth remains the auth foundation for the first batch.
+> - The first batch excludes ReBAC, ABAC/Lua, custom pipeline scripting, webhooks, and custom onboarding flows. Those exclusions are deliberate architecture decisions in Section 5 and should not be re-opened in this batch.
+> - The first batch should be UI-first for runtime management, with code/config reserved for bootstrapping and platform-level invariants.
+> - Work-item tracking sections are intentionally omitted from this document.
 
 ## Table Of Contents
 
 - [1. Goal](#1-goal)
-- [2. System Summary](#2-system-summary)
+- [2. Review Verdict](#2-review-verdict)
+  - [2.1 What Was Correct](#21-what-was-correct)
+  - [2.2 What Needed Correction](#22-what-needed-correction)
+  - [2.3 Remaining Confidence Level](#23-remaining-confidence-level)
 - [3. Current-State Findings](#3-current-state-findings)
-  - [3.1 What Better Auth 1.6 Provides](#31-what-better-auth-16-provides)
-  - [3.2 What Auther Had That Better Auth Now Covers Natively](#32-what-auther-had-that-better-auth-now-covers-natively)
-  - [3.3 What Auther Had That Better Auth Still Does Not Cover](#33-what-auther-had-that-better-auth-still-does-not-cover)
-  - [3.4 Cloudflare Workers Feasibility](#34-cloudflare-workers-feasibility)
+  - [3.1 New `auth` Repo State](#31-new-auth-repo-state)
+  - [3.2 Prior `auther` State](#32-prior-auther-state)
+  - [3.3 Better Auth 1.6.11 Capability Boundary](#33-better-auth-1611-capability-boundary)
+  - [3.4 Cloudflare Workers, D1, And KV Constraints](#34-cloudflare-workers-d1-and-kv-constraints)
 - [4. Target Model](#4-target-model)
-  - [4.1 Tenant Model (Organizations)](#41-tenant-model-organizations)
-  - [4.2 OAuth2 Client Model](#42-oauth2-client-model)
-  - [4.3 Resource Server Model (API Audiences)](#43-resource-server-model-api-audiences)
-  - [4.4 Token Flow Model](#44-token-flow-model)
-  - [4.5 Authorization Model (RBAC)](#45-authorization-model-rbac)
-  - [4.6 User Model](#46-user-model)
+  - [4.1 Runtime Shape](#41-runtime-shape)
+  - [4.2 Tenant Model](#42-tenant-model)
+  - [4.3 OAuth Client Model](#43-oauth-client-model)
+  - [4.4 Resource Server Model](#44-resource-server-model)
+  - [4.5 Token Model](#45-token-model)
+  - [4.6 Authorization Model](#46-authorization-model)
+  - [4.7 User And Admin Model](#47-user-and-admin-model)
+  - [4.8 Non-Negotiable Invariants](#48-non-negotiable-invariants)
 - [5. Architecture Decisions](#5-architecture-decisions)
   - [5.1 Decision: Build On Better Auth, Not From Scratch](#51-decision-build-on-better-auth-not-from-scratch)
   - [5.2 Decision: Use `oauthProvider`, Not `oidcProvider`](#52-decision-use-oauthprovider-not-oidcprovider)
   - [5.3 Decision: Use `organization` Plugin For Tenants](#53-decision-use-organization-plugin-for-tenants)
   - [5.4 Decision: JWT Access Tokens Via `resource` Parameter](#54-decision-jwt-access-tokens-via-resource-parameter)
   - [5.5 Decision: M2M Via `client_credentials`, Not `apiKey`](#55-decision-m2m-via-client_credentials-not-apikey)
-  - [5.6 Decision: UI-First Management (Not Config-First)](#56-decision-ui-first-management-not-config-first)
+  - [5.6 Decision: UI-First Management, Not Config-First](#56-decision-ui-first-management-not-config-first)
   - [5.7 Decision: Defer ReBAC And ABAC](#57-decision-defer-rebac-and-abac)
   - [5.8 Decision: Defer Custom Pipeline/Lua Engine](#58-decision-defer-custom-pipelinelua-engine)
   - [5.9 Decision: Defer Webhooks To Later Batch](#59-decision-defer-webhooks-to-later-batch)
   - [5.10 Decision: Defer Custom Onboarding Flows](#510-decision-defer-custom-onboarding-flows)
 - [6. Data Model](#6-data-model)
-  - [6.1 Tables Owned By Better Auth](#61-tables-owned-by-better-auth)
-  - [6.2 Custom Tables (For Extension Hooks And Future ReBAC)](#62-custom-tables-for-extension-hooks-and-future-rebac)
-  - [6.3 Schema Extension Safety](#63-schema-extension-safety)
+  - [6.1 Better-Auth-Owned Tables](#61-better-auth-owned-tables)
+  - [6.2 Custom First-Batch Tables](#62-custom-first-batch-tables)
+  - [6.3 Schema Extension Rules](#63-schema-extension-rules)
 - [7. API Surface](#7-api-surface)
-  - [7.1 Better-Auth-Provided Endpoints](#71-better-auth-provided-endpoints)
-  - [7.2 Well-Known Metadata Endpoints](#72-well-known-metadata-endpoints)
-  - [7.3 Custom Admin API](#73-custom-admin-api)
+  - [7.1 Better Auth Routes](#71-better-auth-routes)
+  - [7.2 Well-Known Metadata Routes](#72-well-known-metadata-routes)
+  - [7.3 Custom Admin Routes](#73-custom-admin-routes)
 - [8. Deployment Architecture](#8-deployment-architecture)
   - [8.1 Worker Topology](#81-worker-topology)
-  - [8.2 D1 Constraints And Mitigations](#82-d1-constraints-and-mitigations)
-  - [8.3 CLI And Migration Workflow](#83-cli-and-migration-workflow)
-  - [8.4 JWKS Key Rotation](#84-jwks-key-rotation)
+  - [8.2 Better Auth Factory Pattern](#82-better-auth-factory-pattern)
+  - [8.3 Migration Workflow](#83-migration-workflow)
+  - [8.4 JWKS Rotation](#84-jwks-rotation)
 - [9. Auth Flow Walkthroughs](#9-auth-flow-walkthroughs)
-  - [9.1 User Authorization Code Flow (SPA/Mobile)](#91-user-authorization-code-flow-spamobile)
-  - [9.2 M2M Client Credentials Flow](#92-m2m-client-credentials-flow)
-  - [9.3 Post-Login Organization Selection Flow](#93-post-login-organization-selection-flow)
-  - [9.4 Account Selection Flow (prompt=select_account)](#94-account-selection-flow-promptselectaccount)
-  - [9.5 Sign-Up Flow (prompt=create)](#95-sign-up-flow-promptcreate)
-  - [9.6 Resource Server Token Verification Flow](#96-resource-server-token-verification-flow)
+  - [9.1 Authorization Code + PKCE](#91-authorization-code--pkce)
+  - [9.2 Client Credentials](#92-client-credentials)
+  - [9.3 Post-Login Organization Selection](#93-post-login-organization-selection)
+  - [9.4 `prompt=select_account`](#94-promptselect_account)
+  - [9.5 `prompt=create`](#95-promptcreate)
+  - [9.6 Resource Server Verification](#96-resource-server-verification)
 - [10. Admin UI Requirements](#10-admin-ui-requirements)
-- [11. Edge Cases And Failure Modes](#11-edge-cases-and-failure-modes)
-- [12. Definition Of Done](#12-definition-of-done)
-- [13. Final Model](#13-final-model)
+- [11. Pre-Implementation Spikes And Quality Gates](#11-pre-implementation-spikes-and-quality-gates)
+  - [11.1 OAuth Provider Contract Spike](#111-oauth-provider-contract-spike)
+  - [11.2 Resource Audience Strategy Spike](#112-resource-audience-strategy-spike)
+  - [11.3 D1 Schema And Migration Spike](#113-d1-schema-and-migration-spike)
+  - [11.4 JWKS And Secret Rotation Spike](#114-jwks-and-secret-rotation-spike)
+  - [11.5 Admin Authorization Spike](#115-admin-authorization-spike)
+- [12. Implementation Plan](#12-implementation-plan)
+  - [12.1 Foundation](#121-foundation)
+  - [12.2 Auth Core](#122-auth-core)
+  - [12.3 OAuth Provider](#123-oauth-provider)
+  - [12.4 Admin UI](#124-admin-ui)
+  - [12.5 Resource Server Integration](#125-resource-server-integration)
+  - [12.6 Deployment Hardening](#126-deployment-hardening)
+- [13. Security And Privacy Model](#13-security-and-privacy-model)
+  - [13.1 Secret Handling](#131-secret-handling)
+  - [13.2 Token Security](#132-token-security)
+  - [13.3 Admin Security](#133-admin-security)
+  - [13.4 Data Privacy](#134-data-privacy)
+- [14. Operational Model](#14-operational-model)
+  - [14.1 Observability](#141-observability)
+  - [14.2 Runbooks](#142-runbooks)
+  - [14.3 Capacity And Performance Targets](#143-capacity-and-performance-targets)
+- [15. Independent Rollout](#15-independent-rollout)
+  - [15.1 Relationship To `auther`](#151-relationship-to-auther)
+  - [15.2 Rollout Sequence](#152-rollout-sequence)
+  - [15.3 Rollback Strategy](#153-rollback-strategy)
+- [16. Risks, Edge Cases, And Failure Modes](#16-risks-edge-cases-and-failure-modes)
+- [17. Test And Verification Plan](#17-test-and-verification-plan)
+- [18. Definition Of Done](#18-definition-of-done)
+- [19. Final Model](#19-final-model)
 
 ## 1. Goal
 
-Build a new auth service — deployed on Cloudflare Workers with D1 — that serves as a centralized Identity Provider (IdP) comparable to Auth0. It must provide multi-tenant organizations, full OAuth2.1/OIDC flows, JWT-signed access tokens verifiable at JWKS endpoints, machine-to-machine authentication, and an administration UI for managing tenants, OAuth2 clients, users, and resource servers.
+Build a new centralized Identity Provider. It uses lessons from `/home/quanghuy1242/pjs/auther`, but it is a separate service with its own data model, clients, issuer, and operational lifecycle.
 
-This is the **first batch** — core identity and authorization infrastructure. Advanced features (ReBAC graph authorization, ABAC/Lua policy engine, pipelines, webhooks) are explicitly deferred.
+The new service should run on Cloudflare Workers with D1, use Better Auth as the auth foundation, and provide Auth0-like management flows for:
 
-The output is an implementation-grade planning document that can be reviewed by another engineer and then broken into concrete tickets.
+- email/password identity and sessions;
+- organizations as tenant boundaries;
+- OAuth 2.x/OIDC authorization flows for apps;
+- JWKS-verifiable JWT access tokens for API/resource-server access;
+- machine-to-machine authentication through `client_credentials`;
+- admin UI management of users, organizations, OAuth clients, resource servers, and consents.
 
-## 2. System Summary
+This document is the first-batch architecture plan. It intentionally does not plan ReBAC, ABAC/Lua, webhooks, pipeline scripting, or custom onboarding flows beyond the integration points needed to avoid blocking later batches.
 
-The auth service provides the authentication and authorization backbone for a personal ecosystem of applications: a PayloadCMS instance, a Next.js blog, and future apps.
+First-batch success means a new downstream app can perform an OAuth authorization-code flow, receive a resource-bound access token, verify that token locally through JWKS, and enforce tenant access using `aud`, `scope`, and `org_id` without depending on `auther`.
 
-**Core responsibilities:**
+## 2. Review Verdict
 
-- User sign-up, sign-in, session management
-- Multi-tenant scoping via organizations (each org is an isolated auth space)
-- OAuth2.1 / OIDC authorization server (authorization_code with PKCE S256, client_credentials, refresh_token)
-- JWT-signed access tokens with audience binding for resource servers
-- JWKS public key discovery for downstream API verification
-- Machine-to-machine authentication via client_credentials grant
-- Admin UI for managing all entities (not config-file-driven)
+The original document was directionally right and its Section 5 decisions are sound. The main problem was not strategy; it was certainty. Some claims mixed verified Better Auth 1.6 behavior, local `auther` behavior, old Better Auth 1.3 behavior, and inferred future behavior without separating them.
 
-**High-level flow:**
+This rewrite keeps the Section 5 decisions and tightens the implementation contract around facts that were verified on 2026-05-19.
 
-```
-User/Client App
-    │
-    ├─ 1. Sign-in / Sign-up (email/password + optional social providers)
-    │
-    ├─ 2. OAuth2 authorize (/oauth2/authorize)
-    │      └─ PKCE S256, consent, prompt=select_account, prompt=create
-    │
-    ├─ 3. Token exchange (/oauth2/token)
-    │      └─ Returns JWT with aud=resource_server_url when `resource` param present
-    │      └─ Returns opaque token when `resource` not requested
-    │
-    ▼
-Resource Server (your API)
-    │
-    ├─ 4. Validate JWT locally via JWKS endpoint
-    │      └─ Check iss, aud, exp, nbf, signature
-    │
-    ├─ 5. Enforce RBAC scopes (e.g., read:posts, write:admin)
-    │
-    ▼
-Data layer (scoped by organization)
-```
+### 2.1 What Was Correct
+
+- `auther` is built on `better-auth@^1.3.32`, `oidcProvider`, `jwt`, and `apiKey`, confirmed in `/home/quanghuy1242/pjs/auther/package.json` and `/home/quanghuy1242/pjs/auther/src/lib/auth.ts`.
+- `auther` has custom authorization-space, resource-server, OAuth-client metadata, webhook, registration-context, ReBAC, ABAC, and pipeline persistence, confirmed in local schema files.
+- Better Auth's newer OAuth Provider package is the right foundation for the first batch because it covers core authorization server work that `auther` had to assemble through `oidcProvider` plus custom logic.
+- Using organizations as the tenant boundary is a better fit than carrying forward `authorization_spaces` as the core first-batch tenant model.
+- Deferring ReBAC, ABAC/Lua, pipeline scripting, webhooks, and custom onboarding flows is the correct first-batch scope control.
+
+### 2.2 What Needed Correction
+
+- The latest stable npm version on 2026-05-19 is `better-auth@1.6.11` and `@better-auth/oauth-provider@1.6.11`. That part was correct, but feature claims should be tied to docs or package metadata rather than stars, contributor counts, or unreleased roadmap items.
+- Better Auth OAuth Provider docs use `signUp`, not `signup`, for the `prompt=create` continuation page configuration.
+- UserInfo is documented under `/oauth2/userinfo`, not plain `/userinfo`.
+- The public-client endpoint is documented as `/oauth2/public-client`, while server API naming can expose it as `getOAuthClientPublic`.
+- RFC 8707 resource indicator support is real in the docs, but the previous doc over-specified implementation details such as PR numbers and exact error names where primary docs are a better source.
+- Cloudflare KV read `cacheTtl` has a 30 second minimum as of 2026-01-30. KV key expiration TTL is still 60 seconds. The previous statement "minimum KV TTL is 60s" was too broad.
+- D1 `batch()` is documented as transactional: if one statement fails, the whole sequence aborts or rolls back. The remaining risk is multi-step application flows that span multiple separate database operations, not a single `batch()`.
+- JWKS path and rotation configuration should be verified against the installed Better Auth version during implementation. The plan should require standard discovery behavior and explicit tests rather than assuming every option name from memory.
+
+### 2.3 Remaining Confidence Level
+
+This plan is implementation-ready after the Section 11 spikes are completed. Until then, the only material uncertainty is the exact Better Auth 1.6.11 API shape for four integration seams:
+
+| Seam | Why it matters | Required proof |
+|---|---|---|
+| OAuth Provider route map and server API names | Prevents building UI and tests against stale endpoint names | Generated route map or type-level proof from installed packages |
+| Runtime resource audience validation | Determines whether UI-managed resource servers can feed Better Auth `validAudiences` without deploy-time config | Minimal Worker proof that `getAuth(env, request)` can derive `validAudiences` from enabled D1 rows |
+| JWKS rotation option names and behavior | Prevents broken token verification and key churn | Test that signs, verifies, rotates, and verifies old/new `kid` values |
+| D1 migration path for Better Auth schema | Prevents schema drift between CLI, local D1, and remote D1 | Local D1 migration generated from pinned config and applied cleanly under Wrangler |
+
+These are not scope questions. They are integration proofs that must happen before broad feature implementation.
 
 ## 3. Current-State Findings
 
-### 3.1 What Better Auth 1.6 Provides
+### 3.1 New `auth` Repo State
 
-Better Auth is at v1.6.11 (as of the research date) with 480+ contributors and 28K+ GitHub stars. It provides:
+`/home/quanghuy1242/pjs/auth` currently contains:
 
-| Area | Built-in Support |
-|---|---|
-| Core auth | email/password, social providers (Google, GitHub, etc.), session management |
-| Multi-tenant | `organization` plugin — orgs, members, roles (owner/admin/member), invitations, teams |
-| OAuth2.1 / OIDC | `oauthProvider` plugin — authorization_code (PKCE S256 by default), client_credentials, refresh_token |
-| JWT signing | `jwt` plugin — JWKS endpoint, asymmetric signing, key rotation |
-| API tokens | `apiKey` plugin (maintainer recommends client_credentials instead for M2M) |
-| Consent | Built-in consent screen flow with per-client skip_consent option |
-| Account selection | `prompt=select_account` via multi-session plugin |
-| Sign-up prompt | `prompt=create` with configurable sign-up page |
-| Token introspection | RFC 7662 `/oauth2/introspect` |
-| Token revocation | RFC 7009 `/oauth2/revoke` |
-| UserInfo | `/userinfo` endpoint with `openid` scope |
-| RP-initiated logout | Supported for trusted clients |
-| Dynamic client registration | RFC 7591 compliant, configurable |
-| RBAC | `organization` plugin `createAccessControl` — declarative role→permission mapping |
-| Dynamic access control | Stored roles/permissions per-org at database level |
-| Rate limiting | Built-in per-endpoint rate limiting |
-| Cloudflare D1 | Native support via Kysely D1 dialect (since v1.5) |
-| JWKS rotation | Built-in with grace period (since v1.5, PR #6147) |
-| Secret rotation | Non-destructive `BETTER_AUTH_SECRET` rotation (v1.5) |
-| Pairwise subjects | HMAC-SHA256 per-client `sub` values (landed Mar 2026) |
+- `README.md`
+- `docs/001-auth-service-first-batch.md`
+- git metadata
 
-Better Auth's plugin system allows:
-- Defining custom database schemas within plugins
-- Extending core tables (`user`, `session`) with `additionalFields`
-- Registering custom endpoints via `createAuthEndpoint`
-- Hooks for lifecycle events (`before`/`after` middleware)
-- Custom `onRequest`/`onResponse` interceptors
+There is not yet an application skeleton, package manifest, Worker config, source tree, migrations, or tests. The README already declares the intended stack:
 
-### 3.2 What Auther Had That Better Auth Now Covers Natively
+- Better Auth latest stable;
+- `@better-auth/oauth-provider`;
+- Hono;
+- Wrangler;
+- Cloudflare Workers, D1, and KV;
+- first-batch exclusions for ReBAC, ABAC/Lua, webhooks, custom onboarding, and pipeline scripting.
 
-The legacy `auther` project was built on Better Auth 1.3 + `oidcProvider`. Several custom-built features in auther are now native to Better Auth 1.6:
+This means the plan can choose the clean target shape without fighting existing implementation drift in the new repo.
 
-| Auther Custom Implementation | Better Auth 1.6 Equivalent |
-|---|---|
-| OAuth2 token bridge — intercept opaque token, swap for JWKS-signed JWT | `oauthProvider` issues JWT natively when client passes `resource` param |
-| Custom JWKS endpoint + manual key generation | `jwt` plugin built-in JWKS with rotation |
-| OAuth consent page | `consentPage` + consent CRUD endpoints |
-| API key exchange for JWT | `client_credentials` grant (recommended by maintainers) |
-| Non-destructive secret rotation | Built-in `secret: ["new", "old"]` |
-| Resource server audience binding | `validAudiences` + `resource` param + RFC 8707 resource indicators |
-| Custom registration flow | `prompt=create` + `signup.page` |
-| Multi-session account picker | `prompt=select_account` + `selectAccount.page` |
-| Post-login org selection | `postLogin` configuration |
+### 3.2 Prior `auther` State
 
-### 3.3 What Auther Had That Better Auth Still Does Not Cover
+`/home/quanghuy1242/pjs/auther` is a Next.js application with SQLite/Drizzle persistence and Better Auth 1.3.x:
 
-These features existed in auther and have no Better Auth equivalent. They are explicitly deferred:
+```json
+{
+  "better-auth": "^1.3.32",
+  "next": "16.0.7",
+  "drizzle-orm": "^0.44.7",
+  "@upstash/qstash": "^2.8.4",
+  "wasmoon": "^1.16.0"
+}
+```
 
-| Feature | Auther Implementation | Why Deferred |
+Key local evidence:
+
+- `/home/quanghuy1242/pjs/auther/src/lib/auth.ts` uses `oidcProvider`, `jwt`, `apiKey`, `admin`, `username`, `oAuthProxy`, `nextCookies`, Drizzle adapter, and custom hooks.
+- `/home/quanghuy1242/pjs/auther/src/lib/auth.ts` injects permissions into JWT/session callbacks by calling `PermissionService.resolveAllPermissionsWithABACInfo`.
+- `/home/quanghuy1242/pjs/auther/src/db/app-schema.ts` defines `resource_servers`, `authorization_spaces`, `oauth_client_metadata`, OAuth client to authorization-space links, and webhook tables.
+- `/home/quanghuy1242/pjs/auther/src/db/rebac-schema.ts` defines `access_tuples`, `authorization_models`, and authorization-model aliases.
+- `/home/quanghuy1242/pjs/auther/src/lib/auth/permission-service.ts` implements tuple checks, wildcard checks, relation implication, group expansion, hierarchy traversal, and ABAC-aware permission resolution.
+- `/home/quanghuy1242/pjs/auther/src/lib/auth/lua-engine-pool.ts` uses Wasmoon with a max pool size and max concurrency of 20 engines.
+- `/home/quanghuy1242/pjs/auther/src/db/pipeline-schema.ts` stores Lua scripts, encrypted script secrets, DAG execution plans, graph layout, pipeline traces, and pipeline spans.
+- `/home/quanghuy1242/pjs/auther/src/lib/webhooks/delivery-service.ts` uses Upstash QStash for asynchronous webhook delivery and records events/deliveries in local tables.
+- `/home/quanghuy1242/pjs/auther/src/db/platform-access-schema.ts` defines signup policy, registration contexts, platform invites, signup-intent nonces, pending registration applications, and permission request state.
+
+The new service should not port this architecture wholesale. It should preserve the product lessons and avoid copying mechanisms that Better Auth 1.6 now covers or that are intentionally out of first-batch scope.
+
+### 3.3 Better Auth 1.6.11 Capability Boundary
+
+Verified stable packages on 2026-05-19:
+
+- `better-auth@1.6.11`
+- `@better-auth/oauth-provider@1.6.11`
+
+First-batch capabilities to rely on:
+
+| Area | Better Auth capability | First-batch use |
 |---|---|---|
-| ReBAC (Zanzibar-style graph) | Permission service with BFS subject expansion, tuple matching, wildcard support, `owner→editor→viewer` transitivity | Better Auth has flat RBAC only. No graph traversal. Community wants it (issue #2167). No roadmap item. |
-| ABAC / Lua policy engine | Wasmoon Lua engine pool (20 engines), 1s timeout, 10KB limit, sandboxed environment | Complex on Workers (128MB memory limit). Better Auth has no built-in ABAC. Enterprise IAM proposal (#9190) exists but no implementation. |
-| Pipeline/hook scripting | DAG-based Lua scripts at 16 lifecycle hooks, blocking/async/enrichment types, OpenTelemetry tracing, CodeMirror visual editor | Better Auth has hook callbacks but no DAG engine or scripting runtime. |
-| Webhook delivery | QStash-queued delivery, 20 event types, HMAC-SHA256 signing, multi-endpoint subscriptions | No built-in webhook system in Better Auth. Would need custom implementation. |
-| Custom onboarding flows | Registration contexts, HMAC-signed invite tokens, automatic permission grants on sign-up, 7-day invite expiry | App-level concern. Better Auth has basic invitations in the org plugin. |
+| Core auth | Email/password, sessions, verification/reset flows | User identity and admin login |
+| Organizations | Organization, member, invitation, team, active organization, role/permission APIs | Tenant model |
+| OAuth Provider | Authorization endpoint, token endpoint, client CRUD, consent flow, introspection, revocation, userinfo, dynamic registration controls | OAuth/OIDC server |
+| Resource indicators | `resource` parameter and `validAudiences` in OAuth Provider docs | API audience binding and JWT access tokens |
+| M2M | `client_credentials` grant in OAuth Provider docs | Backend-to-backend authentication |
+| JWT/JWKS | JWT plugin and JWKS endpoint | ID token signing and API token verification |
+| Access control | `createAccessControl` and organization permissions | Flat RBAC |
+| Hooks/callbacks | Auth hooks, plugin hooks, OAuth Provider callbacks | Claim enrichment and guardrails |
 
-### 3.4 Cloudflare Workers Feasibility
+Capabilities not present as first-class Better Auth primitives:
 
-**Native D1 support exists** (PR #7519, v1.5+). The Kysely adapter auto-detects D1 and uses a native dialect. You can pass `env.DB` directly.
+- Zanzibar/ReBAC graph authorization;
+- ABAC policy evaluation;
+- embedded Lua or other user-authored policy scripts;
+- visual pipeline/DAG runtime;
+- durable webhook delivery system;
+- custom registration contexts with automatic grant application.
 
-**Known Cloudflare Workers constraints:**
+Those gaps match the deferred features in Section 5.
 
-- **D1 lacks interactive transactions.** `BEGIN`/`COMMIT`/`ROLLBACK` are unsupported. Better Auth's adapter throws a descriptive error for this. Mitigation: use D1's `batch()` API for sequential writes. Token issuance does multiple writes — if one fails mid-flow, partial state is possible. Mitigated by idempotent-ish operations in Better Auth's token endpoints.
-- **D1 binding is per-request only.** You cannot create a static `auth` instance at module scope. Use the `getAuth(c)` pattern — export a function that receives the request context and D1 binding.
-- **CLI tooling limitation.** `npx @better-auth/cli generate` cannot query remote D1 directly. Workaround: use `getPlatformProxy()` for local dev, or programmatic migrations via `getMigrations()` + `runMigrations()`.
-- **`_cf_METADATA` table** is D1-internal and access-prohibited. Kysely's introspection trips over it. Community has workarounds.
-- **KV for secondary storage.** BA's rate limiting and session caching use `secondaryStorage`. On Workers this is KV. Minimum KV TTL is 60s, so rate limit windows must be >= 60s.
+### 3.4 Cloudflare Workers, D1, And KV Constraints
 
-Existing community examples are working: Hono + D1, React Router + D1, Next.js + Cloudflare Pages.
+Cloudflare-specific constraints that shape the design:
+
+| Constraint | Verified behavior | Design implication |
+|---|---|---|
+| D1 binding lifecycle | Workers receive D1 via `env` bindings | Build `getAuth(env, request)` or equivalent; do not depend on a static module-scope database object for runtime |
+| D1 batch behavior | D1 `batch()` executes statements sequentially and rolls back/aborts the sequence on failure | Use `batch()` for custom multi-write operations that can fit in one batch; still design idempotency for flows spanning multiple Better Auth calls |
+| Interactive transactions | D1 does not expose the same long-lived interactive transaction model as a traditional server database connection | Avoid implementation designs that require a transaction handle across arbitrary async application code |
+| Worker memory | Worker memory limit is 128 MB | Do not port Wasmoon pool or large in-memory authorization graph caches in first batch |
+| KV read cache TTL | `cacheTtl` minimum is 30 seconds | Rate limit/session cache behavior should tolerate short stale reads |
+| KV key expiration TTL | `expirationTtl` minimum is 60 seconds | Do not configure secondary storage items that require expiration below 60 seconds |
+
+The first batch can run on Workers/D1/KV, but implementation should keep database writes simple, favor short-lived request-scoped objects, and test D1 behavior under the actual Wrangler runtime.
 
 ## 4. Target Model
 
-### 4.1 Tenant Model (Organizations)
+### 4.1 Runtime Shape
 
-Each organization is an isolated tenant. Users belong to organizations as members with roles.
+The target service is one Cloudflare Worker that serves auth APIs, OAuth/OIDC endpoints, metadata routes, custom admin APIs, and admin UI assets/pages.
 
-**Entity mapping (auther → new service):**
+Primary libraries:
 
-| Auther Concept | New Service Concept |
+- `better-auth`
+- `@better-auth/oauth-provider`
+- Hono for Worker routing and binding access
+- Drizzle or Kysely only where useful for custom tables
+- Wrangler for D1/KV migrations and deployment
+
+Bindings:
+
+| Binding | Purpose |
 |---|---|
-| Authorization Space | Organization (via `organization` plugin) |
-| Space ownership (user belongs to space) | Organization membership |
-| `full_access` on space | Organization owner/admin role |
+| `DB` | D1 database for Better Auth and custom tables |
+| `KV` | Secondary storage for rate limiting/session cache where Better Auth integration supports it |
+| `BETTER_AUTH_SECRET` | Better Auth secret, rotated non-destructively when supported |
+| `BETTER_AUTH_URL` | Public issuer/base URL |
+| Email provider secrets | Verification and password-reset delivery |
+| Social provider secrets | Optional Google/GitHub login later |
 
-**Key behaviors:**
+### 4.2 Tenant Model
 
-- An organization is created by a user who automatically becomes the `owner`.
-- Users can belong to multiple organizations. One is "active" on the session.
-- The `referenceId` (organization ID) on an OAuth client is immutable after creation — a client belongs to exactly one organization.
-- Organization-scoped scopes trigger the post-login org selection flow during OAuth authorization.
+Organizations are the tenant boundary.
 
-**What the `organization` plugin provides:**
-- Org CRUD (`createOrganization`, `updateOrganization`, `deleteOrganization`)
-- Member management (`listMembers`, `removeMember`, `updateMemberRole`)
-- Invitation workflow (`inviteMember`, `acceptInvitation`, `rejectInvitation`, `cancelInvitation`)
-- Active organization on session (`setActive`)
-- Teams (optional sub-division within orgs)
-- Dynamic access control (roles stored per-org in DB)
-- Lifecycle hooks (`organizationHooks`)
+Conceptual contrast with `auther`:
 
-**What we add on top:**
-- Custom admin UI pages for org management
-- `additionalFields` on the `organization` table for metadata (plan, quota, branding, etc.)
-- Eventually: a `resource_servers` custom table referencing `organization.id` for per-org API definitions
+| Prior `auther` concept | New first-batch concept |
+|---|---|
+| `authorization_spaces` | Better Auth organization |
+| Space membership / `full_access` | Organization membership and owner/admin role |
+| Client-space links | OAuth client `referenceId` or custom metadata tied to organization |
+| Space-scoped ReBAC models | Deferred; not represented in first-batch runtime authorization |
 
-### 4.2 OAuth2 Client Model
+First-batch tenant invariants:
 
-OAuth2 clients are applications that request authorization against our IdP. They map to the `oauthClient` table managed by the `oauthProvider` plugin.
+- Every OAuth client belongs to exactly one organization.
+- Every resource server definition belongs to exactly one organization.
+- Admin pages and custom admin APIs enforce organization membership/role checks.
+- A user may belong to multiple organizations.
+- OAuth flows that require organization context must resolve one organization before issuing an organization-scoped token.
 
-**Client types:**
+### 4.3 OAuth Client Model
 
-| Type | `token_endpoint_auth_method` | Use Case |
+OAuth clients are Better Auth OAuth Provider clients.
+
+Client types:
+
+| Client type | Token endpoint auth method | Examples |
 |---|---|---|
-| Confidential | `client_secret_basic` or `client_secret_post` | Web apps with server-side backend |
-| Public | `none` (PKCE only) | SPA, mobile apps, CLI tools |
+| Confidential | `client_secret_basic` or `client_secret_post` | server-rendered web app, backend service |
+| Public | `none` plus PKCE | SPA, mobile, CLI |
 
-**Client properties:**
+Expected client fields:
 
-- `redirect_uris`: Array of valid callback URLs
-- `scopes`: Allowed scopes for this client
-- `grant_types`: Supported grants (`authorization_code`, `client_credentials`, `refresh_token`)
-- `referenceId`: The organization ID this client belongs to (immutable)
-- `skip_consent`: Bypass consent screen (for trusted first-party apps)
-- `require_pkce`: Default true per OAuth 2.1, can be set to false for legacy clients (admin-created only)
-- `subject_type`: `"public"` (shared user ID) or `"pairwise"` (per-client unique user ID)
-- `disabled`: Soft-delete flag
-- `enable_end_session`: Allow RP-initiated logout
+- client ID;
+- client secret where applicable;
+- redirect URIs;
+- allowed scopes;
+- allowed grant types;
+- organization reference;
+- consent behavior;
+- disabled/deleted status;
+- optional pairwise subject behavior if supported by current Better Auth APIs.
 
-**Trusted clients:** Configured in-code via `trustedClients` array. These bypass DB lookups and can skip consent. Used for first-party apps.
+Clients are created through the admin UI and Better Auth server APIs. Dynamic registration remains disabled for first batch unless explicitly turned on for a trusted internal use case.
 
-**UI-first operations (all via server API, not config):**
+### 4.4 Resource Server Model
 
-| Action | Server API Call |
-|---|---|
-| Create client | `auth.api.createOAuthClient(...)` |
-| Create with privileged fields | `auth.api.adminCreateOAuthClient(...)` |
-| Update client | `auth.api.updateOAuthClient(...)` |
-| Get one client | `auth.api.getOAuthClient(...)` |
-| List all clients | `auth.api.getOAuthClients(...)` |
-| Rotate secret | `auth.api.rotateClientSecret(...)` |
-| Delete client | `auth.api.deleteOAuthClient(...)` |
-| Get public info (for login pages) | `auth.api.getOAuthClientPublic(...)` |
+Better Auth OAuth Provider models resource servers as valid audiences, not as a full management entity.
 
-**Access control for client operations:** The `clientPrivileges` callback gates who can create/update/delete/list/rotate clients. Example: grant client CRUD only to organization owners:
+The first batch adds a custom `resource_servers` table so the admin UI can manage API audiences:
 
-```ts
-oauthProvider({
-  clientPrivileges: async ({ headers, action, session }) => {
-    if (!session.activeOrganizationId) return false;
-    const member = await auth.api.getActiveMember({ headers });
-    return member?.role === "owner";
-  },
-})
-```
+- `id`
+- `organization_id`
+- `slug`
+- `name`
+- `audience`
+- `description`
+- `enabled`
+- `created_at`
+- `updated_at`
 
-**Dynamic registration:** Configurable via `allowDynamicClientRegistration: true` (authenticated) and `allowUnauthenticatedClientRegistration: true` (anonymous). For the first batch, we keep dynamic registration off — clients are created only through the admin UI.
+Runtime invariant:
 
-### 4.3 Resource Server Model (API Audiences)
+- A token request may only receive a JWT for a `resource` value that exists in `resource_servers` and is currently enabled.
 
-Better Auth does NOT have a first-class "resource server" database entity. Instead, resource servers are defined as **audiences** (URL strings) in the `oauthProvider` configuration.
+Implementation decision:
 
-**Configuration:**
+- Better Auth OAuth Provider 1.6.11 exposes `validAudiences?: string[]` as a plugin configuration option. It does not expose a documented runtime audience-validation callback.
+- To keep resource servers UI-managed and avoid deploy-time audience config, `getAuth(env, request)` must derive `validAudiences` from enabled rows in D1.
+- A short in-isolate cache is acceptable for latency, but the cache window becomes the maximum delay before a disabled resource server stops receiving new tokens.
+- Do not keep API audiences in `wrangler.jsonc`, `.dev.vars`, source constants, or deployment-specific config except for local bootstrap/test fixtures.
 
-```ts
-oauthProvider({
-  validAudiences: [
-    "https://api.example.com",
-    "https://admin.example.com",
-    "https://cms.example.com",
-  ]
-})
-```
+### 4.5 Token Model
 
-**How it works:**
+Token behavior:
 
-1. A client requests a token with `resource=https://api.example.com` (RFC 8707 parameter)
-2. The auth server validates the resource against `validAudiences`
-3. The access token is issued as a JWKS-signed JWT with `aud=https://api.example.com`
-4. The downstream API verifies the JWT locally using the JWKS endpoint — no introspection call needed
-5. Without a `resource` parameter, the access token is opaque (hashed, stored in DB)
-
-**RFC 8707 resource indicators** are fully supported (PR #7855, Feb 2026):
-- Multiple resources can be requested
-- The token request resource set must be a subset of the authorization request resource set (narrowing allowed, widening rejected)
-- Consent re-prompts when new resources are requested
-- Opaque tokens also expose `aud` via `/oauth2/introspect`
-
-**Protected resource metadata (RFC 9470):**
-
-Each resource server serves discovery metadata at `/.well-known/oauth-protected-resource/{resource-path}`. This allows MCP clients and other automated tooling to discover the auth server:
-
-```ts
-// /.well-known/oauth-protected-resource/api/route.ts on your API worker
-const metadata = await serverClient.getProtectedResourceMetadata({
-  resource: "https://api.example.com",
-  authorization_servers: ["https://id.quanghuy.dev"],
-});
-```
-
-**What we add on top (custom):**
-
-A lightweight `resource_servers` table for the admin UI — just metadata (name, description, audience URL) referencing an organization. This is a management convenience, not part of the auth runtime. The actual enforcement is through `validAudiences`.
-
-### 4.4 Token Flow Model
-
-**Three grant types supported:**
-
-| Grant | Use Case | User Present? | Token Type |
+| Flow | `resource` present? | Expected access token | Verification |
 |---|---|---|---|
-| `authorization_code` + PKCE S256 | User delegates access to an app | Yes | JWT (with `resource`) or opaque |
-| `client_credentials` | M2M, backend-to-backend | No | JWT (with `resource`) or opaque |
-| `refresh_token` | Renew expired access token | No (uses offline token) | JWT (with `resource`) or opaque |
+| Web app session/sign-in | No | Opaque or session cookie, depending on flow | Better Auth/session validation |
+| Authorization code for API | Yes | JWT access token with `aud` bound to resource | Local JWKS verification by resource server |
+| Client credentials for API | Yes | JWT access token with client identity | Local JWKS verification by resource server |
+| Refresh token exchange | Depends on original authorized resources and request | New access token with same or narrowed audience | Same as issued token type |
 
-**Token lifetimes (defaults, configurable):**
-
-| Token | Default | Config Key |
-|---|---|---|
-| Access token (user) | 1 hour | `accessTokenExpiresIn` |
-| Access token (M2M) | 1 hour | `m2mAccessTokenExpiresIn` |
-| ID token | 10 hours | `idTokenExpiresIn` |
-| Refresh token | 30 days | `refreshTokenExpiresIn` |
-| Authorization code | 10 minutes | `codeExpiresIn` |
-
-**JWT access token structure (when `resource` param is used):**
+JWT access token claims should be minimal and stable:
 
 ```json
 {
   "iss": "https://id.quanghuy.dev",
   "aud": "https://api.example.com",
-  "sub": "user_abc123",
-  "iat": 1680000000,
-  "exp": 1680003600,
-  "nbf": 1680000000,
-  "client_id": "app_xyz789",
+  "sub": "user_or_client_subject",
+  "iat": 1779160000,
+  "exp": 1779163600,
+  "nbf": 1779160000,
+  "client_id": "oauth_client_id",
   "scope": "openid profile read:posts",
-  "token_use": "access"
+  "org_id": "org_id_when_applicable",
+  "role": "owner"
 }
 ```
 
-**Enrichment points (injecting custom claims):**
+Custom claims are allowed only when they are stable and useful to downstream APIs:
 
-- `customAccessTokenClaims({ referenceId, scopes })` — adds claims inside the JWT payload. Use for org context, permissions, plan info.
-- `customIdTokenClaims(...)` — adds claims inside the ID token.
-- `customTokenResponseFields({ grantType, user, scopes, metadata, verificationValue })` — adds fields to the token JSON response envelope alongside `access_token`, `token_type`, etc. Standard OAuth fields cannot be overridden.
-- `customUserInfoClaims(...)` — adds claims to the `/userinfo` endpoint response.
+- `org_id` for tenant authorization;
+- `role` only if downstream APIs can tolerate role staleness until token expiry;
+- `plan` only if plan-based authorization is coarse and low-risk;
+- do not embed large permission maps in first batch.
 
-**Example enrichment for org context:**
+### 4.6 Authorization Model
 
-```ts
-oauthProvider({
-  customAccessTokenClaims({ referenceId, scopes }) {
-    if (referenceId) {
-      return {
-        org_id: referenceId,
-      };
-    }
-    return {};
-  },
-  customTokenResponseFields({ grantType, verificationValue }) {
-    if (grantType === "authorization_code" && verificationValue?.referenceId) {
-      return { org_id: verificationValue.referenceId };
-    }
-    return {};
-  },
-})
-```
+First batch authorization is flat:
 
-### 4.5 Authorization Model (RBAC)
+- OAuth scopes express API capability.
+- Organization membership/role expresses tenant authority.
+- Resource servers verify `iss`, `aud`, `exp`, signature, and required scope.
+- Resource servers enforce that `org_id` matches the target resource's tenant.
 
-First batch uses flat RBAC via the organization plugin's access control system.
+No first-batch runtime should require:
 
-**Built-in roles:**
+- graph traversal;
+- tuple expansion;
+- group hierarchy resolution;
+- Lua policy evaluation;
+- inline calls back to the IdP for every resource authorization decision.
 
-| Role | Organization | Members | Invitations |
-|---|---|---|---|
-| `owner` | update, delete | create, update, delete | create, cancel |
-| `admin` | update | create, update, delete | create, cancel |
-| `member` | — | — | — |
+This is a deliberate reduction from `auther`. It favors reliable OAuth infrastructure over feature breadth.
 
-**API-level authorization:** Scopes on the OAuth token. The downstream API enforces: "does this token have scope `read:posts`?" combined with "does its `org_id` claim match the requested resource's org?"
+### 4.7 User And Admin Model
 
-**Custom permissions (extensible):** Use `createAccessControl` to define custom resources and actions:
+Users are Better Auth users.
 
-```ts
-import { createAccessControl } from "better-auth/plugins/access";
-
-const ac = createAccessControl({
-  project: ["create", "read", "update", "delete"],
-  billing: ["read", "manage"],
-});
-
-const roles = {
-  owner: { ...ac.newRole(), project: ["create", "read", "update", "delete"], billing: ["read", "manage"] },
-  admin: { ...ac.newRole(), project: ["create", "read", "update"], billing: ["read"] },
-  member: { ...ac.newRole(), project: ["read"] },
-};
-
-// Pass to organization plugin
-organization({ ac, roles: { owner, admin, member } })
-```
-
-**Dynamic access control:** Roles and permissions can be created at runtime per organization, stored in the `organizationRole` database table. Enable with `dynamicAccessControl: { enabled: true }`.
-
-**What's NOT in the first batch:**
-
-- No ReBAC graph (no BFS subject expansion, no tuple matching, no group hierarchy traversal)
-- No ABAC (no attribute-based policy evaluation, no Lua scripts)
-- No fine-grained permission tuples at the entity level
-
-These gaps are filled by the simple strategy: **embed `org_id` and `role` in the JWT, let each API enforce its own authorization with those claims.** This matches Auth0's model.
-
-### 4.6 User Model
-
-Standard Better Auth user model with `additionalFields` for the admin UI role:
+Add only minimal platform metadata:
 
 ```ts
 betterAuth({
@@ -459,889 +446,1123 @@ betterAuth({
         type: ["superadmin", "admin"],
         required: false,
         defaultValue: "admin",
-        input: false, // not settable by user during signup
+        input: false,
       },
     },
   },
-})
+});
 ```
 
-Users authenticate via email/password. Social providers (Google, GitHub) can be added via `socialProviders` configuration. Multi-session support via the `multiSession` plugin (needed for `prompt=select_account`).
+Admin authority:
+
+| Actor | Authority |
+|---|---|
+| `superadmin` | Cross-organization platform administration |
+| `admin` | Platform UI access constrained by membership/organization rules |
+| Organization `owner` | Manage own organization, members, clients, and resource servers |
+| Organization `admin` | Manage delegated organization resources except destructive owner-only actions |
+| Organization `member` | No admin access by default |
+
+### 4.8 Non-Negotiable Invariants
+
+These invariants are stronger than implementation preferences. If a library constraint makes one difficult, stop and redesign before continuing.
+
+| Invariant | Why |
+|---|---|
+| OAuth redirect URIs are exact-match validated except for explicitly coded development exceptions | Prevents authorization-code exfiltration |
+| Public clients never authenticate with a client secret and never use `client_credentials` | Prevents treating browser/mobile apps as confidential |
+| `client_credentials` tokens never include end-user identity claims | Prevents M2M tokens from being confused with delegated user tokens |
+| JWT access tokens are only accepted by resource servers after `iss`, `aud`, `exp`, `nbf`, signature, and required scopes are checked | Prevents bearer-token replay across APIs |
+| Organization-scoped tokens include exactly one resolved `org_id` | Prevents ambiguous tenant authorization |
+| Admin UI authorization is rechecked server-side on every mutation | Prevents UI-only access control |
+| Better Auth-owned tables are written through Better Auth APIs only | Prevents schema drift and upgrade breakage |
+| Disabled clients and disabled resource servers cannot receive new tokens | Makes admin kill switches meaningful |
+| Token lifetimes are short enough that org/client/resource revocation latency is acceptable without a first-batch token denylist | Keeps first-batch revocation model honest |
+| User-authored scripts, ReBAC graph traversal, and webhook delivery are not introduced through side channels | Preserves the first-batch scope decision |
 
 ## 5. Architecture Decisions
 
+This section preserves the prior decisions. Supporting rationale has been tightened to match verified sources and local evidence.
+
 ### 5.1 Decision: Build On Better Auth, Not From Scratch
 
-**Recommended:** Use Better Auth 1.6 as the auth foundation.
+Recommended: use Better Auth 1.6.x as the auth foundation.
 
-**Rationale:**
-- Better Auth 1.6 with `oauthProvider` covers 80%+ of what auther did, natively
-- The auther codebase became incompatible with Better Auth upstream due to building on the deprecated `oidcProvider` plugin and monkey-patching internal behavior
-- Building from scratch would be significantly more work and would diverge from a maintained, community-vetted OAuth2 implementation
-- Better Auth has 28K+ stars, 480+ contributors, active maintenance, and a growing plugin ecosystem
-- Security patches and protocol compliance updates come from the community, not from us
+Rationale:
 
-**Rejected alternative: fork Better Auth.** This would create the same divergence problem auther had. We keep a thin adapter layer and contribute upstream when possible.
+- The first-batch requirement is an OAuth/OIDC identity service, not a novel auth protocol implementation.
+- Better Auth already provides core identity, sessions, organization management, OAuth Provider, consent, token, and plugin primitives.
+- `auther` shows the cost of building too much adjacent infrastructure around older Better Auth internals.
+- Security-sensitive OAuth behavior should come from a maintained library wherever practical.
 
-**Rejected alternative: build OAuth2 server from scratch.** OAuth2 has many edge cases (PKCE, CSRF state validation, redirect URI matching, refresh token replay prevention, consent flows, prompt handling, scope narrowing). Better Auth has already solved these.
+Rejected alternative: build a custom OAuth server.
+
+Reason rejected: the scope includes PKCE, redirect URI validation, consent, refresh tokens, revocation, introspection, client authentication, discovery metadata, and JWKS. A custom implementation would be slower and riskier than integrating the maintained provider.
+
+Rejected alternative: fork Better Auth.
+
+Reason rejected: a fork recreates the upgrade problem that this rewrite is trying to escape.
 
 ### 5.2 Decision: Use `oauthProvider`, Not `oidcProvider`
 
-**Recommended:** Use `@better-auth/oauth-provider` (OAuth 2.1), not `better-auth/plugins` `oidcProvider`.
+Recommended: use `@better-auth/oauth-provider`, not the prior `oidcProvider` path used by `auther`.
 
-**Rationale:**
-- `oidcProvider` is deprecated. The maintainer plans to remove it.
-- `oidcProvider` only produces opaque access tokens — requiring a DB lookup on every API call. `oauthProvider` produces JWKS-signed JWT access tokens when the `resource` param is provided.
-- `oidcProvider` lacks `client_credentials` grant (M2M). `oauthProvider` has it built-in.
-- `oidcProvider` lacks RFC 8707 resource indicators, RFC 9470 protected resource metadata, pairwise subjects, `prompt=create`, `prompt=select_account`, and RP-initiated logout.
-- The auther project was stuck on `oidcProvider` — this is exactly the divergence we are avoiding.
+Rationale:
 
-**Tradeoff:** `oauthProvider` requires the `jwt` plugin to be enabled by default (for JWKS-signed `id_tokens`). This is acceptable — we want JWKS signing anyway.
+- The prior app is explicitly on `oidcProvider` in `/home/quanghuy1242/pjs/auther/src/lib/auth.ts`.
+- The newer OAuth Provider docs cover authorization, token, client credentials, resource indicators, client management, consent, introspection, revocation, and userinfo in one provider model.
+- `resource`-bound API tokens are central to the new architecture.
+- `client_credentials` removes the need for a custom API-key-to-JWT exchange path.
+
+Compatibility implication:
+
+- Do not migrate `oauthApplication` rows from `auther` in the first batch. `id` owns its OAuth clients independently. If a future operator wants equivalent clients, recreate them through the `id` admin UI or an explicit import tool designed later.
 
 ### 5.3 Decision: Use `organization` Plugin For Tenants
 
-**Recommended:** Use Better Auth's built-in `organization` plugin for tenant scoping.
+Recommended: use the Better Auth organization plugin for tenant scoping.
 
-**Rationale:**
-- Provides org CRUD, member management, invitations, team hierarchies, RBAC roles, and active organization on session — all out of the box
-- Integrates with `oauthProvider` via `clientReference` — OAuth clients are scoped to an organization immutably
-- Integrates with `oauthProvider` via `postLogin` — org-scoped scopes trigger org selection flow during OAuth authorization
-- Maintained upstream — bug fixes and improvements come from the community
+Rationale:
 
-**What we lose vs auther's custom auth spaces:**
-- No custom `full_access` bypass logic — the `owner`/`admin` roles serve the same purpose
-- No entity type models per space (that was part of ReBAC which is deferred)
-- No custom permission checks at the space level (the organization's RBAC handles this)
+- The plugin provides organization CRUD, memberships, invitations, active organization behavior, and role/permission APIs.
+- The first batch needs organization-level tenancy, not entity-level graph authorization.
+- Mapping `authorization_spaces` to organizations makes the model understandable to admins and downstream apps.
+- Keeping tenant logic inside Better Auth's plugin model reduces custom auth surface area.
 
-**Rejected alternative: build custom tenant system.** This was auther's approach. It gave fine control but caused incompatibility with upstream Better Auth changes. Using the built-in plugin keeps us on the upgrade path.
+What is not preserved in first batch:
+
+- custom `full_access` tuple bypass;
+- per-entity authorization models;
+- custom registration-context grant application;
+- group hierarchy traversal.
 
 ### 5.4 Decision: JWT Access Tokens Via `resource` Parameter
 
-**Recommended:** API-facing tokens use the `resource` parameter to get JWKS-signed JWTs. Web-app-facing tokens use opaque (default).
+Recommended: API-facing access tokens require the OAuth `resource` parameter and are JWTs with an `aud` claim bound to the requested resource.
 
-**Rationale:**
-- JWT tokens allow local verification on resource servers — no introspection call, no DB lookup. This is critical for latency and availability.
-- Opaque tokens are instantly revocable — better for user-facing sessions where you want kill-switch capability.
-- The `resource` parameter cleanly separates these: APIs always request their audience, web apps don't.
-- This matches Auth0's recommended pattern.
-- Better Auth's RFC 8707 support means multiple audiences can be requested and narrowed at token exchange time.
+Rationale:
 
-**Token format per use case:**
+- Resource servers can verify JWTs locally using JWKS and avoid a database or introspection call on every request.
+- OAuth Resource Indicators are the right protocol shape for selecting an API audience.
+- Keeping JWT issuance tied to `resource` avoids turning every access token into a bearer JWT by default.
+- Opaque tokens remain useful for flows where revocability and server-side validation are more important than local verification.
 
-| Use Case | `resource` param? | Token format | Verification |
-|---|---|---|---|
-| User logging into a web app | No | Opaque | No verification needed (session cookie) |
-| API called by SPA (with token) | Yes — `resource=https://api.example.com` | JWT | Local JWKS verification |
-| Backend calling another backend (M2M) | Yes — `resource=https://internal.example.com` | JWT | Local JWKS verification |
+Implementation requirement:
 
-**Important: opaque is still the default.** JWT is only issued when the client explicitly passes `resource`. This is a deliberate security design by Better Auth. The maintainer stated: *"A JWT access token is actually not the default. The default is still an opaque token. A JWT-formatted token is only provided when the `resource` parameter is set."*
+- The authorization request must record or validate the allowed resource set.
+- The token request must not widen the resource set beyond what was authorized.
+- Resource server definitions in the admin UI must feed the actual OAuth Provider audience validation path.
 
 ### 5.5 Decision: M2M Via `client_credentials`, Not `apiKey`
 
-**Recommended:** Use the `oauthProvider`'s `client_credentials` grant for machine-to-machine authentication.
+Recommended: machine-to-machine authentication uses OAuth `client_credentials`.
 
-**Rationale:**
-- `client_credentials` provides short-lived JWKS-verifiable JWT access tokens. `apiKey` provides long-lived opaque keys that require a separate exchange endpoint.
-- `client_credentials` benefits from signing key rotation, centralized revocation (`/oauth2/revoke`), and scope-based access control.
-- The Better Auth maintainer explicitly recommends this: *"I do recommend to utilize the client_credentials grant (ie M2M tokens) through this plugin instead [of the apiKey plugin]. It provides similar functionality except it benefits with short-lived access tokens in JWKS-verifiable JWT format, signing key rotation, centralized revocation, etc."*
-- OIDC scopes (`openid`, `profile`, `email`, `offline_access`) are forbidden for `client_credentials` — the grant is explicitly designed for M2M, not user auth.
-- The client for `client_credentials` is an OAuth2 client — meaning it's managed through the same UI and access control as user-facing clients.
+Rationale:
 
-**Rejected alternative: `apiKey` plugin.** It would require a separate management UI, separate exchange logic, and doesn't benefit from the OAuth2 revocation and rotation infrastructure.
+- `client_credentials` is a standard OAuth grant for application identity.
+- It reuses OAuth clients, scopes, token lifetimes, revocation, and JWKS verification.
+- The `apiKey` plugin path in `auther` created a second credential model and extra permission resolution surface.
+- First-batch M2M should issue short-lived API tokens, not long-lived API keys that require a custom exchange service.
 
-### 5.6 Decision: UI-First Management (Not Config-First)
+Implementation requirement:
 
-**Recommended:** All entity management — organizations, OAuth2 clients, resource servers — happens through an admin UI backed by Better Auth server APIs. Not through config files or environment variables.
+- M2M clients must be confidential.
+- OIDC user scopes such as `openid`, `profile`, `email`, and `offline_access` must be rejected for `client_credentials`.
+- M2M tokens must not contain user context.
 
-**Rationale:**
-- This matches Auth0's UX: login to dashboard, create clients, manage tenants visually.
-- Better Auth exposes full CRUD APIs for all entities. The config file (`betterAuth({...})`) is for initialization only — runtime entities are managed via API calls.
-- The `clientPrivileges` callback gates admin operations by role.
-- This is the explicit requirement: *"UI first, not config first — support all types of OAuth2 client creation on UI... like auth0."*
+### 5.6 Decision: UI-First Management, Not Config-First
 
-**What stays in config:**
-- Plugin initialization (`organization()`, `oauthProvider({...})`, `jwt()`)
-- `validAudiences` (though these could be migrated to a DB-sourced approach later)
-- `trustedClients` (first-party apps with skip_consent)
-- Environment variables (secrets, URLs)
+Recommended: organizations, clients, users, resource servers, and consents are managed through the admin UI.
 
-**What lives in the UI:**
-- Organization CRUD
-- OAuth2 client CRUD (create, update, rotate secret, delete, disable)
-- Resource server definitions (custom table — see 6.2)
-- User management
-- Consent management (view/revoke per-user client authorizations)
+Rationale:
+
+- The product target is Auth0-like operational management.
+- Better Auth exposes server-side APIs for OAuth client operations.
+- The prior admin UI already proves the need for a visual management surface.
+- Runtime entities should not require deploys for ordinary changes.
+
+What remains in config:
+
+- plugin initialization;
+- base URL and issuer;
+- secret bindings;
+- first-party trusted client bootstrap entries, if needed;
+- Worker/D1/KV bindings;
+- email/social provider secrets.
+
+Important implementation note:
+
+- Better Auth OAuth Provider 1.6.11 accepts `validAudiences` as plugin config. To keep resource servers UI-first, construct the Better Auth instance per request or per short cache window with `validAudiences` loaded from enabled `resource_servers` rows in D1. Do not hard-code resource audiences in deploy config.
 
 ### 5.7 Decision: Defer ReBAC And ABAC
 
-**Recommended:** Do NOT build ReBAC (Zanzibar graph) or ABAC (Lua policy engine) in the first batch.
+Recommended: do not build ReBAC or ABAC in the first batch.
 
-**Context from research:**
+Rationale:
 
-- Better Auth has no ReBAC or ABAC support. Community has been asking (issue #2167, opened Apr 2025) but no roadmap commitment.
-- An Enterprise IAM proposal (issue #9190, opened Apr 2026) proposes AWS IAM-style policies with Allow/Deny, condition operators, STS, federation, and audit. This is labeled `enhancement` but has zero implementation.
-- The organization plugin rewrite (PR #7251) is modularizing access control but remains RBAC-only. The author confirmed ReBAC is "a possibility after this PR" — not a commitment and not imminent.
-- Running a Lua engine (Wasmoon) on Cloudflare Workers is impractical: 128MB memory limit, 20 engines × 5MB each = 100MB baseline, before any business logic.
-- Auth0's own authorization model stops at RBAC + scopes + custom claims. They do NOT provide Zanzibar or embedded Lua scripting.
+- Local `auther` ReBAC/ABAC is substantial: tuple schema, model schema, permission service, hierarchy traversal, wildcard handling, Lua policy evaluation, ABAC audit logs, and JWT/session permission injection.
+- Better Auth organization access control is flat RBAC, not Zanzibar-style graph authorization.
+- Porting the prior permission service would dominate the first batch and reintroduce the same complexity the rewrite is supposed to reduce.
+- Worker memory limits make a Wasmoon/Lua pool a poor first-batch fit.
 
-**What we do instead (first batch):**
+First-batch substitute:
 
-- Flat RBAC via the organization plugin's `createAccessControl` + role assertions
-- Scope-based API access control
-- `org_id` + `role` + `plan` claims embedded in JWT — each API does its own authorization check
+- organization roles;
+- OAuth scopes;
+- small JWT claims (`org_id`, maybe `role`);
+- downstream resource checks.
 
-**Re-evaluation triggers (later batch):**
+Re-evaluation trigger:
 
-- Concrete use case where a user needs different permissions on different entities within the same org
-- Customer demand for group-based nested permissions beyond org→team hierarchy
-- Performance data showing the flat RBAC model is insufficient
-
-**If we must add it later:** Build as a standalone service or custom Better Auth plugin. The `organization` plugin's hook system (`organizationHooks`) gives enough interception points to layer ReBAC on top without modifying BA internals.
+- A real downstream app needs different permissions on separate entities inside the same organization and cannot express that with scopes plus org role.
 
 ### 5.8 Decision: Defer Custom Pipeline/Lua Engine
 
-**Recommended:** Do NOT build the DAG pipeline system or Lua scripting engine in the first batch.
+Recommended: do not build the DAG pipeline system or Lua scripting runtime in the first batch.
 
-**Context:**
+Rationale:
 
-- The auther pipeline had 16 hooks across 3 groups (authentication, API key, OAuth client) with DAG-based parallel execution and a visual editor.
-- Better Auth provides callback-based injection points (`customAccessTokenClaims`, `customTokenResponseFields`, `customIdTokenClaims`, `customUserInfoClaims`, `clientPrivileges`, `organizationHooks`, plugin hooks) that cover the *enrichment* use case.
-- The *blocking* use case (abort auth flow based on custom logic) is covered by throwing errors in the appropriate callback.
-- Lua engine viability on Workers is questionable (128MB memory, Wasmoon pool overhead).
+- Local `auther` pipeline storage includes scripts, secrets, execution plans, graph state, traces, and spans.
+- The Wasmoon pool is configured for up to 20 active engines, which is incompatible with the simplicity and memory posture expected from a first-batch Worker.
+- Better Auth hooks and OAuth Provider callbacks cover the necessary first-batch extension points: claim enrichment, client-operation authorization, organization hooks, and inline validation.
+- Visual scripting is a developer-experience feature, not a blocker for a correct IdP foundation.
 
-**What the callbacks cover vs the old pipeline:**
+First-batch substitute:
 
-| Old Pipeline Hook | Better Auth Equivalent |
-|---|---|
-| `before_signup`, `after_signup` | `organizationHooks` + core hooks |
-| `before_signin`, `after_signin` | Hooks on sign-in endpoints |
-| `token_build` (enrich JWT) | `customAccessTokenClaims` + `customIdTokenClaims` + `customTokenResponseFields` |
-| `client_before_register` | `clientPrivileges` callback |
-| `client_before_authorize` | Custom logic in `shouldRedirect` callbacks |
-| Pipeline enrichment → response | `customTokenResponseFields` |
-| Pipeline blocking → abort | Throw error in any callback |
-
-**What's lost:** The visual DAG editor, the CodeMirror scripting interface, the OpenTelemetry tracing for pipeline steps. These are developer experience features, not runtime requirements.
+- typed code callbacks;
+- explicit custom admin APIs;
+- test-covered claim enrichment;
+- no user-authored runtime scripts.
 
 ### 5.9 Decision: Defer Webhooks To Later Batch
 
-**Recommended:** Do NOT build the webhook system in the first batch.
+Recommended: do not build webhook delivery in the first batch.
 
-**Context:**
+Rationale:
 
-- Auther had 20 event types, QStash-queued delivery, HMAC-SHA256 signing, multi-endpoint subscriptions.
-- Better Auth has no built-in webhook system.
-- On Cloudflare Workers, QStash is still available but has a different integration pattern.
-- No downstream services currently depend on auth webhooks (PayloadCMS inbound webhook integration can be handled via a separate mechanism).
+- Local `auther` has durable webhook endpoints, subscriptions, events, deliveries, QStash publishing, signing, retry accounting, and metrics.
+- Better Auth does not provide the same durable webhook system as a first-class primitive.
+- Webhook delivery introduces queue credentials, retry semantics, idempotency windows, signature verification contracts, and operator UI.
+- No first-batch core auth flow should depend on webhooks.
 
-**What we do instead (first batch):**
-- Rely on direct API calls for any integration needs
-- Use Better Auth hooks if inline actions are needed on auth events
+First-batch substitute:
+
+- direct API integration where required;
+- Better Auth hooks for inline side effects only when they are low-risk and bounded;
+- document future event names but do not implement delivery.
 
 ### 5.10 Decision: Defer Custom Onboarding Flows
 
-**Recommended:** Do NOT build custom registration contexts, invite token systems, or automatic permission grant flows in the first batch.
+Recommended: do not build registration contexts, signed invite token flows, or automatic permission grant application in first batch.
 
-**Context:**
+Rationale:
 
-- Auther had platform contexts (origin-restricted or invite-only signup), client contexts (permission grants on first OAuth authorization), HMAC-signed invite tokens with 7-day expiry.
-- Better Auth's `organization` plugin has a basic invitation system (`inviteMember`, `acceptInvitation`, `rejectInvitation`) with configurable expiry.
-- The `prompt=create` flow covers the sign-up-during-OAuth use case.
+- Local `platform-access-schema.ts` shows onboarding is a full subsystem, not a small add-on.
+- Better Auth organization invitations cover the basic "invite user to org" requirement.
+- OAuth `prompt=create` covers sign-up-during-authorization.
+- Automatic grant application depends on the deferred ReBAC/ABAC model.
 
-**What we use (first batch):**
-- Standard sign-up via email/password
-- Org invitations via the built-in `organization` plugin
-- `prompt=create` for sign-up-during-authorization
+First-batch substitute:
+
+- standard email/password sign-up;
+- organization invitations;
+- `prompt=create` sign-up page;
+- manual admin assignment of organization roles.
 
 ## 6. Data Model
 
-### 6.1 Tables Owned By Better Auth
+### 6.1 Better-Auth-Owned Tables
 
-These tables are created and managed by Better Auth core and plugins. We do not modify their structure beyond `additionalFields`. Migration is handled by BA's CLI or programmatic migration.
+Treat Better Auth-owned tables as implementation-owned by Better Auth. Generate them from the selected version and do not hand-edit them except through documented `additionalFields`.
 
-**Core tables:**
-- `user` — user accounts (email, name, emailVerified, etc.)
-- `session` — active sessions with token, expiry, IP, user agent
-- `account` — linked OAuth accounts (Google, GitHub, etc.)
-- `verification` — email verification tokens
+Expected table groups:
 
-**Organization plugin tables:**
-- `organization` — org name, slug, metadata
-- `member` — user→org membership with role
-- `invitation` — pending email invitations with expiry
-- `team`, `teamMember` (optional — if teams enabled)
-- `organizationRole` (optional — if dynamic access control enabled)
+| Group | Tables |
+|---|---|
+| Core auth | user, session, account, verification |
+| Organization | organization, member, invitation, team/team member if enabled, dynamic role tables if enabled |
+| OAuth Provider | OAuth clients, access tokens, refresh tokens, consents, authorization/request state as generated |
+| JWT/JWKS | signing key storage used by the JWT plugin |
+| Rate limiting | Better Auth rate-limit storage if database-backed |
 
-**OAuth provider plugin tables:**
-- `oauthClient` — OAuth2 clients with client_secret, redirect_uris, scopes, grant_types, referenceId, etc.
-- `oauthAccessToken` — hashed access tokens
-- `oauthRefreshToken` — hashed refresh tokens
-- `oauthConsent` — recorded user consents per client+scope
+Implementation rule:
 
-**JWT plugin tables:**
-- `jwks` — signing key pairs with `expiresAt` for rotation
+- Generate the schema from the exact package versions pinned in `package.json`, commit generated migrations, and inspect the SQL before applying it to D1.
 
-**Session extensions (added by plugins):**
-- `session.activeOrganizationId` — active organization
-- `session.activeTeamId` — active team (if teams enabled)
+### 6.2 Custom First-Batch Tables
 
-### 6.2 Custom Tables (For Extension Hooks And Future ReBAC)
-
-These tables are separate from Better Auth's schema. They use foreign key references to BA's tables and are managed by our own migration process. Better Auth does not touch them.
-
-**First batch tables:**
+Custom tables should be minimal.
 
 #### `resource_servers`
-| Column | Type | Description |
+
+| Column | Type | Notes |
 |---|---|---|
-| `id` | text (PK) | UUID |
-| `organization_id` | text (FK → organization.id) | Owning org |
-| `name` | text | Display name |
-| `description` | text | Human-readable description |
-| `audience` | text | The `aud` value for JWT tokens (e.g., `https://api.example.com`) |
+| `id` | text primary key | UUID or Better Auth-compatible generated ID |
+| `organization_id` | text not null | References `organization.id` |
+| `slug` | text not null | Unique per organization |
+| `name` | text not null | Display name |
+| `audience` | text not null | URI/string used as JWT `aud`; globally unique unless a later design supports per-org duplicate audiences |
+| `description` | text nullable | UI text |
+| `enabled` | integer boolean | Disabled resource servers cannot receive new tokens |
+| `created_by` | text nullable | Admin user who created the row |
+| `updated_by` | text nullable | Last admin user who changed the row |
+| `disabled_at` | integer nullable | Unix timestamp for disable action |
+| `disabled_by` | text nullable | Admin user who disabled the row |
 | `created_at` | integer | Unix timestamp |
 | `updated_at` | integer | Unix timestamp |
 
-This table is **management convenience only** — it feeds the admin UI and provides metadata. The actual audience enforcement happens through `validAudiences` in the `oauthProvider` config. Initially, `validAudiences` is populated from this table at startup. A future enhancement could make it dynamic.
+Recommended indexes:
 
-**Deferred tables (for ReBAC — later batch):**
+- unique `audience`;
+- unique `(organization_id, slug)`;
+- index `organization_id`;
+- index `enabled`.
+- index `(organization_id, enabled)`.
 
-#### `groups`
-| Column | Type | Description |
-|---|---|---|
-| `id` | text (PK) | UUID |
-| `organization_id` | text (FK → organization.id) | Owning org |
-| `name` | text | Group name |
-| `parent_group_id` | text (FK → groups.id, nullable) | Parent for hierarchy |
-| `created_at` | integer | Unix timestamp |
+### 6.3 Schema Extension Rules
 
-#### `group_memberships`
-| Column | Type | Description |
-|---|---|---|
-| `id` | text (PK) | UUID |
-| `group_id` | text (FK → groups.id) | Group |
-| `user_id` | text (FK → user.id) | User |
+Allowed:
 
-#### `access_tuples`
-| Column | Type | Description |
-|---|---|---|
-| `id` | text (PK) | UUID |
-| `organization_id` | text (FK → organization.id) | Owning org |
-| `subject_type` | text | `"user"` or `"group"` |
-| `subject_id` | text | ID of user or group |
-| `relation` | text | e.g., `"owner"`, `"editor"`, `"viewer"` |
-| `entity_type` | text | e.g., `"project"`, `"post"` |
-| `entity_id` | text | ID of the entity, or `"*"` for wildcard |
-| `created_at` | integer | Unix timestamp |
+- Better Auth `additionalFields` for `user` and organization metadata when supported.
+- Separate custom tables referencing Better Auth IDs.
+- Custom migrations for custom tables.
 
-#### `authorization_models`
-| Column | Type | Description |
-|---|---|---|
-| `id` | text (PK) | UUID |
-| `organization_id` | text (FK → organization.id) | Owning org |
-| `entity_type` | text | Entity type name |
-| `relations` | text (JSON) | Relation definitions with union chains |
-| `created_at` | integer | Unix timestamp |
+Avoid:
 
-**ABAC tables (even further future):**
-- `abac_policies` — Lua/JS policy scripts per org
-- `abac_audit_logs` — evaluation audit trail
-
-### 6.3 Schema Extension Safety
-
-**Pattern: Never modify BA tables. Extend via `additionalFields` only for metadata.**
-
-```ts
-// Safe — BA expects this
-betterAuth({
-  user: {
-    additionalFields: {
-      platformRole: { type: ["superadmin", "admin"], required: false, defaultValue: "admin", input: false },
-    },
-  },
-})
-
-// Safe — organization plugin supports additionalFields natively
-organization({
-  schema: {
-    organization: {
-      additionalFields: {
-        plan: { type: "string", required: false, input: true },
-        logoUrl: { type: "string", required: false, input: true },
-      },
-    },
-  },
-})
-```
-
-**What to avoid:**
-
-- Adding columns to `oauthClient`, `oauthAccessToken`, or `jwks` via raw SQL — these tables may change schema between BA versions
-- Renaming BA-managed columns — type inference in BA uses original names
-- Direct writes to BA tables — always use BA's API calls
-
-**If we need data BA doesn't store:** Create a separate custom table with a FK reference to the BA table's ID column. The `id` column format is very unlikely to change.
+- raw SQL changes to Better Auth-owned OAuth/JWKS/token tables;
+- direct writes to Better Auth tables from admin routes;
+- large JSON permission blobs embedded into users/sessions by default;
+- copying prior `auther` ReBAC/pipeline/webhook tables into first batch.
 
 ## 7. API Surface
 
-### 7.1 Better-Auth-Provided Endpoints
+### 7.1 Better Auth Routes
 
-All paths are under the configured `basePath` (default `/api/auth`).
+Exact paths must be generated or verified against Better Auth 1.6.11 during implementation. The expected first-batch route groups are:
 
-**Core auth:**
-- `POST /sign-up/email`
-- `POST /sign-in/email`
-- `POST /sign-out`
-- `GET /get-session`
-- `POST /forget-password`
-- `POST /reset-password`
-- `POST /change-email`
-- `POST /change-password`
-- `GET /list-sessions`
-- `POST /revoke-session`
+| Group | Routes |
+|---|---|
+| Core auth | email sign-up/sign-in, sign-out, session read, password reset, email verification |
+| Organization | create/update/delete/list orgs, active org, invitations, members, roles/permissions |
+| OAuth Provider | `/oauth2/authorize`, `/oauth2/token`, `/oauth2/introspect`, `/oauth2/revoke`, `/oauth2/userinfo`, client CRUD routes, consent routes, continue route |
+| Dynamic registration | `/oauth2/register`, disabled for first batch unless explicitly enabled |
+| JWKS | Better Auth JWT plugin route, exposed through standard metadata/discovery |
 
-**OAuth2/OIDC (oauthProvider):**
-- `GET /oauth2/authorize` — authorization endpoint
-- `POST /oauth2/token` — token endpoint (authorization_code, client_credentials, refresh_token)
-- `POST /oauth2/register` — dynamic client registration (RFC 7591)
-- `POST /oauth2/introspect` — token introspection (RFC 7662)
-- `POST /oauth2/revoke` — token revocation (RFC 7009)
-- `GET /userinfo` — user info endpoint
-- `GET /oauth2/consent` — consent page data
-- `POST /oauth2/consent` — submit consent
-- `POST /oauth2/continue` — continue after account selection / signup / post-login
-- `GET /jwks` — JSON Web Key Set (at configured `jwksPath`, set to `/.well-known/jwks.json` for OIDC compliance)
-- `GET /oauth2/get-client` — get one OAuth client
-- `GET /oauth2/get-client-public` — get public client info for login pages
-- `GET /oauth2/get-clients` — list OAuth clients
-- `POST /oauth2/create-client` — create OAuth client
-- `POST /oauth2/update-client` — update OAuth client
-- `POST /oauth2/client/rotate-secret` — rotate client secret
-- `POST /oauth2/delete-client` — delete OAuth client
-- `POST /admin/oauth2/create-client` — admin create with privileged fields
+Implementation should add a route smoke test that starts the Worker locally and asserts these routes exist or intentionally return the expected auth error.
 
-**Organization:**
-- `POST /organization/create`
-- `POST /organization/update`
-- `POST /organization/delete`
-- `GET /organization/list`
-- `GET /organization/get-full-organization`
-- `POST /organization/check-slug`
-- `POST /organization/set-active`
-- `POST /organization/leave`
-- `GET /organization/get-active-member`
-- `GET /organization/list-members`
-- `POST /organization/remove-member`
-- `POST /organization/update-member-role`
-- `POST /organization/invite-member`
-- `GET /organization/get-invitation`
-- `GET /organization/list-invitations`
-- `GET /organization/list-user-invitations`
-- `POST /organization/accept-invitation`
-- `POST /organization/reject-invitation`
-- `POST /organization/cancel-invitation`
-- `POST /organization/has-permission`
+### 7.2 Well-Known Metadata Routes
 
-**Admin:**
-- `POST /admin/ban-user`
-- `POST /admin/unban-user`
-- `POST /admin/impersonate-user`
-- `POST /admin/stop-impersonating`
-- `GET /admin/list-users`
+Serve standards-friendly metadata:
 
-### 7.2 Well-Known Metadata Endpoints
+| Route | Purpose |
+|---|---|
+| `/.well-known/oauth-authorization-server` | OAuth authorization server metadata |
+| `/.well-known/openid-configuration` | OIDC discovery where OIDC is used |
+| `/.well-known/jwks.json` | JWKS if supported/configured directly |
+| `/.well-known/oauth-protected-resource` | Protected resource metadata on resource servers, not necessarily on the IdP |
 
-These are implemented as static routes on the auth Worker:
+Implementation requirement:
 
-- `/.well-known/oauth-authorization-server` — RFC 8414 metadata
-- `/.well-known/openid-configuration` — OIDC discovery (when `openid` scope is used)
-- `/.well-known/jwks.json` — JWKS endpoint (requires configuring `jwksPath` on the `jwt` plugin; otherwise JWKS lives at the default `/api/auth/jwks`)
+- Discovery metadata must advertise the actual issuer, authorization endpoint, token endpoint, JWKS URI, supported grants, supported response types, supported auth methods, supported scopes, and resource-indicator behavior.
+- If Better Auth serves JWKS under `/api/auth/jwks`, metadata must point there or the Worker must provide a compatible alias at `/.well-known/jwks.json`.
 
-Implemented using BA helpers:
+### 7.3 Custom Admin Routes
 
-```ts
-// /.well-known/oauth-authorization-server/route.ts
-import { oauthProviderAuthServerMetadata } from "@better-auth/oauth-provider";
-import { auth } from "@/lib/auth";
-export const GET = oauthProviderAuthServerMetadata(auth);
+Custom admin APIs exist only for entities Better Auth does not own or for aggregate dashboard reads.
 
-// /.well-known/openid-configuration/route.ts
-import { oauthProviderOpenIdConfigMetadata } from "@better-auth/oauth-provider";
-import { auth } from "@/lib/auth";
-export const GET = oauthProviderOpenIdConfigMetadata(auth);
-```
+Expected custom routes:
 
-And the `jwt` plugin must be configured to serve JWKS at the standard location:
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/api/admin/resource-servers` | List resource servers visible to current admin |
+| `POST` | `/api/admin/resource-servers` | Create resource server |
+| `GET` | `/api/admin/resource-servers/:id` | Read resource server |
+| `PATCH` | `/api/admin/resource-servers/:id` | Update metadata or enabled state |
+| `DELETE` | `/api/admin/resource-servers/:id` | Soft-delete or disable |
+| `GET` | `/api/admin/dashboard` | Aggregate user, organization, client, and resource-server counts |
 
-```ts
-jwt({
-  jwks: {
-    jwksPath: "/.well-known/jwks.json", // default is /jwks relative to basePath
-  }
-})
-```
+Authorization:
 
-### 7.3 Custom Admin API
-
-Custom endpoints for managing entities not covered by Better Auth's built-in API:
-
-- `GET /api/admin/resource-servers` — list resource servers
-- `POST /api/admin/resource-servers` — create resource server
-- `PUT /api/admin/resource-servers/:id` — update resource server
-- `DELETE /api/admin/resource-servers/:id` — delete resource server
-- `GET /api/admin/dashboard` — aggregated metrics (user count, org count, client count, token volume)
-- `GET /api/admin/metrics/token-usage` — time-series token issuance data
-
-These are implemented as custom Better Auth plugins (using `createAuthEndpoint`) or as separate Worker routes that query D1 directly (using the `getAuth(c)` pattern for session validation).
+- Every custom admin route must validate a Better Auth session.
+- Cross-org access requires `platformRole=superadmin`.
+- Org-scoped access requires membership and appropriate role.
 
 ## 8. Deployment Architecture
 
 ### 8.1 Worker Topology
 
-**Single Worker approach (first batch):** One Cloudflare Worker serves both the auth API and the admin UI. This is the simplest deployment model.
+One Worker is sufficient for first batch:
 
+```text
+id-worker
+├── /api/auth/*                         Better Auth handler
+├── /oauth2/* or /api/auth/oauth2/*     OAuth Provider routes, depending on Better Auth base path
+├── /.well-known/*                      metadata aliases/helpers
+├── /api/admin/*                        custom admin API
+├── /admin/*                            admin UI
+├── /sign-in                            sign-in page
+├── /sign-up                            sign-up page
+├── /consent                            consent page
+├── /select-account                     account picker page
+├── /select-organization                org picker page
+└── /reset-password                     reset page
 ```
-Cloudflare Worker (id-worker)
-├── /api/auth/*           → Better Auth handler (all auth, OAuth, org endpoints)
-├── /.well-known/*        → OAuth metadata endpoints
-├── /api/admin/*          → Custom admin API
-├── /admin/*              → Admin UI (React SPA or Next.js static export)
-├── /sign-in              → Sign-in page
-├── /sign-up              → Sign-up page
-├── /consent              → OAuth consent page
-├── /select-account        → Account selection page
-├── /select-organization   → Post-login org selection page
-├── /reset-password        → Password reset page
-└── /oauth-consent         → OAuth consent page (alias)
-```
 
-**Bindings:**
-- `DB` — D1Database
-- `KV` — Workers KV (for secondary storage: rate limiting, session cache)
-- `BETTER_AUTH_SECRET` — secret (rotatable)
-- `BETTER_AUTH_URL` — the Worker's public URL
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — social providers (optional)
+Use Hono to route requests and pass Cloudflare bindings into the Better Auth factory.
 
-**Framework choice:** Hono is the recommended framework for Cloudflare Workers + Better Auth. It provides native `c.env` binding access, middleware patterns, and route grouping. Alternative: bare `workers-types` with Better Auth handlers.
+### 8.2 Better Auth Factory Pattern
 
-### 8.2 D1 Constraints And Mitigations
-
-| Constraint | Impact | Mitigation |
-|---|---|---|
-| No interactive transactions | Token issuance does multiple DB writes. If one fails, partial state is possible. | D1's `batch()` for sequential writes. Better Auth's token operations are designed to be idempotent-ish. |
-| Per-request binding access | Cannot create static `auth` instance at module scope | Use `getAuth(c)` or `auth.with(env)` pattern — export a function, not an instance |
-| CLI cannot access remote D1 | `npx @better-auth/cli generate` can't introspect remote DB | Use `getPlatformProxy()` for local schema generation, then deploy migrations |
-| `_cf_METADATA` table access denied | Kysely introspection tries to read it | Community workarounds exist; the D1 dialect handles this |
-| 128MB Worker memory | Constraint for any in-memory cache or heavy computation | Keep LRU caches small (< 10MB). This is a significant constraint if we later add Wasmoon/Lua. |
-
-### 8.3 CLI And Migration Workflow
-
-Better Auth's CLI expects a static `auth` export. Since D1 bindings are per-request, we need a dual-config approach:
-
-**For local development and schema generation:**
+Runtime auth construction should be request/binding aware:
 
 ```ts
-// lib/auth-static.ts (used by CLI only)
-import { getPlatformProxy } from "wrangler";
-const { env } = await getPlatformProxy();
-export const auth = betterAuth({
-  database: env.DB,
-  // ... rest of config
-});
+import { betterAuth } from "better-auth";
+import { oauthProvider } from "@better-auth/oauth-provider";
+import { organization } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins/jwt";
+
+export function getAuth(env: Env, request: Request) {
+  const origin = env.BETTER_AUTH_URL ?? new URL(request.url).origin;
+
+  return betterAuth({
+    baseURL: origin,
+    secret: env.BETTER_AUTH_SECRET,
+    database: env.DB,
+    plugins: [
+      organization({
+        // roles/access control configured here
+      }),
+      jwt({
+        // verified option names to be filled from Better Auth 1.6.11 docs/types
+      }),
+      oauthProvider({
+        // valid audiences and OAuth pages configured here
+      }),
+    ],
+  });
+}
 ```
 
-**For runtime (Cloudflare Workers):**
+Implementation requirement:
 
-```ts
-// lib/auth.ts
-export const getAuth = (c: Context) => betterAuth({
-  database: c.env.DB,
-  baseURL: new URL(c.req.url).origin,
-  // ... rest of config (same as static)
-});
+- Factor shared config into a pure helper so runtime config and CLI/schema config cannot drift.
+- Do not import local `.env` in Worker runtime code.
+- Use Wrangler bindings for runtime and a local compatibility path only for schema generation/tests.
+
+### 8.3 Migration Workflow
+
+Recommended workflow:
+
+1. Pin package versions in `package.json`.
+2. Generate Better Auth schema/migrations from the pinned config.
+3. Add the custom migration for `resource_servers`.
+4. Apply migrations to local D1 with Wrangler.
+5. Run route smoke tests against `wrangler dev`.
+6. Apply remote migrations through CI/CD before deploying the Worker.
+
+Commands should be finalized during implementation, but expected scripts are:
+
+```bash
+pnpm db:generate
+pnpm db:migrate:local
+pnpm db:migrate:remote
+pnpm dev
+pnpm test
+pnpm lint
 ```
 
-**Migration commands:**
-1. `npx @better-auth/cli generate --config lib/auth-static.ts` — generate schema
-2. `wrangler d1 migrations apply` — apply to local/remote D1
-3. Programmatic migrations endpoint as fallback
+### 8.4 JWKS Rotation
 
-### 8.4 JWKS Key Rotation
+Target behavior:
 
-JWKS rotation is **built into the `jwt` plugin** (since PR #6147, v1.5). No cron job, no external process needed.
+- JWKS signing keys are stored in D1 through Better Auth's JWT plugin.
+- New tokens include `kid`.
+- JWKS endpoint returns public keys required to verify active tokens.
+- Rotation is configured explicitly if the plugin supports interval/grace settings in 1.6.11.
+- Old keys remain available for at least the maximum access token lifetime plus clock skew.
 
-```ts
-jwt({
-  jwks: {
-    jwksPath: "/.well-known/jwks.json",  // expose at OIDC-standard location
-    rotationInterval: 60 * 60 * 24 * 30, // rotate every 30 days
-    gracePeriod: 60 * 60 * 24 * 7,       // old key valid 7 more days
-  }
-})
-```
+Implementation requirement:
 
-**How it works:**
-- Keys are stored in the `jwks` D1 table with an `expiresAt` timestamp
-- When `rotationInterval` elapses since the last key was created, a new key pair is generated lazily on the next signing request
-- Old keys remain valid for `gracePeriod` seconds — existing tokens signed with the old key continue to verify
-- The `/jwks` endpoint (or configured `jwksPath`) returns only non-expired keys (within their grace period)
-- Each JWT header includes a `kid` (key ID), so verifiers can match the signing key
-
-**Important:** You MUST set `rotationInterval`. Without it, Better Auth may create a new key on every request (this was a known bug in 1.3.x, fixed in 1.4.1, but the behavior is still undefined without explicit configuration).
-
-**Non-destructive secret rotation** is also built-in (v1.5):
-
-```ts
-betterAuth({
-  secret: ["current-secret", "previous-secret", "even-older-secret"]
-})
-```
-
-Old secrets stay available for decryption during transition. Rotate by prepending a new secret and removing the oldest after the grace period.
-
-**Known issue:** JWKS keys are queried from the database on every session read — there is no caching (issue #3954). Mitigated by the fact that signing keys change very infrequently (30-day rotation). On Workers, the small overhead of a D1 read per session is acceptable at typical scale.
+- Add automated tests for key creation, token signing, JWKS fetch, verification by `kid`, and old-key verification during grace.
+- Do not rely on a separate cron rotation service unless Better Auth 1.6.11 requires one.
 
 ## 9. Auth Flow Walkthroughs
 
-### 9.1 User Authorization Code Flow (SPA/Mobile)
+### 9.1 Authorization Code + PKCE
 
-```
-SPA/Mobile App                        Auth Server                         Resource Server
-     │                                     │                                     │
-     │  1. GET /oauth2/authorize           │                                     │
-     │     ?response_type=code             │                                     │
-     │     &client_id=app_123              │                                     │
-     │     &redirect_uri=https://app/cb    │                                     │
-     │     &scope=openid+profile+read:posts│                                     │
-     │     &code_challenge=<S256>          │                                     │
-     │     &code_challenge_method=S256     │                                     │
-     │     &resource=https://api.example.c │                                     │
-     │     &state=<random>                 │                                     │
-     │ ──────────────────────────────────> │                                     │
-     │                                     │  Validate client, redirect_uri,     │
-     │                                     │  scopes, PKCE, resource             │
-     │                                     │                                     │
-     │  302 → /sign-in?<params>            │                                     │
-     │ <────────────────────────────────── │                                     │
-     │                                     │                                     │
-     │  User signs in                      │                                     │
-     │                                     │                                     │
-     │                                     │  (if org-scoped scopes:             │
-     │                                     │   postLogin redirect → org select)  │
-     │                                     │                                     │
-     │  302 → /consent?<params>            │                                     │
-     │ <────────────────────────────────── │                                     │
-     │                                     │                                     │
-     │  User consents to scopes            │                                     │
-     │                                     │                                     │
-     │  302 → https://app/cb?code=<code>   │                                     │
-     │     &state=<random>                 │                                     │
-     │ <────────────────────────────────── │                                     │
-     │                                     │                                     │
-     │  2. POST /oauth2/token              │                                     │
-     │     grant_type=authorization_code   │                                     │
-     │     &code=<code>                    │                                     │
-     │     &code_verifier=<verifier>       │                                     │
-     │     &resource=https://api.example.c │                                     │
-     │ ──────────────────────────────────> │                                     │
-     │                                     │  Validate code, PKCE verifier,      │
-     │                                     │  resource (subset of authorized).   │
-     │                                     │  Issue JWKS-signed JWT access token │
-     │                                     │  with aud=https://api.example.com   │
-     │                                     │                                     │
-     │  { access_token: <JWT>,             │                                     │
-     │    token_type: "Bearer",            │                                     │
-     │    expires_in: 3600,                │                                     │
-     │    id_token: <JWT>,                 │                                     │
-     │    refresh_token: <opaque>,         │                                     │
-     │    scope: "openid profile ...",     │                                     │
-     │    org_id: "org_xyz" }              │                                     │
-     │ <────────────────────────────────── │                                     │
-     │                                     │                                     │
-     │  3. GET /api/posts                  │                                     │
-     │     Authorization: Bearer <JWT>     │                                     │
-     │ ────────────────────────────────────────────────────────────────────────> │
-     │                                     │    Fetch JWKS from auth server       │
-     │                                     │    Verify JWT signature, iss, aud,   │
-     │                                     │    exp. Check scope=read:posts.      │
-     │                                     │    Check org_id matches resource.    │
-     │                                     │                                     │
-     │  { posts: [...] }                   │                                     │
-     │ <──────────────────────────────────────────────────────────────────────── │
+```text
+Client
+  GET /oauth2/authorize
+    response_type=code
+    client_id=...
+    redirect_uri=...
+    scope=openid profile read:posts
+    code_challenge=...
+    code_challenge_method=S256
+    resource=https://api.example.com
+    state=...
+
+Auth Worker
+  validate client, redirect URI, PKCE, scopes, resource
+  redirect to sign-in if needed
+  redirect to organization selection if org context is required
+  show consent for non-trusted clients
+  redirect back with code and state
+
+Client
+  POST /oauth2/token
+    grant_type=authorization_code
+    code=...
+    code_verifier=...
+    resource=https://api.example.com
+
+Auth Worker
+  validate code and resource narrowing
+  return JWT access token for resource, ID token where applicable, refresh token if allowed
 ```
 
-### 9.2 M2M Client Credentials Flow
+### 9.2 Client Credentials
 
-```
-Backend Service                       Auth Server                         Resource Server
-     │                                     │                                     │
-     │  POST /oauth2/token                 │                                     │
-     │  Authorization: Basic base64(cid:sec)│                                    │
-     │  Content-Type: x-www-form-urlencoded│                                     │
-     │  grant_type=client_credentials      │                                     │
-     │  &scope=read:posts+write:posts      │                                     │
-     │  &resource=https://api.example.com  │                                     │
-     │ ──────────────────────────────────> │                                     │
-     │                                     │  Validate client_id, client_secret. │
-     │                                     │  Reject OIDC scopes (openid, etc.). │
-     │                                     │  Issue JWKS-signed JWT access token │
-     │                                     │  with aud=https://api.example.com   │
-     │                                     │  No user context. No id_token.      │
-     │                                     │                                     │
-     │  { access_token: <JWT>,             │                                     │
-     │    token_type: "Bearer",            │                                     │
-     │    expires_in: 3600,                │                                     │
-     │    scope: "read:posts write:posts"} │                                     │
-     │ <────────────────────────────────── │                                     │
-     │                                     │                                     │
-     │  GET /api/posts                     │                                     │
-     │  Authorization: Bearer <JWT>        │                                     │
-     │ ────────────────────────────────────────────────────────────────────────> │
-     │                                     │    Verify JWT locally via JWKS.     │
-     │                                     │    sub = client_id (not a user).    │
-     │  { posts: [...] }                   │                                     │
-     │ <──────────────────────────────────────────────────────────────────────── │
+```text
+Backend service
+  POST /oauth2/token
+    grant_type=client_credentials
+    scope=read:posts write:posts
+    resource=https://api.example.com
+    Authorization: Basic base64(client_id:client_secret)
+
+Auth Worker
+  validate confidential client
+  reject user/OIDC scopes
+  issue short-lived JWT access token
+
+Resource server
+  verify JWT locally using JWKS
+  authorize using aud + scope + client_id
 ```
 
-**Key difference from user flow:** No `sub` claim mapping to a user. No `id_token`. No `openid`/`profile`/`email`/`offline_access` scopes allowed. The `sub` is the client ID itself. The token represents the application, not a user.
+Expected M2M token properties:
 
-### 9.3 Post-Login Organization Selection Flow
+- no end-user `sub`;
+- no `id_token`;
+- no `openid`, `profile`, `email`, or `offline_access`;
+- short lifetime;
+- audience bound to requested resource.
 
-This flow fires when OAuth scopes include org-scoped permissions (e.g., `read:organization`).
+### 9.3 Post-Login Organization Selection
 
-```
-User's Browser                        Auth Server
-     │                                     │
-     │  GET /oauth2/authorize?...          │
-     │  &scope=...read:organization        │
-     │ ──────────────────────────────────> │
-     │                                     │  User signs in
-     │                                     │
-     │                                     │  shouldRedirect() fires:
-     │                                     │  "Does user have orgs?
-     │                                     │   Is active org set?
-     │                                     │   Multiple orgs?"
-     │                                     │  → YES, need selection
-     │                                     │
-     │  302 → /select-organization?<params>│
-     │ <────────────────────────────────── │
-     │                                     │
-     │  User selects "Acme Inc"            │
-     │  Browser: authClient.setActive({    │
-     │    organizationId: "org_acme"       │
-     │  })                                 │
-     │  Then: oauth2Continue({             │
-     │    postLogin: true                  │
-     │  })                                 │
-     │ ──────────────────────────────────> │
-     │                                     │  consentReferenceId() fires:
-     │                                     │  returns session.activeOrganizationId
-     │                                     │  → "org_acme" stored as referenceId
-     │                                     │  on authorization code
-     │                                     │
-     │  302 → /consent?<params>            │
-     │ <────────────────────────────────── │
-     │                                     │
-     │  User consents                      │
-     │                                     │
-     │  302 → app/cb?code=<code>           │
-     │ <────────────────────────────────── │
-     │                                     │
-     │  (Later) POST /oauth2/token         │
-     │ ──────────────────────────────────> │
-     │                                     │  customAccessTokenClaims:
-     │                                     │  { org_id: "org_acme" }
-     │                                     │  → injected into JWT
-     │  { access_token: <JWT with          │
-     │    org_id=org_acme>, ... }          │
-     │ <────────────────────────────────── │
-```
+Org selection is required when a user token will carry organization context and the session does not already have the correct active organization.
 
-**Configuration:**
+Target behavior:
+
+1. User starts OAuth authorization.
+2. User signs in.
+3. OAuth Provider callback determines whether selected scopes/resources require org context.
+4. If needed, redirect to `/select-organization`.
+5. User selects an organization.
+6. Server validates membership.
+7. Flow resumes through Better Auth's continue route.
+8. Token claims include `org_id`.
+
+Implementation note:
+
+- The original doc used `authClient.setActive` and `oauth2Continue` as the client-side shape. Verify exact client API names from Better Auth 1.6.11 types when implementing.
+
+### 9.4 `prompt=select_account`
+
+When a client sends `prompt=select_account`, the service should force account selection if multiple device sessions are available.
+
+Target behavior:
+
+- Redirect to `/select-account` when appropriate.
+- Show available sessions/accounts.
+- User selects one.
+- OAuth flow resumes.
+- If only one session exists, skip the page unless Better Auth requires explicit confirmation.
+
+Requirement:
+
+- Include Better Auth's multi-session/client support only if required by the current OAuth Provider API for this flow.
+
+### 9.5 `prompt=create`
+
+When a client sends `prompt=create`, the service should redirect to sign-up instead of sign-in.
+
+Configuration should use the Better Auth OAuth Provider spelling verified in docs:
 
 ```ts
 oauthProvider({
-  postLogin: {
-    page: "/select-organization",
-    shouldRedirect: async ({ session, scopes, headers }) => {
-      const userOnlyScopes = ["openid", "profile", "email", "offline_access"];
-      if (scopes.every(s => userOnlyScopes.includes(s))) return false;
-      const organizations = await auth.api.listOrganizations({ headers });
-      return organizations.length > 1 ||
-        !(organizations.length === 1 &&
-          organizations.at(0)?.id === session.activeOrganizationId);
-    },
-    consentReferenceId: ({ session, scopes }) => {
-      if (scopes.includes("read:organization")) {
-        return session.activeOrganizationId as string;
-      }
-      return undefined;
-    },
-  },
-})
-```
-
-### 9.4 Account Selection Flow (prompt=select_account)
-
-The client sends `prompt=select_account` to force an account picker screen, even if the user is already logged in. This is the equivalent of Auth0's "Account Chooser" or Google's multi-account picker.
-
-```
-Client sends:
-GET /oauth2/authorize?prompt=select_account&...
-
-Auth server:
-  1. shouldRedirect() fires:
-     "How many sessions on this device?"
-     → Uses multiSession plugin to count device sessions
-     → If > 1: redirect to /select-account page
-
-Browser lands on /select-account:
-  - Shows list of logged-in accounts on this device
-  - User picks one
-  - Browser calls: authClient.oauth2.oauth2Continue({ selected: true })
-  - Auth server switches to that session
-  - Flow resumes → consent → code → app callback
-```
-
-**Configuration:**
-
-```ts
-oauthProvider({
-  selectAccount: {
-    page: "/select-account",
-    shouldRedirect: async ({ headers }) => {
-      const allSessions = await auth.api.listDeviceSessions({ headers });
-      return allSessions?.length > 1;
-    },
-  },
-})
-```
-
-### 9.5 Sign-Up Flow (prompt=create)
-
-The client sends `prompt=create` to redirect to a sign-up page instead of sign-in. After registration, the flow resumes.
-
-```
-Client sends:
-GET /oauth2/authorize?prompt=create&...
-
-Auth server:
-  → Redirects to configured signup page
-  → User completes registration
-  → Browser calls: authClient.oauth2.oauth2Continue({ created: true })
-  → Flow resumes with the new session → consent → code → app callback
-```
-
-**Configuration:**
-
-```ts
-oauthProvider({
-  signup: {
+  signUp: {
     page: "/sign-up",
   },
-})
-```
-
-### 9.6 Resource Server Token Verification Flow
-
-The downstream API verifies JWT access tokens locally — no introspection call to the auth server needed.
-
-```
-Resource Server receives request:
-  Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImtleV8xMjMifQ...
-
-Verification steps:
-  1. Decode JWT header. Get `kid` (key ID) and `alg` (algorithm).
-  2. Check if public key for this `kid` is cached locally.
-     - If yes → use cached key
-     - If no → fetch GET /.well-known/jwks.json from auth server
-              → cache the response (TTL: 1 hour recommended)
-              → find key matching `kid`
-  3. Verify JWT signature using the public key.
-  4. Verify claims:
-     - `iss` matches auth server URL (https://id.quanghuy.dev)
-     - `aud` matches this API's audience (https://api.example.com)
-     - `exp` is in the future
-     - `nbf` is in the past (if present)
-     - `iat` is not too far in the past (optional clock skew check)
-  5. Extract `sub`, `org_id`, `client_id`, `scope`, `role` from JWT payload.
-  6. Authorize: does the scope include the required permission?
-     Does the org_id match the requested resource's owner?
-
-If any check fails → 401 Unauthorized with WWW-Authenticate header
-```
-
-**Helper for verification (using Better Auth's built-in):**
-
-```ts
-import { verifyAccessToken } from "better-auth/oauth2";
-
-const payload = await verifyAccessToken(accessToken, {
-  verifyOptions: {
-    issuer: "https://id.quanghuy.dev",
-    audience: "https://api.example.com",
-  },
-  scopes: ["read:posts"], // optional — verify scope
 });
 ```
 
-**Without Better Auth (using any JWT library + JWKS fetch):**
+After sign-up:
 
-1. Fetch `GET https://id.quanghuy.dev/.well-known/jwks.json`
-2. Use `jose.createRemoteJWKSet(new URL('...'))` or manual JWKS parsing
-3. Verify JWT with `jose.jwtVerify(token, JWKS)`
-4. Assert claims manually (`payload.aud === 'https://api.example.com'`)
+- verify email if required;
+- create session;
+- resume OAuth flow through the provider continue route;
+- continue to consent or callback.
 
-The JWKS response can be cached aggressively — signing keys rotate every 30 days.
+### 9.6 Resource Server Verification
+
+Resource servers verify JWT access tokens locally:
+
+1. Read `Authorization: Bearer <token>`.
+2. Decode JWT header.
+3. Fetch or use cached JWKS from issuer metadata.
+4. Verify signature and `kid`.
+5. Validate `iss`.
+6. Validate `aud` equals the API's configured audience.
+7. Validate `exp`, `nbf`, and acceptable clock skew.
+8. Validate required scope.
+9. Validate `org_id` against the target resource tenant when applicable.
+
+Recommended Node/Worker verification libraries:
+
+- `jose` with `createRemoteJWKSet`;
+- Better Auth OAuth helper if exposed and compatible with Worker runtime.
+
+Failure behavior:
+
+- Invalid/missing token: `401` with `WWW-Authenticate: Bearer`.
+- Valid token, insufficient scope/org: `403`.
+- JWKS unavailable and no cached key: `503` or fail closed with clear logging.
 
 ## 10. Admin UI Requirements
 
-The admin UI is a protected web application (served from the same Worker or a separate static site) that provides management surfaces for all entities.
+The admin UI is an authenticated operational app. It should be dense, reliable, and task-focused.
 
-**Pages (first batch):**
+First-batch pages:
 
-| Page | Route | Description |
+| Page | Route | Capabilities |
 |---|---|---|
-| Dashboard | `/admin` | Metrics overview: user count, org count, active sessions, token issuance |
-| Organizations | `/admin/organizations` | List, create, edit, delete organizations |
-| Organization Detail | `/admin/organizations/:id` | Members, invitations, teams, settings |
-| OAuth Clients | `/admin/clients` | List all clients, create new, view details |
-| Client Detail | `/admin/clients/:id` | Client settings, rotate secret, disable, view redirect URIs |
-| Resource Servers | `/admin/resource-servers` | List, create, edit, delete resource server definitions |
-| Users | `/admin/users` | List users, view details, ban/unban, impersonate |
-| User Detail | `/admin/users/:id` | User sessions, organization memberships, linked accounts |
-| Consents | `/admin/consents` | View and revoke per-user client authorizations |
-| Settings | `/admin/settings` | Application configuration (JWKS rotation status, secret rotation, etc.) |
+| Dashboard | `/admin` | user/org/client/resource counts and metadata/JWKS health |
+| Organizations | `/admin/organizations` | list/create/update/delete where authorized |
+| Organization detail | `/admin/organizations/:id` | members, invitations, roles, settings |
+| OAuth clients | `/admin/clients` | list/create/update/disable |
+| OAuth client detail | `/admin/clients/:id` | redirect URIs, scopes, grants, secret rotation, consent settings |
+| Resource servers | `/admin/resource-servers` | list/create/update/disable audiences |
+| Users | `/admin/users` | list users, view sessions, ban/unban if enabled |
+| User detail | `/admin/users/:id` | profile, sessions, org memberships, linked accounts |
+| Consents | `/admin/consents` | list/revoke user-client consents |
+| Settings | `/admin/settings` | issuer URL, metadata health, JWKS status, package/runtime versions |
 
-**Access control for admin pages:**
+Admin UI implementation requirements:
 
-- `superadmin` platform role → full access to all admin pages and cross-org operations
-- `admin` platform role → access to admin pages within their own organization scope
-- Organization `owner` → can manage that organization's clients, members, and settings
+- All mutations call server actions/routes that re-check authorization.
+- Secret values are shown once at creation/rotation and never persisted in plaintext in UI state.
+- Deleting an organization/resource/client should be disable-first unless a hard delete is explicitly safe.
+- Lists must be paginated from the start.
+- The UI should expose IDs and audience strings in copyable fields for integration work.
 
-**Technology options for admin UI:**
-- Next.js static export deployed alongside the Worker (on Cloudflare Pages or same Worker via Workers Sites)
-- React SPA embedded in the Worker
-- Hono JSX (lightweight, no framework overhead)
+## 11. Pre-Implementation Spikes And Quality Gates
 
-## 11. Edge Cases And Failure Modes
+These spikes are mandatory because they remove integration uncertainty. They should be completed before the main implementation starts. Each spike produces a small code proof, a note in this document or a companion implementation note, and a failing/passing test where practical.
 
-| Failure mode | Expected handling |
+### 11.1 OAuth Provider Contract Spike
+
+Purpose:
+
+- Verify exact route paths, option names, server API names, and client API names from the installed `better-auth@1.6.11` and `@better-auth/oauth-provider@1.6.11` packages.
+
+Scope:
+
+- `package.json`
+- `src/auth/get-auth.ts`
+- `test/oauth-provider-contract.test.ts`
+- generated Better Auth type output or route map
+
+Questions to prove:
+
+- Whether OAuth Provider routes are served under `/api/auth/oauth2/*`, `/oauth2/*`, or another path based on `basePath`.
+- Exact names for client CRUD server APIs.
+- Exact config names for `signUp`, `selectAccount`, `postLogin`, `validAudiences`, trusted clients, and consent pages.
+- Exact userinfo path.
+- Whether `client_credentials` returns a JWT access token when `resource` is present.
+
+Acceptance criteria:
+
+- A local test starts the Worker and asserts the metadata route advertises the same authorization/token/userinfo/JWKS routes the implementation expects.
+- TypeScript compilation proves all chosen option names exist.
+- The document's route table is updated if the spike finds path differences.
+
+### 11.2 Resource Audience Strategy Spike
+
+Purpose:
+
+- Prove the final implementation for UI-managed resource servers feeding OAuth Provider audience validation.
+
+Scope:
+
+- `src/db/resource-servers.ts`
+- `src/auth/resource-audiences.ts`
+- `src/auth/get-auth.ts`
+- `test/resource-audience.test.ts`
+
+Chosen design:
+
+- `getAuth(env, request)` loads enabled `resource_servers.audience` values from D1 and passes them to `oauthProvider({ validAudiences })`.
+- A small per-isolate cache may be used, but it must have a documented maximum TTL.
+- Static `validAudiences` in source or deployment config is rejected because resource servers must be managed through the UI.
+
+Acceptance criteria:
+
+- Creating a resource server through D1 can make a subsequent token request for its `audience` succeed without manually editing source code.
+- Disabling the resource server makes new token requests fail within the chosen cache window.
+- Existing JWTs remain valid until expiry and this behavior is documented in the UI.
+- No API audience is required in `wrangler.jsonc`, `.dev.vars`, or source constants for production operation.
+
+### 11.3 D1 Schema And Migration Spike
+
+Purpose:
+
+- Prove Better Auth schema generation and custom migrations work against local D1 under Wrangler.
+
+Scope:
+
+- `src/auth/get-auth.ts`
+- `src/auth/cli-auth.ts` or equivalent CLI-only auth export
+- `src/db/schema.ts`
+- `migrations/*`
+- `wrangler.jsonc`
+
+Acceptance criteria:
+
+- Better Auth-generated schema is committed as migration SQL or a reproducible generated artifact.
+- Custom `resource_servers` migration applies after Better Auth tables.
+- `wrangler d1 migrations apply <db> --local` succeeds from a clean local database.
+- Running migrations twice does not fail.
+- A smoke script can create a user, organization, OAuth client, and resource server in local D1.
+
+### 11.4 JWKS And Secret Rotation Spike
+
+Purpose:
+
+- Prove token signing, JWKS publishing, key selection by `kid`, and old-key verification behavior.
+
+Scope:
+
+- `src/auth/get-auth.ts`
+- `src/auth/jwks.ts`
+- `test/jwks-rotation.test.ts`
+- `test/fixtures/verify-access-token.ts`
+
+Acceptance criteria:
+
+- First signed token creates or uses a JWKS key.
+- JWKS endpoint returns the public key for the token's `kid`.
+- `jose` can verify the token using the advertised JWKS URI.
+- Rotation creates a new signing key without immediately invalidating a token signed by the previous key.
+- Metadata advertises the actual JWKS URI used by resource servers.
+
+### 11.5 Admin Authorization Spike
+
+Purpose:
+
+- Prove the platform role plus organization role model is sufficient for first-batch admin UI and custom API authorization.
+
+Scope:
+
+- `src/admin/guards.ts`
+- `src/routes/admin/resource-servers.ts`
+- `test/admin-authorization.test.ts`
+
+Acceptance criteria:
+
+- `superadmin` can access cross-org lists and mutate any organization resource.
+- Organization `owner` can manage only that organization's clients/resource servers/members.
+- Organization `admin` can perform only delegated non-owner actions.
+- Organization `member` and unauthenticated users receive `403`/`401`.
+- Every admin mutation has a server-side authorization test.
+
+## 12. Implementation Plan
+
+This is a sequenced implementation plan, not a work-item tracking list.
+
+### 12.1 Foundation
+
+Create the Worker project structure:
+
+- `package.json`
+- `pnpm-lock.yaml`
+- `wrangler.jsonc`
+- `.dev.vars.example`
+- `src/index.ts`
+- `src/auth/config.ts`
+- `src/auth/get-auth.ts`
+- `src/db/schema.ts`
+- `src/db/migrations/*`
+- `src/routes/*`
+- `src/admin/*` or chosen UI app structure
+- `test/*`
+
+Recommended source ownership:
+
+| Path | Responsibility |
 |---|---|
-| D1 write fails mid-token-issuance | Token endpoint returns 500. Client retries. Partial state (access token created but refresh token not) is mitigated by idempotent-ish operations — the authorization code is consumed atomically. |
-| JWKS endpoint unreachable | Resource server uses cached JWKS. If cache is cold (first request or key rotated during outage), return 503 with Retry-After header. Fallback to introspection endpoint if configured. |
-| Signing key rotation happens while tokens are in flight | Grace period keeps old key valid for 7 days. Any token signed within the last rotation cycle is still verifiable. |
-| User's active organization is deleted | Session's `activeOrganizationId` becomes a dangling reference. On next session read, clear the field or prompt user to select another org. |
-| OAuth client's `referenceId` (org) is deleted | The client becomes orphaned — still exists but not scoped to any org. Admin UI should surface orphaned clients. Token issuance still works (the client exists), but `org_id` claims may be stale. |
-| Same user authorizes the same client twice (re-consent) | New consent record. New authorization code. Previous tokens remain valid until expiry or revocation. |
-| Refresh token replay | Better Auth implements refresh token replay prevention — each refresh_token is single-use. A replayed refresh token returns an error. |
-| Client requests wider resource set at token endpoint than authorization | RFC 8707 narrowing rule: resource at `/token` must be subset of resource at `/authorize`. Wider set → `invalid_target` error. |
-| Public client (no secret) + `disableJWTPlugin: true` | Public clients cannot receive `id_token` directly when JWT plugin is disabled. They must use `/userinfo` instead. This is enforced by the `oauthProvider`. |
-| D1 `batch()` partially fails | D1 `batch()` is atomic — all statements succeed or none do. However, if multiple `batch()` calls are needed for a multi-step operation, the intermediate state may be lost. Structure operations to use single `batch()` calls where possible. |
-| KV rate limit storage lag | KV is eventually consistent. Rate limit counters may be slightly inaccurate during high concurrency. Acceptable for auth rate limiting. |
-| Worker cold start | D1 connection establishment on cold start. Better Auth's D1 dialect handles this. First request may be slightly slower (100-300ms). |
+| `src/index.ts` | Hono app, route registration, request ID middleware, top-level error handling |
+| `src/auth/get-auth.ts` | Runtime Better Auth factory using Worker bindings |
+| `src/auth/config.ts` | Shared pure config helpers for plugins, scopes, and pages |
+| `src/auth/cli-auth.ts` | CLI/schema-generation auth export, if Better Auth tooling requires a static export |
+| `src/auth/resource-audiences.ts` | Resource-server audience loading/cache strategy |
+| `src/auth/claims.ts` | Custom access-token/ID-token/userinfo claim helpers |
+| `src/db/schema.ts` | Custom table schema only; Better Auth generated schema remains separate if tooling produces it |
+| `src/db/migrations/*` | D1 migrations |
+| `src/routes/admin/*` | Custom admin APIs for resource servers/dashboard |
+| `src/admin/*` | Admin UI routes/components if UI is bundled into the Worker project |
+| `src/resource-server/verify.ts` | Downstream JWT verification helper |
+| `test/*` | Worker, OAuth, admin authorization, D1, and JWKS tests |
 
-## 12. Definition Of Done
+Pin versions:
+
+- `better-auth@1.6.11`
+- `@better-auth/oauth-provider@1.6.11`
+- Hono and Wrangler versions pinned during implementation after checking npm metadata.
+
+### 12.2 Auth Core
+
+Implement:
+
+- Better Auth core with D1 binding.
+- email/password sign-up and sign-in.
+- email verification and password reset using selected email provider.
+- admin plugin only if it is needed for user management.
+- organization plugin with owner/admin/member roles.
+- platform role `additionalFields` on users.
+
+Acceptance criteria:
+
+- User can sign up, verify email, sign in, sign out, and read session.
+- User can create an organization and becomes owner.
+- Owner can invite a user and invited user can accept.
+
+### 12.3 OAuth Provider
+
+Implement:
+
+- `oauthProvider` plugin.
+- authorization code with PKCE.
+- consent page.
+- client CRUD through Better Auth server APIs.
+- `client_credentials`.
+- refresh token support where appropriate.
+- introspection and revocation.
+- resource indicators and valid audience checks.
+- JWT/JWKS integration.
+- `prompt=create` and `prompt=select_account`.
+- post-login org selection.
+
+Acceptance criteria:
+
+- Public SPA client completes PKCE.
+- Confidential client completes server-side authorization code exchange.
+- M2M client receives a JWT access token for a resource.
+- Tokens without `resource` behave as opaque/server-validated tokens.
+- Resource-widening at token exchange is rejected.
+
+### 12.4 Admin UI
+
+Implement UI pages in the order required by dependent flows:
+
+1. sign-in/sign-up/reset/verification pages;
+2. admin shell and route protection;
+3. organizations and members;
+4. OAuth clients;
+5. resource servers;
+6. users and sessions;
+7. consents;
+8. dashboard/settings.
+
+Acceptance criteria:
+
+- A platform admin can bootstrap and operate the service without editing config for normal org/client/resource changes.
+- Organization owners can manage only their own organization resources.
+- Members cannot access admin pages unless explicitly authorized.
+
+### 12.5 Resource Server Integration
+
+Implement and document a small verification helper for downstream APIs:
+
+- issuer URL;
+- JWKS URL;
+- expected audience;
+- required scopes;
+- org check helper;
+- failure response helper.
+
+Add at least one test resource server or fixture route that verifies a real token from the local Worker.
+
+### 12.6 Deployment Hardening
+
+Implement:
+
+- local D1 migrations;
+- remote D1 migration command;
+- CI checks;
+- Worker deploy command;
+- smoke test against local Wrangler;
+- metadata route verification;
+- health endpoint;
+- basic structured logging.
+
+## 13. Security And Privacy Model
+
+### 13.1 Secret Handling
+
+Required rules:
+
+- `BETTER_AUTH_SECRET`, email provider keys, social provider secrets, and OAuth client secrets are stored as Cloudflare secrets or equivalent secure bindings, not in `wrangler.jsonc`.
+- `.dev.vars.example` documents required secret names but contains no real secret values.
+- OAuth client secrets are displayed only on creation or rotation.
+- Secret rotation is non-destructive where Better Auth supports previous-secret arrays or equivalent fallback.
+- Logs never include access tokens, refresh tokens, authorization codes, client secrets, password reset tokens, email verification tokens, or full webhook-style payloads if later introduced.
+
+Implementation checks:
+
+- Add a log redaction utility before adding structured request logging.
+- Add tests for secret rotation behavior where Better Auth exposes it.
+- Add a manual deployment checklist item that confirms Cloudflare secret bindings exist before remote deploy.
+
+### 13.2 Token Security
+
+Access token policy:
+
+| Token | First-batch policy |
+|---|---|
+| Authorization code | Short-lived, one-time use, bound to PKCE verifier for public clients |
+| Access token | Short-lived; JWT only when `resource` is requested and accepted |
+| Refresh token | Issued only where needed; replay behavior tested and documented |
+| ID token | For client identity/login only; not accepted as API bearer token |
+| M2M access token | Short-lived, client identity only, no user claims |
+
+JWT verification requirements for resource servers:
+
+- Reject missing `kid`.
+- Reject unsupported algorithms.
+- Reject wrong issuer.
+- Reject wrong audience.
+- Reject expired or not-yet-valid tokens.
+- Reject missing required scope.
+- Treat `org_id` as required for organization-owned API resources.
+
+### 13.3 Admin Security
+
+Admin routes and UI must fail closed.
+
+Required controls:
+
+- `GET` pages and data loaders check session and role.
+- Mutations re-check authorization server-side.
+- Destructive actions require explicit confirmation in UI and are disable-first where possible.
+- Client secret rotation invalidates the old secret immediately unless Better Auth documents a grace behavior.
+- Admin audit fields are stored for custom tables: `created_by`, `updated_by`, and optionally `disabled_by`/`disabled_at` if the first migration can include them.
+
+Recommended custom table additions:
+
+| Table | Columns |
+|---|---|
+| `resource_servers` | `created_by`, `updated_by`, `disabled_at`, `disabled_by` |
+
+### 13.4 Data Privacy
+
+First-batch data minimization:
+
+- Store only the user profile fields Better Auth requires plus `platformRole`.
+- Do not add custom token telemetry tables in the first batch.
+- Do not copy prior `auther` permission graphs into `id`.
+- Do not expose cross-org user membership data to organization admins unless required for their organization.
+
+PII-bearing surfaces:
+
+- users;
+- sessions;
+- accounts/linked providers;
+- invitations;
+- email verification/password reset flows;
+- admin audit metadata.
+
+Operational requirement:
+
+- Add a future-compatible deletion path: deleting or disabling a user must revoke sessions and prevent new token issuance. Full data erasure can be a later privacy workflow, but first batch must avoid creating unnecessary custom PII copies.
+
+## 14. Operational Model
+
+### 14.1 Observability
+
+Use structured logs and lightweight metrics from Worker logs or the deployment platform. Do not add a custom token metrics table in the first batch.
+
+Required events:
+
+| Event | Fields |
+|---|---|
+| `auth.sign_in.success` | `user_id`, `method`, `request_id` |
+| `auth.sign_in.failure` | `reason`, `method`, `request_id` |
+| `oauth.authorize.failure` | `client_id`, `reason`, `request_id` |
+| `oauth.token.issued` | `client_id`, `grant_type`, `token_type`, `resource`, `organization_id`, `request_id` |
+| `oauth.token.failure` | `client_id`, `grant_type`, `reason`, `request_id` |
+| `admin.mutation` | `actor_user_id`, `organization_id`, `entity_type`, `entity_id`, `action`, `request_id` |
+| `jwks.rotation` | `kid`, `result`, `request_id` |
+
+Do not log:
+
+- token values;
+- client secrets;
+- authorization codes;
+- password reset or verification URLs;
+- raw request bodies for auth endpoints.
+
+### 14.2 Runbooks
+
+Create operator runbooks before first production launch:
+
+| Runbook | Required content |
+|---|---|
+| Deploy | migrations, Worker deploy, metadata smoke tests, rollback command |
+| Rotate Better Auth secret | add new secret, keep previous secret, deploy, observe, remove old secret after window |
+| Rotate OAuth client secret | admin UI flow, client coordination, failure symptoms |
+| JWKS incident | inspect JWKS endpoint, verify `kid`, cache purge guidance for resource servers |
+| Disable compromised client | disable client, revoke tokens where supported, communicate JWT expiry window |
+| Disable resource server | disable audience, explain existing JWT expiry behavior |
+| D1 migration failure | stop deploy, inspect local/remote migration state, restore from backup if needed |
+
+### 14.3 Capacity And Performance Targets
+
+Initial targets:
+
+| Operation | Target |
+|---|---|
+| Metadata/JWKS route | P95 under 100 ms from warm Worker, excluding network variance |
+| Session read | P95 under 250 ms with D1 |
+| Authorization redirect decision | P95 under 500 ms excluding user interaction |
+| Token endpoint | P95 under 500 ms for normal D1 latency |
+| Admin list pages | Server response under 700 ms for first 100 rows |
+
+Implementation rules:
+
+- Do not introduce large in-memory caches.
+- Cache JWKS in resource servers, not in the auth service only.
+- Paginate admin lists from day one.
+- Keep access-token custom claims small.
+
+## 15. Independent Rollout
+
+### 15.1 Relationship To `auther`
+
+`id` is not built on top of `auther`, does not share `auther` tables, does not need compatibility with `auther` clients or tokens, and does not require existing `auther` consumers to move.
+
+`auther` remains useful only as prior-art evidence:
+
+| `auther` area | How this plan uses it |
+|---|---|
+| Better Auth 1.3 + `oidcProvider` setup | Evidence for why `id` should use the newer OAuth Provider path |
+| Authorization spaces | Prior concept compared against organizations, not data to import |
+| Resource servers | Prior UI/product concept, not a table to copy |
+| API keys | Prior complexity avoided by `client_credentials` |
+| ReBAC/ABAC/pipeline/webhooks/onboarding | Evidence for explicit first-batch exclusions |
+
+First-batch non-goals:
+
+- No `auther` database import.
+- No `auther` token compatibility.
+- No `auther` OAuth client compatibility.
+- No `auther` session compatibility.
+- No requirement that apps currently using `auther` move to `id`.
+- No rollback path from `id` to `auther`.
+
+### 15.2 Rollout Sequence
+
+Recommended sequence:
+
+1. Build and test `id` locally against D1.
+2. Deploy `id` to staging Worker and staging D1.
+3. Create a test organization, OAuth client, and resource server.
+4. Integrate one new or explicitly selected downstream app with staging.
+5. Run authorization code, refresh, revocation, and client credentials smoke tests.
+6. Deploy production Worker and D1 with no downstream traffic.
+7. Create production admin account and first organization.
+8. Register first production resource server and OAuth client.
+9. Configure the selected downstream app to use `id` as a new issuer.
+10. Observe logs and OAuth smoke-test results.
+11. Add additional new downstream apps only after the first one is stable.
+
+### 15.3 Rollback Strategy
+
+Rollback means disabling or reverting the new `id` integration. It does not mean falling back to `auther`.
+
+Rules:
+
+- If `id` token issuance fails, stop onboarding new apps and disable affected `id` clients/resource servers.
+- If a new downstream app cannot use `id` safely, disable that app's `id` integration and return it to its pre-integration state.
+- If D1 migration fails before deploy, do not deploy the Worker.
+- If Worker deploy succeeds but smoke tests fail, roll back Worker version and leave database as-is unless the migration itself is proven harmful.
+
+## 16. Risks, Edge Cases, And Failure Modes
+
+| Risk/failure mode | Expected behavior |
+|---|---|
+| D1 unavailable | Auth and admin requests fail closed with clear `5xx` logs; no fallback to accepting tokens except already issued JWTs verified by resource servers |
+| D1 write partially completes across multiple app-level operations | Design each mutation to be idempotent where possible; use D1 `batch()` for custom multi-write operations |
+| KV stale reads | Rate limits/session caches tolerate short inconsistency; security-critical authorization does not depend solely on KV |
+| Resource server deleted while tokens are active | New tokens are rejected; existing JWTs remain valid until expiry unless resource server uses introspection or denylist |
+| OAuth client disabled while tokens are active | New authorization/token requests fail; existing JWTs remain valid until expiry |
+| Organization deleted while session has active org | Next session/admin check clears active org or requires reselection |
+| User removed from org while JWT is active | Existing JWT can remain valid until expiry; keep access token lifetime short |
+| JWKS rotates during requests | Old key remains available through grace period; resource servers cache by `kid` and refetch on unknown `kid` |
+| JWKS endpoint unreachable | Resource server uses cached keys; if no matching key is cached, fail closed |
+| Public client tries client credentials | Reject |
+| M2M requests OIDC user scopes | Reject |
+| Token request widens resource set | Reject |
+| Redirect URI mismatch | Reject and do not redirect to untrusted URI |
+| Consent declined | Return OAuth error to client with state preserved |
+| Admin attempts cross-org mutation | Reject with `403` and audit log where available |
+| Secret rotation mistake | Support previous secret during transition; document rollback and removal window |
+
+## 17. Test And Verification Plan
+
+Automated tests:
+
+- core sign-up/sign-in/session/sign-out;
+- email verification and password reset token behavior with provider mocked;
+- organization create/invite/accept/member role checks;
+- admin route protection by `platformRole` and org role;
+- OAuth authorization code with PKCE;
+- authorization code with invalid PKCE verifier;
+- redirect URI mismatch;
+- consent required and consent skipped for trusted client;
+- `prompt=create`;
+- `prompt=select_account`;
+- post-login organization selection;
+- client credentials success;
+- client credentials with public client rejected;
+- client credentials with OIDC scopes rejected;
+- `resource` JWT issued for valid resource;
+- invalid resource rejected;
+- resource narrowing allowed and widening rejected;
+- JWKS verification of issued token;
+- JWKS rotation/grace behavior;
+- introspection active/inactive behavior;
+- revocation behavior;
+- refresh token exchange and replay prevention if Better Auth supports single-use refresh tokens in the selected config;
+- resource server helper returns `401`, `403`, or success correctly.
+
+Manual smoke tests:
+
+- `wrangler dev` starts cleanly.
+- `/.well-known/oauth-authorization-server` returns current local issuer metadata.
+- `/.well-known/openid-configuration` returns current local issuer metadata when enabled.
+- JWKS endpoint returns at least one public key after first signing operation.
+- Admin UI can create org, create client, create resource server, run OAuth flow, and call test API.
+- Remote deployment can run migrations and complete the same smoke flow.
+
+Static checks:
+
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- migration dry run or local D1 apply
+
+## 18. Definition Of Done
 
 ### Required implementation outcomes:
 
@@ -1355,76 +1576,91 @@ The admin UI is a protected web application (served from the same Worker or a se
 - [ ] Admin can rotate an OAuth client's secret via admin UI
 - [ ] Third-party SPA can complete authorization_code flow with PKCE S256
 - [ ] SPA receives JWKS-signed JWT access token when `resource` param is provided
-- [ ] SPA receives opaque access token when `resource` param is NOT provided
-- [ ] Resource server (downstream API) can verify JWT locally using JWKS endpoint
+- [ ] SPA receives opaque access token or server-validated token when `resource` param is not provided
+- [ ] Resource server can verify JWT locally using JWKS endpoint
 - [ ] Backend service can authenticate via client_credentials grant (M2M)
 - [ ] M2M token does not contain user context or OIDC scopes
-- [ ] JWKS key rotation happens automatically on the configured interval
-- [ ] Old JWKS keys remain valid during the grace period
+- [ ] JWKS key rotation behavior is configured and tested
+- [ ] Old JWKS keys remain valid during the configured grace period
 - [ ] Consent screen is shown for non-trusted clients
-- [ ] Trusted clients skip consent
+- [ ] Trusted clients skip consent where configured
 - [ ] `prompt=select_account` works with multiple device sessions
 - [ ] `prompt=create` redirects to sign-up page and resumes flow
 - [ ] Post-login org selection flow works for org-scoped scopes
-- [ ] `org_id` is injected into JWT claims via `customAccessTokenClaims`
-- [ ] `org_id` is returned in token response envelope via `customTokenResponseFields`
-- [ ] Admin UI is protected by platform role (`superadmin`/`admin`)
-- [ ] Admin UI shows dashboard with user/org/client counts
-- [ ] Admin UI allows CRUD of organizations, OAuth clients, resource servers
+- [ ] `org_id` is injected into JWT claims for org-scoped tokens
+- [ ] Admin UI is protected by platform role (`superadmin`/`admin`) and org role checks
+- [ ] Admin UI shows dashboard with user/org/client/resource counts
+- [ ] Admin UI allows CRUD of organizations, OAuth clients, and resource servers
 - [ ] Admin UI allows viewing and revoking consents
 - [ ] UserInfo endpoint returns correct user data with `openid` scope
-- [ ] Token introspection (`/oauth2/introspect`) returns valid/invalid for any token
-- [ ] Token revocation (`/oauth2/revoke`) invalidates the token immediately
-- [ ] Refresh token can be exchanged for a new access token
-- [ ] Refresh token replay is prevented (single-use)
+- [ ] Token introspection returns valid/invalid for supported token types
+- [ ] Token revocation invalidates supported token types immediately
+- [ ] Refresh token can be exchanged for a new access token where enabled
+- [ ] Refresh token replay behavior is tested and documented
 - [ ] `/.well-known/oauth-authorization-server` returns correct metadata
-- [ ] `/.well-known/openid-configuration` returns correct metadata
-- [ ] `/.well-known/jwks.json` returns signing keys
+- [ ] `/.well-known/openid-configuration` returns correct metadata where OIDC is enabled
+- [ ] JWKS URI advertised by metadata returns signing keys
+- [ ] Section 11 spikes are complete and their outcomes are reflected in implementation docs or tests
+- [ ] Runtime resource server audience strategy is proven and documented
+- [ ] Admin mutation audit fields are written for custom tables
+- [ ] Secrets are configured through Cloudflare secret bindings, not committed config
+- [ ] Runbooks exist for deploy, secret rotation, OAuth client disable, resource server disable, JWKS incident, and D1 migration failure
+- [ ] First downstream app integration can be disabled or reverted without involving `auther`
 
 ### Required automated verification:
 
 - [ ] OAuth2 authorization_code flow end-to-end test (PKCE S256, token exchange, API call)
 - [ ] OAuth2 client_credentials flow end-to-end test
-- [ ] OAuth2 refresh_token flow end-to-end test
-- [ ] Token revocation test (revoked token rejected by API)
+- [ ] OAuth2 refresh_token flow end-to-end test where refresh tokens are enabled
+- [ ] Token revocation test
 - [ ] Admin UI access control tests (superadmin, admin, org owner, member)
 - [ ] JWKS rotation test (old key valid during grace period, new key used for new tokens)
-- [ ] Organization isolation test (user in org A cannot access org B's clients)
-- [ ] Rate limit test (repeated auth attempts are throttled)
+- [ ] Organization isolation test (user in org A cannot access org B's clients/resources)
+- [ ] Rate limit test for repeated auth attempts
+- [ ] Metadata route tests
+- [ ] Resource server JWT verification helper tests
+- [ ] Admin custom route audit-field tests
+- [ ] Log redaction tests for token/secret-bearing fields
+- [ ] Resource audience cache invalidation or expiry test
+- [ ] Local D1 clean migration and repeat migration test
 
 ### Required documentation:
 
-- [ ] API reference (all custom endpoints)
-- [ ] OAuth2 integration guide for downstream APIs
-- [ ] Admin UI user guide
-- [ ] Deployment guide (Cloudflare Workers setup)
-- [ ] Migration guide (from auther to new service)
+- [ ] API reference for custom admin endpoints
+- [ ] OAuth2/OIDC integration guide for apps
+- [ ] Resource server JWT verification guide
+- [ ] Admin UI operator guide
+- [ ] Cloudflare Workers/D1/KV deployment guide
+- [ ] Design-context notes explaining which `auther` ideas were intentionally not carried forward
+- [ ] Operational runbooks from Section 14.2
+- [ ] Security notes covering token policy, secret handling, and JWT verification requirements
 
-## 13. Final Model
+## 19. Final Model
 
-The new auth service is a Cloudflare Worker running Better Auth 1.6 with three primary plugins: `organization` (tenant scoping), `oauthProvider` (OAuth2.1/OIDC provider), and `jwt` (JWKS signing with rotation). It uses D1 for persistence and KV for rate limiting.
+The new `id` service is a Cloudflare Worker backed by D1 and Better Auth 1.6.x. It uses:
 
-**Core data boundaries:**
-- Organizations are the tenant boundary — OAuth clients, resource servers, and users are all scoped to an organization
-- OAuth clients are managed via the admin UI backed by Better Auth's server API (not config files)
-- Resource servers are defined as audiences (`validAudiences`) with a thin custom table for metadata
-- JWT access tokens are issued with audience binding when the `resource` parameter is provided; opaque tokens otherwise
-- Authorization is flat RBAC (organization roles + OAuth scopes) — no ReBAC or ABAC in the first batch
+- Better Auth core for users and sessions;
+- organization plugin for tenants;
+- OAuth Provider for authorization code, client credentials, refresh, consent, revocation, introspection, and userinfo;
+- JWT/JWKS support for locally verifiable API access tokens;
+- one small custom table for resource server metadata;
+- an admin UI as the primary management surface.
 
-**What this replaces from auther:**
-- Custom auth space system → Better Auth `organization` plugin
-- Custom OIDC provider + token bridge → Better Auth `oauthProvider` with native JWT
-- Custom JWKS rotation cron → Built-in `jwt` plugin rotation
-- Custom consent flow → Built-in consent with per-client skip_consent
-- Custom account picker → `prompt=select_account` with multi-session
-- Custom API key exchange → `client_credentials` grant
-- Custom pipeline system → Callback-based injection (`customAccessTokenClaims`, `customTokenResponseFields`, hooks)
+What it deliberately does differently from `auther`:
 
-**What is deferred to later batches:**
-- ReBAC (Zanzibar graph authorization with BFS subject expansion)
-- ABAC (attribute-based policy engine, Lua or JS)
-- Pipeline/hook scripting engine (DAG editor, OpenTelemetry tracing)
-- Webhook delivery system
-- Custom onboarding flows (registration contexts, invite tokens)
+- custom authorization spaces become organizations;
+- `oidcProvider` becomes `oauthProvider`;
+- API-key exchange becomes `client_credentials`;
+- custom resource server metadata is reduced to a first-batch audience table;
+- custom JWKS/token bridging is replaced by Better Auth JWT/JWKS behavior;
+- custom admin surfaces are rebuilt against Better Auth server APIs.
 
-**Deployment footprint:** One Cloudflare Worker + one D1 database + one KV namespace. No external services required for core auth. Email sending (for verification and password reset) will need an external provider (Resend or similar).
+What it intentionally does not include in first batch:
+
+- ReBAC tuple graph authorization;
+- ABAC/Lua policy evaluation;
+- pipeline scripting/DAG editor/tracing;
+- webhook delivery;
+- registration contexts and automatic grant workflows.
+
+The first batch succeeds when downstream apps can use `id` as a reliable OAuth/OIDC issuer, admins can manage tenants/clients/resources through UI, and resource servers can verify API tokens locally through JWKS without depending on `auther`.
