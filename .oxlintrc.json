@@ -1,0 +1,144 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "vitest",
+    "import",
+    "promise"
+  ],
+  "jsPlugins": ["./scripts/oxlint-js-plugins/architecture.js"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "settings": {
+    "vitest": {
+      "testPattern": ["workers/**/*.test.ts"]
+    }
+  },
+  "rules": {
+    "no-console": "error",
+    "eqeqeq": "error",
+    "import/no-cycle": "error",
+    "import/no-default-export": "off",
+    "typescript/no-explicit-any": "error",
+    "unicorn/no-array-sort": "off",
+    "architecture/layer-imports": ["error", {
+      "internalAllowed": {
+        "domain": ["@/domain/", "@/shared/"],
+        "application": ["@/application/", "@/domain/", "@/shared/"],
+        "http": ["@/application/", "@/composition/", "@/config/", "@/domain/", "@/http/", "@/shared/"],
+        "infrastructure": ["@/config/", "@/domain/", "@/infrastructure/", "@/shared/"],
+        "composition": ["@/application/", "@/composition/", "@/config/", "@/domain/", "@/infrastructure/", "@/shared/"],
+        "shared": ["@/shared/"],
+        "auth": ["@/auth/", "@/config/", "@/shared/"],
+        "config": ["@/config/", "@/shared/"]
+      },
+      "externalBanned": {
+        "domain": ["@hono/", "hono", "drizzle-orm", "cloudflare:", "@cloudflare/"],
+        "application": ["@hono/", "hono", "drizzle-orm", "cloudflare:", "@cloudflare/"],
+        "http": ["drizzle-orm"],
+        "infrastructure": ["@hono/", "hono"],
+        "shared": ["@hono/", "hono", "drizzle-orm", "cloudflare:", "@cloudflare/"]
+      }
+    }],
+    "architecture/no-mapper-imports-outside-infra": "error",
+    "architecture/no-storage-error-parsing": "error",
+    "architecture/no-custom-errors-outside-shared": "error",
+    "architecture/req-valid-usage": "error",
+    "architecture/no-plain-zod-import": "error",
+    "architecture/route-module": "error",
+    "architecture/route-handler-boundary": "error",
+    "architecture/repository-workflow": "error",
+    "architecture/mapper-file": "error",
+    "architecture/entity-class": "error",
+    "architecture/no-raw-entity-serialization": "error",
+    "architecture/crud-adapter-jsdoc": "error",
+    "architecture/no-magic-numbers": "error",
+    "architecture/constants-placement": "error",
+    "architecture/constants-jsdoc": "error",
+    "architecture/worker-isolation": "error",
+    "architecture/core-no-ui-deps": "error",
+    "architecture/ui-no-auth-deps": "error",
+    "architecture/packages-lib-isolation": "error",
+    "architecture/auth-boundary": "error",
+    "architecture/admin-auth-required": "error",
+    "architecture/ui-route-composition": "error"
+  },
+  "overrides": [
+    {
+      "files": ["workers/**/tests/**/*.ts"],
+      "rules": {
+        "architecture/layer-imports": "off",
+        "architecture/no-mapper-imports-outside-infra": "off",
+        "architecture/no-storage-error-parsing": "off",
+        "architecture/no-custom-errors-outside-shared": "off",
+        "architecture/req-valid-usage": "off",
+        "architecture/no-plain-zod-import": "off",
+        "architecture/route-module": "off",
+        "architecture/route-handler-boundary": "off",
+        "architecture/repository-workflow": "off",
+        "architecture/mapper-file": "off",
+        "architecture/entity-class": "off",
+        "architecture/no-raw-entity-serialization": "off",
+        "architecture/crud-adapter-jsdoc": "off",
+        "architecture/no-magic-numbers": "off",
+        "architecture/constants-placement": "off",
+        "architecture/constants-jsdoc": "off",
+        "architecture/worker-isolation": "off",
+        "architecture/core-no-ui-deps": "off",
+        "architecture/ui-no-auth-deps": "off",
+        "architecture/packages-lib-isolation": "off",
+        "architecture/auth-boundary": "off",
+        "architecture/admin-auth-required": "off",
+        "architecture/ui-route-composition": "off",
+        "no-console": "off",
+        "no-await-in-loop": "off"
+      }
+    },
+    {
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "architecture/layer-imports": "off",
+        "architecture/no-mapper-imports-outside-infra": "off",
+        "architecture/no-storage-error-parsing": "off",
+        "architecture/no-custom-errors-outside-shared": "off",
+        "architecture/req-valid-usage": "off",
+        "architecture/no-plain-zod-import": "off",
+        "architecture/route-module": "off",
+        "architecture/route-handler-boundary": "off",
+        "architecture/repository-workflow": "off",
+        "architecture/mapper-file": "off",
+        "architecture/entity-class": "off",
+        "architecture/no-raw-entity-serialization": "off",
+        "architecture/crud-adapter-jsdoc": "off",
+        "architecture/no-magic-numbers": "off",
+        "architecture/constants-placement": "off",
+        "architecture/constants-jsdoc": "off",
+        "architecture/worker-isolation": "off",
+        "architecture/core-no-ui-deps": "off",
+        "architecture/ui-no-auth-deps": "off",
+        "architecture/packages-lib-isolation": "off",
+        "architecture/auth-boundary": "off",
+        "architecture/admin-auth-required": "off",
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".wrangler",
+    "migrations",
+    ".architecture-rule-workspace",
+    "**/tests/fixtures/**"
+  ],
+  "env": {
+    "es2022": true,
+    "worker": true
+  }
+}

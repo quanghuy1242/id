@@ -1,0 +1,21 @@
+{
+  "name": "id-core",
+  "main": "src/main.ts",
+  "compatibility_date": "2026-05-19",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "id",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+  "vars": {
+    "BETTER_AUTH_URL": "https://id.quanghuy.dev"
+  }
+}

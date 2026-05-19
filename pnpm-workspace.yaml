@@ -1,0 +1,17 @@
+packages:
+  - "."
+  - "packages/*"
+  - "workers/*"
+allowBuilds:
+  aislop: true
+  esbuild: true
+  fallow: true
+  sharp: true
+  workerd: true
+minimumReleaseAge: 0
+onlyBuiltDependencies:
+  - aislop
+  - esbuild
+  - fallow
+  - sharp
+  - workerd

@@ -40,6 +40,7 @@
 > Assumptions:
 >
 > - Cloudflare Workers is the deployment target, not Vercel.
+> - Repository topology in this document is superseded by `docs/000_repo-architecture.md`: first-batch implementation uses two Workers, `core-id` and `ui-id`.
 > - D1 is the primary database and must be treated as SQLite-compatible but not equivalent to a long-lived Node database connection.
 > - Better Auth remains the auth foundation for the first batch.
 > - The first batch excludes ReBAC, ABAC/Lua, custom pipeline scripting, webhooks, and custom onboarding flows. Those exclusions are deliberate architecture decisions in Section 5 and should not be re-opened in this batch.

@@ -49,8 +49,8 @@ Versions will be pinned at start of implementation. Verified package metadata on
 - `src/composition/create-container.ts` is the only file that wires infrastructure implementations to application use cases.
 - `src/infrastructure/persistence/crud-adapter.ts` owns shared CRUD row access and cursor pagination.
 - `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
-- Better Auth-owned tables are never defined in `src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
-- Custom tables are gated by `.schema-whitelist.json`; unapproved tables fail CI.
+- Better Auth-owned tables are never defined in `workers/core/src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
+- Custom tables are defined through Better Auth plugin `schema` definitions, migrated via BA CLI.
 - Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
 
 ## Local Setup
@@ -107,9 +107,9 @@ pnpm dev:stack:ui                # both Workers with service binding (UI primary
 
 ## Migrations
 
-Better Auth schema is generated via CLI. Custom tables use Drizzle. Generated SQL migrations live under `drizzle/`.
+Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `drizzle/`.
 
-Generate BA schema and Drizzle migrations:
+Generate BA schema (built-in + plugin tables):
 
 ```bash
 pnpm db:generate
@@ -132,21 +132,19 @@ pnpm db:migrate:remote
 ```bash
 pnpm lint
 pnpm check:dup
-pnpm check:schema
-pnpm check:ui
 pnpm typecheck
 pnpm test
 pnpm check
 pnpm advise
 ```
 
-`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 6 id-specific), Fallow mild duplicate threshold (<3%), schema whitelist, UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
+`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 6 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 
 ## Deployment
 
 CI/CD is handled by `.github/workflows/ci-deploy.yml`. On every push to `main`:
 
-1. `pnpm check` — lint, dup gate, schema whitelist, UI composition, typecheck, tests
+1. `pnpm check` — lint, dup gate, UI composition, typecheck, tests
 2. `wrangler d1 migrations apply id --remote`
 3. `wrangler deploy --config workers/core/wrangler.jsonc`
 4. `vinext deploy --cwd workers/ui`
