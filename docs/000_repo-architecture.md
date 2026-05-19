@@ -1,6 +1,6 @@
 # id — Repository Architecture, Layers, And Enforcement
 
-> Status: implementation-grade architecture specification
+> Status: implementation-grade architecture specification, rewritten after claim review
 >
 > Date: 2026-05-19
 >
@@ -10,98 +10,175 @@
 >
 > Source docs and reference implementations:
 >
-> - `/home/quanghuy1242/pjs/content-api` — reference for layer architecture, oxlint rules, entity patterns, repository/mapper contracts, and multi-worker setup
-> - `/home/quanghuy1242/pjs/books` — reference for Lumina UI system (DaisyUI v5 + Tailwind v4 CSS-first, component token props, app shell, compact density)
-> - `/home/quanghuy1242/pjs/auther` — prior art showing structural problems this architecture is designed to prevent
->
-> Related local files:
->
-> - `/home/quanghuy1242/pjs/auth/README.md`
-> - `/home/quanghuy1242/pjs/auth/docs/001_first-batch-plan.md`
-> - `/home/quanghuy1242/pjs/content-api/scripts/oxlint-js-plugins/architecture.js` (16 rules)
-> - `/home/quanghuy1242/pjs/content-api/docs/architecture.md`
-> - `/home/quanghuy1242/pjs/content-api/docs/003_entity-classes-and-oxlint-arch-linting.md`
-> - `/home/quanghuy1242/pjs/content-api/docs/004_code-duplication-and-abstraction-linting.md`
-> - `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md`
+> - `/home/quanghuy1242/pjs/auth/README.md` — current repo contract; declares two Workers
+> - `/home/quanghuy1242/pjs/auth/docs/001_first-batch-plan.md` — domain plan; older one-Worker topology is superseded by this architecture document
+> - `/home/quanghuy1242/pjs/auth/docs/reference/content-api-architecture.md` — accepted content-api architecture facts for this review
+> - `/home/quanghuy1242/pjs/content-api/scripts/oxlint-js-plugins/architecture.js` — verified 16-rule architecture plugin
+> - `/home/quanghuy1242/pjs/content-api/.oxlintrc.json` — verified strict layer-import, route, entity, mapper, repository, constants, and test override rules
+> - `/home/quanghuy1242/pjs/content-api/scripts/check-duplication-threshold.mjs` — verified 3% Fallow hard gate
+> - `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md` — Lumina UI system reference
+> - `/home/quanghuy1242/pjs/auther/package.json`
+> - `/home/quanghuy1242/pjs/auther/src/lib/auth.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/app-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/rebac-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/pipeline-schema.ts`
+> - `/home/quanghuy1242/pjs/auther/src/db/platform-access-schema.ts`
+> - Better Auth OAuth Provider docs, checked on 2026-05-19: <https://better-auth.com/docs/plugins/oauth-provider>
+> - Better Auth JWT plugin docs, checked on 2026-05-19: <https://better-auth.com/docs/plugins/jwt>
+> - Better Auth Organization plugin docs, checked on 2026-05-19: <https://better-auth.com/docs/plugins/organization>
+> - Better Auth database docs, checked on 2026-05-19: <https://www.better-auth.com/docs/concepts/database>
+> - Cloudflare Workers service bindings docs, checked on 2026-05-19: <https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/>
+> - Cloudflare Workers multi-Worker local development docs, checked on 2026-05-19: <https://developers.cloudflare.com/workers/development-testing/multi-workers/>
+> - Cloudflare D1 Worker API docs, checked on 2026-05-19: <https://developers.cloudflare.com/d1/worker-api/d1-database/>
+> - Vinext repository docs, checked on 2026-05-19: <https://github.com/cloudflare/vinext>
 >
 > Assumptions:
 >
-> - This document defines **how** the codebase is structured, layered, and enforced. The domain plan (`001_first-batch-plan.md`) defines **what** is built.
-> - The first batch deploys two Cloudflare Workers: `core-id` (auth/OAuth/JWKS) and `ui-id` (admin dashboard).
+> - This document defines **how** the codebase is structured, layered, and enforced. `001_first-batch-plan.md` defines **what** is built.
+> - This document is newer than the one-Worker wording in `001_first-batch-plan.md`; for repository topology, this document supersedes `001`.
+> - The first batch deploys two Cloudflare Workers: `core-id` for auth/OAuth/JWKS/admin API and `ui-id` for the admin dashboard.
 > - Workers never import from each other. Shared code lives in `packages/`.
-> - All enforcement rules are mechanical — lint gates, CI scripts, type constraints. No unwritten conventions.
-> - This document can be extended as later batches introduce new packages or tables, but the original invariants should not be weakened.
+> - Architecture rules are mechanical gates. LLM-friendly implementation freedom is not a goal of this document.
+> - ReBAC, ABAC/Lua, webhook delivery, custom registration contexts, and pipeline scripting are intentionally out of first batch.
 
 ## Table Of Contents
 
 - [1. Goal](#1-goal)
-- [2. Root Layout](#2-root-layout)
-- [3. Worker Topology](#3-worker-topology)
-  - [3.1 `core-id` — Auth And OAuth Worker](#31-core-id--auth-and-oauth-worker)
-  - [3.2 `ui-id` — Admin UI Worker](#32-ui-id--admin-ui-worker)
-  - [3.3 Worker Isolation](#33-worker-isolation)
-- [4. Shared Packages](#4-shared-packages)
-  - [4.1 `packages/ui` — Lumina Component Library](#41-packagesui--lumina-component-library)
-  - [4.2 `packages/lib` — Shared Types, Constants, API Client](#42-packageslib--shared-types-constants-api-client)
-  - [4.3 Package Isolation](#43-package-isolation)
-- [5. Layer Architecture](#5-layer-architecture)
-  - [5.1 Layer Definitions](#51-layer-definitions)
-  - [5.2 Import Rules](#52-import-rules)
-  - [5.3 Banned External Imports Per Layer](#53-banned-external-imports-per-layer)
-- [6. Design Patterns](#6-design-patterns)
-  - [6.1 Entity Class Pattern](#61-entity-class-pattern)
-  - [6.2 Repository Pattern](#62-repository-pattern)
-  - [6.3 Mapper Pattern](#63-mapper-pattern)
-  - [6.4 Use Case Pattern](#64-use-case-pattern)
-  - [6.5 Route Handler Pattern](#65-route-handler-pattern)
-  - [6.6 Request-Scoped Container](#66-request-scoped-container)
-  - [6.7 Better Auth Factory Pattern](#67-better-auth-factory-pattern)
-  - [6.8 CrudAdapter Pattern](#68-crudadapter-pattern)
-- [7. UI Architecture](#7-ui-architecture)
-  - [7.1 Lumina System Contract](#71-lumina-system-contract)
-  - [7.2 Route File Rules](#72-route-file-rules)
-  - [7.3 Admin Page Conventions](#73-admin-page-conventions)
-- [8. Enforcement System](#8-enforcement-system)
-  - [8.1 Oxlint Architecture Rules](#81-oxlint-architecture-rules)
-  - [8.2 Table Whitelist](#82-table-whitelist)
-  - [8.3 Duplicate Code Gate](#83-duplicate-code-gate)
-  - [8.4 TypeScript Strict Mode](#84-typescript-strict-mode)
-  - [8.5 Advisory Pass](#85-advisory-pass)
-  - [8.6 Quality Gate Summary](#86-quality-gate-summary)
-- [9. Toolchain](#9-toolchain)
-  - [9.1 Root Configuration](#91-root-configuration)
-  - [9.2 Worker Configuration](#92-worker-configuration)
-  - [9.3 Scripts](#93-scripts)
-- [10. Rules Summary](#10-rules-summary)
-- [11. Pre-Implementation Spikes](#11-pre-implementation-spikes)
-- [12. Definition Of Done](#12-definition-of-done)
+- [2. Review Findings And Corrections](#2-review-findings-and-corrections)
+  - [2.1 Verified Claims To Keep Strong](#21-verified-claims-to-keep-strong)
+  - [2.2 Corrections Applied](#22-corrections-applied)
+  - [2.3 Architecture Gaps Strengthened](#23-architecture-gaps-strengthened)
+- [3. Root Layout](#3-root-layout)
+- [4. Worker Topology](#4-worker-topology)
+  - [4.1 `core-id` — Auth And OAuth Worker](#41-core-id--auth-and-oauth-worker)
+  - [4.2 `ui-id` — Admin UI Worker](#42-ui-id--admin-ui-worker)
+  - [4.3 Worker Isolation](#43-worker-isolation)
+  - [4.4 Local Multi-Worker Development](#44-local-multi-worker-development)
+- [5. Shared Packages](#5-shared-packages)
+  - [5.1 `packages/ui` — Lumina Component Library](#51-packagesui--lumina-component-library)
+  - [5.2 `packages/lib` — Shared Types, Constants, API Client](#52-packageslib--shared-types-constants-api-client)
+  - [5.3 Package Isolation](#53-package-isolation)
+- [6. Core Layer Architecture](#6-core-layer-architecture)
+  - [6.1 Layer Definitions](#61-layer-definitions)
+  - [6.2 Import Rules](#62-import-rules)
+  - [6.3 Banned External Imports Per Layer](#63-banned-external-imports-per-layer)
+  - [6.4 Better Auth Boundary](#64-better-auth-boundary)
+- [7. Design Patterns](#7-design-patterns)
+  - [7.1 Entity Class Pattern](#71-entity-class-pattern)
+  - [7.2 Repository Pattern](#72-repository-pattern)
+  - [7.3 Mapper Pattern](#73-mapper-pattern)
+  - [7.4 Use Case Pattern](#74-use-case-pattern)
+  - [7.5 Route Handler Pattern](#75-route-handler-pattern)
+  - [7.6 Request-Scoped Container](#76-request-scoped-container)
+  - [7.7 Better Auth Factory Pattern](#77-better-auth-factory-pattern)
+  - [7.8 CrudAdapter Pattern](#78-crudadapter-pattern)
+- [8. UI Architecture](#8-ui-architecture)
+  - [8.1 Lumina System Contract](#81-lumina-system-contract)
+  - [8.2 Route File Rules](#82-route-file-rules)
+  - [8.3 Admin Page Convention](#83-admin-page-convention)
+  - [8.4 UI Enforcement](#84-ui-enforcement)
+- [9. Data Ownership And Schema Control](#9-data-ownership-and-schema-control)
+  - [9.1 Better Auth-Owned Tables](#91-better-auth-owned-tables)
+  - [9.2 Custom Tables](#92-custom-tables)
+  - [9.3 Table Whitelist](#93-table-whitelist)
+- [10. Enforcement System](#10-enforcement-system)
+  - [10.1 Oxlint Architecture Rules](#101-oxlint-architecture-rules)
+  - [10.2 Duplicate Code Gate](#102-duplicate-code-gate)
+  - [10.3 TypeScript Strict Mode](#103-typescript-strict-mode)
+  - [10.4 Advisory Pass](#104-advisory-pass)
+  - [10.5 Quality Gate Summary](#105-quality-gate-summary)
+- [11. Toolchain](#11-toolchain)
+  - [11.1 Root Configuration](#111-root-configuration)
+  - [11.2 Worker Configuration](#112-worker-configuration)
+  - [11.3 Scripts](#113-scripts)
+- [12. Rules Summary](#12-rules-summary)
+- [13. Pre-Implementation Spikes](#13-pre-implementation-spikes)
+- [14. Risks, Edge Cases, And Failure Modes](#14-risks-edge-cases-and-failure-modes)
+- [15. Test And Verification Plan](#15-test-and-verification-plan)
+- [16. Definition Of Done](#16-definition-of-done)
+- [17. Final Model](#17-final-model)
 
 ## 1. Goal
 
-Define the repository structure, layer architecture, design patterns, and enforcement system for the `id` project. This document is the constitution — it constrains every line of code that enters the repo. The domain plan (`001_first-batch-plan.md`) defines what must be built. This document defines how it must be built.
+Define the repository structure, layer architecture, design patterns, and enforcement system for the `id` project. This document is the constitution: it constrains every line of code that enters the repo. The domain plan (`001_first-batch-plan.md`) defines what must be built. This document defines how it must be built.
 
-The architecture is designed to prevent the structural problems observed in `/home/quanghuy1242/pjs/auther`:
-- no layer boundaries (domain code imports from webhook delivery, auth config touches pipeline engine);
-- no mechanical enforcement (rules live in the developer's head, not in the CI pipeline);
-- direct database table access everywhere (Better Auth table writes from admin routes, making BA upgrades dangerous);
-- entity state as plain objects (no guard against accidental field mutation or serialization leakage).
+The architecture prevents the structural problems observed in `/home/quanghuy1242/pjs/auther`:
 
-The reference implementation is `/home/quanghuy1242/pjs/content-api`, which enforces hexagonal architecture through 16 custom oxlint rules, a strict duplicate code gate, TypeScript strict mode, and advisory scanning. The `id` repo ports the same enforcement stack and adapts it to a two-worker topology with Better Auth as the auth foundation.
+- no layer boundaries: auth configuration imports pipeline hooks, webhook delivery, and permission services directly;
+- no mechanical architecture enforcement: conventions are distributed through code and docs rather than CI gates;
+- direct persistence access scattered across feature code, making auth-library and schema upgrades risky;
+- entity state modeled as plain objects, making accidental serialization, mutation, and field leakage easy;
+- too many control-plane systems in the first runtime: ReBAC, ABAC/Lua, pipeline execution, webhooks, registration contexts, and OAuth are all coupled.
 
-## 2. Root Layout
+The reference implementation is `/home/quanghuy1242/pjs/content-api`. It demonstrates a Cloudflare Worker with clean layer boundaries, a request-scoped container, domain entity classes, repository/mapper separation, 16 custom oxlint architecture rules, a strict duplicate-code gate, TypeScript strict mode, and advisory scanning. The `id` repo ports that enforcement stack, then adds worker/package/UI rules needed for a two-worker Better Auth system.
 
-The root must stay minimal — no `wrangler.jsonc`, no framework configuration, no per-environment files. Worker-specific configuration lives inside each worker's directory. Shared packages live under `packages/`. Scripts live under `scripts/`. Documentation lives under `docs/`.
+## 2. Review Findings And Corrections
 
-```
-pjs/id/
-├── package.json                    # Single package.json — Wrangler bundles each worker independently via esbuild
+### 2.1 Verified Claims To Keep Strong
+
+The strict posture of the original architecture document is correct and should not be relaxed.
+
+Verified local claims:
+
+- `content-api` has a 16-rule `architecture` oxlint plugin with rules for layer imports, mapper isolation, storage error parsing, custom errors, request validation, route shape, route handler boundaries, repository workflow, mapper files, entity classes, raw entity serialization, CrudAdapter JSDoc, magic numbers, constants placement, and constants JSDoc.
+- `content-api` runs `pnpm check` as a hard gate: lint, duplicate-code threshold, typecheck, and tests.
+- `content-api` uses a 3% Fallow duplication threshold with `--mode mild --min-tokens 50 --min-lines 5`.
+- `auther` uses Better Auth 1.3.x with `oidcProvider`, `jwt`, `apiKey`, `admin`, `username`, `oAuthProxy`, and `nextCookies`.
+- `auther` contains resource-server, authorization-space, OAuth-client metadata, ReBAC, ABAC, webhook, pipeline, and registration-context persistence. Those are real systems and are intentionally not first-batch `id` systems.
+- `README.md` declares the two-worker target: `core-id` and `ui-id`.
+
+Verified external claims:
+
+- Better Auth OAuth Provider is documented as an OAuth 2.1 provider plugin with OIDC compatibility, authorization-code with PKCE, refresh tokens, `client_credentials`, introspection, revocation, UserInfo, dynamic registration, JWT signing when requesting a `resource`, and remote JWKS verification. Source: [Better Auth OAuth Provider](https://better-auth.com/docs/plugins/oauth-provider).
+- Better Auth OAuth Provider requires well-known metadata endpoints at the issuer path. Source: [Better Auth OAuth Provider](https://better-auth.com/docs/plugins/oauth-provider).
+- Better Auth JWT plugin exposes `/api/auth/jwks` by default, supports custom `jwksPath`, and supports key rotation via `rotationInterval` and `gracePeriod`. Source: [Better Auth JWT](https://better-auth.com/docs/plugins/jwt).
+- Better Auth database docs show Cloudflare Workers/D1 examples using a D1 binding in runtime config and CLI/schema generation paths for Cloudflare projects. Source: [Better Auth database docs](https://www.better-auth.com/docs/concepts/database).
+- Package metadata checked with `npm view` on 2026-05-19: `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`, `vinext@0.0.50`, and `wrangler@4.92.0`.
+- Cloudflare service bindings allow one Worker to call another without a public URL, support both HTTP-style `fetch()` and RPC-style calls, and are configured on the caller Worker. Source: [Cloudflare service bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/).
+- Cloudflare documents running multiple Workers locally with multiple `-c` config flags; the first config is the primary HTTP Worker and the rest are accessible through service bindings. Source: [Cloudflare multi-Worker development](https://developers.cloudflare.com/workers/development-testing/multi-workers/).
+- D1 `batch()` executes statements as a transaction and aborts or rolls back the whole sequence on failure. Source: [Cloudflare D1 Worker API](https://developers.cloudflare.com/d1/worker-api/d1-database/).
+- Vinext currently documents Cloudflare Worker deployment for App Router and Pages Router, but it is still an experimental project. Source: [cloudflare/vinext](https://github.com/cloudflare/vinext).
+
+### 2.2 Corrections Applied
+
+These are corrections to facts or wording, not loosened architecture decisions:
+
+- `001_first-batch-plan.md` still contains one-Worker wording. That is not a blocker for this document. This architecture document is newer and supersedes the old topology wording.
+- The repo path is `/home/quanghuy1242/pjs/auth`; examples may refer to the product/package name `id`, but implementation paths should use the actual repo path.
+- UserInfo should be documented as `/oauth2/userinfo` from Better Auth OAuth Provider. Depending on Better Auth base path/mounting, the public URL may include the auth base path; tests must assert the final route map.
+- Better Auth JWT's default JWKS endpoint is `/api/auth/jwks`; custom OIDC-style paths such as `/.well-known/jwks.json` require explicit `jwksPath` configuration.
+- The OAuth Provider sign-up prompt docs show `signUp` in configuration. Do not invent `signup` or other option names.
+- `validAudiences`, custom token claims, JWKS rotation, and route mounting must be proven by the pinned installed packages before feature work proceeds. This proof is required because exact TypeScript option shapes matter, not because the architecture is optional.
+- The root URL `/` should be owned by `core-id` by default. It can redirect to `/admin` or return service metadata, but `ui-id` must not become the default catch-all owner of auth/API paths.
+- UI route composition cannot stay review-only. It must be mechanically enforced by an oxlint rule or a dedicated AST script before substantial admin pages merge.
+
+### 2.3 Architecture Gaps Strengthened
+
+The original hexagonal/clean architecture is good enough for `core-id`, but three boundaries need stronger wording:
+
+1. Better Auth boundary:
+   Better Auth is a runtime integration boundary. It is allowed in `src/auth/**`, selected route mounting files, migration/schema scripts, and tests. It is forbidden in domain and application code.
+
+2. UI boundary:
+   Admin route files must not draw UI directly. The route-file rules are strict and must become a mechanical gate, not just code review guidance.
+
+3. Service binding boundary:
+   Service binding traffic is internal transport, not trust. `core-id` admin routes must authorize every request even when called through `CORE_ID`.
+
+## 3. Root Layout
+
+The root stays minimal. No root `wrangler.jsonc`, no framework config that belongs to only one Worker, and no real environment files. Worker-specific configuration lives inside each worker directory. Shared packages live under `packages/`. Scripts live under `scripts/`. Documentation lives under `docs/`.
+
+```text
+/home/quanghuy1242/pjs/auth/
+├── package.json                    # Single root package.json; each Worker bundles independently
 ├── pnpm-workspace.yaml             # Workspace: . (root), packages/*
 ├── pnpm-lock.yaml
 ├── tsconfig.json                   # Base config; workers and packages extend it
 ├── .oxlintrc.json                  # Shared lint rules for all workers and packages
-├── .schema-whitelist.json          # Approved custom table names — CI fails on unlisted tables
+├── .schema-whitelist.json          # Approved custom table names; CI fails on unlisted tables
 ├── .advise-suppressions.json       # Known advisory noise filtered during pnpm advise
-├── vitest.workspace.ts             # References workers/core/vitest.config.ts and workers/ui/vitest.config.ts
+├── vitest.workspace.ts             # References workers/core and workers/ui test configs
 ├── .dev.vars.example               # Documents required secret names; no real values
 ├── .gitignore
 ├── AGENTS.md                       # Agent/LLM workflow instructions
@@ -110,283 +187,310 @@ pjs/id/
 ├── docs/
 │   ├── 000_repo-architecture.md    # This document
 │   ├── 001_first-batch-plan.md     # Domain and feature plan
-│   └── ...
+│   └── reference/
+│       └── content-api-architecture.md
 │
 ├── scripts/
-│   ├── check-duplication-threshold.mjs     # Fallow hard gate wrapper
-│   ├── check-schema-whitelist.mjs          # CI script: fails if Drizzle schema defines unlisted tables
-│   ├── filter-advise.mjs                   # Filters Aislop + Fallow output through suppressions
+│   ├── check-duplication-threshold.mjs
+│   ├── check-schema-whitelist.mjs
+│   ├── check-ui-route-composition.mjs
+│   ├── filter-advise.mjs
 │   └── oxlint-js-plugins/
-│       └── architecture.js                 # Custom oxlint rules ported from content-api
+│       └── architecture.js
 │
 ├── packages/
-│   ├── ui/                          # Lumina component library
+│   ├── ui/
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   └── src/
-│   │       ├── actions/             # Button, LinkButton, AriaButton
-│   │       ├── feedback/            # Toast
-│   │       ├── forms/               # TextField, SearchField, Select
-│   │       ├── layout/              # Stack, Inline, Grid, Panel, Container, Spacer
-│   │       ├── navigation/          # Menu, Popover
-│   │       ├── page/                # Page, PageHeader, PageBody, PageSection
-│   │       ├── theme/               # ThemeScript
-│   │       ├── typography/          # Text, Heading
-│   │       ├── app-shell/           # AppShell, Topbar, Sidebar, MobileDock
+│   │       ├── actions/
+│   │       ├── feedback/
+│   │       ├── forms/
+│   │       ├── layout/
+│   │       ├── navigation/
+│   │       ├── page/
+│   │       ├── theme/
+│   │       ├── typography/
+│   │       ├── app-shell/
 │   │       └── index.ts
 │   │
-│   └── lib/                         # Shared primitives (zero framework imports)
+│   └── lib/
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── src/
-│           ├── types.ts             # Shared type definitions
-│           ├── constants.ts         # Shared constants
-│           ├── errors.ts            # Shared error codes or error types
-│           └── api-client.ts        # Typed client for calling core-id admin API from ui-id
+│           ├── types.ts
+│           ├── constants.ts
+│           ├── errors.ts
+│           ├── paths.ts
+│           └── api-client.ts
 │
 └── workers/
     ├── core/
-    │   ├── package.json             # Dependencies: hono, better-auth, drizzle-orm, zod, jose
-    │   ├── wrangler.jsonc           # Worker config: D1, KV, secrets, routes
-    │   ├── tsconfig.json            # Extends root, path alias @/ → src/
-    │   ├── vitest.config.ts         # Cloudflare Workers pool
+    │   ├── package.json
+    │   ├── wrangler.jsonc
+    │   ├── tsconfig.json
+    │   ├── vitest.config.ts
     │   ├── src/
-    │   │   ├── main.ts              # Hono entry: creates app, registers middleware and routes
-    │   │   ├── app.ts               # createApp() factory for test injection
-    │   │   ├── domain/              # Pure domain: entities, repository interfaces, policies
-    │   │   │   ├── authz/           # Actor, authorization primitives
-    │   │   │   └── resource-servers/# ResourceServer entity + repository interface
-    │   │   ├── application/         # Use cases (one class per operation, one .execute() method)
-    │   │   │   ├── auth/            # AuthenticateBearerTokenUseCase
-    │   │   │   └── resource-servers/# CRUD use cases
-    │   │   ├── composition/         # DI wiring: createRequestContainer(env, ctx?)
-    │   │   │   └── create-container.ts
+    │   │   ├── main.ts
+    │   │   ├── app.ts
+    │   │   ├── domain/
+    │   │   ├── application/
+    │   │   ├── composition/
     │   │   ├── config/
-    │   │   │   └── env.ts           # Zod-validated env + AppBindings type
-    │   │   ├── http/                # Hono adapter layer
-    │   │   │   ├── app-env.ts       # AppEnv type (Bindings + Variables)
-    │   │   │   ├── middleware/       # auth, request-id, error-handler
-    │   │   │   ├── presenters/       # Entity → JSON-safe response objects
-    │   │   │   ├── routes/           # Route modules (*.routes.ts)
-    │   │   │   │   ├── auth/        # Delegates to Better Auth handler
-    │   │   │   │   ├── oauth/       # OAuth page routes (sign-in, consent, select-account, etc.)
-    │   │   │   │   └── admin/       # Custom admin API routes
-    │   │   │   ├── schemas/          # Zod request/response schemas
-    │   │   │   └── helpers.ts        # requireActor, route registration helpers
-    │   │   ├── infrastructure/       # Concrete implementations of domain interfaces
-    │   │   │   ├── db/
-    │   │   │   │   ├── client.ts    # createDb() — Drizzle/D1 factory
-    │   │   │   │   └── schema.ts    # Custom table definitions only (no BA tables)
-    │   │   │   ├── persistence/
-    │   │   │   │   └── crud-adapter.ts
-    │   │   │   └── repositories/
-    │   │   │       ├── drizzle-*.repository.ts
-    │   │   │       └── mappers/
-    │   │   │           └── *.mapper.ts
-    │   │   ├── shared/               # Cross-layer primitives (allowed everywhere)
-    │   │   │   ├── constants.ts
-    │   │   │   ├── errors.ts
-    │   │   │   └── pagination/
-    │   │   │       └── cursor.ts
-    │   │   └── auth/                 # Better Auth integration (NOT in domain/application)
-    │   │       ├── get-auth.ts       # Runtime factory: getAuth(env, request)
-    │   │       ├── config.ts         # Shared pure config (scopes, pages, plugin options)
-    │   │       ├── resource-audiences.ts  # D1-backed audience loader for validAudiences
-    │   │       └── claims.ts         # Custom token claim helpers
+    │   │   ├── http/
+    │   │   ├── infrastructure/
+    │   │   ├── shared/
+    │   │   └── auth/
     │   └── tests/
-    │       ├── oauth-flows.test.ts
-    │       ├── admin-auth.test.ts
-    │       ├── resource-audience.test.ts
-    │       └── jwks-rotation.test.ts
     │
     └── ui/
-        ├── package.json             # Dependencies: react, react-dom, @/ui, hono (thin proxy)
-        ├── wrangler.jsonc           # Worker config: CORE_ID service binding, no D1
-        ├── tsconfig.json            # Extends root, jsx: react-jsx
-        ├── vitest.config.ts         # jsdom environment
-        ├── vinext.config.ts         # Vinext build config
+        ├── package.json
+        ├── wrangler.jsonc
+        ├── tsconfig.json
+        ├── vitest.config.ts
+        ├── vinext.config.ts
         ├── src/
-        │   ├── main.ts              # Hono entry: serves SPA, proxies admin API calls to core-id
-        │   ├── app/                 # Vinext App Router (same conventions as books)
-        │   │   ├── globals.css      # Tailwind v4 + DaisyUI v5 + lumina themes
-        │   │   ├── layout.tsx       # AppShell, theme, global providers
-        │   │   ├── page.tsx         # Redirect to /admin
-        │   │   └── admin/           # Admin pages (composition-only, nothing else)
-        │   │       ├── layout.tsx   # Admin layout with sidebar + topbar
-        │   │       ├── page.tsx     # Dashboard
-        │   │       ├── organizations/
-        │   │       ├── clients/
-        │   │       ├── resource-servers/
-        │   │       ├── users/
-        │   │       ├── consents/
-        │   │       └── settings/
+        │   ├── main.ts
+        │   ├── app/
         │   └── lib/
-        │       └── admin-api.ts     # Calls core-id via service binding (typed)
         └── tests/
-            └── admin-pages.test.tsx
 ```
 
-## 3. Worker Topology
+## 4. Worker Topology
 
-Two Cloudflare Workers deployed independently. They communicate at runtime through Cloudflare service bindings, not through code imports.
+Two Cloudflare Workers deploy independently and communicate at runtime through service bindings, not through source imports.
 
-```
+```text
 Internet
     │
-    ├──> https://id.quanghuy.dev/*           ──> core-id worker
-    │                                              ├── D1 database
-    │                                              ├── KV namespace
-    │                                              └── Better Auth instance (per-request)
+    ├──> https://id.quanghuy.dev/                 ──> core-id worker
+    ├──> https://id.quanghuy.dev/api/auth/*       ──> core-id worker
+    ├──> https://id.quanghuy.dev/oauth2/*         ──> core-id worker
+    ├──> https://id.quanghuy.dev/.well-known/*    ──> core-id worker
+    ├──> https://id.quanghuy.dev/api/admin/*      ──> core-id worker
     │
-    └──> https://id.quanghuy.dev/admin/*     ──> ui-id worker
-                                                   ├── CORE_ID service binding ──> core-id (internal)
-                                                   └── React/Vinext app (no D1, no BA)
+    └──> https://id.quanghuy.dev/admin/*          ──> ui-id worker
+                                                       └── CORE_ID service binding ──> core-id
 ```
 
-### 3.1 `core-id` — Auth And OAuth Worker
+Route specificity is part of the architecture. `/admin/*` is the UI Worker. Auth, OAuth, metadata, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
 
-**Responsibility:**
-- Better Auth handler for all auth routes (`/api/auth/*`)
-- OAuth2.1/OIDC provider endpoints (`/oauth2/*`)
-- Well-known metadata (`/.well-known/*`)
-- Custom admin API (`/api/admin/*`) for entities BA doesn't own
-- OAuth flow pages: sign-in, sign-up, consent, select-account, select-organization, reset-password
-- JWKS endpoint
-- Token issuance, introspection, revocation
+### 4.1 `core-id` — Auth And OAuth Worker
 
-**Bindings:**
-- `DB` — D1 database (Better Auth tables + custom tables)
-- `KV` — Workers KV for secondary storage (rate limiting, session cache)
-- `BETTER_AUTH_SECRET` — Better Auth secret key
-- `BETTER_AUTH_URL` — Public issuer URL (`https://id.quanghuy.dev`)
-- Email provider secrets (verification and password reset)
+Responsibility:
 
-**Stack:** Hono, Better Auth 1.6.x, `@better-auth/oauth-provider`, Drizzle ORM, Zod, Jose.
+- Better Auth handler for auth routes.
+- OAuth 2.1/OIDC provider endpoints.
+- well-known metadata endpoints.
+- JWKS endpoint, using Better Auth JWT default `/api/auth/jwks` or an explicitly configured `jwksPath`.
+- custom admin API for first-batch entities Better Auth does not own.
+- OAuth flow pages if they need server-hosted auth state.
+- token issuance, introspection, and revocation.
+- resource audience loading and validation.
 
-**Framework constraint:** Cannot import `react`, `react-dom`, `vinext`, `@vitejs/*`, or any UI framework. Enforced by oxlint.
+Bindings:
 
-### 3.2 `ui-id` — Admin UI Worker
+- `DB` — D1 database for Better Auth tables and approved custom tables.
+- `KV` — secondary storage where Better Auth or local rate/session code needs it.
+- `BETTER_AUTH_SECRET` — Better Auth secret key.
+- `BETTER_AUTH_URL` — public issuer/base URL.
+- email provider secrets.
 
-**Responsibility:**
-- Serve the admin dashboard (React/Vinext SPA)
-- Proxy admin API calls to `core-id` via service binding when needed
-- Render pages: dashboard, organizations, OAuth clients, resource servers, users, consents, settings
+Allowed stack:
 
-**Bindings:**
-- `CORE_ID` — service binding to `core-id` worker (internal, no public internet hop)
-- No D1. No KV. No Better Auth instance.
+- Hono.
+- Better Auth 1.6.x.
+- `@better-auth/oauth-provider`.
+- Drizzle ORM.
+- Zod.
+- Jose, when needed for downstream verification tests or custom verification helpers.
 
-**Stack:** Hono (thin proxy layer), Vinext (App Router), React 19, the `packages/ui` Lumina component library.
+Forbidden stack:
 
-**Framework constraint:** Cannot import `better-auth`, `drizzle-orm`, `jose`, or any Cloudflare D1/KV binding type. Cannot directly access the database. All data flows through `core-id`'s API. Enforced by oxlint.
+- React.
+- React DOM.
+- Vinext.
+- Vite UI plugins.
+- React Aria.
+- DaisyUI/Tailwind runtime imports.
+- UI package imports.
 
-### 3.3 Worker Isolation
+### 4.2 `ui-id` — Admin UI Worker
 
-Workers are build-time isolated and runtime-communicating. The rule is absolute:
+Responsibility:
+
+- serve the admin dashboard.
+- render admin pages for dashboard, organizations, OAuth clients, resource servers, users, consents, and settings.
+- call `core-id` admin APIs through service binding on server-side UI paths or through public admin endpoints from browser code, depending on the session flow.
+- never own auth state, token signing, D1 schema, or Better Auth initialization.
+
+Bindings:
+
+- `CORE_ID` — service binding to `core-id`.
+- no D1.
+- no KV unless a later document adds UI-specific cache storage.
+- no Better Auth instance.
+
+Allowed stack:
+
+- Hono as a thin Worker adapter/proxy only.
+- Vinext App Router.
+- React 19.
+- `packages/ui`.
+- `packages/lib`.
+
+Forbidden stack:
+
+- Better Auth.
+- Drizzle ORM.
+- Jose.
+- Cloudflare D1/KV binding types.
+- imports from `workers/core/**`.
+
+### 4.3 Worker Isolation
+
+Workers are build-time isolated and runtime-communicating. The rule is absolute.
 
 | Rule | Enforcement |
 |---|---|
-| `workers/core/src/**` must not import from `workers/ui/` | Oxlint architecture rule |
-| `workers/ui/src/**` must not import from `workers/core/` | Oxlint architecture rule |
-| `workers/core/src/**` must not import `react`, `react-dom` | Oxlint architecture rule |
-| `workers/ui/src/**` must not import `better-auth`, `drizzle-orm`, `jose` | Oxlint architecture rule |
-| Both workers may import from `packages/ui/` and `packages/lib/` | Allowed by layer-imports rule |
+| `workers/core/src/**` must not import from `workers/ui/**` | Oxlint `worker-isolation` |
+| `workers/ui/src/**` must not import from `workers/core/**` | Oxlint `worker-isolation` |
+| `workers/core/src/**` must not import React, React DOM, Vinext, or Vite UI tooling | Oxlint `core-no-ui-deps` |
+| `workers/ui/src/**` must not import Better Auth, Drizzle, Jose, or D1/KV bindings | Oxlint `ui-no-auth-deps` |
+| Both workers may import from `packages/lib` | Allowed by package rules |
+| Only `workers/ui` may import from `packages/ui` | Oxlint `core-no-ui-deps` |
 
-## 4. Shared Packages
+### 4.4 Local Multi-Worker Development
 
-### 4.1 `packages/ui` — Lumina Component Library
+Cloudflare supports service bindings in local development and supports multiple Worker configs in one `wrangler dev` command. Because only the first config is exposed as the primary HTTP Worker, the repo must include scripts for both common local modes.
 
-Reusable React components following the Lumina UI system. All visual primitives live here: buttons, layout, typography, forms, navigation, app shell.
+```json
+{
+  "scripts": {
+    "dev:core": "wrangler dev --config workers/core/wrangler.jsonc",
+    "dev:ui": "vinext dev --cwd workers/ui",
+    "dev:stack:core": "wrangler dev -c workers/core/wrangler.jsonc -c workers/ui/wrangler.jsonc",
+    "dev:stack:ui": "wrangler dev -c workers/ui/wrangler.jsonc -c workers/core/wrangler.jsonc"
+  }
+}
+```
 
-**Design contract (from `books/docs/001_lumina_ui_system_daisyui_tailwind.md`):**
+Acceptance requirement:
 
-- Token props, not raw `className`: `<Button variant="primary" size="sm">` not `<button className="btn btn-primary btn-sm">`
-- DaisyUI v5 + Tailwind v4 CSS-first (no `tailwind.config.ts`)
-- Two themes: `lumina-light` (default) and `lumina-dark`, activated via `data-theme` on `<html>`
-- Compact density everywhere: `btn-sm`, `input-sm`, `menu-sm`, `card-compact`
-- React Aria wrapped at leaf components only (`AriaButton`, `Menu`, `Popover`, `Select`) — `"use client"` stays at leaves, never at pages
-- Typography via `Text` component with variants (`h1`, `h2`, `h3`, `body`, `caption`, `label`, `sectionLabel`, `brand`)
-- Button hierarchy: `Button` (actions, renders `<button>`), `LinkButton` (navigation, renders `<a>`), `AriaButton` (client-only `onPress`)
-- Layout primitives: `Stack`, `Inline`, `Grid`, `Panel`, `Page`, `PageHeader`, `PageBody`, `PageSection`
+- `dev:stack:ui` proves `/admin` can call `core-id` through `CORE_ID`.
+- `dev:stack:core` proves core routes can run while the UI Worker is available as a secondary service.
 
-**What this package must not import:** `hono`, `better-auth`, `drizzle-orm`, Cloudflare bindings, any `workers/*` code. Pure React component library.
+## 5. Shared Packages
 
-### 4.2 `packages/lib` — Shared Types, Constants, API Client
+### 5.1 `packages/ui` — Lumina Component Library
+
+Reusable React components follow the Lumina UI system from `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md`.
+
+Design contract:
+
+- token props, not raw `className`: `<Button variant="primary" size="sm">`, not `<button className="btn btn-primary btn-sm">`;
+- DaisyUI v5 and Tailwind v4 CSS-first setup;
+- two themes: `lumina-light` and `lumina-dark`;
+- compact density everywhere;
+- React Aria wrapped at leaf components only;
+- `"use client"` stays at leaves and shell providers, never at route pages by default;
+- typography via `Text` and `Heading`;
+- layout via `Stack`, `Inline`, `Grid`, `Panel`, `Page`, `PageHeader`, `PageBody`, and `PageSection`;
+- app shell via `AppShell`, `Topbar`, `Sidebar`, and `MobileDock`.
+
+This package must not import Hono, Better Auth, Drizzle, Cloudflare bindings, or any `workers/**` code.
+
+### 5.2 `packages/lib` — Shared Types, Constants, API Client
 
 Zero-framework primitives shared between workers.
 
-**Contents:**
+Contents:
 
-- Shared TypeScript types (entity DTOs, API response shapes, error codes)
-- Shared constants (pagination defaults, token lifetimes, well-known paths)
-- Error code enums or string constants used by both workers
-- Typed API client for `core-id`'s admin API — used by `ui-id` when calling through the service binding
+- DTOs and API response shapes.
+- error code constants.
+- pagination types and constants.
+- public path constants.
+- typed API client for `core-id` admin APIs.
 
-**What this package must not import:** `react`, `hono`, `better-auth`, `drizzle-orm`, Cloudflare bindings, `zod`, or any framework. Pure TypeScript. Can import from itself only.
+This package must not import React, Hono, Better Auth, Drizzle, Zod, Cloudflare bindings, or any worker-local source. If runtime validation is needed, keep schemas in the owning Worker and export inferred DTO types or duplicate a minimal type-only contract.
 
-### 4.3 Package Isolation
+### 5.3 Package Isolation
 
 | Package | May import from | Must not import |
 |---|---|---|
-| `packages/ui/` | `packages/ui/`, `packages/lib/`, `react`, `react-dom`, `react-aria-components`, DaisyUI/Tailwind | `workers/`, `hono`, `better-auth`, `drizzle-orm`, Cloudflare bindings |
-| `packages/lib/` | `packages/lib/` only | Everything else (pure TypeScript) |
+| `packages/ui` | `packages/ui`, `packages/lib`, React, React DOM, React Aria, UI-only helpers | `workers/**`, Hono, Better Auth, Drizzle, Cloudflare bindings |
+| `packages/lib` | `packages/lib` only | all frameworks, runtime adapters, workers |
 
-## 5. Layer Architecture
+## 6. Core Layer Architecture
 
-Borrowed from `/home/quanghuy1242/pjs/content-api`. Hexagonal / clean architecture with strict import direction. The layers apply within `workers/core/src/`. The `ui-id` worker uses Vinext conventions instead.
+The clean architecture applies inside `workers/core/src`. `ui-id` uses Vinext route conventions plus the UI composition rules in Section 8.
 
-### 5.1 Layer Definitions
+### 6.1 Layer Definitions
 
 | Layer | Path | Purpose |
 |---|---|---|
-| Domain | `src/domain/` | Pure business logic: entities, repository interfaces, policy objects. No framework code. No I/O. |
+| Domain | `src/domain/` | Pure business logic: entities, repository interfaces, policies, value objects. No framework code. No I/O. |
 | Application | `src/application/` | Use cases that orchestrate domain objects. No HTTP awareness. No database access. |
-| HTTP | `src/http/` | Hono adapter: route definitions, middleware, request/response schemas, presenters. |
-| Infrastructure | `src/infrastructure/` | Concrete implementations: Drizzle repositories, D1 connection, CrudAdapter, mappers. |
-| Composition | `src/composition/` | DI wiring: the one file that connects infrastructure implementations to application use cases. |
-| Shared | `src/shared/` | Cross-cutting primitives: constants, error classes, pagination utilities. Importable by all layers. |
-| Auth | `src/auth/` | Better Auth integration layer: factory, config, claims, resource-audience loader. Not a domain concern. |
+| HTTP | `src/http/` | Hono adapter: route definitions, middleware, schemas, presenters. |
+| Infrastructure | `src/infrastructure/` | Concrete implementations: Drizzle repositories, D1 client, CrudAdapter, mappers. |
+| Composition | `src/composition/` | Request-scoped DI wiring. |
+| Config | `src/config/` | env parsing and binding types. |
+| Shared | `src/shared/` | constants, error classes, pagination, validation primitives. |
+| Auth | `src/auth/` | Better Auth integration: factory, config, claims, resource audience loader. |
 
-**Key distinction: `src/auth/` is NOT a clean-architecture layer.** It is an integration concern — it knows about Better Auth, Cloudflare bindings, and the D1 database. It sits outside the domain/application/infrastructure layering. Domain and application layers must never import from `src/auth/`.
+`src/auth` is not a clean-architecture layer. It is an integration boundary. Domain and application code must never import it.
 
-### 5.2 Import Rules
+### 6.2 Import Rules
 
-Enforced by the `architecture/layer-imports` oxlint rule.
-
-| Layer | Allowed import sources |
+| Layer | Allowed internal imports |
 |---|---|
 | `domain/` | `@/domain/`, `@/shared/` |
 | `application/` | `@/application/`, `@/domain/`, `@/shared/` |
-| `http/` | `@/application/`, `@/composition/`, `@/config/`, `@/domain/`, `@/http/`, `@/shared/` |
+| `http/` | `@/application/`, `@/composition/`, `@/config/`, `@/domain/`, `@/http/`, `@/shared/`, selected `@/auth/` route-mounting entrypoints |
 | `infrastructure/` | `@/config/`, `@/domain/`, `@/infrastructure/`, `@/shared/` |
-| `composition/` | `@/application/`, `@/composition/`, `@/config/`, `@/domain/`, `@/infrastructure/`, `@/shared/` |
+| `composition/` | `@/application/`, `@/composition/`, `@/config/`, `@/domain/`, `@/infrastructure/`, `@/shared/`, selected `@/auth/` factory/config entrypoints |
 | `shared/` | `@/shared/` only |
-| `auth/` | `@/config/`, `@/domain/` (types only), `@/shared/`, `better-auth`, Cloudflare bindings |
+| `auth/` | `@/config/`, `@/shared/`, selected domain types only, Better Auth packages |
 
-**Critical: no layer may import from `src/auth/` except `http/` and `composition/`.** Domain entities must not know about Better Auth. Use cases must not call `getAuth()`.
-
-### 5.3 Banned External Imports Per Layer
-
-Enforced by `architecture/layer-imports` external ban configuration.
+### 6.3 Banned External Imports Per Layer
 
 | Layer | Banned external imports |
 |---|---|
-| `domain/` | `@hono/`, `hono`, `drizzle-orm`, `better-auth`, `cloudflare:`, `@cloudflare/`, `react` |
-| `application/` | `@hono/`, `hono`, `drizzle-orm`, `better-auth`, `cloudflare:`, `@cloudflare/`, `react` |
-| `http/` | `drizzle-orm`, `better-auth` (use auth layer via composition), `react` |
-| `infrastructure/` | `@hono/`, `hono`, `better-auth` |
-| `shared/` | All external frameworks — pure TypeScript only |
+| `domain/` | `@hono/`, `hono`, `drizzle-orm`, `better-auth`, `@better-auth/*`, `cloudflare:`, `@cloudflare/`, `react` |
+| `application/` | `@hono/`, `hono`, `drizzle-orm`, `better-auth`, `@better-auth/*`, `cloudflare:`, `@cloudflare/`, `react` |
+| `http/` | `drizzle-orm`, direct D1 access, React |
+| `infrastructure/` | `@hono/`, `hono`, Better Auth, React |
+| `shared/` | all runtime/framework packages unless explicitly approved |
 
-## 6. Design Patterns
+### 6.4 Better Auth Boundary
 
-All patterns are ported from `/home/quanghuy1242/pjs/content-api`. Each pattern has a corresponding oxlint rule that prevents regression.
+Allowed Better Auth import locations:
 
-### 6.1 Entity Class Pattern
+- `workers/core/src/auth/**`.
+- the minimal route mounting file if Better Auth's handler requires direct access there.
+- migration/schema generation scripts.
+- tests.
 
-Every domain entity follows this contract. Enforced by `architecture/entity-class`.
+Forbidden:
+
+- domain entities.
+- repository interfaces.
+- use cases.
+- policies.
+- mappers.
+- `packages/lib`.
+- `workers/ui`.
+
+Better Auth records must not become domain entities. Domain code may receive stable IDs, actor data, scopes, organization IDs, and resource audiences through explicit DTOs.
+
+## 7. Design Patterns
+
+### 7.1 Entity Class Pattern
+
+Every custom domain entity follows this contract. Enforced by `architecture/entity-class`.
 
 ```ts
-// domain/resource-servers/resource-server.entity.ts
+// workers/core/src/domain/resource-servers/resource-server.entity.ts
 export type ResourceServerProps = {
   id: string;
   organizationId: string;
@@ -421,6 +525,7 @@ export class ResourceServer {
       ...input,
       id: crypto.randomUUID(),
       enabled: true,
+      createdBy: input.createdBy,
       updatedBy: input.createdBy,
       disabledAt: null,
       disabledBy: null,
@@ -473,25 +578,20 @@ export class ResourceServer {
 }
 ```
 
-**Why classes, not plain types:**
-- `JSON.stringify(entity)` on a class instance returns `"{}"` — prevents accidental raw serialization
-- `{ ...entity }` returns `{}` — prevents accidental field spreading
-- `.toSnapshot()` is the only way to extract data for persistence or serialization
-- State transitions (`disable()`, `update()`) are explicit methods, not ad-hoc field assignments
-- `private constructor` prevents external construction without going through `create()` or `reconstitute()`
+Why classes:
 
-**Oxlint rule checks:**
-- Entity file must export a class with `private constructor`
-- Entity file must export `static create()` and `static reconstitute()` methods
-- Entity file must export a `toSnapshot()` method
-- Entity file must NOT be a plain type or interface
+- `JSON.stringify(entity)` returns `{}` unless a serializer is added.
+- `{ ...entity }` returns `{}`.
+- `.toSnapshot()` is the only data extraction path.
+- mutations are named methods.
+- `private constructor` prevents uncontrolled construction.
 
-### 6.2 Repository Pattern
+### 7.2 Repository Pattern
 
-Domain defines the interface. Infrastructure implements it. Enforced by `architecture/repository-workflow`.
+Domain defines repository interfaces. Infrastructure implements them. Enforced by `architecture/repository-workflow`.
 
 ```ts
-// domain/resource-servers/resource-server.repository.ts
+// workers/core/src/domain/resource-servers/resource-server.repository.ts
 export interface ResourceServerRepository {
   findMany(params: {
     organizationId: string;
@@ -510,19 +610,21 @@ export interface ResourceServerRepository {
 }
 ```
 
-**Infrastructure implementation must:**
-- Use `CrudAdapter` for all CRUD operations (never `this.db.insert()` directly)
-- Use mapper functions for row↔entity conversion (never inline `.reconstitute()` or `.toSnapshot()`)
-- Never import policies or application code
-- Accept and return domain entity instances (not partials, not raw rows)
+Infrastructure repositories must:
 
-### 6.3 Mapper Pattern
+- implement domain interfaces.
+- use CrudAdapter for CRUD.
+- use mapper functions for row/entity conversion.
+- never import policies, use cases, or HTTP types.
+- return entities, not rows.
 
-Mappers convert between database rows and domain entities. They live in `src/infrastructure/repositories/mappers/`. Enforced by `architecture/mapper-file` and `architecture/no-mapper-imports-outside-infra`.
+### 7.3 Mapper Pattern
+
+Mappers live under `workers/core/src/infrastructure/repositories/mappers`. Enforced by `architecture/mapper-file` and `architecture/no-mapper-imports-outside-infra`.
 
 ```ts
-// infrastructure/repositories/mappers/resource-server.mapper.ts
-import { ResourceServer, type ResourceServerProps } from "@/domain/resource-servers/resource-server.entity";
+// workers/core/src/infrastructure/repositories/mappers/resource-server.mapper.ts
+import { ResourceServer } from "@/domain/resource-servers/resource-server.entity";
 import type { ResourceServerRow } from "@/infrastructure/db/schema";
 
 export function resourceServerRowToEntity(row: ResourceServerRow): ResourceServer {
@@ -543,7 +645,7 @@ export function resourceServerRowToEntity(row: ResourceServerRow): ResourceServe
   });
 }
 
-export function resourceServerToInsertRow(entity: ResourceServer): Omit<ResourceServerRow, "id"> & { id: string } {
+export function resourceServerToInsertRow(entity: ResourceServer): ResourceServerRow {
   const snapshot = entity.toSnapshot();
   return {
     id: snapshot.id,
@@ -563,50 +665,49 @@ export function resourceServerToInsertRow(entity: ResourceServer): Omit<Resource
 }
 ```
 
-**Rules:**
-- `RowToEntity` must call `Entity.reconstitute(...)` with every field explicitly
-- `ToInsertRow` and `ToUpdateRow` must call `entity.toSnapshot()` first
-- Must not spread the input directly — every field must be listed
-- Must accept exactly one argument
-- Mapper files must not be imported outside `src/infrastructure/`
+Rules:
 
-### 6.4 Use Case Pattern
+- explicitly map every field.
+- never spread raw rows into entities.
+- never serialize entities outside presenters/mappers.
+- never import mappers from HTTP/application/domain.
 
-Use cases are classes with a single `execute()` method. Enforced by `architecture/route-handler-boundary` (one `.execute()` per handler) and `architecture/repository-workflow` (no direct DB access).
+### 7.4 Use Case Pattern
+
+Use cases are classes with one public `execute()` method.
 
 ```ts
-// application/resource-servers/create-resource-server.usecase.ts
-import type { ResourceServerRepository } from "@/domain/resource-servers/resource-server.repository";
-import { ResourceServer, type CreateResourceServerProps } from "@/domain/resource-servers/resource-server.entity";
-
-export type CreateResourceServerInput = CreateResourceServerProps;
+// workers/core/src/application/resource-servers/create-resource-server.usecase.ts
+export type CreateResourceServerInput = CreateResourceServerProps & {
+  actorId: string;
+};
 
 export class CreateResourceServerUseCase {
   constructor(
     private readonly resourceServerRepository: ResourceServerRepository,
   ) {}
 
-  async execute(input: CreateResourceServerInput & { actorId: string }): Promise<ResourceServer> {
-    const entity = ResourceServer.create({ ...input, createdBy: input.actorId });
+  async execute(input: CreateResourceServerInput): Promise<ResourceServer> {
+    const entity = ResourceServer.create(input);
     return this.resourceServerRepository.create(entity);
   }
 }
 ```
 
-**Rules:**
-- Constructor receives repository interfaces and policy objects (DI)
-- `.execute()` is the single public method
-- Returns domain entities, not raw data
-- Never accesses the database directly
-- Never imports HTTP layer types
-- Authorization checks happen in the use case or policy, not in the repository
+Rules:
 
-### 6.5 Route Handler Pattern
+- constructor receives repository interfaces and policies.
+- no HTTP context types.
+- no database access.
+- no Better Auth import.
+- authorization lives in use cases or policies.
 
-Every route handler follows this contract. Enforced by `architecture/route-module` and `architecture/route-handler-boundary`.
+### 7.5 Route Handler Pattern
+
+Custom API route handlers follow this shape. Better Auth handler routes are isolated exceptions.
 
 ```ts
-// http/routes/admin/resource-servers.routes.ts
+// workers/core/src/http/routes/admin/resource-servers.routes.ts
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { AppEnv } from "@/http/app-env";
 
@@ -624,7 +725,14 @@ const listResourceServersRoute = createRoute({
   responses: {
     200: {
       description: "List of resource servers",
-      content: { "application/json": { schema: z.object({ data: z.array(z.any()), cursor: z.string().nullable() }) } },
+      content: {
+        "application/json": {
+          schema: z.object({
+            data: z.array(z.any()),
+            cursor: z.string().nullable(),
+          }),
+        },
+      },
     },
   },
 });
@@ -641,51 +749,47 @@ export function registerResourceServerRoutes(app: OpenAPIHono<AppEnv>) {
       limit: query.limit,
     });
 
-    return c.json({ data: result.items.map(presentResourceServer), cursor: result.cursor }, 200);
+    return c.json({
+      data: result.items.map(presentResourceServer),
+      cursor: result.cursor,
+    }, 200);
   });
 }
 ```
 
-**What is FORBIDDEN in route handlers (oxlint-guarded):**
-- Accessing `c.env` directly — use the container
-- Using `c.req.json()` instead of `c.req.valid("json")`
-- Using `c.req.query()` instead of `c.req.valid("query")`
-- Using `c.req.param()` instead of `c.req.valid("param")`
-- Calling more than one use case `.execute()`
-- Calling `fetch()` or making outbound HTTP requests
-- Using `JSON.parse()` or `JSON.stringify()`
-- Creating `new Request()` or `new Response()`
-- Accessing `drizzle-orm` or the database directly
+Forbidden in custom route handlers:
 
-**What is REQUIRED in route handlers:**
-- `requireActor(c)` call when `security: [{ bearer: [] }]` is declared — the two must pair
-- Exactly one `.execute()` call on a container use case
-- Presenter function wrapping each entity before `c.json()`
+- `c.env` direct access.
+- `c.req.json()`, `c.req.query()`, or `c.req.param()` after schema validation is available.
+- more than one use case `.execute()` for simple CRUD handlers.
+- direct `fetch()`.
+- direct database access.
+- `JSON.parse()` or `JSON.stringify()` for business payloads.
+- `new Response()` instead of framework response helpers, except low-level auth adapter boundaries.
 
-### 6.6 Request-Scoped Container
+Required:
 
-One file (`src/composition/create-container.ts`) wires all dependencies per request. This is the only place where infrastructure implementations meet domain interfaces.
+- `security` metadata and `requireActor(c)` stay paired.
+- exactly one use-case call for simple CRUD.
+- presenter wraps entities before JSON.
+
+### 7.6 Request-Scoped Container
+
+One file wires dependencies per request.
 
 ```ts
-// composition/create-container.ts
+// workers/core/src/composition/create-request-container.ts
 import { createDb } from "@/infrastructure/db/client";
 import { DrizzleResourceServerRepository } from "@/infrastructure/repositories/drizzle-resource-server.repository";
 import { CreateResourceServerUseCase } from "@/application/resource-servers/create-resource-server.usecase";
-// ... other imports
 
 export function createRequestContainer(env: AppBindings) {
   const db = createDb(env.DB);
-
   const resourceServerRepository = new DrizzleResourceServerRepository(db);
 
   return {
     resourceServers: {
-      list: new ListResourceServersUseCase(resourceServerRepository),
-      get: new GetResourceServerUseCase(resourceServerRepository),
       create: new CreateResourceServerUseCase(resourceServerRepository),
-      update: new UpdateResourceServerUseCase(resourceServerRepository),
-      disable: new DisableResourceServerUseCase(resourceServerRepository),
-      delete: new DeleteResourceServerUseCase(resourceServerRepository),
     },
   };
 }
@@ -693,28 +797,31 @@ export function createRequestContainer(env: AppBindings) {
 export type AppContainer = ReturnType<typeof createRequestContainer>;
 ```
 
-**Rules:**
-- This is the ONLY file that imports from both `@/infrastructure/` and `@/application/` simultaneously
-- Every use case must be instantiated here — no lazy instantiation
-- The container type (`AppContainer`) is consumed by the Hono `AppEnv` for typed `c.get("container")` access
-- No business logic in this file — pure wiring
+Rules:
 
-### 6.7 Better Auth Factory Pattern
+- only this file imports both infrastructure implementations and application use cases.
+- no business logic.
+- no route parsing.
+- no module-scope request state.
 
-Better Auth cannot be stored in the DI container because on Cloudflare Workers it must be constructed per-request (D1 binding is request-scoped).
+### 7.7 Better Auth Factory Pattern
+
+Better Auth must be constructed from Worker bindings through a runtime factory.
 
 ```ts
-// auth/get-auth.ts
+// workers/core/src/auth/get-auth.ts
 import { betterAuth } from "better-auth";
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { organization, jwt, admin } from "better-auth/plugins";
+import { organization, admin } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins/jwt";
 import { getAuthConfig } from "./config";
 import { getResourceAudiences } from "./resource-audiences";
 import { customClaims } from "./claims";
 
-export function getAuth(env: AppBindings, request: Request) {
+export async function getAuth(env: AppBindings, request: Request) {
   const origin = env.BETTER_AUTH_URL ?? new URL(request.url).origin;
   const config = getAuthConfig(env);
+  const validAudiences = await getResourceAudiences(env);
 
   return betterAuth({
     baseURL: origin,
@@ -731,7 +838,7 @@ export function getAuth(env: AppBindings, request: Request) {
       admin(config.admin),
       oauthProvider({
         ...config.oauthProvider,
-        validAudiences: getResourceAudiences(env),
+        validAudiences,
         customAccessTokenClaims: customClaims.accessToken,
         customTokenResponseFields: customClaims.tokenResponse,
       }),
@@ -740,71 +847,99 @@ export function getAuth(env: AppBindings, request: Request) {
 }
 ```
 
-**Rules:**
-- Factory function only — no module-scope Better Auth instance
-- Config lives in a pure helper (`config.ts`) that can be shared with CLI/schema generation paths
-- `resource-audiences.ts` loads enabled audiences from D1 — this is the bridge between the UI-managed `resource_servers` table and the OAuth Provider's `validAudiences` config
-- `claims.ts` contains custom claim enrichment functions — no inline claim logic in the factory
-- The factory is called once per request from the Hono middleware that handles Better Auth routes
+Implementation notes:
 
-### 6.8 CrudAdapter Pattern
+- The async shape is intentional because D1-backed resource audiences may be loaded before constructing the provider.
+- If Better Auth requires `validAudiences` to be synchronous in the installed version, the resource audience loader must use a request-local cache or the architecture must choose a static bootstrap source and document the tradeoff.
+- Better Auth config option names must be proven against the pinned package types.
+- No module-scope Better Auth instance can capture runtime bindings.
+- Config used for runtime and schema generation must be factored so migrations cannot drift from runtime config.
 
-Centralized Drizzle/D1 persistence primitives. Every infrastructure repository delegates to it. Enforced by `architecture/repository-workflow` (repositories must use CrudAdapter, not raw `this.db.insert()`).
+### 7.8 CrudAdapter Pattern
+
+Centralized Drizzle/D1 persistence primitives. Every infrastructure repository delegates to it.
 
 ```ts
-// infrastructure/persistence/crud-adapter.ts
+// workers/core/src/infrastructure/persistence/crud-adapter.ts
 export class CrudAdapter {
   constructor(private readonly db: DrizzleDatabase) {}
 
-  listRows<Row>(params: ListParams): Promise<CursorPage<Row>> { /* cursor pagination */ }
-  findRowById<Row>(id: string): Promise<Row | null> { /* single row by ID */ }
-  insertRow<Row>(params: InsertParams): Promise<Row> { /* insert with optional onConflictDoNothing */ }
-  updateRow<Row>(params: UpdateParams): Promise<Row> { /* partial update, drops undefined */ }
-  deleteRowById(table, id): Promise<boolean> { /* returns whether a change occurred */ }
+  /** Lists rows with cursor pagination. */
+  listRows<Row>(params: ListParams): Promise<CursorPage<Row>> {
+    // implementation
+  }
+
+  /** Finds one row by ID. */
+  findRowById<Row>(id: string): Promise<Row | null> {
+    // implementation
+  }
+
+  /** Inserts one row and returns the inserted row. */
+  insertRow<Row>(params: InsertParams): Promise<Row> {
+    // implementation
+  }
+
+  /** Updates one row and returns the updated row. */
+  updateRow<Row>(params: UpdateParams): Promise<Row> {
+    // implementation
+  }
+
+  /** Deletes one row by ID and reports whether it existed. */
+  deleteRowById(table: unknown, id: string): Promise<boolean> {
+    // implementation
+  }
 }
 ```
 
-**Rules:**
-- Every public method must have JSDoc (enforced by `architecture/crud-adapter-jsdoc`)
-- Repositories must not import `drizzle-orm` operators directly — they use the CrudAdapter
-- `db.batch()` is reserved for workflow ports only (idempotent multi-write operations); first batch doesn't need workflow ports
+Rules:
 
-## 7. UI Architecture
+- every public method has JSDoc.
+- repositories use CrudAdapter, not raw `this.db.insert()`.
+- `db.batch()` is reserved for workflow ports or infrastructure methods explicitly documented as atomic multi-write operations.
 
-### 7.1 Lumina System Contract
+## 8. UI Architecture
 
-The `ui-id` worker's admin dashboard follows the Lumina UI system defined in `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md`. All visual components come from `packages/ui/`.
+### 8.1 Lumina System Contract
 
-**Core rules:**
-- DaisyUI v5 + Tailwind v4, CSS-first (no `tailwind.config.ts`)
-- Token props on all components — no raw `className` on public API
-- `unstable_className` escape hatch only on internal primitives, must be explainable in review
-- Two themes: `lumina-light` (default) + `lumina-dark`
-- Compact density as the baseline (`btn-sm`, `input-sm`, `menu-sm`, `card-compact`)
-- React Aria at leaf components only — `"use client"` never at page level
+The admin dashboard follows Lumina.
 
-### 7.2 Route File Rules
+Core rules:
 
-Admin pages in `workers/ui/src/app/admin/` follow these constraints:
+- DaisyUI v5 and Tailwind v4 CSS-first.
+- token props on public components.
+- no raw `className` in route files.
+- `unstable_className` only on internal primitives and only with review explanation.
+- two themes: `lumina-light` and `lumina-dark`.
+- compact density.
+- React Aria only at leaf interactive components or shell/provider boundaries.
+- no `"use client"` at page level unless a specific page is a client-only island and the exception is documented.
 
-**ALLOWED:**
-- Compose `Page`, `PageHeader`, `PageBody`, `PageSection`, `Stack`, `Inline`, `Grid`, `Panel`, `Text`, `Heading`
-- Compose `Button`, `LinkButton`, `TextField`, `Select`, and other `packages/ui/` components
-- Pass route params, search params, data, and callbacks
-- Call `packages/lib/` API client functions for data fetching
+### 8.2 Route File Rules
 
-**FORBIDDEN:**
-- Raw HTML layout tags: `div`, `main`, `section`, `header`, `footer`, `aside`, `nav`
-- Raw typography tags: `h1`, `h2`, `h3`, `p`, `span`
-- Raw DaisyUI classes: `btn`, `navbar`, `drawer`, `menu`, `card`, `dock`, `input`
-- Raw Tailwind utility classes: `flex`, `grid`, `gap-*`, `p-*`, `text-*`, `bg-*`
-- Direct `fetch()` calls — use the `packages/lib/` API client
+Admin pages in `workers/ui/src/app/admin/**` are composition files.
 
-### 7.3 Admin Page Conventions
+Allowed:
+
+- import app-specific page sections.
+- import `packages/ui` primitives.
+- import `packages/lib` DTOs/API-client helpers.
+- pass route params, search params, and already-shaped data.
+
+Forbidden:
+
+- raw layout tags: `div`, `main`, `section`, `header`, `footer`, `aside`, `nav`;
+- raw typography tags: `h1`, `h2`, `h3`, `p`, `span`;
+- raw DaisyUI classes: `btn`, `navbar`, `drawer`, `menu`, `card`, `dock`, `input`;
+- raw Tailwind utility classes: `flex`, `grid`, `gap-*`, `p-*`, `text-*`, `bg-*`;
+- direct `fetch()`;
+- importing from `workers/core/**`;
+- importing Better Auth, Drizzle, D1/KV types, or Jose.
+
+### 8.3 Admin Page Convention
 
 ```tsx
 // workers/ui/src/app/admin/organizations/page.tsx
-import { Page, PageHeader, PageBody, Stack, Panel, Text, Button } from "@id/ui";
+import { Page, PageBody, PageHeader, Panel, Stack, Text, Button } from "@id/ui";
 
 export default function OrganizationsPage() {
   return (
@@ -825,169 +960,265 @@ export default function OrganizationsPage() {
 
 No raw HTML. No raw classes. No inline styles. Composition only.
 
-## 8. Enforcement System
+### 8.4 UI Enforcement
 
-### 8.1 Oxlint Architecture Rules
+UI route-file rules must be mechanical.
 
-The `scripts/oxlint-js-plugins/architecture.js` plugin contains rules ported from content-api, adapted for the id repo's two-worker topology. Rule details are implementation-accurate from the content-api source. Exact rule names may need minor adjustment during the pre-implementation spike.
+Implement one of:
 
-| # | Rule | Severity | What it prevents |
-|---|---|---|---|
-| 1 | `layer-imports` | error | Layer boundary violations (domain importing drizzle, http importing drizzle, etc.) |
-| 2 | `no-mapper-imports-outside-infra` | error | Mapper functions leaking into application/domain/HTTP layers |
-| 3 | `no-storage-error-parsing` | error | SQLite/D1 error string matching outside infrastructure |
-| 4 | `no-custom-errors-outside-shared` | error | Scattered error class definitions |
-| 5 | `req-valid-usage` | error | Using raw `c.req.json()` instead of `c.req.valid("json")` |
-| 6 | `no-plain-zod-import` | error | Importing plain `zod` instead of `@hono/zod-openapi` in schema files |
-| 7 | `route-module` | error | Routes without `createRoute`, without `app.openapi`, without exactly one `.execute()`, security/requireActor mismatch |
-| 8 | `route-handler-boundary` | error | `fetch()`, `c.env`, `JSON.parse`, direct storage calls, `new Response()` in handlers |
-| 9 | `repository-workflow` | error | `this.db.insert()` instead of CrudAdapter, importing policies into repos, `db.batch()` outside workflow ports |
-| 10 | `mapper-file` | error | Mappers that spread input without `.reconstitute()`/`.toSnapshot()`, importing from application/HTTP |
-| 11 | `entity-class` | error | Plain type entities instead of classes with private constructor, `.create()`, `.reconstitute()`, `.toSnapshot()` |
-| 12 | `no-raw-entity-serialization` | error | Passing entity instances directly to `JSON.stringify(entity)` or `{ ...entity }` |
-| 13 | `crud-adapter-jsdoc` | error | Undocumented public methods on CrudAdapter |
-| 14 | `no-magic-numbers` | error | Inline numeric literals in domain/application/HTTP/shared without named constants |
-| 15 | `constants-placement` | error | `SCREAMING_SNAKE` constants outside `shared/`, `domain/`, or `infrastructure/` |
-| 16 | `constants-jsdoc` | error | Undocumented exported constants |
+- `architecture/ui-route-composition` oxlint rule.
+- `scripts/check-ui-route-composition.mjs` AST script.
 
-**Additional rules specific to the id repo:**
+The rule/script must fail on:
 
-| # | Rule | Severity | What it prevents |
-|---|---|---|---|
-| 17 | `worker-isolation` | error | `workers/core/` importing from `workers/ui/` and vice versa |
-| 18 | `core-no-ui-deps` | error | `workers/core/` importing `react`, `react-dom`, `vinext`, `@vitejs/*` |
-| 19 | `ui-no-auth-deps` | error | `workers/ui/` importing `better-auth`, `drizzle-orm`, `jose`, Cloudflare D1/KV bindings |
-| 20 | `packages-lib-isolation` | error | `packages/lib/` importing any framework or package other than itself |
-| 21 | `admin-auth-required` | error | Admin route handlers without `requireActor(c)` call |
-| 22 | `no-console-log` | error | `console.log` in non-test production paths (oxlint built-in) |
+- forbidden JSX intrinsic elements in `workers/ui/src/app/admin/**/page.tsx` and layout route files;
+- forbidden `className` values containing raw Tailwind/DaisyUI classes;
+- direct `fetch()`;
+- imports from core source;
+- forbidden auth/persistence packages.
 
-**Configuration:**
-- All architecture rules are `"error"` severity
-- All architecture rules are disabled for `tests/**` and `**/*.d.ts` files
-- Built-in oxlint plugins: `typescript`, `unicorn`, `oxc`, `vitest`, `import`, `promise`
-- Built-in error-level rules: `typescript/no-explicit-any`, `import/no-cycle`, `no-console`, `eqeqeq`
+Tests must include passing and failing fixtures. This is a first-batch quality gate, not future polish.
 
-### 8.2 Table Whitelist
+## 9. Data Ownership And Schema Control
 
-Custom tables outside Better Auth's ownership must be explicitly approved. The `.schema-whitelist.json` file lists approved table names. A CI script (`scripts/check-schema-whitelist.mjs`) runs in `pnpm check` and fails if the Drizzle schema defines any table not in the whitelist.
+### 9.1 Better Auth-Owned Tables
+
+Better Auth owns its generated schema:
+
+- users.
+- sessions.
+- accounts.
+- verification/reset state.
+- organizations, members, invitations, teams.
+- OAuth clients, tokens, consents, and related OAuth Provider tables.
+- JWT/JWKS tables.
+
+Do not define Better Auth tables in `workers/core/src/infrastructure/db/schema.ts`.
+
+### 9.2 Custom Tables
+
+First-batch custom standalone tables are minimal.
+
+Approved starting table:
+
+- `resource_servers`
+
+Likely fields:
+
+- `id`
+- `organization_id`
+- `slug`
+- `name`
+- `audience`
+- `description`
+- `enabled`
+- `created_by`
+- `updated_by`
+- `disabled_at`
+- `disabled_by`
+- `created_at`
+- `updated_at`
+
+Forbidden in first batch:
+
+- `authorization_spaces`
+- ReBAC tuple/model tables
+- ABAC policy tables
+- webhook tables
+- pipeline tables
+- registration-context tables
+
+### 9.3 Table Whitelist
+
+`.schema-whitelist.json` is mandatory.
 
 ```json
 {
   "tables": ["resource_servers"],
-  "note": "Add new tables only with explicit approval. Update this file and the planning doc together."
+  "note": "Add new custom tables only with explicit architecture-doc approval."
 }
 ```
 
-**Behavior:**
-- Scans `workers/core/src/infrastructure/db/schema.ts` for exported Drizzle table definitions
-- Any table name not in the whitelist → CI fails with: `Unapproved table: X. If this is intentional, update .schema-whitelist.json and the planning document.`
-- Better Auth tables (user, session, organization, oauthClient, jwks, etc.) are NOT listed — they are managed by BA's CLI migration and are never defined in our `schema.ts`
-- Custom tables defined via `additionalFields` on BA tables (e.g., `user.additionalFields.platformRole`) do not trigger the whitelist check — only standalone Drizzle table definitions
+`scripts/check-schema-whitelist.mjs` fails CI when `workers/core/src/infrastructure/db/schema.ts` defines an unlisted standalone Drizzle table. Better Auth generated schema is outside this file and outside this whitelist.
 
-### 8.3 Duplicate Code Gate
+## 10. Enforcement System
 
-Fallow runs in `--mode mild --min-tokens 50 --min-lines 5`. The `scripts/check-duplication-threshold.mjs` wrapper fails if duplication exceeds 3%.
+### 10.1 Oxlint Architecture Rules
 
-This prevents LLM copy-paste patterns: identical use case flows, nearly-identical route handler blocks, duplicated entity definitions.
+The architecture plugin is ported from content-api and extended for `id`.
 
-### 8.4 TypeScript Strict Mode
+Content-api rules, all hard errors:
 
-`strict: true` in the base `tsconfig.json`, extended by both workers and packages. Key options: `noEmit: true`, `moduleResolution: "bundler"`, `target: "ES2022"`. Path alias `@/*` → `src/*` in each worker.
+| # | Rule | What it prevents |
+|---|---|---|
+| 1 | `layer-imports` | wrong internal/external imports per layer |
+| 2 | `no-mapper-imports-outside-infra` | mapper leakage outside infrastructure |
+| 3 | `no-storage-error-parsing` | storage error string matching outside infrastructure |
+| 4 | `no-custom-errors-outside-shared` | scattered custom error classes |
+| 5 | `req-valid-usage` | raw request parsing instead of validated input |
+| 6 | `no-plain-zod-import` | plain `zod` imports in OpenAPI schema contexts |
+| 7 | `route-module` | routes without required createRoute/openapi/security shape |
+| 8 | `route-handler-boundary` | side effects and persistence in handlers |
+| 9 | `repository-workflow` | raw DB writes and policy imports in repositories |
+| 10 | `mapper-file` | unsafe mapper structure |
+| 11 | `entity-class` | plain object entities |
+| 12 | `no-raw-entity-serialization` | spreading/stringifying entities |
+| 13 | `crud-adapter-jsdoc` | undocumented CrudAdapter methods |
+| 14 | `no-magic-numbers` | unnamed numeric policy/config literals |
+| 15 | `constants-placement` | constants outside approved locations |
+| 16 | `constants-jsdoc` | undocumented exported constants |
 
-### 8.5 Advisory Pass
+Id-specific rules, all hard errors:
 
-`pnpm advise` runs two tools and filters output:
+| # | Rule | What it prevents |
+|---|---|---|
+| 17 | `worker-isolation` | cross-imports between core and UI workers |
+| 18 | `core-no-ui-deps` | React/Vinext/UI dependencies in core |
+| 19 | `ui-no-auth-deps` | Better Auth/Drizzle/Jose/D1/KV dependencies in UI |
+| 20 | `packages-lib-isolation` | framework/runtime imports in `packages/lib` |
+| 21 | `auth-boundary` | Better Auth imports outside approved core files |
+| 22 | `admin-auth-required` | admin API routes without explicit actor requirement |
+| 23 | `ui-route-composition` | raw HTML/classes/fetch/core imports in admin route files |
 
-1. **Aislop** — broad agent-output scanner (duplicate imports, duplicate blocks, complexity, thin wrappers, narrative comments, security)
-2. **Fallow** — conservative semantic duplication (`--mode semantic --min-tokens 150 --min-lines 10`)
+Built-in hard rules:
 
-The output is filtered through `.advise-suppressions.json`. Known architecture-mandated patterns (entity getter symmetry, mapper field mapping, create use case pattern, narrative JSDoc at boundaries) are auto-suppressed. New findings appear as review input. The suppression file should be reviewed periodically — if it grows significantly, the architecture may be generating noise.
+- `no-console`
+- `eqeqeq`
+- `import/no-cycle`
+- `typescript/no-explicit-any`
 
-### 8.6 Quality Gate Summary
+Tests and `.d.ts` files may disable architecture rules only through explicit overrides.
+
+### 10.2 Duplicate Code Gate
+
+Fallow hard gate:
+
+```text
+fallow dupes --mode mild --min-tokens 50 --min-lines 5 --skip-local --ignore-imports --format json --quiet
+```
+
+Threshold: 3%.
+
+The gate exists specifically to stop LLM copy-paste drift in route handlers, use cases, entities, mappers, and UI pages.
+
+### 10.3 TypeScript Strict Mode
+
+Base config:
+
+- `strict: true`
+- `noEmit: true`
+- `moduleResolution: "bundler"`
+- `target: "ES2022"`
+
+Each worker owns its own `@/* -> src/*` alias. Packages use package imports, not worker-local aliases.
+
+### 10.4 Advisory Pass
+
+`pnpm advise` runs Aislop plus semantic Fallow and filters through `.advise-suppressions.json`.
+
+Advisory output is not a substitute for hard gates. It is review input for structural risk that the hard gates do not cover.
+
+### 10.5 Quality Gate Summary
 
 | Gate | Command | Status |
 |---|---|---|
-| Lint | `pnpm lint` (oxlint with 22 architecture rules) | Hard gate in CI |
-| Dup check | `pnpm check:dup` (Fallow <3%) | Hard gate in CI |
-| Typecheck | `pnpm typecheck` (`tsc --noEmit`) | Hard gate in CI |
-| Tests | `pnpm test` (Vitest with Workers pool + jsdom) | Hard gate in CI |
-| Schema whitelist | `pnpm check:schema` (custom script) | Hard gate in CI |
-| Combined | `pnpm check` | All of the above |
-| Advisory | `pnpm advise` (Aislop + Fallow semantic, filtered) | Non-blocking review input |
+| Lint | `pnpm lint` | Hard gate |
+| Dup check | `pnpm check:dup` | Hard gate |
+| Schema whitelist | `pnpm check:schema` | Hard gate |
+| UI composition | `pnpm check:ui` | Hard gate |
+| Typecheck | `pnpm typecheck` | Hard gate |
+| Tests | `pnpm test` | Hard gate |
+| Combined | `pnpm check` | Hard gate |
+| Advisory | `pnpm advise` | Review input, must be run before major PRs |
 
-## 9. Toolchain
+## 11. Toolchain
 
-### 9.1 Root Configuration
+### 11.1 Root Configuration
 
-**`package.json` (root)**
-- Single package.json for the entire repo
-- Wrangler bundles each worker independently via esbuild using per-worker `wrangler.jsonc`
-- Dependencies: `better-auth`, `@better-auth/oauth-provider`, `hono`, `drizzle-orm`, `zod`, `jose`, `react`, `react-dom`, `react-aria-components`, `lucide-react`, `tailwindcss`, `daisyui`, `vinext`
-- Dev dependencies: `oxlint`, `typescript`, `vitest`, `@cloudflare/vitest-pool-workers`, `@cloudflare/workers-types`, `wrangler`, `fallow`, `aislop`
-- Package manager: `pnpm`
+Root `package.json`:
 
-**`pnpm-workspace.yaml`**
+- one dependency manifest for the monorepo;
+- per-worker package manifests may exist for ownership and scripts, but root owns install/lock;
+- Wrangler bundles workers from per-worker config;
+- dependencies include Better Auth, OAuth Provider, Hono, Drizzle, Zod, Jose, React, React DOM, React Aria, Lucide, Tailwind, DaisyUI, and Vinext;
+- dev dependencies include oxlint, TypeScript, Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
+
+Workspace:
+
 ```yaml
 packages:
   - "."
   - "packages/*"
+  - "workers/*"
 ```
 
-**`vitest.workspace.ts` (root)**
-```ts
-export default [
-  "workers/core/vitest.config.ts",
-  "workers/ui/vitest.config.ts",
-];
-```
+### 11.2 Worker Configuration
 
-### 9.2 Worker Configuration
+`workers/core/wrangler.jsonc`:
 
-**`workers/core/wrangler.jsonc`**
 ```jsonc
 {
   "name": "id-core",
   "main": "src/main.ts",
-  "compatibility_date": "2026-05-01",
-  "d1_databases": [{ "binding": "DB", "database_name": "id", "database_id": "<UUID>" }],
-  "kv_namespaces": [{ "binding": "KV", "id": "<ID>" }],
+  "compatibility_date": "2026-05-19",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "id",
+      "database_id": "<UUID>"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "<ID>"
+    }
+  ],
   "vars": {
     "BETTER_AUTH_URL": "https://id.quanghuy.dev"
   }
 }
 ```
 
-**`workers/ui/wrangler.jsonc`**
+`workers/ui/wrangler.jsonc`:
+
 ```jsonc
 {
   "name": "id-ui",
   "main": "src/main.ts",
-  "compatibility_date": "2026-05-01",
-  "services": [{ "binding": "CORE_ID", "service": "id-core" }],
-  "assets": { "directory": "./dist/client" }
+  "compatibility_date": "2026-05-19",
+  "services": [
+    {
+      "binding": "CORE_ID",
+      "service": "id-core"
+    }
+  ],
+  "assets": {
+    "directory": "./dist/client"
+  }
 }
 ```
 
-### 9.3 Scripts
-
-Defined in root `package.json`:
+### 11.3 Scripts
 
 ```json
 {
   "scripts": {
-    "dev": "wrangler dev --config workers/core/wrangler.jsonc",
+    "dev:core": "wrangler dev --config workers/core/wrangler.jsonc",
     "dev:ui": "vinext dev --cwd workers/ui",
+    "dev:stack:core": "wrangler dev -c workers/core/wrangler.jsonc -c workers/ui/wrangler.jsonc",
+    "dev:stack:ui": "wrangler dev -c workers/ui/wrangler.jsonc -c workers/core/wrangler.jsonc",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
     "check:schema": "node scripts/check-schema-whitelist.mjs",
+    "check:ui": "node scripts/check-ui-route-composition.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm check:dup && pnpm check:schema && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm check:dup && pnpm check:schema && pnpm check:ui && pnpm typecheck && pnpm test",
     "advise": "node scripts/filter-advise.mjs",
-    "advise:raw": "aislop scan && fallow dupes --mode semantic --min-tokens 150 --min-lines 10",
-    "db:generate": "wrangler d1 migrations create id --config workers/core/wrangler.jsonc",
+    "db:generate": "auth generate && drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
@@ -996,107 +1227,201 @@ Defined in root `package.json`:
 }
 ```
 
-## 10. Rules Summary
+The exact `db:generate` command must be finalized after the Better Auth schema-generation spike. The invariant is fixed: Better Auth schema generation and custom Drizzle migration generation must both be represented, repeatable, and documented.
 
-Every rule in this document is mechanically enforced. No convention survives on good intentions alone.
+## 12. Rules Summary
+
+Every rule in this document is mechanically enforced. No convention survives on good intentions.
 
 | Category | Rule | Enforcement |
 |---|---|---|
-| Worker isolation | `workers/core/` and `workers/ui/` never cross-import | Oxlint `worker-isolation` |
-| Core deps | `workers/core/` must not import React, React DOM, Vinext | Oxlint `core-no-ui-deps` |
-| UI deps | `workers/ui/` must not import Better Auth, Drizzle, Jose, Cloudflare bindings | Oxlint `ui-no-auth-deps` |
-| Package isolation | `packages/lib/` must not import any framework | Oxlint `packages-lib-isolation` |
-| Layer imports | Domain ← Application ← HTTP ← Composition → Infrastructure | Oxlint `layer-imports` |
-| Entity classes | Private constructor, `.create()`, `.reconstitute()`, `.toSnapshot()` | Oxlint `entity-class` |
-| Serialization | No `JSON.stringify(entity)` — must use `.toSnapshot()` | Oxlint `no-raw-entity-serialization` |
-| Route handlers | `c.req.valid()`, one `.execute()`, no `c.env`, no `fetch()` | Oxlint `route-module`, `route-handler-boundary` |
-| Admin auth | Every admin route must call `requireActor(c)` | Oxlint `admin-auth-required` |
-| Repositories | Use CrudAdapter, never `this.db.insert()`, never import policies | Oxlint `repository-workflow` |
-| Mappers | `.reconstitute()` + `.toSnapshot()`, every field explicit, no external imports | Oxlint `mapper-file`, `no-mapper-imports-outside-infra` |
-| Errors | All error classes in `shared/errors.ts` | Oxlint `no-custom-errors-outside-shared` |
-| Constants | `SCREAMING_SNAKE` only in `shared/`, `domain/`, `infrastructure/` | Oxlint `constants-placement`, `no-magic-numbers` |
-| Tables | Only `.schema-whitelist.json` tables may be defined in Drizzle schema | CI script `check:schema` |
-| Duplication | <3% mild duplication threshold | Fallow gate in `pnpm check:dup` |
-| Types | Strict mode, no explicit `any` | TypeScript + oxlint `typescript/no-explicit-any` |
-| Console | No `console.log` in production paths | Oxlint `no-console` |
-| UI composition | Route files compose components — no raw HTML, Tailwind, or DaisyUI classes | Code review (not lint-enforced in first batch; consider later) |
+| Worker isolation | core and UI workers never cross-import | Oxlint `worker-isolation` |
+| Core deps | core never imports UI packages/deps | Oxlint `core-no-ui-deps` |
+| UI deps | UI never imports auth/persistence/signing deps | Oxlint `ui-no-auth-deps` |
+| Package isolation | `packages/lib` stays framework-free | Oxlint `packages-lib-isolation` |
+| Auth boundary | Better Auth imports stay in approved files | Oxlint `auth-boundary` |
+| Layer imports | domain/application/http/infrastructure/composition/shared imports stay directional | Oxlint `layer-imports` |
+| Entity classes | private constructor, create, reconstitute, toSnapshot | Oxlint `entity-class` |
+| Serialization | no raw entity spreading/stringifying | Oxlint `no-raw-entity-serialization` |
+| Routes | validated inputs, one use case, presenter output | Oxlint route rules |
+| Admin auth | admin API routes require actor | Oxlint `admin-auth-required` |
+| Repositories | CrudAdapter and mapper workflow only | Oxlint `repository-workflow` |
+| Mappers | explicit row/entity conversion | Oxlint mapper rules |
+| Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
+| Constants | placement and JSDoc rules | Oxlint constants rules |
+| Tables | only approved custom tables | `check:schema` |
+| UI route composition | no raw admin route UI | `ui-route-composition` or `check:ui` |
+| Duplication | <3% mild duplication | `check:dup` |
+| Types | strict and no explicit `any` | TypeScript + oxlint |
+| Console | no production console logging | oxlint built-in |
 
-## 11. Pre-Implementation Spikes
+## 13. Pre-Implementation Spikes
 
-Before full implementation, these architecture-level proofs must be completed:
+These are not permission to loosen the architecture. They are proof tasks required before broad implementation.
 
-### Spike A: Oxlint Rules Port
+### Spike A: Architecture Rule Port
 
-**Purpose:** Verify the 16 content-api architecture rules plus the 6 id-specific rules work against a minimal id codebase.
+Purpose: port the 16 content-api rules and add id-specific rules.
 
-**Acceptance criteria:**
-- A scaffolded `workers/core/src/` with one entity, one use case, one route handler, and one repository passes all rules
-- A deliberately broken file (drizzle import in domain, raw `c.req.json()` in handler, plain type entity) fails all relevant rules
-- Worker isolation rules detect cross-worker imports
-- The oxlint config is committed and ready for implementation
+Acceptance:
+
+- valid fixture with one entity, mapper, repository, use case, route, and UI page passes;
+- invalid fixtures fail each rule;
+- all rules are hard errors in `pnpm lint`.
 
 ### Spike B: Table Whitelist Script
 
-**Purpose:** Verify `check-schema-whitelist.mjs` correctly identifies unapproved tables.
+Purpose: prove custom table control.
 
-**Acceptance criteria:**
-- A schema file with only `resource_servers` passes
-- Adding a second Drizzle table definition fails the check
-- The failure message includes the unapproved table name and remediation instructions
+Acceptance:
 
-### Spike C: Single Package.json + Two Workers
+- `resource_servers` passes;
+- an unlisted table fails;
+- Better Auth generated tables are not scanned from custom schema.
 
-**Purpose:** Verify Wrangler correctly bundles two workers from one `package.json` without dependency conflicts.
+### Spike C: Better Auth Contract
 
-**Acceptance criteria:**
-- `wrangler dev --config workers/core/wrangler.jsonc` starts and responds to requests
-- `wrangler dev --config workers/ui/wrangler.jsonc` starts and serves a React page
-- No runtime errors from shared dependencies
-- Tree-shaking prevents React from landing in the core-id worker bundle
+Purpose: prove the installed Better Auth 1.6.11 API shape.
 
-### Spike D: Service Binding Communication
+Acceptance:
 
-**Purpose:** Verify `ui-id` can call `core-id`'s admin API through a Cloudflare service binding.
+- OAuth Provider route map is documented from tests/types;
+- `/oauth2/userinfo` route behavior is tested;
+- JWKS default/custom path is tested;
+- `validAudiences`, custom claims, and resource-bound JWT behavior are tested;
+- key rotation with `kid` and grace period is tested;
+- schema generation command is finalized.
 
-**Acceptance criteria:**
-- A minimal `core-id` endpoint returns JSON
-- A minimal `ui-id` page calls it via service binding and renders the response
-- The round trip completes within `wrangler dev` local environment
+### Spike D: Two Workers And Service Binding
 
-## 12. Definition Of Done
+Purpose: prove Cloudflare topology.
 
-### Required repository outcomes:
+Acceptance:
 
-- [ ] Root layout matches the specification (≤12 config files, no noise)
-- [ ] Single `package.json` with all dependencies; Wrangler bundles both workers correctly
-- [ ] `packages/ui/` exists with Lumina component exports (buttons, layout, typography, app shell)
-- [ ] `packages/lib/` exists with shared types, constants, and typed API client
-- [ ] `workers/core/` has full hexagonal layer structure (domain, application, http, infrastructure, composition, shared, auth)
-- [ ] `workers/ui/` has Vinext App Router with admin pages, importing only from `packages/ui/` and `packages/lib/`
-- [ ] Workers never cross-import — enforced by oxlint
-- [ ] Core never imports React, UI never imports Better Auth — enforced by oxlint
+- `core-id` starts independently;
+- `ui-id` starts independently;
+- `dev:stack:ui` renders `/admin` and calls `core-id`;
+- deployed service binding order is documented: deploy `id-core` before `id-ui`.
 
-### Required enforcement outcomes:
+### Spike E: UI Composition Gate
 
-- [ ] 22 oxlint architecture rules (16 ported + 6 id-specific) run as hard errors in CI
-- [ ] `.schema-whitelist.json` exists and `check:schema` CI step fails on unapproved tables
-- [ ] `pnpm check` passes (lint + dup <3% + schema whitelist + typecheck + tests)
-- [ ] `pnpm advise` runs successfully and `.advise-suppressions.json` is populated for known architecture patterns
-- [ ] TypeScript strict mode enabled and `typescript/no-explicit-any` is error-level
+Purpose: prove admin pages cannot bypass Lumina.
 
-### Required pattern compliance:
+Acceptance:
 
-- [ ] At least one domain entity follows the class contract (private constructor, `.create()`, `.reconstitute()`, `.toSnapshot()`)
-- [ ] At least one infrastructure repository delegates to CrudAdapter
-- [ ] At least one mapper follows the `.reconstitute()`/`.toSnapshot()` contract
-- [ ] At least one route handler uses `createRoute`, `app.openapi`, `c.req.valid()`, exactly one `.execute()`, and `requireActor(c)`
-- [ ] Request-scoped container is the only file importing from both `@/infrastructure/` and `@/application/`
-- [ ] Better Auth factory is a per-request function, not a module-scope instance
-- [ ] At least one admin page composes Lumina components without raw HTML/Tailwind/DaisyUI classes
+- raw admin route `<div>` fails;
+- raw Tailwind/DaisyUI class fails;
+- direct `fetch()` fails;
+- import from `workers/core` fails;
+- valid composition page passes.
 
-### Required spike outcomes:
+## 14. Risks, Edge Cases, And Failure Modes
 
-- [ ] Spike A: Oxlint rules port proven against scaffolded codebase
-- [ ] Spike B: Table whitelist script proven with passing and failing cases
-- [ ] Spike C: Single package.json + two workers bundle and start correctly
-- [ ] Spike D: Service binding communication between ui-id and core-id works locally
+| Risk | Failure mode | Required mitigation |
+|---|---|---|
+| Old one-Worker wording in `001` | Implementer scaffolds wrong topology | Update `001` to state it is superseded by `000` for repo topology. |
+| Better Auth route mismatch | UI/tests target stale endpoint names | Spike C route-map tests. |
+| JWKS path confusion | resource servers fetch wrong key URL | Decide default `/api/auth/jwks` vs custom `/.well-known/jwks.json` and test discovery. |
+| Dynamic audiences unsupported | UI-managed resource servers cannot feed provider config | Prove `validAudiences` runtime shape or choose documented static/cached bridge. |
+| Service binding trust bypass | internal UI call skips auth | core admin API authorizes every request. |
+| D1 transaction overreach | multi-step flows assume long-lived transactions | use D1 `batch()` only for bounded atomic writes; add idempotency for multi-call flows. |
+| Legacy scope creep | ReBAC/ABAC/webhooks/pipeline tables appear | schema whitelist and docs review. |
+| UI raw markup drift | LLM writes route pages directly | `check:ui` or oxlint UI rule. |
+| Package leak | `packages/lib` imports runtime frameworks | package isolation lint. |
+| Bundle leak | React/Vinext enters core | `core-no-ui-deps` plus bundle smoke. |
+| Secret leakage | `.dev.vars` committed | `.dev.vars.example` only and secret scan if available. |
+
+## 15. Test And Verification Plan
+
+Automated:
+
+- `pnpm lint`
+- `pnpm check:dup`
+- `pnpm check:schema`
+- `pnpm check:ui`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm check`
+
+Core tests:
+
+- env parsing.
+- Better Auth factory construction under Worker bindings.
+- OAuth authorization-code + PKCE.
+- `client_credentials`.
+- invalid resource audience rejection.
+- JWKS verification and rotation.
+- admin route auth.
+- `resource_servers` CRUD.
+- schema whitelist passing/failing fixtures.
+- route-handler lint failing fixtures.
+
+UI tests:
+
+- `/admin` render.
+- app shell render.
+- service binding API call path.
+- unauthorized admin state.
+- UI composition failing fixtures.
+
+Manual smoke:
+
+- run `dev:stack:ui`;
+- visit `/admin`;
+- sign in;
+- create resource server;
+- create OAuth client;
+- complete PKCE flow;
+- verify access token against JWKS from a standalone script;
+- deploy `core-id`, then `ui-id`, and repeat smoke.
+
+## 16. Definition Of Done
+
+Required repository outcomes:
+
+- [ ] `001_first-batch-plan.md` explicitly notes that this document supersedes its one-Worker topology.
+- [ ] root layout matches this spec.
+- [ ] `packages/ui` exists and exports Lumina primitives.
+- [ ] `packages/lib` exists and remains framework-free.
+- [ ] `workers/core` has full clean architecture layers plus `src/auth`.
+- [ ] `workers/ui` has Vinext admin pages and no auth/persistence/signing imports.
+- [ ] two-worker local dev works through service bindings.
+- [ ] deployed route ownership is documented and tested.
+
+Required enforcement outcomes:
+
+- [ ] 16 content-api architecture rules are ported.
+- [ ] id-specific rules are implemented as hard errors.
+- [ ] UI route composition is mechanically enforced.
+- [ ] `.schema-whitelist.json` exists.
+- [ ] `check:schema` fails on unapproved custom tables.
+- [ ] duplicate-code threshold is <3%.
+- [ ] TypeScript strict mode is enabled.
+- [ ] `pnpm check` passes from a clean checkout.
+- [ ] `pnpm advise` runs and suppressions are reviewed.
+
+Required pattern compliance:
+
+- [ ] at least one custom entity follows the class contract.
+- [ ] at least one repository uses CrudAdapter.
+- [ ] at least one mapper explicitly maps row/entity fields.
+- [ ] at least one custom route follows the route-handler contract.
+- [ ] request-scoped container is the only app/infrastructure wiring file.
+- [ ] Better Auth factory is request/binding-aware.
+- [ ] at least one admin page passes UI composition enforcement.
+
+Required auth/platform outcomes:
+
+- [ ] Better Auth schema generation and D1 migration path is documented.
+- [ ] OAuth Provider routes are tested.
+- [ ] JWKS default/custom path decision is tested.
+- [ ] resource-bound JWT access token is verified by JWKS.
+- [ ] service binding communication is tested locally.
+
+## 17. Final Model
+
+`id` is a strict two-worker identity-provider monorepo.
+
+`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation and calls `core-id`; it never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
+
+The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route composition enforcement, and service-binding authorization invariant.
