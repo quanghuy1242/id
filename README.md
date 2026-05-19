@@ -14,11 +14,18 @@ This repo implements the first-batch documented scope:
 
 ## Contracts
 
-This implementation follows the planning document:
+Architecture and implementation follow:
 
-- [docs/001-auth-service-first-batch.md](docs/001-auth-service-first-batch.md)
+- [docs/000_repo-architecture.md](docs/000_repo-architecture.md) — layer architecture, design patterns, enforcement rules, two-worker topology
+- [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done
+- [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
-It is designed to replace the legacy `~/pjs/auther` IdP. Downstream resource servers (e.g., `content-api`) validate JWTs against this service's JWKS endpoint.
+Two Cloudflare Workers:
+
+- `core-id` — auth, OAuth2.1/OIDC, JWKS, D1-backed (Better Auth)
+- `ui-id` — admin dashboard, Vinext/React, communicates with `core-id` via service binding
+
+Designed to replace the legacy `~/pjs/auther` IdP. Downstream resource servers (e.g., `content-api`) validate JWTs against this service's JWKS endpoint.
 
 ## Stack
 
@@ -97,9 +104,10 @@ pnpm db:migrate:remote
 
 CI/CD is handled by `.github/workflows/ci-deploy.yml`. On every push to `main`:
 
-1. lint, typecheck, tests
+1. `pnpm check` — lint, dup gate, schema whitelist, typecheck, tests
 2. `wrangler d1 migrations apply id --remote`
-3. deploy Worker
+3. `wrangler deploy --config workers/core/wrangler.jsonc`
+4. `vinext deploy --cwd workers/ui`
 
 Required GitHub secrets:
 

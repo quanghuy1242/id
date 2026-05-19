@@ -192,7 +192,7 @@ These are not scope questions. They are integration proofs that must happen befo
 `/home/quanghuy1242/pjs/auth` currently contains:
 
 - `README.md`
-- `docs/001-auth-service-first-batch.md`
+- `docs/001_first-batch-plan.md`
 - git metadata
 
 There is not yet an application skeleton, package manifest, Worker config, source tree, migrations, or tests. The README already declares the intended stack:
