@@ -11,6 +11,30 @@
       "file": "package.json",
       "rule": "security/vulnerable-dependency",
       "reason": "Current pnpm audit reports transitive ws moderate advisory; note and avoid dependency upgrades until compatibility is reviewed."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/get-auth.ts",
+      "rule": "complexity/function-too-long",
+      "reason": "getAuthOptions is pure Better Auth config construction; structurally required to assemble all plugin options in one call."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/http/routes/auth-mount.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Well-known alias handlers follow identical audience-load plus auth-handler pattern by design; each alias resolves a different pathname."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/contracts.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Route map entries are structurally identical contract records listing name/method/path/source; duplication is intentional documentation."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/resource-server/index.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Plugin endpoint handlers follow identical pattern: findOne, check NOT_FOUND, assert access, update/delete, invalidate cache. Structural similarity is intentional in BA plugin endpoints."
     }
   ]
 }

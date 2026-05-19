@@ -4,7 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
-import type { BetterAuthKvStorage } from "../../src/auth/secondary-storage";
+import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
 
 function createKv(): BetterAuthKvStorage {
@@ -13,6 +13,35 @@ function createKv(): BetterAuthKvStorage {
     put: async () => undefined,
     delete: async () => undefined,
   };
+}
+
+async function signInSuperadmin(auth: ReturnType<typeof betterAuth>, raw: { exec(sql: string): void }) {
+  await auth.handler(
+    new Request("https://id.example.test/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Root Admin",
+        email: "root@example.test",
+        password: "password123",
+      }),
+    }),
+  );
+  raw.exec(`update "user" set "emailVerified" = 1, "platformRole" = 'superadmin' where "email" = 'root@example.test';`);
+
+  const response = await auth.handler(
+    new Request("https://id.example.test/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "root@example.test",
+        password: "password123",
+      }),
+    }),
+  );
+  const cookie = response.headers.get("set-cookie");
+  expect(cookie).toEqual(expect.any(String));
+  return cookie ?? "";
 }
 
 describe("idResourceServer plugin endpoint", () => {
@@ -43,11 +72,12 @@ describe("idResourceServer plugin endpoint", () => {
         [],
       ),
     );
+    const cookie = await signInSuperadmin(auth, raw);
 
     const response = await auth.handler(
       new Request("https://id.example.test/api/auth/admin/resource-servers", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", cookie },
         body: JSON.stringify({
           organizationId: "org_1",
           slug: "api",

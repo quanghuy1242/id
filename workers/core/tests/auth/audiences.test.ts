@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { authPluginConfig } from "../../src/auth/config";
-import { invalidateResourceAudiences, loadResourceAudiences } from "../../src/auth/audiences";
+import { invalidateResourceAudiences, loadResourceAudiences } from "../../src/auth/adapters/audiences";
 
 type StoredValue = {
   readonly value: string;

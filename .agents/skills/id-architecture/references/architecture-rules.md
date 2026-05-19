@@ -30,8 +30,7 @@ When docs and code disagree, fix code or stop and ask if the docs are ambiguous.
 
 `workers/core/src/http` contains transport concerns:
 
-- route registration with `@hono/zod-openapi`
-- Zod/OpenAPI input and output schemas
+- route registration with Hono
 - presenters that convert domain objects to documented JSON
 - middleware for request context, optional authentication, and error shaping
 - no permission logic beyond requiring an authenticated actor for protected use cases
@@ -174,49 +173,33 @@ Better Auth is a runtime integration boundary:
 - `ui-no-auth-deps`: UI never imports Better Auth, Drizzle, Jose, D1/KV types, or core source.
 - `packages-lib-isolation`: `packages/lib` remains framework-free and only imports relative files or itself.
 - `auth-boundary`: Better Auth imports stay in approved core auth boundary files.
-- `admin-auth-required`: every `/api/admin/*` OpenAPI route handler calls `requireActor(c)`.
 
-## OpenAPI Route Rule
+## Route Handler Rules
 
-Every core API route must be registered through `createRoute` plus `app.openapi`. Plain `app.get`, `app.post`, `app.patch`, or `app.delete` should not appear in API route modules.
-
-Route modules should follow this shape:
+Core route modules follow a plain Hono pattern:
 
 ```ts
-const resourceRoute = createRoute({
-  method: "post",
-  path: "/api/admin/resources",
-  security: bearerSecurity,
-  request: { body: { required: true, content: { "application/json": { schema } } } },
-  responses: {
-    201: {
-      description: "Created",
-      content: { "application/json": { schema: responseSchema } },
-    },
-  },
-});
-
-app.openapi(resourceRoute, async (c) => {
-  requireActor(c);
-  const input = c.req.valid("json");
-  const result = await getContainer(c).resources.create.execute(input);
-  return c.json(result, 201);
-});
+export function registerMyRoutes(app: Hono<{ Bindings: CoreEnv }>) {
+  app.get("/api/admin/resources", async (c) => {
+    requireActor(c);
+    const result = await getContainer(c).resources.list.execute();
+    return c.json(presentResources(result), 200);
+  });
+}
 ```
 
 Rules:
 
-- import `z` from `@hono/zod-openapi`
-- use presenters for response JSON when responses become non-trivial
-- use `c.req.valid("param" | "query" | "json" | "header")`; do not call raw request parsers
-- add exactly `security: bearerSecurity` to protected operations
-- routes declaring `security: bearerSecurity` must call `requireActor(c)` in the handler
+- import `Hono` from `hono`
 - `/api/admin/*` routes must call `requireActor(c)`
 - route handlers should call exactly one use case `.execute(...)`
 - let use cases and policies enforce authorization
-- route handlers must not read `c.env`, call global `fetch`, use `crypto`, call `JSON.parse`/`JSON.stringify`, call direct storage methods, or construct `Request`/`Response` manually
+- route handlers must not read `c.env`, call global `fetch`, use `crypto`, call `JSON.parse`/`JSON.stringify`, call direct storage methods, or construct `Request`/`Response` manually (enforced by `route-handler-boundary` on `*.routes.ts` files)
+- Better Auth handler mounting (`app.all("/api/auth/*", ...)`) is exempt from these constraints; use a non-`.routes.ts` filename for those files
 
-## UI Composition Rule
+## Database Access Rule
+
+- `no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/` and `auth/cli.ts`. Use Better Auth adapter APIs or infrastructure/persistence for D1 access.
 
 The Phase 3 UI gate must fail admin route files for:
 

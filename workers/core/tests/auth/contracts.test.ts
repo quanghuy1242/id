@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { authRouteMap } from "../../src/auth/contracts";
 import { authPluginConfig } from "../../src/auth/config";
 import type { BetterAuthOptions } from "better-auth";
-import type { BetterAuthKvStorage } from "../../src/auth/secondary-storage";
+import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import { getAuthOptions } from "../../src/auth/get-auth";
 
 const oauthProviderTypeSource = readFileSync(
@@ -33,6 +33,7 @@ describe("Better Auth installed contract", () => {
     expect(oauthProviderEndpointSource).toContain('createOAuthClient: better_call0.StrictEndpoint<"/oauth2/create-client"');
     expect(oauthProviderEndpointSource).toContain('updateOAuthClient: better_call0.StrictEndpoint<"/oauth2/update-client"');
     expect(oauthProviderEndpointSource).toContain('deleteOAuthClient: better_call0.StrictEndpoint<"/oauth2/delete-client"');
+    expect(oauthProviderEndpointSource).toContain('rotateClientSecret: better_call0.StrictEndpoint<"/oauth2/client/rotate-secret"');
     expect(oauthProviderEndpointSource).toContain('oauth2UserInfo: better_call0.StrictEndpoint<"/oauth2/userinfo"');
   });
 
@@ -53,6 +54,7 @@ describe("Better Auth installed contract", () => {
   it("proves email/password sign-up uses disableSignUp, not a signup option", () => {
     expect(betterAuthOptionsSource).toContain("disableSignUp?: boolean");
     expect(betterAuthOptionsSource).not.toContain("signup?:");
+    expect(oauthProviderTypeSource).toContain("signup?:");
   });
 
   it("constructs Better Auth options with plugin-owned resource server schema", () => {

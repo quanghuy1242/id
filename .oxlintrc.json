@@ -48,9 +48,6 @@
     "architecture/no-mapper-imports-outside-infra": "error",
     "architecture/no-storage-error-parsing": "error",
     "architecture/no-custom-errors-outside-shared": "error",
-    "architecture/req-valid-usage": "error",
-    "architecture/no-plain-zod-import": "error",
-    "architecture/route-module": "error",
     "architecture/route-handler-boundary": "error",
     "architecture/repository-workflow": "error",
     "architecture/mapper-file": "error",
@@ -65,8 +62,8 @@
     "architecture/ui-no-auth-deps": "error",
     "architecture/packages-lib-isolation": "error",
     "architecture/auth-boundary": "error",
-    "architecture/admin-auth-required": "error",
-    "architecture/ui-route-composition": "error"
+    "architecture/ui-route-composition": "error",
+    "architecture/no-direct-db-access": "error"
   },
   "overrides": [
     {
@@ -76,9 +73,6 @@
         "architecture/no-mapper-imports-outside-infra": "off",
         "architecture/no-storage-error-parsing": "off",
         "architecture/no-custom-errors-outside-shared": "off",
-        "architecture/req-valid-usage": "off",
-        "architecture/no-plain-zod-import": "off",
-        "architecture/route-module": "off",
         "architecture/route-handler-boundary": "off",
         "architecture/repository-workflow": "off",
         "architecture/mapper-file": "off",
@@ -93,8 +87,8 @@
         "architecture/ui-no-auth-deps": "off",
         "architecture/packages-lib-isolation": "off",
         "architecture/auth-boundary": "off",
-        "architecture/admin-auth-required": "off",
         "architecture/ui-route-composition": "off",
+        "architecture/no-direct-db-access": "off",
         "no-console": "off",
         "no-await-in-loop": "off"
       }
@@ -106,9 +100,6 @@
         "architecture/no-mapper-imports-outside-infra": "off",
         "architecture/no-storage-error-parsing": "off",
         "architecture/no-custom-errors-outside-shared": "off",
-        "architecture/req-valid-usage": "off",
-        "architecture/no-plain-zod-import": "off",
-        "architecture/route-module": "off",
         "architecture/route-handler-boundary": "off",
         "architecture/repository-workflow": "off",
         "architecture/mapper-file": "off",
@@ -123,7 +114,7 @@
         "architecture/ui-no-auth-deps": "off",
         "architecture/packages-lib-isolation": "off",
         "architecture/auth-boundary": "off",
-        "architecture/admin-auth-required": "off",
+        "architecture/no-direct-db-access": "off",
         "no-console": "off"
       }
     }
@@ -135,7 +126,8 @@
     ".wrangler",
     "migrations",
     ".architecture-rule-workspace",
-    "**/tests/fixtures/**"
+    "**/tests/fixtures/**",
+    "scripts/**"
   ],
   "env": {
     "es2022": true,

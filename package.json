@@ -25,11 +25,13 @@
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
-    "deploy:ui": "vinext deploy --cwd workers/ui"
+    "deploy:core:dry-run": "wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core",
+    "deploy:ui": "vinext deploy --cwd workers/ui",
+    "deploy:ui:dry-run": "vinext build --cwd workers/ui",
+    "smoke:remote": "node scripts/remote-smoke.mjs"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.6.11",
-    "@hono/zod-openapi": "1.4.0",
     "@id/lib": "workspace:*",
     "@id/ui": "workspace:*",
     "better-auth": "1.6.11",

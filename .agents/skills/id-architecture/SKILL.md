@@ -21,7 +21,7 @@ Read only the docs needed for the task:
 Identify which boundary the change touches:
 
 - `workers/core/src/auth/**`: Better Auth factory, plugins, plugin schemas/endpoints, CLI/schema generation.
-- `workers/core/src/http/**`: Hono OpenAPI routes and presenters.
+- `workers/core/src/http/**`: Hono routes and presenters.
 - `workers/core/src/domain/**` or `application/**`: entities, policies, use cases, repository interfaces.
 - `workers/core/src/infrastructure/**`: Drizzle/D1 persistence for Hono-owned resources only.
 - `workers/ui/**`: Vinext admin presentation and service-binding calls.
@@ -48,7 +48,7 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 - Plugin endpoints mount under the Better Auth base path, expected as `/api/auth/admin/resource-servers...` with the current base path.
 - Do not add `workers/core/src/infrastructure/db/schema.ts` tables for first-batch custom data.
 - Do not create `CrudAdapter`, mapper, repository, or entity layers for plugin-owned CRUD.
-- Hono `/api/admin/*` routes are for aggregate reads or non-BA-owned workflows; they validate OpenAPI input, call `requireActor(c)`, call one use case, and present output.
+- Hono `/api/admin/*` routes are for aggregate reads or non-BA-owned workflows; they call `requireActor(c)`, call one use case, and present output.
 
 ## Pattern Reminders
 
@@ -56,7 +56,7 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 - Persistence mappers live only in `workers/core/src/infrastructure/repositories/mappers/*.mapper.ts` and explicitly map fields.
 - Repositories use `CrudAdapter` only for Hono-owned Drizzle resources.
 - Use cases depend on domain interfaces and shared errors, not HTTP or infrastructure.
-- Core route handlers use `@hono/zod-openapi`, `c.req.valid(...)`, `requireActor(c)` for `/api/admin/*`, exactly one use case, and presenters.
+- Core route handlers call `requireActor(c)` for `/api/admin/*`, exactly one use case, and presenters.
 - Admin UI route files compose `@id/ui` primitives; no raw route HTML/classes/fetch/core imports.
 
 ## Verification

@@ -15,6 +15,10 @@ This implementation follows the planning and architecture documents:
 - [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done
 - [docs/002_implementation-sequence.md](docs/002_implementation-sequence.md) — merged phased execution order (spikes → enforcement → features)
 - [docs/003_future-implementation.md](docs/003_future-implementation.md) — CEL policy engine, onboarding, analytics, pipeline hooks, plugin strategy
+- [docs/004_admin-api-reference.md](docs/004_admin-api-reference.md) — admin API and Better Auth management endpoints
+- [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide
+- [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
+- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, and incident runbooks
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
@@ -50,7 +54,7 @@ Versions are pinned in `package.json`. Verified package metadata on May 19, 2026
 - `src/infrastructure/persistence/crud-adapter.ts` owns shared CRUD row access and cursor pagination.
 - `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
 - Better Auth-owned tables are never defined in `workers/core/src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
-- Custom tables are defined through Better Auth plugin `schema` definitions, migrated via BA CLI.
+- Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path.
 - Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
 
 ## Local Setup
@@ -108,7 +112,7 @@ pnpm dev:stack:ui                # both Workers with service binding (UI primary
 
 ## Migrations
 
-Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `better-auth_migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
+Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
 
 Generate BA schema (built-in + plugin tables):
 
@@ -137,19 +141,22 @@ pnpm typecheck
 pnpm test
 pnpm check
 pnpm advise
+pnpm smoke:remote
 ```
 
 `pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
+`pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`.
 
 ## Deployment
 
-CI/CD is handled by `.github/workflows/ci-deploy.yml`. On every push to `main`:
+CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check`; manual dispatch with `deploy=true` runs:
 
 1. `pnpm check` — lint, dup gate, UI composition, typecheck, tests
-2. `wrangler d1 migrations apply id --remote`
-3. `wrangler deploy --config workers/core/wrangler.jsonc`
-4. `vinext deploy --cwd workers/ui`
+2. `pnpm db:migrate:remote`
+3. `pnpm deploy:core`
+4. `pnpm deploy:ui`
+5. `pnpm smoke:remote`
 
 Required GitHub secrets:
 
@@ -157,3 +164,8 @@ Required GitHub secrets:
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
 - `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret
 - Email provider secrets (verification and password reset)
+
+Required GitHub variables:
+
+- `ID_CORE_URL` — deployed core Worker base URL
+- `ID_UI_URL` — deployed UI Worker base URL

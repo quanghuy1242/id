@@ -1,4 +1,4 @@
-import { createApp } from "@/app";
+import { createApp } from "@/composition/create-app";
 
 const app = createApp();
 

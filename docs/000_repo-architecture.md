@@ -231,13 +231,14 @@ The tree below is the target shape at first-batch maturity. The current scaffold
     │   ├── vitest.config.ts
     │   ├── src/
     │   │   ├── main.ts
-    │   │   ├── app.ts
     │   │   ├── domain/
     │   │   ├── application/
     │   │   ├── composition/
     │   │   ├── config/
     │   │   ├── http/
-    │   │   ├── infrastructure/
+    │   │   │   └── routes/
+    │   │   │       ├── health.routes.ts
+    │   │   │       └── auth-mount.ts    │   │   ├── infrastructure/
     │   │   ├── shared/
     │   │   └── auth/
     │   └── tests/
@@ -732,51 +733,22 @@ Custom API route handlers follow this shape. Better Auth handler routes are isol
 
 ```ts
 // workers/core/src/http/routes/admin/resource-servers.routes.ts
-import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import type { AppEnv } from "@/http/app-env";
+import type { Hono } from "hono";
+import type { CoreEnv } from "@/config/env";
 
-const listResourceServersRoute = createRoute({
-  method: "get",
-  path: "/",
-  security: [{ bearer: [] }],
-  request: {
-    query: z.object({
-      organizationId: z.string(),
-      cursor: z.string().optional(),
-      limit: z.coerce.number().min(1).max(100).optional().default(20),
-    }),
-  },
-  responses: {
-    200: {
-      description: "List of resource servers",
-      content: {
-        "application/json": {
-          schema: z.object({
-            data: z.array(z.any()),
-            cursor: z.string().nullable(),
-          }),
-        },
-      },
-    },
-  },
-});
-
-export function registerResourceServerRoutes(app: OpenAPIHono<AppEnv>) {
-  app.openapi(listResourceServersRoute, async (c) => {
+export function registerResourceServerRoutes(app: Hono<{ Bindings: CoreEnv }>) {
+  app.get("/api/admin/resource-servers", async (c) => {
     const actor = requireActor(c);
-    const query = c.req.valid("query");
 
     const result = await c.get("container").resourceServers.list.execute({
       actor,
-      organizationId: query.organizationId,
-      cursor: query.cursor ?? null,
-      limit: query.limit,
+      limit: 20,
     });
 
     return c.json({
       data: result.items.map(presentResourceServer),
       cursor: result.cursor,
-    }, 200);
+    });
   });
 }
 ```
@@ -784,7 +756,6 @@ export function registerResourceServerRoutes(app: OpenAPIHono<AppEnv>) {
 Forbidden in custom route handlers:
 
 - `c.env` direct access.
-- `c.req.json()`, `c.req.query()`, or `c.req.param()` after schema validation is available.
 - more than one use case `.execute()` for simple CRUD handlers.
 - direct `fetch()`.
 - direct database access.
@@ -793,7 +764,7 @@ Forbidden in custom route handlers:
 
 Required:
 
-- `security` metadata and `requireActor(c)` stay paired.
+- `requireActor(c)` for every `/api/admin/*` route.
 - exactly one use-case call for simple CRUD.
 - presenter wraps entities before JSON.
 
@@ -1099,30 +1070,27 @@ Content-api rules, all hard errors:
 | 2 | `no-mapper-imports-outside-infra` | mapper leakage outside infrastructure |
 | 3 | `no-storage-error-parsing` | storage error string matching outside infrastructure |
 | 4 | `no-custom-errors-outside-shared` | scattered custom error classes |
-| 5 | `req-valid-usage` | raw request parsing instead of validated input |
-| 6 | `no-plain-zod-import` | plain `zod` imports in OpenAPI schema contexts |
-| 7 | `route-module` | routes without required createRoute/openapi/security shape |
-| 8 | `route-handler-boundary` | side effects and persistence in handlers |
-| 9 | `repository-workflow` | raw DB writes and policy imports in repositories |
-| 10 | `mapper-file` | unsafe mapper structure |
-| 11 | `entity-class` | plain object entities |
-| 12 | `no-raw-entity-serialization` | spreading/stringifying entities |
-| 13 | `crud-adapter-jsdoc` | undocumented CrudAdapter methods |
-| 14 | `no-magic-numbers` | unnamed numeric policy/config literals |
-| 15 | `constants-placement` | constants outside approved locations |
-| 16 | `constants-jsdoc` | undocumented exported constants |
+| 5 | `route-handler-boundary` | side effects and persistence in handlers |
+| 6 | `repository-workflow` | raw DB writes and policy imports in repositories |
+| 7 | `mapper-file` | unsafe mapper structure |
+| 8 | `entity-class` | plain object entities |
+| 9 | `no-raw-entity-serialization` | spreading/stringifying entities |
+| 10 | `crud-adapter-jsdoc` | undocumented CrudAdapter methods |
+| 11 | `no-magic-numbers` | unnamed numeric policy/config literals |
+| 12 | `constants-placement` | constants outside approved locations |
+| 13 | `constants-jsdoc` | undocumented exported constants |
 
 Id-specific rules, all hard errors:
 
 | # | Rule | What it prevents |
 |---|---|---|
-| 17 | `worker-isolation` | cross-imports between core and UI workers |
-| 18 | `core-no-ui-deps` | React/Vinext/UI dependencies in core |
-| 19 | `ui-no-auth-deps` | Better Auth/Drizzle/Jose/D1/KV dependencies in UI |
-| 20 | `packages-lib-isolation` | framework/runtime imports in `packages/lib` |
-| 21 | `auth-boundary` | Better Auth imports outside approved core files |
-| 22 | `admin-auth-required` | admin API routes without explicit actor requirement |
-| 23 | `ui-route-composition` | raw HTML/classes/fetch/core imports in admin route files |
+| 14 | `worker-isolation` | cross-imports between core and UI workers |
+| 15 | `core-no-ui-deps` | React/Vinext/UI dependencies in core |
+| 16 | `ui-no-auth-deps` | Better Auth/Drizzle/Jose/D1/KV dependencies in UI |
+| 17 | `packages-lib-isolation` | framework/runtime imports in `packages/lib` |
+| 18 | `auth-boundary` | Better Auth imports outside approved core files |
+| 19 | `ui-route-composition` | raw HTML/classes/fetch/core imports in admin route files |
+| 20 | `no-direct-db-access` | raw D1 `.prepare()`/`.batch()`/`.exec()` outside infrastructure |
 
 Built-in hard rules:
 
@@ -1286,9 +1254,10 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Layer imports | domain/application/http/infrastructure/composition/shared imports stay directional | Oxlint `layer-imports` |
 | Entity classes | private constructor, create, reconstitute, toSnapshot | Oxlint `entity-class` |
 | Serialization | no raw entity spreading/stringifying | Oxlint `no-raw-entity-serialization` |
-| Routes | validated inputs, one use case, presenter output | Oxlint route rules |
-| Admin auth | admin API routes require actor | Oxlint `admin-auth-required` |
+| Routes | one use case, presenter output, no direct env access | Oxlint `route-handler-boundary` |
+| Admin auth | admin API routes require actor (review-enforced, not mechanical) | Code review |
 | Repositories | CrudAdapter and mapper workflow only | Oxlint `repository-workflow` |
+| Database access | raw D1 `.prepare()`/`.batch()`/`.exec()` only in infrastructure | Oxlint `no-direct-db-access` |
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |

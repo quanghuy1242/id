@@ -1,4 +1,4 @@
-import { authPluginConfig } from "./config";
+import { authPluginConfig } from "../config";
 import type { BetterAuthKvStorage } from "./secondary-storage";
 
 export type ResourceAudienceRow = {

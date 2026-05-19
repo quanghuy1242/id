@@ -1,3 +1,6 @@
+/** Returned for successful operations. */
+export const HTTP_OK = 200;
+
 /** Returned when no authenticated actor exists for a protected admin action. */
 export const HTTP_UNAUTHORIZED = 401;
 

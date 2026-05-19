@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../src/app";
+import { createApp } from "../src/composition/create-app";
 
 describe("core scaffold", () => {
   it("creates a Hono app", () => {

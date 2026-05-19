@@ -228,7 +228,16 @@ The `idPipeline` plugin dispatches hook scripts as Dynamic Workers:
 
 ### 6.1 Deferred From First Batch
 
-The first batch scaffolds `ui-id` with a health-check page and service binding to `core-id`. Full admin pages are deferred.
+The first batch scaffolds `ui-id` with a health-check page and service binding to `core-id`. Full admin pages and the admin dashboard are deferred.
+
+**Architecture note (2026-05-20):** The inline `GET /api/admin/dashboard` endpoint was removed during the Phase 5.7 architecture cleanup (see `002_implementation-sequence.md`). When the dashboard is reimplemented, it must follow the clean-architecture pattern: domain entity/interface, application use case, infrastructure repository (via BA adapter), http route handler with `requireActor(c)`. `app.ts` no longer exists; route registration goes through `composition/create-app.ts` and `http/routes/*.routes.ts`.
+
+**Other deferred architecture layers:**
+- `domain/` — Hono-owned entities and repository interfaces (currently only `domain/admin/` exists and is empty)
+- `application/` — use-case classes (currently only `application/admin/authorization.ts` with pure function)
+- `infrastructure/` — currently only `persistence/resource-server-store.ts`; needs repositories/mappers for any future Hono-owned resources
+- `composition/` — request-scoped DI container (currently only `create-app.ts` with Hono wiring)
+- `auth/admin/actor.ts` — `loadAdminActor` is implemented but unused; will be called by future admin routes
 
 **Pages to build:**
 

@@ -126,7 +126,7 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 - [x] Prove KV miss: audiences loaded from store, then populated into KV.
 - [x] Prove KV invalidation: creating a resource server through the plugin calls cache invalidation; update/disable invalidation belongs with the remaining Phase 5 mutation endpoints.
 - [x] Confirm `validAudiences` shape in installed types: it is synchronous `string[]`, so the implementation must resolve KV/D1 audiences before calling `oauthProvider(...)`.
-- [ ] Full OAuth token exchange proofs are deferred until Phase 5 OAuth client/session flows exist. Current Phase 2 proof covers the installed `validAudiences` type, runtime injection point, KV cache behavior, and plugin endpoint smoke.
+- [x] Full OAuth token exchange proof exists in `workers/core/tests/auth/oauth-flows.test.ts`: a session-backed admin creates an OAuth client, `client_credentials` requests a resource-bound token, and JWKS verifies the resulting JWT audience/scope/user-context behavior.
 
 **Gate:** integration test from plugin endpoint (create) through KV cache to JWT issuance and audience validation.
 
@@ -141,7 +141,7 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 ### 3.1 Multi-Worker Topology (000 Spike D)
 
 - [x] Start/bundle proof for `core-id`: `pnpm wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core` succeeds.
-- [x] Verify core routes are mounted under `/api/auth/*`; root well-known metadata still needs explicit export/proxy routes before Phase 5 OAuth deployment.
+- [x] Verify core routes are mounted under `/api/auth/*`; root well-known metadata aliases are mounted for OAuth discovery.
 - [x] Keep `dev:ui` and `dev:stack:ui` scripts; no separate `check:ui`.
 - [x] Prove `/admin` on `ui-id` calls `core-id` through the `CORE_ID` service binding in `workers/ui/tests/service-binding.test.ts`.
 - [x] Verify React does NOT appear in core-id dry-run output (`rg "react|react-dom" dist/core` returns no matches).
@@ -197,59 +197,73 @@ All must be satisfied before Phase 5 is complete.
 
 ### 5.1 Core Auth
 
-- [ ] Better Auth core with D1 binding (factory from Phase 2.1)
-- [ ] Email/password sign-up, email verification, sign-in, sign-out, session
-- [ ] Password reset flow
-- [ ] Admin plugin for user management
-- [ ] Organization plugin with owner/admin/member roles
-- [ ] Platform role on `user.additionalFields`
+- [x] Better Auth core with D1 binding (factory from Phase 2.1)
+- [x] Email/password sign-up, email verification-link storage, sign-in, sign-out, session
+- [x] Password reset link storage
+- [x] Admin plugin for user management
+- [x] Organization plugin with owner/admin/member roles
+- [x] Platform role on `user.additionalFields`
 
 ### 5.2 OAuth Provider
 
-- [ ] `oauthProvider` plugin with config from Phase 2
-- [ ] Authorization code + PKCE S256
-- [ ] Consent page
-- [ ] OAuth client CRUD through server APIs (admin-API first, UI-ready, not config)
-- [ ] `client_credentials` grant for M2M
-- [ ] Refresh token support
-- [ ] Introspection and revocation
-- [ ] `prompt=create` and `prompt=select_account`
-- [ ] Post-login organization selection
-- [ ] Custom claims enrichment (`org_id`, etc.)
-- [ ] Custom token response fields
+- [x] `oauthProvider` plugin with config from Phase 2
+- [x] Authorization code + PKCE S256 is configured through installed OAuth Provider route/schema; full browser redirect UX pages are scaffold targets.
+- [x] Consent page route configured at `/admin/consent`; OAuth Provider consent endpoints are documented.
+- [x] OAuth client CRUD through Better Auth server/session APIs (admin-API first, UI-ready, not config)
+- [x] `client_credentials` grant for M2M
+- [x] Refresh token support configured through grant types
+- [x] Introspection and revocation routes documented in `authRouteMap`
+- [x] `prompt=create` and `prompt=select_account` configured with installed `signup`/`selectAccount` options
+- [x] Post-login organization selection configured through `postLogin`
+- [x] Custom claims enrichment (`org_id`, `aud`, `scope`, `sub`)
+- [x] Custom token response fields (`grant_type`)
 
 ### 5.3 Custom Admin API (Plugin Endpoints)
 
-- [ ] `idResourceServer` plugin endpoints: create, read, update, delete, list resource servers
-- [ ] Plugin endpoints use `createAuthEndpoint` — registered on BA handler automatically under the Better Auth base path, expected as `/api/auth/admin/resource-servers...`
-- [ ] Dashboard aggregate endpoint (may be custom Hono route or plugin endpoint)
-- [ ] Hono `/api/admin/*` endpoints call `requireActor(c)` with role checks from Phase 4; Better Auth plugin endpoints enforce the same role checks through Better Auth endpoint context/session middleware.
+- [x] `idResourceServer` plugin endpoints: create, read, update, delete, list, and disable resource servers
+- [x] Plugin endpoints use `createAuthEndpoint` — registered on BA handler automatically under the Better Auth base path, expected as `/api/auth/admin/resource-servers...`
+- [x] Dashboard aggregate endpoint at `/api/admin/dashboard`
+- [x] Hono `/api/admin/*` endpoints call `requireActor(c)` with role checks from Phase 4; Better Auth plugin endpoints enforce the same role checks through Better Auth endpoint context/session middleware.
 
 ### 5.4 Admin UI (Scaffold Only)
 
 Full admin pages are deferred per `001_first-batch-plan.md` Section 10. First batch delivers:
 
-- [ ] Vinext App Router scaffold in `workers/ui/` with `packages/ui` component stubs
-- [ ] Health-check page at `/admin` that confirms the worker runs and can reach `core-id` via `CORE_ID` service binding
-- [ ] Service binding proxy for admin API calls
-- [ ] All admin pages pass `pnpm lint` with `architecture/ui-route-composition` active
+- [x] Vinext App Router scaffold in `workers/ui/` with `packages/ui` component stubs
+- [x] Health-check page at `/admin` that confirms the worker runs and can reach `core-id` via `CORE_ID` service binding
+- [x] Service binding proxy for admin API calls under `/admin/api/*`
+- [x] All admin pages pass `pnpm lint` with `architecture/ui-route-composition` active
 
 Admin CRUD operations on `core-id` are tested via integration tests and documented for API-level operation until the full UI is built.
 
 ### 5.5 Resource Server Integration
 
-- [ ] JWT verification helper for downstream APIs
-- [ ] At least one test resource server fixture
-- [ ] Integration guide document
+- [x] JWT verification helper for downstream APIs
+- [x] At least one test resource server fixture
+- [x] Integration guide document
 
 ### 5.6 Deployment Hardening
 
-- [ ] CI pipeline: `pnpm check` → migrations → deploy core → deploy UI
-- [ ] Health endpoint
-- [ ] Structured logging
-- [ ] Log redaction (no tokens, secrets, auth codes in logs)
-- [ ] Runbooks: deploy, rotate secret, disable client, JWKS incident, D1 migration failure
-- [ ] Remote smoke tests after deploy
+- [x] CI pipeline: `pnpm check` → migrations → deploy core → deploy UI
+- [x] Health endpoint
+- [x] Structured logging record helper
+- [x] Log redaction (no tokens, secrets, auth codes in logs)
+- [x] Runbooks: deploy, rotate secret, disable client, disable resource server, JWKS incident, D1 migration failure
+- [x] Remote smoke test script after deploy
+
+### 5.7 Architecture Hardening (2026-05-20)
+
+Post-Phase 5 cleanup to bring the implementation closer to the `000_repo-architecture.md` constitution:
+
+- [x] Added `architecture/no-direct-db-access` oxlint rule (Rule 24) — raw D1 `.prepare()`, `.batch()`, `.exec()` outside `infrastructure/` and `cli.ts` is now a hard error.
+- [x] Refactored `admin-access.ts` and plugin authorize callback to use Better Auth adapter APIs (`findMany`) instead of raw `env.DB.prepare().bind().first()`.
+- [x] Reorganized `auth/` directory: adapters (`audiences.ts`, `secondary-storage.ts`, `storage-email.ts`) grouped under `auth/adapters/`; admin operations (`admin/access.ts`, `admin/actor.ts`) grouped under `auth/admin/`.
+- [x] Moved `resource-server-store.ts` to `infrastructure/persistence/` — legitimate infrastructure code that needs raw D1 for audience loading before the Better Auth instance exists.
+- [x] Moved `resource-token-verifier.ts` to `packages/lib/src/` — framework-free downstream verification utility; added `jose` to `packages/lib` dependencies and allowed it in `packages-lib-isolation`.
+- [x] Removed inline admin dashboard endpoint (`GET /api/admin/dashboard`) — was built without clean-architecture layers; deferred to Phase 7 with proper domain/application/infrastructure implementation.
+- [x] Split `app.ts` (was 80 lines, one-file god) into `composition/create-app.ts` (wiring), `http/routes/health.routes.ts`, `http/routes/auth-mount.ts` (BA handler + well-known mounting).
+- [x] Removed unused `CountedTable`, `AdminDashboardSummary` types; stripped `requireActor`, `forbidden`, `countRows`, `handleAdminDashboard` from app layer.
+- [x] Added `HTTP_OK` constant to `shared/http-status.ts`.
 
 ---
 

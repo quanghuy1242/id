@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { CORE_HEALTH_PATH } from "@id/lib";
+import { ADMIN_API_PROXY_PREFIX, CORE_HEALTH_PATH } from "@id/lib";
 import type { UiEnv } from "@/lib/env";
 
 const app = new Hono<{ Bindings: UiEnv }>();
@@ -16,6 +16,15 @@ app.get("/health", async (c) => {
 app.get("/admin", async (c) => {
   const response = await fetchCoreHealth(c.env);
   return c.json({ admin: "id-ui", coreReachable: response.ok });
+});
+
+app.all(`${ADMIN_API_PROXY_PREFIX}/*`, async (c) => {
+  const url = new URL(c.req.url);
+  const corePath = url.pathname.slice(ADMIN_API_PROXY_PREFIX.length);
+  url.hostname = "core-id.local";
+  url.protocol = "https:";
+  url.pathname = `/api/admin${corePath}`;
+  return c.env.CORE_ID.fetch(new Request(url, c.req.raw));
 });
 
 export default app;

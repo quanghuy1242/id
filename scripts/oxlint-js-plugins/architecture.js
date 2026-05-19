@@ -6,8 +6,6 @@ var STORAGE_ERROR_PATTERNS = [
 ];
 
 var ROUTE_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
-var DISALLOWED_REQ_METHODS = new Set(["json", "text", "formData", "parseBody", "query", "queries", "param", "header"]);
-var ALLOWED_VALID_KINDS = new Set(["param", "query", "json", "header"]);
 
 function getLayer(filename) {
   var srcIndex = filename.lastIndexOf("/src/");
@@ -32,10 +30,6 @@ function isMapperFile(filename) {
 
 function isCrudAdapter(filename) {
   return filename.endsWith("/infrastructure/persistence/crud-adapter.ts");
-}
-
-function isInSchemaValidationPagination(filename) {
-  return filename.includes("/http/schemas/");
 }
 
 function startsWithAny(str, prefixes) {
@@ -91,23 +85,27 @@ function findDescendants(root, predicate) {
   return matches;
 }
 
-function isAppOpenapiCall(node) {
-  if (!node || node.type !== "CallExpression") return false;
+function getInlineRouteHandlerBody(node) {
+  if (!node || node.type !== "CallExpression") return null;
   var callee = node.callee;
-  return callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.object.type === "Identifier" &&
-    callee.object.name === "app" &&
-    getPropertyName(callee.property) === "openapi";
-}
-
-function getInlineOpenapiHandlerBody(node) {
-  if (!isAppOpenapiCall(node)) return null;
-  var handlerArg = node.arguments[1];
-  var isArrow = handlerArg && handlerArg.type === "ArrowFunctionExpression";
-  var isFunc = handlerArg && handlerArg.type === "FunctionExpression";
-  if (!isArrow && !isFunc) return null;
-  return handlerArg.body;
+  if (callee.type !== "MemberExpression" || callee.computed) return null;
+  if (callee.object.type !== "Identifier" || callee.object.name !== "app") return null;
+  var prop = getPropertyName(callee.property);
+  if (prop === "all") {
+    var handler = node.arguments[1];
+    var isArrow = handler && handler.type === "ArrowFunctionExpression";
+    var isFunc = handler && handler.type === "FunctionExpression";
+    if (!isArrow && !isFunc) return null;
+    return handler.body;
+  }
+  if (ROUTE_METHODS.has(prop)) {
+    var handler = node.arguments[1];
+    var isArrow = handler && handler.type === "ArrowFunctionExpression";
+    var isFunc = handler && handler.type === "FunctionExpression";
+    if (!isArrow && !isFunc) return null;
+    return handler.body;
+  }
+  return null;
 }
 
 function hasJSDoc(context, node) {
@@ -260,208 +258,6 @@ var noCustomErrorsOutsideSharedRule = {
   },
 };
 
-// ─── Rule 5: req-valid-usage ──────────────────────────────────────────────
-var reqValidUsageRule = {
-  meta: { type: "problem", docs: { description: "Enforce c.req.valid(...) usage" } },
-  create: function (context) {
-    var filename = context.filename || context.physicalFilename || "";
-    return {
-      CallExpression: function (node) {
-        var callee = node.callee;
-        if (callee.type !== "MemberExpression") return;
-        if (callee.computed || callee.property.type !== "Identifier") return;
-        var method = callee.property.name;
-        var obj = callee.object;
-        if (obj.type !== "MemberExpression" || obj.computed) return;
-        if (getPropertyName(obj.property) !== "req") return;
-
-        if (DISALLOWED_REQ_METHODS.has(method) && isRouteModule(filename)) {
-          context.report({ node: node, message: "Use req.valid(...) instead of raw req." + method + "(...) in route modules" });
-          return;
-        }
-        if (method !== "valid") return;
-        if (!isRouteModule(filename)) {
-          context.report({ node: node, message: "c.req.valid(...) is only allowed in HTTP route modules" });
-          return;
-        }
-        var firstArg = node.arguments[0];
-        if (!firstArg || firstArg.type !== "Literal" || typeof firstArg.value !== "string" || !ALLOWED_VALID_KINDS.has(firstArg.value)) {
-          context.report({ node: node, message: "c.req.valid(...) must use one of: param, query, json, header" });
-        }
-      },
-    };
-  },
-};
-
-// ─── Rule 6: no-plain-zod-import ──────────────────────────────────────────
-var noPlainZodImportRule = {
-  meta: { type: "problem", docs: { description: "No plain zod import in schema files" } },
-  create: function (context) {
-    var filename = context.filename || context.physicalFilename || "";
-    if (!isInSchemaValidationPagination(filename)) return {};
-    return {
-      ImportDeclaration: function (node) {
-        var spec = extractImportSource(node);
-        if (spec === "zod") {
-          context.report({ node: node.source, message: "Route and shared validation schemas must import z from @hono/zod-openapi" });
-        }
-      },
-    };
-  },
-};
-
-// ─── Rule 7: route-module ─────────────────────────────────────────────────
-var routeModuleRule = {
-  meta: { type: "problem", docs: { description: "Enforce createRoute + app.openapi pattern" } },
-  create: function (context) {
-    var filename = context.filename || context.physicalFilename || "";
-    if (!isRouteModule(filename)) return {};
-
-    var createRouteImported = false;
-    var routeDefinitions = {};
-    var openapiCalls = 0;
-    var handlerBodies = [];
-
-    return {
-      ImportDeclaration: function (node) {
-        var spec = extractImportSource(node);
-        if (spec !== "@hono/zod-openapi") return;
-        if (!node.specifiers) return;
-        for (var i = 0; i < node.specifiers.length; i++) {
-          var s = node.specifiers[i];
-          if (s.type === "ImportSpecifier" && s.imported && s.imported.name === "createRoute") {
-            createRouteImported = true;
-          }
-        }
-      },
-
-      VariableDeclarator: function (node) {
-        if (!node.id || node.id.type !== "Identifier" || !node.init) return;
-        if (node.init.type !== "CallExpression") return;
-        if (node.init.callee.type !== "Identifier" || node.init.callee.name !== "createRoute") return;
-        var config = node.init.arguments[0];
-        if (config && config.type === "ObjectExpression") {
-          routeDefinitions[node.id.name] = config;
-        }
-      },
-
-      CallExpression: function (node) {
-        var callee = node.callee;
-        if (callee.type !== "MemberExpression" || callee.computed) return;
-        if (callee.property.type !== "Identifier") return;
-        var prop = callee.property.name;
-        if (callee.object.type !== "Identifier" || callee.object.name !== "app") return;
-
-        if (ROUTE_METHODS.has(prop) && prop !== "openapi") {
-          context.report({ node: node, message: "Route modules must register endpoints with createRoute(...) and app.openapi(...)" });
-          return;
-        }
-        if (prop !== "openapi") return;
-
-        openapiCalls++;
-
-        var routeArg = node.arguments[0];
-        var handlerArg = node.arguments[1];
-
-        var foundRoute = false;
-        if (routeArg) {
-          if (routeArg.type === "Identifier" && routeDefinitions[routeArg.name]) {
-            foundRoute = true;
-          } else if (routeArg.type === "ObjectExpression") {
-            foundRoute = true;
-          }
-        }
-
-        if (!foundRoute) {
-          context.report({ node: node, message: "app.openapi(...) must use a route created by createRoute(...)" });
-          return;
-        }
-
-        var isArrow = handlerArg && handlerArg.type === "ArrowFunctionExpression";
-        var isFunc = handlerArg && handlerArg.type === "FunctionExpression";
-        if (!isArrow && !isFunc) {
-          context.report({ node: node, message: "app.openapi(...) must receive an inline handler" });
-          return;
-        }
-
-        handlerBodies.push({
-          handlerBody: handlerArg.body,
-          routeConfig: routeArg.type === "Identifier" ? routeDefinitions[routeArg.name] : routeArg,
-        });
-      },
-
-      "Program:exit": function () {
-        if (!createRouteImported) {
-          reportProgramError(context, "Route modules must import createRoute from @hono/zod-openapi");
-        }
-        if (openapiCalls === 0) {
-          reportProgramError(context, "Route modules must register endpoints with app.openapi(...)");
-        }
-
-        for (var i = 0; i < handlerBodies.length; i++) {
-          var hb = handlerBodies[i];
-
-          var execCount = 0;
-          var seen = new Set();
-          function countExecute(n) {
-            if (!n || typeof n !== "object" || seen.has(n)) return;
-            seen.add(n);
-            if (n.type === "CallExpression" &&
-                n.callee.type === "MemberExpression" &&
-                !n.callee.computed &&
-                n.callee.property.type === "Identifier" &&
-                n.callee.property.name === "execute") {
-              execCount++;
-            }
-            var keys = Object.keys(n);
-            for (var k = 0; k < keys.length; k++) {
-              var key = keys[k];
-              if (key === "parent") continue;
-              var val = n[key];
-              if (val && typeof val === "object") {
-                if (Array.isArray(val)) {
-                  for (var a = 0; a < val.length; a++) countExecute(val[a]);
-                } else if (val.type) {
-                  countExecute(val);
-                }
-              }
-            }
-          }
-          countExecute(hb.handlerBody);
-
-          if (execCount !== 1) {
-            context.report({ node: hb.handlerBody, message: "Route handlers must call exactly one use case .execute(...); found " + execCount });
-          }
-
-          var requireActorCalls = findDescendants(hb.handlerBody, function (n) {
-            return n.type === "CallExpression" && n.callee.type === "Identifier" && n.callee.name === "requireActor";
-          });
-
-          var hasSecurity = false;
-          var hasBearerSecurity = false;
-          if (hb.routeConfig && hb.routeConfig.type === "ObjectExpression") {
-            for (var j = 0; j < hb.routeConfig.properties.length; j++) {
-              var prop = hb.routeConfig.properties[j];
-              if (prop.type === "Property" && getPropertyName(prop.key) === "security") {
-                hasSecurity = true;
-                hasBearerSecurity = prop.value && prop.value.type === "Identifier" && prop.value.name === "bearerSecurity";
-                break;
-              }
-            }
-          }
-
-          if (requireActorCalls.length > 0 && !hasBearerSecurity) {
-            context.report({ node: hb.routeConfig || hb.handlerBody, message: "Protected routes using requireActor(c) must declare security: bearerSecurity" });
-          }
-          if (hasSecurity && requireActorCalls.length === 0) {
-            context.report({ node: hb.routeConfig || hb.handlerBody, message: "Routes declaring security: bearerSecurity must call requireActor(c) in the handler" });
-          }
-        }
-      },
-    };
-  },
-};
-
 // ─── Rule 8: route-handler-boundary ──────────────────────────────────────
 var ROUTE_FORBIDDEN_STORAGE_METHODS = new Set(["batch", "delete", "exec", "insert", "prepare", "select", "update"]);
 
@@ -498,7 +294,7 @@ var routeHandlerBoundaryRule = {
 
     return {
       CallExpression: function (node) {
-        var handlerBody = getInlineOpenapiHandlerBody(node);
+        var handlerBody = getInlineRouteHandlerBody(node);
         if (!handlerBody) return;
 
         var envAccesses = findDescendants(handlerBody, isCEnvAccess);
@@ -1337,7 +1133,8 @@ var packagesLibIsolationRule = {
         if (!spec) return;
         if (spec.startsWith("./") || spec.startsWith("../")) return;
         if (spec === "@id/lib" || spec.startsWith("@id/lib/")) return;
-        context.report({ node: node.source, message: "packages/lib may only import itself or relative files: " + spec });
+        if (spec === "jose") return;
+        context.report({ node: node.source, message: "packages/lib may only import itself, relative files, or jose: " + spec });
       },
     };
   },
@@ -1347,7 +1144,6 @@ var packagesLibIsolationRule = {
 function isApprovedAuthBoundaryFile(filename) {
   if (filename.includes("/workers/core/src/auth/")) return true;
   if (endsWithSegment(filename, "workers/core/src/main.ts")) return true;
-  if (endsWithSegment(filename, "workers/core/src/app.ts")) return true;
   if (filename.includes("/workers/core/tests/")) return true;
   return false;
 }
@@ -1372,59 +1168,6 @@ var authBoundaryRule = {
         var spec = extractImportSource(node);
         if (spec && isBetterAuthImport(spec)) {
           context.report({ node: node.source, message: "Better Auth imports are only allowed in workers/core/src/auth, core main mounting, or tests: " + spec });
-        }
-      },
-    };
-  },
-};
-
-// ─── Rule 22: admin-auth-required ─────────────────────────────────────────
-function getRoutePath(routeConfig) {
-  if (!routeConfig || routeConfig.type !== "ObjectExpression") return null;
-  for (var i = 0; i < routeConfig.properties.length; i++) {
-    var prop = routeConfig.properties[i];
-    if (prop.type !== "Property" || getPropertyName(prop.key) !== "path") continue;
-    if (prop.value && prop.value.type === "Literal" && typeof prop.value.value === "string") {
-      return prop.value.value;
-    }
-  }
-  return null;
-}
-
-var adminAuthRequiredRule = {
-  meta: { type: "problem", docs: { description: "Admin API routes must call requireActor(c)" } },
-  create: function (context) {
-    var filename = context.filename || context.physicalFilename || "";
-    if (!isRouteModule(filename)) return {};
-
-    var routeDefinitions = {};
-
-    return {
-      VariableDeclarator: function (node) {
-        if (!node.id || node.id.type !== "Identifier" || !node.init) return;
-        if (node.init.type !== "CallExpression") return;
-        if (node.init.callee.type !== "Identifier" || node.init.callee.name !== "createRoute") return;
-        var config = node.init.arguments[0];
-        if (config && config.type === "ObjectExpression") {
-          routeDefinitions[node.id.name] = config;
-        }
-      },
-      CallExpression: function (node) {
-        if (!isAppOpenapiCall(node)) return;
-        var routeArg = node.arguments[0];
-        var handlerArg = node.arguments[1];
-        var routeConfig = routeArg && routeArg.type === "Identifier" ? routeDefinitions[routeArg.name] : routeArg;
-        var routePath = getRoutePath(routeConfig);
-        if (!routePath || !routePath.startsWith("/api/admin/")) return;
-
-        var isArrow = handlerArg && handlerArg.type === "ArrowFunctionExpression";
-        var isFunc = handlerArg && handlerArg.type === "FunctionExpression";
-        if (!isArrow && !isFunc) return;
-        var requireActorCalls = findDescendants(handlerArg.body, function (n) {
-          return n.type === "CallExpression" && n.callee.type === "Identifier" && n.callee.name === "requireActor";
-        });
-        if (requireActorCalls.length === 0) {
-          context.report({ node: handlerArg, message: "Admin API route " + routePath + " must call requireActor(c)" });
         }
       },
     };
@@ -1502,6 +1245,50 @@ var uiRouteCompositionRule = {
   },
 };
 
+// ─── Rule 24: no-direct-db-access ─────────────────────────────────────────
+var DB_METHODS = new Set(["prepare", "batch", "exec"]);
+
+function isApprovedDbAccessFile(filename) {
+  if (filename.includes("/workers/core/src/infrastructure/")) return true;
+  if (filename.endsWith("workers/core/src/auth/cli.ts")) return true;
+  if (filename.includes("/workers/core/tests/")) return true;
+  return false;
+}
+
+var noDirectDbAccessRule = {
+  meta: { type: "problem", docs: { description: "Raw D1/WRONG?database access is forbidden outside infrastructure; use Better Auth adapter APIs instead" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+    if (!filename.includes("/workers/core/src/")) return {};
+    if (isApprovedDbAccessFile(filename)) return {};
+
+    return {
+      CallExpression: function (node) {
+        if (node.callee.type !== "MemberExpression" || node.callee.computed) return;
+        var method = getPropertyName(node.callee.property);
+        if (!DB_METHODS.has(method)) return;
+
+        var object = node.callee.object;
+        var isEnvDb = object.type === "MemberExpression" && !object.computed &&
+          getPropertyName(object.property) === "DB";
+        var isEnvDbViaC = isEnvDb && object.object.type === "MemberExpression" && !object.object.computed &&
+          object.object.object.type === "Identifier" && object.object.object.name === "c" &&
+          getPropertyName(object.object.property) === "env";
+
+        if (isEnvDb || isEnvDbViaC) {
+          context.report({ node: node, message: "Direct " + method + "() on env.DB is forbidden outside infrastructure. Use Better Auth adapter APIs or infrastructure/persistence for D1 access." });
+          return;
+        }
+
+        var isIdentifier = object.type === "Identifier";
+        if (isIdentifier) {
+          context.report({ node: node, message: "Direct " + method + "() on a database handle is forbidden outside infrastructure. Use Better Auth adapter APIs or infrastructure/persistence for D1 access." });
+        }
+      },
+    };
+  },
+};
+
 // ─── Plugin ───────────────────────────────────────────────────────────────
 var plugin = {
   meta: { name: "architecture" },
@@ -1510,9 +1297,6 @@ var plugin = {
     "no-mapper-imports-outside-infra": noMapperImportsOutsideInfraRule,
     "no-storage-error-parsing": noStorageErrorParsingRule,
     "no-custom-errors-outside-shared": noCustomErrorsOutsideSharedRule,
-    "req-valid-usage": reqValidUsageRule,
-    "no-plain-zod-import": noPlainZodImportRule,
-    "route-module": routeModuleRule,
     "route-handler-boundary": routeHandlerBoundaryRule,
     "repository-workflow": repositoryWorkflowRule,
     "mapper-file": mapperFileRule,
@@ -1527,8 +1311,8 @@ var plugin = {
     "ui-no-auth-deps": uiNoAuthDepsRule,
     "packages-lib-isolation": packagesLibIsolationRule,
     "auth-boundary": authBoundaryRule,
-    "admin-auth-required": adminAuthRequiredRule,
     "ui-route-composition": uiRouteCompositionRule,
+    "no-direct-db-access": noDirectDbAccessRule,
   },
 };
 

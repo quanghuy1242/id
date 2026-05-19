@@ -25,7 +25,7 @@ Core rules:
 - Better Auth imports belong in `workers/core/src/auth/**`, approved core mounting files, or tests.
 - Custom tables are Better Auth plugin schemas, not standalone Drizzle schema definitions.
 - `workers/core/src/infrastructure/db/schema.ts` remains empty. New tables require a BA plugin and architecture-plan approval.
-- Core route handlers validate OpenAPI input, call `requireActor(c)` for `/api/admin/*`, call exactly one use case, and present output.
+- Core route handlers call `requireActor(c)` for `/api/admin/*`, call exactly one use case, and present output.
 
 ## Advisory Checks
 

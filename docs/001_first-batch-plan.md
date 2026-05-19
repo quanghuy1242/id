@@ -205,10 +205,10 @@ Verification on 2026-05-19:
 - `pnpm lint` passes with the architecture plugin loaded through `.oxlintrc.json`.
 - `pnpm check:dup` passes with `Fallow mild duplication: 0.0%`.
 - `pnpm typecheck` passes.
-- `pnpm test` passes, including Better Auth contract, JWKS proof, resource-audience cache, resource-server plugin smoke, service-binding, and admin authorization tests.
+- `pnpm test` passes, including Better Auth contract, auth-core flow, OAuth client/M2M token flow, JWKS proof, resource-audience cache, resource-server plugin smoke, service-binding/proxy, resource-token verifier, log redaction, and admin authorization tests.
 - `pnpm check` passes. There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint` and therefore by `pnpm check`.
 
-That means Phase 0 and Phase 1 are clean. Phase 2-4 proof code is present, while the full OAuth token exchange and full admin API/UI implementation remain Phase 5 feature work.
+That means Phase 0 through Phase 5 implementation code is present. Remote deployment remains an operator action gated by Cloudflare credentials and the runbook/CI workflow.
 
 ### 3.2 Prior `auther` State
 
@@ -776,7 +776,7 @@ Expected plugin endpoint shape:
 | `PATCH` | `/api/auth/admin/resource-servers/:id` | Update metadata or enabled state |
 | `DELETE` | `/api/auth/admin/resource-servers/:id` | Soft-delete or disable |
 
-Standalone Hono `/api/admin/*` routes are reserved for aggregate reads or non-BA-owned workflows. Those routes must use OpenAPI validation and `requireActor(c)`. Plugin endpoints must enforce the same authorization semantics through Better Auth endpoint context/session middleware and role checks.
+Standalone Hono `/api/admin/*` routes are reserved for aggregate reads or non-BA-owned workflows. Those routes must call `requireActor(c)` for authorization. Plugin endpoints must enforce the same authorization semantics through Better Auth endpoint context/session middleware and role checks.
 
 Expected Hono aggregate route shape:
 

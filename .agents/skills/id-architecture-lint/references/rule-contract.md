@@ -22,10 +22,7 @@ Every new rule must include:
 - `architecture/no-mapper-imports-outside-infra`: persistence mappers stay infrastructure-only.
 - `architecture/no-storage-error-parsing`: SQLite/D1/Drizzle/UNIQUE parsing terms stay in infrastructure helpers, including template literals.
 - `architecture/no-custom-errors-outside-shared`: cross-layer custom errors live in `src/shared/errors.ts`.
-- `architecture/req-valid-usage`: route input comes from `req.valid("param" | "query" | "json" | "header")`, not raw request parsers.
-- `architecture/no-plain-zod-import`: OpenAPI/validation schemas use `z` from `@hono/zod-openapi`.
-- `architecture/route-module`: routes use `createRoute` + `app.openapi`, protected handlers pair `requireActor(c)` with `security: bearerSecurity`, and each route handler calls exactly one use case `.execute(...)`.
-- `architecture/route-handler-boundary`: route handlers stay at the HTTP orchestration boundary. They may validate with `c.req.valid(...)`, call `requireActor(c)`, call one use case, and present responses. They must not directly read `c.env`, call global `fetch`, use `crypto`, call `JSON.parse`/`JSON.stringify`, call direct storage methods (`prepare`, `select`, `insert`, `update`, `delete`, `batch`, `exec`), or construct `Request`/`Response` manually.
+- `architecture/route-handler-boundary`: route handlers stay at the HTTP orchestration boundary. They may call `requireActor(c)`, call one use case, and present responses. They must not directly read `c.env`, call global `fetch`, use `crypto`, call `JSON.parse`/`JSON.stringify`, call direct storage methods (`prepare`, `select`, `insert`, `update`, `delete`, `batch`, `exec`), or construct `Request`/`Response` manually. Applies to `*.routes.ts` files under `http/routes/`.
 - `architecture/repository-workflow`: repository/workflow implementations use mappers, avoid authorization decisions, avoid inline entity reconstitution, write through `CrudAdapter`, and reserve `db.batch(...)` for workflow ports.
 - `architecture/mapper-file`: mapper functions accept one object argument, map fields explicitly, use `Entity.reconstitute(...)` for row-to-entity, and use `entity.toSnapshot()` for entity-to-row.
 - `architecture/entity-class`: entity files export class entities with `private constructor(private props: XxxProps)`, `static create(input: CreateXxxProps)`, `static reconstitute(...)`, `toSnapshot()`, and `CreateXxxProps = Omit<XxxProps, generated fields>`.
@@ -39,7 +36,7 @@ Every new rule must include:
 - `architecture/ui-no-auth-deps`: UI worker source must not import auth, persistence, signing dependencies, or D1/KV binding types.
 - `architecture/packages-lib-isolation`: `packages/lib` must remain framework-free.
 - `architecture/auth-boundary`: Better Auth imports stay inside approved core auth boundary files and tests.
-- `architecture/admin-auth-required`: `/api/admin/*` OpenAPI route handlers must call `requireActor(c)`.
+- `architecture/no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/` and `auth/cli.ts`. Use Better Auth adapter APIs or infrastructure/persistence for D1 access.
 
 ## Required Sync Points
 

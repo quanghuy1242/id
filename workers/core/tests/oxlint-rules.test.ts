@@ -86,7 +86,7 @@ describe("oxlint architecture rules", () => {
   });
 
   it("passes cleanly on valid files", () => {
-    const result = runOxlint("workers/core/src/app.ts");
+    const result = runOxlint("workers/core/src/composition/create-app.ts");
     expect(result.status).toBe(0);
   });
 
