@@ -25,6 +25,7 @@
 - [4. Analytics And Metrics](#4-analytics-and-metrics)
 - [5. Pipeline Hook System](#5-pipeline-hook-system)
 - [6. Full Admin UI](#6-full-admin-ui)
+- [7. Deferred OAuth Browser Pages](#7-deferred-oauth-browser-pages)
 
 ## 1. Plugin Architecture Strategy
 
@@ -292,3 +293,18 @@ All admin pages follow the Lumina UI system from `/home/quanghuy1242/pjs/books/d
 ### 6.3 Data Flow
 
 The admin UI calls `core-id`'s admin API through the `CORE_ID` service binding. No D1 access. No Better Auth instance. Pure presentation.
+
+## 7. Deferred OAuth Browser Pages
+
+The first release should configure only the OAuth pages it actually builds: login and consent. Other Better Auth OAuth Provider browser surfaces are deferred because configured-but-missing pages create dead redirects in production.
+
+Deferred pages and flows:
+
+| Flow | Better Auth option | Future page | Notes |
+|---|---|---|---|
+| Public sign-up / `prompt=create` | `signup.page` | `/admin/sign-up` or `/sign-up` | Revisit when public or invite-aware self-service registration is intentionally opened. First release disables `emailAndPassword.disableSignUp`. |
+| Account selection | `selectAccount.page` | `/admin/select-account` or `/select-account` | Useful only after multi-session/account switching is part of the product. |
+| Post-login organization selection | `postLogin.page` | `/admin/select-organization` or `/select-organization` | Revisit when browser clients request org-scoped scopes before an active organization is selected. |
+| Password recovery UX | Better Auth password reset callbacks/pages | `/forgot-password`, `/reset-password` | Email delivery is P0, but a polished hosted reset UX can follow if first release handles reset through API/direct links. |
+
+Re-enable each option only in the same change that adds the page and tests the redirect-resume behavior. The tests should prove the page preserves Better Auth's signed OAuth query or continuation parameters and calls the expected Better Auth endpoint before resuming authorization.

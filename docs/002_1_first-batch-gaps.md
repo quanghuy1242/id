@@ -25,11 +25,13 @@
 >
 > Assumptions:
 >
-> - `content-api` is the first downstream app. API resource-server verification and M2M/client setup come first; browser OAuth can follow after a login/sign-up/consent surface exists.
+> - `content-api` is the first downstream app. API resource-server verification and M2M/client setup come first; browser OAuth can follow after login and consent fallback surfaces exist.
 > - Email sending should use the Sender free plan, not Cloudflare Email Service.
 > - First-release email volume stays well below Sender's free-plan monthly quota and per-minute API limits.
 > - Full admin UI pages are deferred. First-release administration is API-only.
-> - Minimal hosted auth pages are still required if `content-ui` needs user sign-in through OAuth. Admin UI is not required for that, but login and consent handling are.
+> - Minimal hosted auth pages are still required if `content-ui` needs user sign-in through OAuth. Admin UI is not required for that. First release needs only login plus a small consent fallback.
+> - Public email/password sign-up is not part of the first release. Admin-only user creation should use Better Auth Admin `createUser`; `/api/auth/sign-up/email` must be disabled.
+> - Browser OAuth is production-domain only. Preview `*.workers.dev` deployments are API-only because shared parent-domain cookies are impossible on the public suffix.
 
 ## Table Of Contents
 
@@ -47,6 +49,9 @@
   - [4.3 Bootstrap Admin](#43-bootstrap-admin)
   - [4.4 Resource-Server Read Authorization](#44-resource-server-read-authorization)
   - [4.5 Runtime Audience Integration Proof](#45-runtime-audience-integration-proof)
+  - [4.6 Disable Public Sign-Up](#46-disable-public-sign-up)
+  - [4.7 Production Cookie And Preview Boundary](#47-production-cookie-and-preview-boundary)
+  - [4.8 OAuth Token Lifetimes And Refresh Rotation](#48-oauth-token-lifetimes-and-refresh-rotation)
 - [5. High-Priority Non-Blocker Gaps](#5-high-priority-non-blocker-gaps)
 - [6. Sender Target Model](#6-sender-target-model)
   - [6.1 Provider Facts](#61-provider-facts)
@@ -62,6 +67,9 @@
   - [8.1 Why Minimal Auth Pages Are Required](#81-why-minimal-auth-pages-are-required)
   - [8.2 Consent Behavior](#82-consent-behavior)
   - [8.3 Trusted Clients Without Hard Config](#83-trusted-clients-without-hard-config)
+  - [8.4 Production Domain, Cookies, And Preview Boundary](#84-production-domain-cookies-and-preview-boundary)
+  - [8.5 OAuth Token Lifetimes And Refresh Rotation](#85-oauth-token-lifetimes-and-refresh-rotation)
+  - [8.6 Public Sign-Up Policy](#86-public-sign-up-policy)
 - [9. Missing Tests](#9-missing-tests)
 - [10. Integration Scenario: content-api](#10-integration-scenario-content-api)
 - [11. Implementation Backlog](#11-implementation-backlog)
@@ -74,9 +82,10 @@
 
 Close the gap between the current configured/tested scaffold and a production-usable first batch where a downstream app can:
 
-- sign users up and reset passwords through real email delivery;
+- send verification and reset emails for admin-created users through real email delivery;
+- keep public sign-up disabled until there is an explicit product decision to open it;
 - expose API-only admin operation without building an admin UI;
-- complete a browser authorization-code + PKCE sign-in flow for `content-ui` through minimal hosted auth pages;
+- complete a browser authorization-code + PKCE sign-in flow for `content-ui` through the two minimal hosted auth pages required for first release;
 - receive resource-bound JWT access tokens for a registered resource server;
 - verify those tokens locally through JWKS;
 - rely on admin/resource-server APIs that enforce tenant and platform authorization; and
@@ -93,12 +102,15 @@ Required before `content-api` integration:
 | Priority | Gap | Why it blocks |
 |---|---|---|
 | P0 | Sender transactional email is not wired | New users cannot receive verification links and password reset links. |
+| P0 | Public email/password sign-up is still enabled | Anyone can call `POST /api/auth/sign-up/email`; first-release user creation must be admin-only through Better Auth Admin `createUser`. |
 | P0 | Minimal hosted OAuth login page is missing | `content-ui` cannot let users sign in unless the IdP login redirect can create a Better Auth session and resume `/oauth2/authorize`. |
-| P0 | Consent handling is unresolved | Better Auth requires consent for every non-trusted client. There is no built-in default consent page; either `skip_consent` must be set per trusted first-party client or a consent page must exist. |
+| P0 | Minimal hosted consent fallback is missing | Trusted first-party clients should use DB-backed `skip_consent`, but any future non-trusted browser client needs a real fallback page because Better Auth does not ship a default consent UI. |
 | P0 | No bootstrap admin path | Native Better Auth admin endpoints cannot be used until the first admin user exists. |
 | P0 | Platform admin uses custom `platformRole` instead of Better Auth native `user.role` | The Admin plugin already uses `user.role`; keeping a separate platform role duplicates policy and makes official admin APIs harder to reason about. |
 | P0 | Resource-server read endpoints are session-only | Any signed-in user can list/read all resource servers through plugin endpoints. |
 | P0 | No end-to-end runtime audience proof through the actual Worker route | Tests prove cache and token issuance separately, but not create/disable resource server -> D1/KV -> Hono mount -> OAuth token behavior. |
+| P0 | Production session cookie config is missing | `id.quanghuy.dev` and `content.quanghuy.dev` need a shared parent-domain session cookie, and `id` must not collide with legacy `auther` cookie names during migration. |
+| P0 | OAuth token lifetimes and refresh rotation are not asserted | Defaults are one-hour access tokens and 30-day refresh tokens; first release wants 3-hour access tokens, 7-day refresh tokens, and replay rejection coverage. |
 | P1 | No Wrangler-gated generic operator request path | API-only operation should not require a UI, raw API-key env vars, or custom commands for every Better Auth endpoint. |
 | P1 | Rate limiting is not explicitly configured | Better Auth has production defaults, but the repo should set Cloudflare IP headers and stricter auth/token endpoint rules intentionally. |
 | P1 | Resource-server audit fields can be spoofed or bypassed | `createdBy` is accepted from request body and `PATCH enabled` can bypass disable audit fields. |
@@ -132,6 +144,7 @@ Current code:
 
 - `workers/core/src/auth/get-auth.ts` sets `emailVerification.sendOnSignUp: true`.
 - `workers/core/src/auth/get-auth.ts` sets `emailAndPassword.requireEmailVerification: true`.
+- `workers/core/src/auth/get-auth.ts` does not set `emailAndPassword.disableSignUp: true`, so `POST /api/auth/sign-up/email` is currently public.
 - `sendVerificationEmail` calls `storeVerificationEmailLink(env.KV, { email, url, token })`.
 - `sendResetPassword` calls `storePasswordResetEmailLink(env.KV, { email, url, token })`.
 - `workers/core/src/auth/adapters/storage-email.ts` stores a single JSON payload per lowercased email key.
@@ -157,13 +170,29 @@ Configured OAuth UI paths:
 |---|---|---|
 | Login | `loginPage: "/admin/login"` | Missing |
 | Consent | `consentPage: "/admin/consent"` | Missing |
-| Prompt create | `signup.page: "/admin/sign-up"` | Missing |
-| Select account | `selectAccount.page: "/admin/select-account"` | Missing |
-| Post-login org selection | `postLogin.page: "/admin/select-organization"` | Missing |
+| Prompt create | `signup.page: "/admin/sign-up"` | Missing and should be removed from first-release config |
+| Select account | `selectAccount.page: "/admin/select-account"` | Missing and should be removed from first-release config |
+| Post-login org selection | `postLogin.page: "/admin/select-organization"` | Missing and should be removed from first-release config |
 
 `workers/ui/src/app/admin/page.tsx` exists, but `workers/ui/wrangler.jsonc` points the deployed Worker at `workers/ui/src/main.ts`, which currently serves JSON for `/admin`. The real browser pages needed by OAuth are not implemented.
 
 Better Auth OAuth Provider docs state that trusted clients with `skipConsent: true` bypass the consent screen, and otherwise the provider redirects to the configured `consentPage` with client and scope query details. The current code does not create a first-party trusted client by default, and no test proves `skipConsent`.
+
+Browser deployment findings:
+
+- `content-ui` should start `/api/auth/oauth2/authorize` as top-level browser navigation, not `fetch`. CORS is not needed for that redirect flow.
+- In production, `id.quanghuy.dev` and `content.quanghuy.dev` are same-site under `quanghuy.dev`; token and consent `POST` calls can be kept same-origin by hosting/proxying the minimal auth pages on the auth origin.
+- If hosted auth pages and API endpoints are split across origins, `/api/auth/oauth2/token` and `/api/auth/oauth2/consent` become browser `fetch` calls and would need CORS. First release should avoid that by treating preview `*.workers.dev` browser OAuth as unsupported.
+- Shared cookies cannot be made to work across arbitrary `*.workers.dev` hosts because browsers reject cookies on public suffixes.
+- Better Auth 1.6.11 uses cookie names derived from `advanced.cookiePrefix` and per-cookie overrides under `advanced.cookies`. Session token defaults to `better-auth.session_token` at runtime, with secure production prefixing when secure cookies are enabled.
+- The code does not configure `advanced.crossSubDomainCookies`, `advanced.cookiePrefix`, or `advanced.cookies.session_token.name`, so it has no explicit production parent-domain cookie or collision protection against legacy `auther`.
+
+Token lifetime findings from installed `@better-auth/oauth-provider@1.6.11`:
+
+- `accessTokenExpiresIn` defaults to 3600 seconds.
+- `m2mAccessTokenExpiresIn` defaults to 3600 seconds.
+- `refreshTokenExpiresIn` defaults to 2592000 seconds.
+- Refresh-token rotation is implemented natively: refresh exchange marks the old refresh-token row revoked and creates a new refresh token. Reuse of a revoked refresh token invalidates the client/user refresh-token family.
 
 ### 3.4 Admin And Resource-Server Current State
 
@@ -198,7 +227,7 @@ Observed drift:
 
 ### 4.1 Sender Transactional Email
 
-Current production behavior would create or locate Better Auth verification/reset tokens, but no user receives an email. This blocks sign-up, verified sign-in, password reset, organization invitations that require email, and realistic OAuth browser flows.
+Current production behavior would create or locate Better Auth verification/reset tokens, but no user receives an email. This blocks verified sign-in for admin-created users, password reset, organization invitations that require email, and realistic OAuth browser flows.
 
 Required target:
 
@@ -226,14 +255,16 @@ Better Auth behavior verified from docs and installed package:
 
 Required target:
 
-- Build minimal hosted auth pages, not a full admin UI:
+- Build only the two minimal hosted auth pages needed for first release, not a full admin UI:
   - `/admin/login` or a renamed `/login` page that posts to `/api/auth/sign-in/email` with `oauth_query`;
-  - `/admin/consent` or a renamed `/consent` page that calls `/api/auth/oauth2/consent`;
-  - `/admin/sign-up` and password reset only if public sign-up/password recovery are needed in first release.
+  - `/admin/consent` or a renamed `/consent` page that calls `/api/auth/oauth2/consent` as a hardcoded fallback for any future non-trusted client.
 - For first-party `content-ui`, prefer setting `skip_consent: true` on the OAuth client through Better Auth's restricted admin create/update path, not through hard-coded source lists.
 - For any non-trusted client, consent page is required.
+- Remove `signup`, `selectAccount`, and `postLogin` OAuth page configuration from `workers/core/src/auth/get-auth.ts` until those pages are actually built. Their product intent belongs in `docs/003_future-implementation.md`.
 
 Rejected option: assume a default Better Auth consent page exists. The docs show a configured `consentPage` and a consent endpoint; the page is application-owned.
+
+Rejected option: keep configured redirect pages that do not exist because the redirect is "unlikely." Missing configured pages are latent production failures.
 
 ### 4.3 Bootstrap Admin
 
@@ -285,6 +316,64 @@ Missing proof:
 
 This is the core integration guarantee from `docs/001_first-batch-plan.md`, and it should be a P0 test.
 
+### 4.6 Disable Public Sign-Up
+
+The current first-release model is admin-created users only. Public registration creates an uncontrolled onboarding path before there is a consent page, invitation policy, abuse controls, and email deliverability monitoring.
+
+Required target:
+
+- Set `emailAndPassword.disableSignUp: true` in `workers/core/src/auth/get-auth.ts`.
+- Keep `emailAndPassword.enabled: true` so admin-created users can still sign in with email/password.
+- Create users through Better Auth Admin `createUser` after the first admin exists.
+- Do not expose a first-release sign-up page.
+- Move `prompt=create`, sign-up page, invite-only signup, domain-restricted signup, and password-recovery UX notes to future implementation unless explicitly pulled into first release.
+
+Acceptance criteria:
+
+- `POST /api/auth/sign-up/email` rejects public callers.
+- Admin `createUser` remains available to native Better Auth admins.
+- Tests prove public sign-up is closed and admin user creation is the supported path.
+
+### 4.7 Production Cookie And Preview Boundary
+
+Browser OAuth needs the Better Auth session cookie to survive across the production auth and content subdomains.
+
+Required target:
+
+- Configure Better Auth advanced cookies for production:
+  - `advanced.crossSubDomainCookies.enabled: true`
+  - `advanced.crossSubDomainCookies.domain: ".quanghuy.dev"`
+  - `advanced.cookiePrefix: "id-auth"` or an explicit `advanced.cookies.session_token.name`, for example `"id-auth.session_token"`
+- Prefer `advanced.cookiePrefix: "id-auth"` unless there is a reason to override only one cookie. A prefix avoids collisions for `session_token`, `session_data`, `account_data`, and future Better Auth cookies, not just the primary session token.
+- Keep the explicit cookie prefix permanently. It is not a temporary migration flag.
+- Do not support browser OAuth on `*.workers.dev` preview domains. Preview supports API-only smoke, M2M OAuth, admin API, and Worker health/JWKS checks.
+- Register production redirect URIs only for browser clients. Do not create dynamic preview redirect URIs for `content-ui`.
+- Do not add broad CORS middleware for OAuth as a workaround for preview. Top-level authorize redirects do not need CORS, and production token/consent calls should remain same-site.
+
+Acceptance criteria:
+
+- A production login at `id.quanghuy.dev` sets an `id-auth...` session cookie scoped to `.quanghuy.dev`.
+- Legacy `auther` and new `id` cookies can coexist during migration.
+- Preview smoke docs clearly state "API-only; no browser OAuth."
+
+### 4.8 OAuth Token Lifetimes And Refresh Rotation
+
+The installed OAuth Provider defaults are not the desired product policy. First release should be explicit so downstream apps can design session refresh behavior correctly.
+
+Required target:
+
+- Set OAuth Provider `accessTokenExpiresIn: 10800` for a 3-hour user access token lifetime.
+- Decide whether M2M should also use 3 hours by setting `m2mAccessTokenExpiresIn: 10800`, or keep a separate shorter M2M policy and document it. Do not leave it implicit.
+- Set `refreshTokenExpiresIn: 604800` for a 7-day refresh token lifetime.
+- Rely on Better Auth's native refresh-token rotation. In 1.6.11, refresh exchange revokes the old refresh-token row and creates a new one; replay of a revoked refresh token invalidates the refresh-token family for that client/user.
+- Require `offline_access` in browser authorization requests when `content-ui` needs refresh tokens.
+
+Acceptance criteria:
+
+- Authorization-code exchange returns `expires_in` near 10800 and a refresh token when `offline_access` is requested.
+- Refresh-token grant returns a new access token and a new refresh token.
+- Replaying the old refresh token is rejected and covered by tests.
+
 ## 5. High-Priority Non-Blocker Gaps
 
 | Gap | Impact | Target |
@@ -293,12 +382,13 @@ This is the core integration guarantee from `docs/001_first-batch-plan.md`, and 
 | No generic API-only operator helper | Operators may fall back to ad hoc curl, UI work, or endpoint-specific scripts. | Add a thin request helper that calls arbitrary paths, gates on `pnpm wrangler whoami`, and does not accept raw admin API keys through env vars or command arguments. |
 | No explicit Better Auth rate-limit config | Defaults may be okay in production, but Cloudflare IP headers and stricter auth/token rules are not intentional. | Configure `advanced.ipAddress.ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"]` and `rateLimit` with `storage: "secondary-storage"`. |
 | OAuth token type behavior untested | Downstream apps may treat opaque tokens as JWTs. | Test `resource` present -> JWT; no `resource` -> opaque/server-validated token. |
-| Refresh/introspection/revocation untested | Incident and long-lived session behavior is unproven. | Add endpoint tests with real issued tokens. |
+| Refresh/introspection/revocation untested | Incident and long-lived session behavior is unproven. | Add endpoint tests with real issued tokens, including refresh-token rotation and old-token replay rejection. |
 | UserInfo untested | OIDC client integration may fail late. | Test `/api/auth/oauth2/userinfo` with `openid email profile`. |
 | Organization invitations untested | Tenant onboarding depends on this. | Test invite and accept flows. |
-| OAuth prompt flows untested | `prompt=create`, `prompt=select_account`, and org-selection may break browser flows. | Add browser-like redirect tests for configured flows; remove any configured prompt page that is not supported in first release. |
+| Extra OAuth prompt pages are configured but not built | `prompt=create`, `prompt=select_account`, and post-login org selection can redirect to dead routes. | Remove `signup`, `selectAccount`, and `postLogin` config from first release; keep future notes in `docs/003_future-implementation.md`. |
 | OAuth client management authorization unproven | `clientPrivileges` allows read/list for any signed-in user. | Add tests for platform admin, org owner/admin, member, and cross-org behavior. |
 | Client/resource relationship not proven | `referenceId` and `org_id` behavior for browser and M2M clients is not asserted. | Test client creation with active organization/reference id and token claims. |
+| Preview browser OAuth would be misleading | `*.workers.dev` cannot share parent-domain cookies and dynamic preview redirect URIs should not be registered. | Document preview as API-only; production browser clients use fixed `*.quanghuy.dev` redirect URIs. |
 | Docs drift | Engineers may call routes that do not exist. | Update docs after implementation decisions. |
 | CI deploy claims drift | Manual deployment may be assumed but not present. | Either implement deploy workflow or correct README/runbook. |
 
@@ -380,11 +470,11 @@ Data rules:
 
 ### 6.4 Failure Policy
 
-Better Auth docs advise avoiding awaited email sends to reduce timing attack risk. That creates a product tradeoff: sign-up may return success while the background email send later fails.
+Better Auth docs advise avoiding awaited email sends to reduce timing attack risk. That creates a product tradeoff: admin user creation, verification resend, or reset request may return success while the background email send later fails.
 
 First-release policy:
 
-- Sign-up and reset request responses should not reveal whether a mailbox exists or whether Sender accepted the message.
+- Verification and reset request responses should not reveal whether a mailbox exists or whether Sender accepted the message.
 - Background email send failures should be logged as structured operational events with redacted fields.
 - A remote smoke command should be able to send one test message to an operator-controlled mailbox and assert Sender accepted it.
 - For `429`, respect `Retry-After` only for short retries that fit within Worker execution limits. Do not build a durable retry queue in the first batch.
@@ -529,8 +619,60 @@ Recommended first-release approach:
 
 - Do not maintain a source-code list of trusted client ids.
 - Use native Better Auth admin APIs to create `content-ui` as a trusted first-party client with `skip_consent: true`.
-- Keep the consent page as P0 only if non-trusted browser clients are in first release.
-- Still add a small consent page soon, because it is the standards-compliant fallback for any future non-trusted client.
+- Still ship a tiny consent page as a hardcoded fallback because it is cheap and prevents the next non-trusted client from discovering a dead redirect in production.
+- Do not use `cachedTrustedClients` for first-party trust. It is hard configuration and cached clients are immutable through CRUD endpoints.
+
+### 8.4 Production Domain, Cookies, And Preview Boundary
+
+Production browser OAuth target:
+
+| Concern | Target |
+|---|---|
+| Auth origin | `https://id.quanghuy.dev` |
+| Browser client origin | `https://content.quanghuy.dev` |
+| Shared cookie domain | `.quanghuy.dev` |
+| Better Auth cookie config | `advanced.crossSubDomainCookies: { enabled: true, domain: ".quanghuy.dev" }` |
+| Collision avoidance | `advanced.cookiePrefix: "id-auth"` or explicit `advanced.cookies.session_token.name` |
+| Redirect URIs | Production `content-ui` callback URIs only |
+
+Use top-level browser navigation for `/api/auth/oauth2/authorize`. Do not call authorize with `fetch`.
+
+CORS policy:
+
+- Same-site production browser OAuth should not need broad CORS.
+- If a hosted auth page makes a browser `fetch` to `/api/auth/oauth2/token` or `/api/auth/oauth2/consent` from a different origin, that specific cross-origin case would need CORS. First release should avoid that topology.
+- Preview `*.workers.dev` is API-only. Do not attempt browser OAuth there and do not register preview callback URLs.
+
+Cookie collision policy:
+
+- During migration, legacy `auther` and new `id` can both run under `.quanghuy.dev`.
+- If both use Better Auth defaults and both set parent-domain cookies, a single default cookie slot can be overwritten by whichever IdP writes last.
+- Configure `id` with a unique prefix/name now. Keeping that name after `auther` is decommissioned is fine.
+
+### 8.5 OAuth Token Lifetimes And Refresh Rotation
+
+First-release token policy:
+
+| Token | Lifetime | Config |
+|---|---:|---|
+| User access token | 3 hours | `accessTokenExpiresIn: 10800` |
+| Refresh token | 7 days | `refreshTokenExpiresIn: 604800` |
+| M2M access token | Explicitly decide before implementation | `m2mAccessTokenExpiresIn` |
+
+Better Auth 1.6.11 already rotates refresh tokens on the refresh grant. The implementation should rely on that native behavior and test it instead of adding custom rotation state.
+
+`content-ui` must request `offline_access` if it should avoid forcing users to re-authenticate every 3 hours.
+
+### 8.6 Public Sign-Up Policy
+
+First release is not public self-service registration.
+
+Target behavior:
+
+- `POST /api/auth/sign-up/email` is disabled through `emailAndPassword.disableSignUp: true`.
+- User creation goes through Better Auth Admin `createUser`.
+- The hosted login page signs in existing/admin-created users only.
+- Sign-up, `prompt=create`, invitation-aware registration, and domain-restricted onboarding are future implementation notes, not live config.
 
 ## 9. Missing Tests
 
@@ -559,7 +701,8 @@ Scope:
 
 Assertions:
 
-- Sign-up schedules or calls verification email sender.
+- Public `POST /api/auth/sign-up/email` is disabled when `emailAndPassword.disableSignUp: true`.
+- The supported verification-email path schedules or calls the verification email sender.
 - Unverified sign-in triggers verification behavior expected by Better Auth config.
 - Password reset schedules or calls reset email sender.
 - Tests no longer depend on production KV token storage.
@@ -581,6 +724,8 @@ Assertions:
 - Exchange code with correct verifier.
 - Mismatched verifier is rejected.
 - Resulting resource-bound access token verifies through JWKS.
+- `expires_in` reflects the configured 3-hour access token lifetime.
+- `offline_access` returns a refresh token.
 
 ### T4. Token Type Behavior
 
@@ -598,8 +743,9 @@ Assertions:
 - `/api/auth/oauth2/userinfo` returns expected OIDC claims for an access token with `openid`.
 - `/api/auth/oauth2/introspect` returns active state for a live token.
 - `/api/auth/oauth2/revoke` invalidates the relevant token.
-- `grant_type=refresh_token` produces a new access token.
-- Refresh replay behavior is characterized and documented.
+- `grant_type=refresh_token` produces a new access token and a new refresh token.
+- Replaying the old refresh token is rejected.
+- Reuse of a revoked refresh token invalidates the refresh-token family as Better Auth implements it.
 
 ### T6. Organization Invitations
 
@@ -628,12 +774,19 @@ Assertions:
 - Missing login/consent pages fail the browser flow and are not acceptable for `content-ui`.
 - Minimal hosted login page preserves and submits the signed `oauth_query`.
 - Minimal hosted consent page calls `/api/auth/oauth2/consent` and follows its returned `redirect_uri`.
-- `prompt=create` redirects to configured sign-up page and resumes flow if the page exists.
-- `prompt=select_account` redirects only when the provider expects it and resumes with selection.
-- `postLogin` org selection redirects when `org:` scopes are requested and no active organization exists.
+- `prompt=create`, `prompt=select_account`, and post-login org selection are not configured in first release unless their pages exist.
 - First-party trusted client does not hit missing `/admin/consent`.
 
-### T9. Runtime Audience Worker Integration
+### T9. Cookie And Preview Boundary
+
+Assertions:
+
+- Production auth config sets `advanced.crossSubDomainCookies.domain` to `.quanghuy.dev`.
+- Session cookie uses an `id`-specific prefix/name and does not use the Better Auth default.
+- Preview configuration or runbook marks browser OAuth as unsupported on `*.workers.dev`.
+- OAuth browser client redirect URIs are production URIs only.
+
+### T10. Runtime Audience Worker Integration
 
 Assertions:
 
@@ -642,7 +795,7 @@ Assertions:
 - Confirm cache invalidation and new token rejection.
 - Confirm D1/KV failures fail closed for new token issuance.
 
-### T10. Native Admin Bootstrap And API-Only Operation
+### T11. Native Admin Bootstrap And API-Only Operation
 
 Assertions:
 
@@ -654,7 +807,7 @@ Assertions:
 - `pnpm auth:api` fails before sending requests when `pnpm wrangler whoami` fails.
 - `pnpm auth:api` can call an arbitrary Better Auth/plugin path with inline JSON and does not require endpoint-specific command code.
 
-### T11. content-ui Full Browser Sign-In Smoke
+### T12. content-ui Full Browser Sign-In Smoke
 
 Assertions:
 
@@ -664,6 +817,7 @@ Assertions:
 - Trusted `content-ui` client with `skip_consent: true` returns directly to callback, or non-trusted client goes through hosted consent page.
 - Callback exchanges code for tokens.
 - Access token is a resource-bound JWT accepted by the downstream verifier.
+- Refresh-token grant extends the session without a full re-login and rotates the refresh token.
 
 ## 10. Integration Scenario: content-api
 
@@ -716,6 +870,7 @@ Minimum needed:
 
 - create a public or confidential OAuth client named `content-ui`;
 - configure exact redirect URI(s);
+  - use production redirect URIs only, not preview `*.workers.dev` callbacks;
 - decide trusted status:
   - first-party trusted: set `skip_consent: true` through Better Auth admin OAuth client creation/update;
   - non-trusted: build hosted consent page before use;
@@ -728,6 +883,8 @@ Current blockers:
 - No hosted login page exists.
 - No hosted consent page exists for non-trusted clients.
 - No full browser-style auth-code + PKCE test exists.
+- No explicit production cookie-domain/cookie-name policy exists.
+- No refresh-token rotation test exists for `content-ui`.
 - Current docs overstate API-only readiness if `content-ui` sign-in is part of the first integration.
 
 ## 11. Implementation Backlog
@@ -759,12 +916,34 @@ Tasks:
 
 Acceptance criteria:
 
-- Sign-up sends a verification email through Sender in a smoke environment.
+- A supported verification-email path sends through Sender in a smoke environment.
 - Password reset sends a reset email through Sender in a smoke environment.
 - Tests prove request shape and failure handling without calling Sender.
 - No raw token, URL, API key, or authorization header is logged.
 
-### P0-B. Use Native Better Auth Admin Role
+### P0-B. Disable Public Email/Password Sign-Up
+
+Scope:
+
+- `workers/core/src/auth/get-auth.ts`
+- `workers/core/tests/auth/auth-core.test.ts`
+- `docs/005_oauth2-oidc-integration-guide.md`
+- `README.md`
+
+Tasks:
+
+- [ ] Set `emailAndPassword.disableSignUp: true`.
+- [ ] Keep email/password sign-in enabled for admin-created users.
+- [ ] Add tests proving `POST /api/auth/sign-up/email` is rejected.
+- [ ] Add tests proving Better Auth Admin `createUser` remains the supported creation path after bootstrap.
+- [ ] Remove first-release docs that imply public self-service sign-up exists.
+
+Acceptance criteria:
+
+- Public sign-up is closed.
+- Admin-only user creation is documented and tested.
+
+### P0-C. Use Native Better Auth Admin Role
 
 Scope:
 
@@ -789,7 +968,7 @@ Acceptance criteria:
 
 - Native Better Auth Admin plugin endpoints and local resource-server policy agree on who is a platform admin.
 
-### P0-C. Add One-Time Bootstrap Endpoint
+### P0-D. Add One-Time Bootstrap Endpoint
 
 Scope:
 
@@ -816,7 +995,7 @@ Acceptance criteria:
 
 - A fresh local or remote D1 can be bootstrapped into one native Better Auth admin without manual SQL and without leaving the bootstrap token useful afterward.
 
-### P0-D. Add Wrangler-Gated Generic API Helper
+### P0-E. Add Wrangler-Gated Generic API Helper
 
 Scope:
 
@@ -839,7 +1018,7 @@ Acceptance criteria:
 
 - Operators can call official Better Auth Admin, OAuth Provider, and repo plugin endpoints without an admin UI, custom per-endpoint wrappers, or raw API-key env flows.
 
-### P0-E. Enforce Resource-Server Read Authorization
+### P0-F. Enforce Resource-Server Read Authorization
 
 Scope:
 
@@ -858,7 +1037,7 @@ Acceptance criteria:
 
 - Non-admin members cannot enumerate resource-server rows outside their authorization boundary.
 
-### P0-F. Add Runtime Audience Worker Integration Test
+### P0-G. Add Runtime Audience Worker Integration Test
 
 Scope:
 
@@ -878,7 +1057,7 @@ Acceptance criteria:
 
 - The runtime-managed audience table is proven to feed OAuth Provider `validAudiences` in the actual Worker route path.
 
-### P0-G. Add Minimal Hosted Auth Pages For content-ui
+### P0-H. Add Minimal Hosted Auth Pages For content-ui
 
 Scope:
 
@@ -894,7 +1073,8 @@ Tasks:
 
 - [ ] Decide route names. Current config uses `/admin/login` and `/admin/consent`; keep them or rename both config and docs together.
 - [ ] Build a minimal login page that preserves the signed OAuth query and posts it as `oauth_query` to `/api/auth/sign-in/email`.
-- [ ] Build a minimal consent page that displays client/scopes and calls `/api/auth/oauth2/consent`.
+- [ ] Build a minimal hardcoded consent fallback page that displays client/scopes and calls `/api/auth/oauth2/consent`.
+- [ ] Remove `signup`, `selectAccount`, and `postLogin` from `oauthProvider(...)` options until those pages exist.
 - [ ] Create `content-ui` OAuth client with exact redirect URI and `skip_consent: true` if it is trusted first-party.
 - [ ] Prove non-trusted clients hit consent page.
 - [ ] Prove trusted `content-ui` bypasses consent but still completes login and token exchange.
@@ -903,7 +1083,56 @@ Tasks:
 Acceptance criteria:
 
 - `content-ui` can complete authorization-code + PKCE through a real hosted login page and receive a resource-bound JWT for `content-api`.
-- Non-trusted clients have a working consent path or are explicitly not supported.
+- Non-trusted clients have a working consent path.
+
+### P0-I. Configure Production Cookies And Preview Boundary
+
+Scope:
+
+- `workers/core/src/auth/get-auth.ts`
+- `workers/core/tests/auth/auth-core.test.ts` or a focused cookie config test
+- `docs/005_oauth2-oidc-integration-guide.md`
+- `docs/007_cloudflare-deployment-runbooks.md`
+- `README.md`
+
+Tasks:
+
+- [ ] Add `advanced.crossSubDomainCookies.enabled: true`.
+- [ ] Add `advanced.crossSubDomainCookies.domain: ".quanghuy.dev"` for production.
+- [ ] Add `advanced.cookiePrefix: "id-auth"` or explicit `advanced.cookies.session_token.name`.
+- [ ] Prefer `advanced.cookiePrefix: "id-auth"` to avoid collisions for all Better Auth cookies.
+- [ ] Document that browser OAuth works only on production `*.quanghuy.dev` domains.
+- [ ] Document that preview `*.workers.dev` is API-only and does not support browser OAuth.
+- [ ] Ensure browser OAuth clients use production redirect URIs only.
+
+Acceptance criteria:
+
+- Better Auth session cookies are parent-domain cookies for `.quanghuy.dev` and cannot collide with legacy `auther` defaults.
+- Preview runbooks do not promise browser OAuth.
+
+### P0-J. Configure Token Lifetimes And Refresh Rotation Tests
+
+Scope:
+
+- `workers/core/src/auth/get-auth.ts`
+- `workers/core/tests/auth/oauth-auth-code.test.ts`
+- `workers/core/tests/auth/oauth-flows.test.ts`
+- `docs/005_oauth2-oidc-integration-guide.md`
+
+Tasks:
+
+- [ ] Set `accessTokenExpiresIn: 10800`.
+- [ ] Set `refreshTokenExpiresIn: 604800`.
+- [ ] Decide and set `m2mAccessTokenExpiresIn` explicitly.
+- [ ] Ensure `offline_access` is requested and allowed for `content-ui` refresh behavior.
+- [ ] Test authorization-code exchange returns a refresh token when `offline_access` is requested.
+- [ ] Test refresh-token grant returns a new access token and a new refresh token.
+- [ ] Test replaying the old refresh token is rejected.
+
+Acceptance criteria:
+
+- `content-ui` can refresh without forcing re-login every 3 hours.
+- Refresh-token replay behavior is tested against Better Auth's native rotation/reuse handling.
 
 ### P1-A. Fix Resource-Server Audit And Schema Semantics
 
@@ -958,8 +1187,9 @@ Tasks:
 - [ ] T4 token type behavior.
 - [ ] T5 userinfo, introspection, revocation, refresh.
 - [ ] T6 org invitations.
-- [ ] T8 prompt flows.
-- [ ] T11 content-ui full browser sign-in smoke.
+- [ ] T8 configured-page redirect behavior.
+- [ ] T9 cookie and preview boundary.
+- [ ] T12 content-ui full browser sign-in smoke.
 
 Acceptance criteria:
 
@@ -998,18 +1228,23 @@ Acceptance criteria:
 | Sender domain unverified | API rejects the send; runbook points to domain verification and SPF/DKIM/DMARC. | P0-A |
 | Sender 429 | Background send logs throttling metadata; no user enumeration leak. | P0-A |
 | Sender accepts but mail bounces | Operator checks Sender transactional logs; future webhook/outbox can track bounces. | P0-A |
-| Email background task fails after sign-up success | User sees generic check-email state; operator log captures failure. | P0-A |
-| Missing login page | `content-ui` browser sign-in cannot complete. Build minimal hosted login page; this is separate from the admin UI. | P0-G |
-| Missing consent page | Trusted `content-ui` with `skip_consent: true` can bypass consent. Any non-trusted browser client must use a hosted consent page. | P0-G |
-| No admin user | One-time bootstrap endpoint creates native Better Auth admin; admin APIs stay locked before bootstrap. | P0-C |
-| Bootstrap token leaked after first use | Route refuses once a native admin exists; operator removes or rotates `ID_BOOTSTRAP_TOKEN` through Wrangler. | P0-C |
-| `platformRole` and `user.role` disagree | Native Better Auth `user.role` wins after migration; compatibility mirror is removed or ignored. | P0-B |
-| Generic API helper runs on non-operator machine | Helper fails before request if `pnpm wrangler whoami` fails. No static IP or MAC allowlist is required. | P0-D |
-| Raw admin API key is passed to local helper | Unsupported by design; helper accepts session-cookie login or another documented Wrangler-gated path, not key env vars or args. | P0-D |
-| Member lists resource servers | Denied or filtered to zero rows. | P0-E |
-| Resource server disabled while JWTs exist | New tokens rejected after cache invalidation/expiry; existing JWTs remain valid until expiry. | P0-F |
-| D1 unavailable during audience load | Token issuance fails closed with 5xx; already issued JWT verification by downstream services remains independent. | P0-F |
-| KV stale or unavailable | Fallback policy must be explicit. Prefer D1 load on cache miss; fail closed if D1 unavailable. | P0-F |
+| Email background task fails after verification/reset request | User sees generic check-email state; operator log captures failure. | P0-A |
+| Public sign-up abuse | `POST /api/auth/sign-up/email` is disabled; admins create users through Better Auth Admin `createUser`. | P0-B |
+| Missing login page | `content-ui` browser sign-in cannot complete. Build minimal hosted login page; this is separate from the admin UI. | P0-H |
+| Missing consent page | Trusted `content-ui` with `skip_consent: true` can bypass consent, but the fallback page should exist before any non-trusted client is supported. | P0-H |
+| Dead prompt page redirect | `signup`, `selectAccount`, and `postLogin` config is removed until matching pages exist. | P0-H |
+| No admin user | One-time bootstrap endpoint creates native Better Auth admin; admin APIs stay locked before bootstrap. | P0-D |
+| Bootstrap token leaked after first use | Route refuses once a native admin exists; operator removes or rotates `ID_BOOTSTRAP_TOKEN` through Wrangler. | P0-D |
+| `platformRole` and `user.role` disagree | Native Better Auth `user.role` wins after migration; compatibility mirror is removed or ignored. | P0-C |
+| Generic API helper runs on non-operator machine | Helper fails before request if `pnpm wrangler whoami` fails. No static IP or MAC allowlist is required. | P0-E |
+| Raw admin API key is passed to local helper | Unsupported by design; helper accepts session-cookie login or another documented Wrangler-gated path, not key env vars or args. | P0-E |
+| Member lists resource servers | Denied or filtered to zero rows. | P0-F |
+| Resource server disabled while JWTs exist | New tokens rejected after cache invalidation/expiry; existing JWTs remain valid until expiry. | P0-G |
+| D1 unavailable during audience load | Token issuance fails closed with 5xx; already issued JWT verification by downstream services remains independent. | P0-G |
+| KV stale or unavailable | Fallback policy must be explicit. Prefer D1 load on cache miss; fail closed if D1 unavailable. | P0-G |
+| Legacy `auther` and new `id` cookie collision | `id` uses `advanced.cookiePrefix: "id-auth"` or an explicit unique session-token cookie name. | P0-I |
+| Preview browser OAuth attempted on `*.workers.dev` | Unsupported by design; previews are API-only because shared parent-domain cookies cannot work on the public suffix. | P0-I |
+| Refresh token stolen or replayed | Better Auth native rotation rejects old-token replay; tests assert old refresh token cannot be reused. | P0-J |
 | Duplicate resource-server slug in same org | Reject before create/update. | P1-A |
 | OAuth client created without active organization/reference | Token `org_id` may be absent. Tests must define expected behavior for M2M and browser clients. | P1-C |
 
@@ -1032,33 +1267,44 @@ Manual/smoke verification:
 - Add and verify sending domain.
 - Confirm SPF, DKIM, and DMARC indicators are green in Sender.
 - Store `SENDER_API_TOKEN`, `EMAIL_FROM`, and `EMAIL_FROM_NAME`.
-- Run local sign-up with fake sender in automated tests.
+- Run local verification/reset email paths with fake sender in automated tests.
 - Run remote smoke to send one real verification-style email to an operator mailbox.
 - Set `ID_BOOTSTRAP_TOKEN` with `pnpm wrangler secret put ID_BOOTSTRAP_TOKEN`.
 - Call `POST /api/bootstrap/admin` once, then remove or rotate `ID_BOOTSTRAP_TOKEN`.
 - Confirm the created user has native Better Auth `role = "admin"`.
+- Confirm public `POST /api/auth/sign-up/email` is disabled.
 - Run `pnpm auth:api` after `pnpm wrangler whoami` succeeds.
 - Create `content-api` resource server and OAuth client through API-only calls.
 - Issue a `client_credentials` token with `resource=<content-api audience>`.
 - Verify the API access token with `packages/lib/src/resource-token-verifier.ts`.
-- Create `content-ui` OAuth client with exact redirect URI.
+- Create `content-ui` OAuth client with exact production redirect URI.
+- Confirm Better Auth uses `.quanghuy.dev` cross-subdomain cookies and a unique `id-auth` cookie prefix/name.
 - Run browser-style authorization-code + PKCE through hosted login.
 - For trusted `content-ui`, verify `skip_consent: true` bypasses consent.
 - For a non-trusted test client, verify hosted consent page completes `/api/auth/oauth2/consent`.
 - Exchange code and verify the resulting resource-bound JWT against `content-api` expectations.
+- Request `offline_access`, refresh the token, and verify old refresh-token replay is rejected.
+- Confirm preview `*.workers.dev` smoke stays API-only and does not register browser OAuth redirect URIs.
 
 ## 14. Definition Of Done
 
 - [ ] Sender transactional email sends verification and reset emails from a verified domain.
 - [ ] Production code no longer stores raw verification/reset tokens in KV as the email delivery mechanism.
+- [ ] Public `POST /api/auth/sign-up/email` is disabled.
+- [ ] Admin-only user creation through Better Auth Admin `createUser` is tested and documented.
 - [ ] Platform admin access uses native Better Auth `user.role`, not custom `platformRole`.
 - [ ] One-time first-admin bootstrap works without manual SQL and becomes unusable after bootstrap.
 - [ ] API-only operation works through a Wrangler-gated generic request helper.
 - [ ] No local helper accepts raw admin API keys through env vars or command arguments.
 - [ ] `content-api` resource server and M2M OAuth client can be created without an admin UI.
 - [ ] `content-ui` browser authorization-code + PKCE completes through a real hosted login page.
+- [ ] Only login and consent OAuth UI pages are configured in first release; sign-up, select-account, and post-login pages are removed until implemented.
 - [ ] Trusted `content-ui` consent bypass is stored on the OAuth client with `skip_consent`, not hard-coded in source.
-- [ ] Non-trusted browser clients either have a working consent page or are explicitly unsupported.
+- [ ] Non-trusted browser clients have a working consent fallback page before they are supported.
+- [ ] Better Auth cookies are configured for `.quanghuy.dev` with an `id`-specific cookie prefix/name that cannot collide with legacy `auther`.
+- [ ] Preview `*.workers.dev` environments are documented and treated as API-only for OAuth.
+- [ ] OAuth Provider token lifetimes are explicit: 3-hour user access tokens and 7-day refresh tokens.
+- [ ] Refresh-token grant returns a rotated refresh token and old refresh-token replay is rejected in tests.
 - [ ] Resource-server read/list endpoints enforce platform/org visibility.
 - [ ] Runtime resource-server audience creation/disable behavior is proven through the actual Worker route path.
 - [ ] Rate limiting is explicitly configured for Cloudflare Workers.
@@ -1076,7 +1322,10 @@ The first batch should ship as a small but real IdP, not just a protocol proof:
 - `idResourceServer` owns resource-server metadata and feeds OAuth Provider `validAudiences` at request time through D1/KV.
 - Sender owns transactional email delivery through REST API calls scheduled from Worker background tasks.
 - First-release admin operation is API-only; the admin dashboard is deferred.
-- Browser sign-in for `content-ui` uses minimal hosted auth pages, not the full admin UI.
+- Browser sign-in for `content-ui` uses exactly the minimal hosted login and consent pages, not the full admin UI.
+- Public self-service sign-up is disabled; admins create users through Better Auth Admin.
+- Production browser OAuth runs on `*.quanghuy.dev` with parent-domain `id-auth` cookies; preview Worker URLs are API-only.
+- OAuth access tokens last 3 hours, refresh tokens last 7 days, and refresh-token rotation is tested.
 - One-time admin bootstrap is protected by a long random Wrangler-managed secret and disabled after use.
 - Local operator calls use a Wrangler-gated generic request helper, not a broad custom admin SDK.
 - Resource-server admin data is tenant-scoped on read and mutation.

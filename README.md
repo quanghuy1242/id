@@ -20,6 +20,7 @@ This implementation follows the planning and architecture documents:
 - [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
 - [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, incident runbooks, Email Service setup
+- [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
