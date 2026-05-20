@@ -14,11 +14,12 @@ This implementation follows the planning and architecture documents:
 - [docs/000_repo-architecture.md](docs/000_repo-architecture.md) — layer architecture, design patterns, enforcement rules, two-worker topology
 - [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done
 - [docs/002_implementation-sequence.md](docs/002_implementation-sequence.md) — merged phased execution order (spikes → enforcement → features)
+- [docs/002_1_first-batch-gaps.md](docs/002_1_first-batch-gaps.md) — gap analysis: blockers, missing tests, integration readiness
 - [docs/003_future-implementation.md](docs/003_future-implementation.md) — CEL policy engine, onboarding, analytics, pipeline hooks, plugin strategy
 - [docs/004_admin-api-reference.md](docs/004_admin-api-reference.md) — admin API and Better Auth management endpoints
 - [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
-- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, and incident runbooks
+- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, incident runbooks, Email Service setup
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
