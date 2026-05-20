@@ -12,17 +12,26 @@ describe("createResourceServerBody", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts an optional description and createdBy", () => {
+  it("accepts an optional description", () => {
     const result = createResourceServerBody.parse({
       organizationId: "org_1",
       slug: "api",
       name: "API",
       audience: "https://api.example.test",
       description: "The main API",
-      createdBy: "user_abc",
     });
     expect(result.description).toBe("The main API");
-    expect(result.createdBy).toBe("user_abc");
+  });
+
+  it("rejects caller-owned createdBy", () => {
+    const result = createResourceServerBody.safeParse({
+      organizationId: "org_1",
+      slug: "api",
+      name: "API",
+      audience: "https://api.example.test",
+      createdBy: "user_abc",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects an empty organizationId", () => {
@@ -63,9 +72,14 @@ describe("updateResourceServerBody", () => {
   });
 
   it("accepts a partial patch", () => {
-    const result = updateResourceServerBody.parse({ name: "New Name", enabled: false });
+    const result = updateResourceServerBody.parse({ name: "New Name" });
     expect(result.name).toBe("New Name");
-    expect(result.enabled).toBe(false);
+    expect(result.enabled).toBeUndefined();
+  });
+
+  it("rejects direct enabled toggles", () => {
+    const result = updateResourceServerBody.safeParse({ enabled: false });
+    expect(result.success).toBe(false);
   });
 
   it("accepts a nullable description to clear it", () => {

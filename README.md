@@ -19,7 +19,7 @@ This implementation follows the planning and architecture documents:
 - [docs/004_admin-api-reference.md](docs/004_admin-api-reference.md) — admin API and Better Auth management endpoints
 - [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
-- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, incident runbooks, Email Service setup
+- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, Sender email, API-only operation, incident runbooks
 - [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
@@ -27,7 +27,7 @@ This implementation follows the planning and architecture documents:
 
 Intentionally deferred to later batches:
 
-- full admin UI pages (scaffold only in first batch; admin operations are API-first)
+- full admin UI pages (first batch has only minimal hosted login/consent pages; admin operations are API-first)
 - ReBAC (Zanzibar graph authorization)
 - ABAC / Lua policy engine
 - webhook delivery
@@ -84,7 +84,9 @@ wrangler kv:namespace create id-kv
 ```jsonc
 {
   "vars": {
-    "BETTER_AUTH_URL": "https://id.quanghuy.dev"
+    "BETTER_AUTH_URL": "https://id.quanghuy.dev",
+    "BETTER_AUTH_COOKIE_DOMAIN": ".quanghuy.dev",
+    "EMAIL_FROM_NAME": "id"
   }
 }
 ```
@@ -111,6 +113,30 @@ pnpm dev:stack:ui                # both Workers with service binding (UI primary
 ```
 
 `dev:stack:ui` runs `core-id` and `ui-id` together locally with a service binding so `/admin` can call `core-id` through `CORE_ID`.
+
+## First Admin And API-Only Operation
+
+Bootstrap a fresh D1 once with a long random Wrangler secret:
+
+```bash
+pnpm wrangler secret put ID_BOOTSTRAP_TOKEN --config workers/core/wrangler.jsonc
+curl -X POST https://id.quanghuy.dev/api/bootstrap/admin \
+  -H 'authorization: Bearer <ID_BOOTSTRAP_TOKEN>' \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@example.com","password":"long-random-password","name":"Root Admin","organization":{"name":"Default","slug":"default"}}'
+pnpm wrangler secret delete ID_BOOTSTRAP_TOKEN --config workers/core/wrangler.jsonc
+```
+
+After bootstrap, use a Better Auth admin session through the Wrangler-gated generic helper. It refuses to send requests unless `pnpm wrangler whoami` succeeds and it stores only a local session cookie, not an admin API key:
+
+```bash
+pnpm auth:api:login https://id.quanghuy.dev admin@example.com
+pnpm auth:api POST /api/auth/admin/create-user '{"email":"user@example.com","password":"long-random-password","name":"User"}'
+pnpm auth:api POST /api/auth/oauth2/create-client '{"client_name":"content-api","redirect_uris":["https://content.quanghuy.dev/callback"],"token_endpoint_auth_method":"client_secret_post","grant_types":["client_credentials"],"response_types":["code"],"scope":"api:read"}'
+pnpm auth:api:logout
+```
+
+Public `POST /api/auth/sign-up/email` is disabled. Admins create users through Better Auth Admin `createUser`, then send verification through `/api/auth/send-verification-email` when needed.
 
 ## Migrations
 
@@ -144,6 +170,9 @@ pnpm test
 pnpm check
 pnpm advise
 pnpm smoke:remote
+pnpm auth:api <METHOD> <PATH> [inline-json]
+pnpm auth:api:login <origin> <email>
+pnpm auth:api:logout
 ```
 
 `pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
@@ -165,7 +194,9 @@ Required GitHub secrets:
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with Workers and D1:Edit permissions
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
 - `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret
-- Email provider secrets (verification and password reset)
+- `SENDER_API_TOKEN` — Sender transactional API token
+- `EMAIL_FROM` — verified Sender `from.email`
+- `ID_BOOTSTRAP_TOKEN` — temporary one-time bootstrap token; remove or rotate after first admin creation
 
 Required GitHub variables:
 

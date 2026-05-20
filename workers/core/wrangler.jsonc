@@ -18,6 +18,8 @@
     }
   ],
   "vars": {
-    "BETTER_AUTH_URL": "https://id.quanghuy.dev"
+    "BETTER_AUTH_URL": "https://id.quanghuy.dev",
+    "BETTER_AUTH_COOKIE_DOMAIN": ".quanghuy.dev",
+    "EMAIL_FROM_NAME": "id"
   }
 }

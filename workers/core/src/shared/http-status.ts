@@ -1,6 +1,9 @@
 /** Returned for successful operations. */
 export const HTTP_OK = 200;
 
+/** Returned when request input is malformed or unsupported. */
+export const HTTP_BAD_REQUEST = 400;
+
 /** Returned when no authenticated actor exists for a protected admin action. */
 export const HTTP_UNAUTHORIZED = 401;
 

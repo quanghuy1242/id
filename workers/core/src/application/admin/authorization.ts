@@ -1,6 +1,6 @@
 import { HTTP_FORBIDDEN, HTTP_UNAUTHORIZED } from "../../shared/http-status";
 
-export type PlatformRole = "admin" | "member" | "superadmin";
+export type PlatformRole = "admin" | "user";
 export type OrganizationRole = "admin" | "member" | "owner";
 
 export type AdminActor = {
@@ -37,10 +37,6 @@ export function authorizeAdminAction(
 ): AuthorizationDecision {
   if (!actor) {
     return deny(HTTP_UNAUTHORIZED, "Authentication required");
-  }
-
-  if (actor.platformRole === "superadmin") {
-    return { allowed: true };
   }
 
   if (action === "listAnyOrganization" || action === "mutateAnyOrganization") {

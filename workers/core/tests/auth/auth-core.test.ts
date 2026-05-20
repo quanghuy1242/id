@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { authPluginConfig } from "../../src/auth/config";
 import { getAuthOptions } from "../../src/auth/get-auth";
+import { createCapturedAuthEmailSender } from "../../src/auth/adapters/test-email";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
 
@@ -37,16 +38,21 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
 }
 
 describe("Better Auth core flows", () => {
-  it("signs up, stores verification/reset links, signs in, reads session, signs out, and creates owner organization", async () => {
+  it("keeps public sign-up disabled, sends verification/reset emails, signs in, and creates owner organization", async () => {
     const raw = await createMemoryDatabase();
     const kv = createKv();
+    const emailSender = createCapturedAuthEmailSender();
     const auth = betterAuth(
-      getAuthOptions({
-        BETTER_AUTH_SECRET: "test-secret",
-        BETTER_AUTH_URL: "https://id.example.test",
-        DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
-        KV: kv,
-      }),
+      getAuthOptions(
+        {
+          BETTER_AUTH_SECRET: "test-secret",
+          BETTER_AUTH_URL: "https://id.example.test",
+          DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+          KV: kv,
+        },
+        [],
+        { emailSender },
+      ),
     );
 
     const signup = await auth.handler(
@@ -60,8 +66,28 @@ describe("Better Auth core flows", () => {
         }),
       }),
     );
-    expect(signup.status).toBe(200);
-    expect(kv.values.has(`${authPluginConfig.emailVerificationStoragePrefix}alice@example.test`)).toBe(true);
+    expect(signup.status).toBe(400);
+
+    await auth.api.createUser({
+      body: {
+        name: "Alice",
+        email: "alice@example.test",
+        password: "password123",
+      },
+    });
+
+    const verification = await auth.handler(
+      new Request("https://id.example.test/api/auth/send-verification-email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "alice@example.test" }),
+      }),
+    );
+    expect(verification.status).toBe(200);
+    expect(emailSender.messages).toContainEqual(
+      expect.objectContaining({ kind: "verification", to: "alice@example.test" }),
+    );
+    expect([...kv.values.keys()].some((key) => key.startsWith(authPluginConfig.emailVerificationStoragePrefix))).toBe(false);
 
     const blockedSignIn = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-in/email", {
@@ -116,7 +142,10 @@ describe("Better Auth core flows", () => {
       }),
     );
     expect(reset.status).toBe(200);
-    expect(kv.values.has(`${authPluginConfig.passwordResetStoragePrefix}alice@example.test`)).toBe(true);
+    expect(emailSender.messages).toContainEqual(
+      expect.objectContaining({ kind: "password-reset", to: "alice@example.test" }),
+    );
+    expect([...kv.values.keys()].some((key) => key.startsWith(authPluginConfig.passwordResetStoragePrefix))).toBe(false);
 
     const signout = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-out", {
@@ -127,4 +156,3 @@ describe("Better Auth core flows", () => {
     expect(signout.status).toBe(200);
   });
 });
-

@@ -45,7 +45,7 @@ describe("assertResourceServerAccess", () => {
     ).rejects.toBeInstanceOf(APIError);
   });
 
-  it("throws FORBIDDEN for unauthenticated (null platformRole) when callback returns false", async () => {
+  it("throws FORBIDDEN for unauthenticated (null role) when callback returns false", async () => {
     await expect(
       assertResourceServerAccess(forbid(), "org_1", "user_1", null, dummyAdapter),
     ).rejects.toBeInstanceOf(APIError);
@@ -75,15 +75,9 @@ describe("buildCreatePayload", () => {
     expect(payload.enabled).toBe(true);
   });
 
-  it("defaults createdBy to actorId when not supplied", () => {
+  it("sets createdBy to actorId", () => {
     const payload = buildCreatePayload(base, "user_1");
     expect(payload.createdBy).toBe("user_1");
-    expect(payload.updatedBy).toBe("user_1");
-  });
-
-  it("uses body.createdBy when explicitly supplied", () => {
-    const payload = buildCreatePayload({ ...base, createdBy: "system" }, "user_1");
-    expect(payload.createdBy).toBe("system");
     expect(payload.updatedBy).toBe("user_1");
   });
 
@@ -110,11 +104,11 @@ describe("buildCreatePayload", () => {
 describe("buildUpdatePayload", () => {
   it("merges provided fields and stamps updatedBy/updatedAt", () => {
     const before = Date.now();
-    const payload = buildUpdatePayload({ name: "New Name", enabled: false }, "user_2");
+    const payload = buildUpdatePayload({ name: "New Name" }, "user_2");
     const after = Date.now();
 
     expect(payload.name).toBe("New Name");
-    expect(payload.enabled).toBe(false);
+    expect(payload.enabled).toBeUndefined();
     expect(payload.updatedBy).toBe("user_2");
     expect(payload.updatedAt).toBeGreaterThanOrEqual(before);
     expect(payload.updatedAt).toBeLessThanOrEqual(after);

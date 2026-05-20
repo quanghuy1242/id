@@ -15,19 +15,16 @@ function createKv(): BetterAuthKvStorage {
   };
 }
 
-async function signInSuperadmin(auth: ReturnType<typeof betterAuth>, raw: { exec(sql: string): void }) {
-  await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "Root Admin",
-        email: "root@example.test",
-        password: "password123",
-      }),
-    }),
-  );
-  raw.exec(`update "user" set "emailVerified" = 1, "platformRole" = 'superadmin' where "email" = 'root@example.test';`);
+async function signInSuperadmin(auth: ReturnType<typeof betterAuth>, _raw: { exec(sql: string): void }) {
+  await auth.api.createUser({
+    body: {
+      name: "Root Admin",
+      email: "root@example.test",
+      password: "password123",
+      role: "admin",
+      data: { emailVerified: true },
+    },
+  });
 
   const response = await auth.handler(
     new Request("https://id.example.test/api/auth/sign-in/email", {
@@ -95,5 +92,136 @@ describe("idResourceServer plugin endpoint", () => {
         enabled: true,
       }),
     );
+  });
+
+  it("filters resource server reads by platform and organization access", async () => {
+    const sqliteModuleName = "better-sqlite3";
+    const { default: Database } = (await import(sqliteModuleName)) as {
+      readonly default: new (path: string) => { exec(sql: string): void };
+    };
+    const raw = new Database(":memory:");
+    raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+    raw.exec(
+      `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_2', 'Other', 'other', 1700000000000);`,
+    );
+
+    const db = drizzleAdapter(drizzle(raw), {
+      provider: "sqlite",
+      camelCase: true,
+      schema: authSchema,
+    });
+    const auth = betterAuth(
+      getAuthOptions({
+        BETTER_AUTH_SECRET: "test-secret",
+        BETTER_AUTH_URL: "https://id.example.test",
+        DB: db,
+        KV: createKv(),
+      }),
+    );
+
+    const owner = await auth.api.createUser({
+      body: {
+        name: "Owner",
+        email: "owner@example.test",
+        password: "password123",
+        data: { emailVerified: true },
+      },
+    });
+    const member = await auth.api.createUser({
+      body: {
+        name: "Member",
+        email: "member@example.test",
+        password: "password123",
+        data: { emailVerified: true },
+      },
+    });
+    raw.exec(
+      `update "user" set "emailVerified" = 1 where "id" in ('${owner.user.id}', '${member.user.id}');`,
+    );
+
+    const organizationOne = await auth.api.createOrganization({
+      body: { name: "Acme", slug: "acme", userId: owner.user.id },
+    });
+    const ownerMemberships = (
+      raw as unknown as { prepare: (sql: string) => { all: () => Array<Record<string, unknown>> } }
+    ).prepare(`select * from "member" where "userId" = '${owner.user.id}'`).all();
+    expect(ownerMemberships).toEqual([expect.objectContaining({ role: "owner" })]);
+    raw.exec(
+      `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('m_member', '${organizationOne.id}', '${member.user.id}', 'member', 1700000000000);`,
+    );
+    const ownerSignIn = await auth.handler(
+      new Request("https://id.example.test/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "owner@example.test", password: "password123" }),
+      }),
+    );
+    expect(ownerSignIn.status).toBe(200);
+    const ownerCookie = ownerSignIn.headers.get("set-cookie") ?? "";
+    const ownerSession = await auth.api.getSession({ headers: new Headers({ cookie: ownerCookie }) });
+    expect(ownerSession?.user.id).toBe(owner.user.id);
+    const resourceOne = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/resource-servers", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: ownerCookie },
+        body: JSON.stringify({
+          organizationId: organizationOne.id,
+          slug: "api",
+          name: "API",
+          audience: "https://api.example.test",
+        }),
+      }),
+    );
+    expect(resourceOne.status).toBe(200);
+    const createdOne = (await resourceOne.json()) as { readonly id: string };
+    const adminCookie = await signInSuperadmin(auth, raw);
+    const resourceTwo = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/resource-servers", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: adminCookie },
+        body: JSON.stringify({
+          organizationId: "org_2",
+          slug: "other",
+          name: "Other",
+          audience: "https://other.example.test",
+        }),
+      }),
+    );
+    expect(resourceTwo.status).toBe(200);
+    const createdTwo = (await resourceTwo.json()) as { readonly id: string };
+
+    const list = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/resource-servers", {
+        headers: { cookie: ownerCookie },
+      }),
+    );
+    expect(list.status).toBe(200);
+    await expect(list.json()).resolves.toEqual({
+      resourceServers: [expect.objectContaining({ id: createdOne.id })],
+    });
+
+    const crossOrg = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}`, {
+        headers: { cookie: ownerCookie },
+      }),
+    );
+    expect(crossOrg.status).toBe(404);
+
+    const memberSignIn = await auth.handler(
+      new Request("https://id.example.test/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "member@example.test", password: "password123" }),
+      }),
+    );
+    expect(memberSignIn.status).toBe(200);
+    const memberCookie = memberSignIn.headers.get("set-cookie") ?? "";
+    const memberList = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/resource-servers", {
+        headers: { cookie: memberCookie },
+      }),
+    );
+    expect(memberList.status).toBe(200);
+    await expect(memberList.json()).resolves.toEqual({ resourceServers: [] });
   });
 });

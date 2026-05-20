@@ -62,6 +62,7 @@ describe("Better Auth installed contract", () => {
       {
         BETTER_AUTH_SECRET: "test-secret",
         BETTER_AUTH_URL: "https://id.example.test",
+        BETTER_AUTH_COOKIE_DOMAIN: ".quanghuy.dev",
         DB: {} as unknown as BetterAuthOptions["database"],
         KV: {} as unknown as BetterAuthKvStorage,
       },
@@ -69,6 +70,13 @@ describe("Better Auth installed contract", () => {
     );
 
     expect(options.basePath).toBe("/api/auth");
+    expect(options.emailAndPassword?.disableSignUp).toBe(true);
+    expect(options.advanced?.cookiePrefix).toBe("id-auth");
+    expect(options.advanced?.crossSubDomainCookies).toEqual({
+      enabled: true,
+      domain: ".quanghuy.dev",
+    });
+    expect(options.rateLimit?.storage).toBe("secondary-storage");
     expect(options.plugins?.some((plugin) => plugin.id === "id-resource-server")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "oauth-provider")).toBe(true);
   });

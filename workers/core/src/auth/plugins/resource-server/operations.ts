@@ -30,18 +30,28 @@ export async function assertResourceServerAccess(
   authorize: AuthorizeFn | undefined,
   organizationId: string,
   userId: string,
-  platformRole: string | null | undefined,
+  role: string | null | undefined,
   adapter: unknown,
 ): Promise<void> {
-  if (!authorize || !(await authorize(organizationId, userId, platformRole, adapter))) {
+  if (!authorize || !(await authorize(organizationId, userId, role, adapter))) {
     throw new APIError("FORBIDDEN");
   }
+}
+
+export async function canAccessResourceServer(
+  authorize: AuthorizeFn | undefined,
+  row: Pick<ResourceServerRow, "organizationId">,
+  userId: string,
+  role: string | null | undefined,
+  adapter: unknown,
+): Promise<boolean> {
+  return Boolean(authorize && (await authorize(row.organizationId, userId, role, adapter)));
 }
 
 /**
  * Builds the insert payload for a new resource server.
  * Defaults `enabled` to `true`, stamps `createdAt`/`updatedAt`, and resolves
- * `createdBy` to the acting user when the caller omits it.
+ * `createdBy` to the acting user.
  */
 export function buildCreatePayload(
   body: CreateResourceServerBody,
@@ -51,7 +61,7 @@ export function buildCreatePayload(
   return {
     ...body,
     enabled: true,
-    createdBy: body.createdBy ?? actorId,
+    createdBy: actorId,
     updatedBy: actorId,
     createdAt: now,
     updatedAt: now,

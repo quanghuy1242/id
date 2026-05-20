@@ -32,4 +32,23 @@ describe("ui worker service binding", () => {
     expect(res.status).toBe(200);
     expect(calls).toEqual(["https://core-id.local/api/admin/dashboard"]);
   });
+
+  it("serves minimal login and consent pages", async () => {
+    const { env } = createEnv();
+    const login = await app.request("/admin/login?client_id=client_1&sig=sig_1", {}, env);
+    const consent = await app.request("/admin/consent?client_id=client_1&scope=openid", {}, env);
+
+    expect(login.status).toBe(200);
+    expect(await login.text()).toContain("oauth_query");
+    expect(consent.status).toBe(200);
+    expect(await consent.text()).toContain("/api/auth/oauth2/consent");
+  });
+
+  it("proxies auth API requests through CORE_ID", async () => {
+    const { env, calls } = createEnv();
+    const res = await app.request("/api/auth/get-session", {}, env);
+
+    expect(res.status).toBe(200);
+    expect(calls).toEqual(["https://core-id.local/api/auth/get-session"]);
+  });
 });

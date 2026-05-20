@@ -28,7 +28,10 @@
     "deploy:core:dry-run": "wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core",
     "deploy:ui": "vinext deploy --cwd workers/ui",
     "deploy:ui:dry-run": "vinext build --cwd workers/ui",
-    "smoke:remote": "node scripts/remote-smoke.mjs"
+    "smoke:remote": "node scripts/remote-smoke.mjs",
+    "auth:api": "node scripts/auth-api.mjs",
+    "auth:api:login": "node scripts/auth-api-login.mjs",
+    "auth:api:logout": "node scripts/auth-api-logout.mjs"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.6.11",

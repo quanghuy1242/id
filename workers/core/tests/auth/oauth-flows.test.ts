@@ -47,19 +47,16 @@ async function createAuth(raw: RawSqlite, validAudiences: readonly string[] = []
   );
 }
 
-async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<string> {
-  await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "Root Admin",
-        email: "root@example.test",
-        password: "password123",
-      }),
-    }),
-  );
-  raw.exec(`update "user" set "emailVerified" = 1, "platformRole" = 'superadmin' where "email" = 'root@example.test';`);
+async function signInSuperadmin(auth: TestAuth, _raw: RawSqlite): Promise<string> {
+  await auth.api.createUser({
+    body: {
+      name: "Root Admin",
+      email: "root@example.test",
+      password: "password123",
+      role: "admin",
+      data: { emailVerified: true },
+    },
+  });
 
   const response = await auth.handler(
     new Request("https://id.example.test/api/auth/sign-in/email", {
@@ -132,11 +129,13 @@ describe("OAuth Provider flows", () => {
     expect(tokenResponse.status).toBe(200);
     const token = (await tokenResponse.json()) as {
       readonly access_token: string;
+      readonly expires_in: number;
       readonly grant_type: string;
       readonly token_type: string;
     };
     expect(token.grant_type).toBe("client_credentials");
     expect(token.token_type).toBe("Bearer");
+    expect(token).toEqual(expect.objectContaining({ expires_in: 10_800 }));
 
     const jwksResponse = await auth.handler(new Request("https://id.example.test/api/auth/jwks"));
     const jwks = await jwksResponse.json();

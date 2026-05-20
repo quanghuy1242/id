@@ -8,10 +8,37 @@ import {
   buildCreatePayload,
   buildDisablePayload,
   buildUpdatePayload,
+  canAccessResourceServer,
   type ResourceServerRow,
 } from "./operations";
 
 export type { ResourceServerPluginOptions } from "./types";
+
+type AdapterContext = {
+  readonly findMany: <T>(params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown }>;
+  }) => Promise<T[]>;
+};
+
+async function assertUniqueSlug(
+  adapter: AdapterContext,
+  organizationId: string,
+  slug: string,
+  ignoreId?: string,
+): Promise<void> {
+  const rows = await adapter.findMany<ResourceServerRow>({
+    model: RESOURCE_SERVER_MODEL,
+    where: [
+      { field: "organizationId", value: organizationId },
+      { field: "slug", value: slug },
+    ],
+  });
+
+  if (rows.some((row) => row.id !== ignoreId)) {
+    throw new APIError("BAD_REQUEST", { message: "Resource server slug already exists in organization" });
+  }
+}
 
 export const idResourceServer = (options: ResourceServerPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-resource-server",
@@ -45,9 +72,10 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           options.authorize,
           ctx.body.organizationId,
           session.user.id,
-          session.user.platformRole,
+          session.user.role,
           ctx.context.adapter,
         );
+        await assertUniqueSlug(ctx.context.adapter as AdapterContext, ctx.body.organizationId, ctx.body.slug);
 
         const row = await ctx.context.adapter.create<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
@@ -62,13 +90,28 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
       "/admin/resource-servers",
       { method: "GET", use: [sessionMiddleware] },
       async (ctx) => {
-        if (!ctx.context.session) throw new APIError("UNAUTHORIZED");
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
 
         const rows = await ctx.context.adapter.findMany<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
           sortBy: { field: "createdAt", direction: "desc" },
         });
-        return ctx.json({ resourceServers: rows });
+        const access = await Promise.all(
+          rows.map(async (row) => ({
+            row,
+            visible: await canAccessResourceServer(
+              options.authorize,
+              row,
+              session.user.id,
+              session.user.role,
+              ctx.context.adapter,
+            ),
+          })),
+        );
+        const visible = access.filter((entry) => entry.visible).map((entry) => entry.row);
+
+        return ctx.json({ resourceServers: visible });
       },
     ),
 
@@ -76,13 +119,17 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
       "/admin/resource-servers/:id",
       { method: "GET", use: [sessionMiddleware] },
       async (ctx) => {
-        if (!ctx.context.session) throw new APIError("UNAUTHORIZED");
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
 
         const row = await ctx.context.adapter.findOne<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!row) throw new APIError("NOT_FOUND");
+        if (!(await canAccessResourceServer(options.authorize, row, session.user.id, session.user.role, ctx.context.adapter))) {
+          throw new APIError("NOT_FOUND");
+        }
 
         return ctx.json(row);
       },
@@ -105,9 +152,12 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           options.authorize,
           existing.organizationId,
           session.user.id,
-          session.user.platformRole,
+          session.user.role,
           ctx.context.adapter,
         );
+        if (ctx.body.slug) {
+          await assertUniqueSlug(ctx.context.adapter as AdapterContext, existing.organizationId, ctx.body.slug, existing.id);
+        }
 
         const row = await ctx.context.adapter.update<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
@@ -136,7 +186,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           options.authorize,
           existing.organizationId,
           session.user.id,
-          session.user.platformRole,
+          session.user.role,
           ctx.context.adapter,
         );
 
@@ -166,7 +216,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           options.authorize,
           existing.organizationId,
           session.user.id,
-          session.user.platformRole,
+          session.user.role,
           ctx.context.adapter,
         );
 

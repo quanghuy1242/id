@@ -7,7 +7,11 @@ import { loadEnabledResourceAudienceRows } from "../../infrastructure/persistenc
 export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/api/auth/*", async (c) => {
     const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences);
+    const auth = getAuth(c.env, loaded.audiences, {
+      backgroundTaskRunner: {
+        waitUntil: (task) => c.executionCtx.waitUntil(task),
+      },
+    });
     return auth.handler(c.req.raw);
   });
 }

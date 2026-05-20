@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { authorizeAdminAction, type AdminActor } from "../../src/application/admin/authorization";
 
-const superadmin: AdminActor = {
-  userId: "user_superadmin",
-  platformRole: "superadmin",
-  organizations: [],
-};
-
 const platformAdmin: AdminActor = {
   userId: "user_platform_admin",
   platformRole: "admin",
@@ -15,28 +9,23 @@ const platformAdmin: AdminActor = {
 
 const owner: AdminActor = {
   userId: "user_owner",
-  platformRole: "member",
+  platformRole: "user",
   organizations: [{ organizationId: "org_1", role: "owner" }],
 };
 
 const orgAdmin: AdminActor = {
   userId: "user_org_admin",
-  platformRole: "member",
+  platformRole: "user",
   organizations: [{ organizationId: "org_1", role: "admin" }],
 };
 
 const member: AdminActor = {
   userId: "user_member",
-  platformRole: "member",
+  platformRole: "user",
   organizations: [{ organizationId: "org_1", role: "member" }],
 };
 
 describe("admin authorization model", () => {
-  it("allows superadmin to list and mutate across organizations", () => {
-    expect(authorizeAdminAction(superadmin, "listAnyOrganization")).toEqual({ allowed: true });
-    expect(authorizeAdminAction(superadmin, "mutateAnyOrganization", "org_2")).toEqual({ allowed: true });
-  });
-
   it("allows platform admin to perform platform-wide admin operations", () => {
     expect(authorizeAdminAction(platformAdmin, "listAnyOrganization")).toEqual({ allowed: true });
     expect(authorizeAdminAction(platformAdmin, "mutateAnyOrganization", "org_1")).toEqual({ allowed: true });
