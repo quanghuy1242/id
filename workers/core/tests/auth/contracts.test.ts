@@ -51,6 +51,15 @@ describe("Better Auth installed contract", () => {
     expect(authRouteMap).toContainEqual(expect.objectContaining({ name: "getJwks", path: "/api/auth/jwks" }));
   });
 
+  it("records Better Auth OpenAPI plugin routes", () => {
+    expect(authRouteMap).toContainEqual(
+      expect.objectContaining({ name: "generateOpenAPISchema", path: "/api/auth/open-api/generate-schema" }),
+    );
+    expect(authRouteMap).toContainEqual(
+      expect.objectContaining({ name: "openAPIReference", path: "/api/auth/reference" }),
+    );
+  });
+
   it("proves email/password sign-up uses disableSignUp, not a signup option", () => {
     expect(betterAuthOptionsSource).toContain("disableSignUp?: boolean");
     expect(betterAuthOptionsSource).not.toContain("signup?:");

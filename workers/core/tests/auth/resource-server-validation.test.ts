@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createResourceServerBody, updateResourceServerBody } from "../../src/auth/plugins/resource-server/validation";
+import {
+  createResourceServerBody,
+  createResourceServerOpenApiRequestBody,
+  resourceServerBetterAuthFields,
+  resourceServerOpenApiSchema,
+  updateResourceServerBody,
+} from "../../src/auth/plugins/resource-server/schema";
 
 describe("createResourceServerBody", () => {
   it("accepts a valid create payload", () => {
@@ -95,5 +101,40 @@ describe("updateResourceServerBody", () => {
   it("rejects a non-URL audience", () => {
     const result = updateResourceServerBody.safeParse({ audience: "not-a-url" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("resourceServerBetterAuthFields", () => {
+  it("matches the Better Auth table field contract", () => {
+    expect(resourceServerBetterAuthFields).toEqual({
+      organizationId: { type: "string", required: true, references: { model: "organization", field: "id" } },
+      slug: { type: "string", required: true },
+      name: { type: "string", required: true },
+      audience: { type: "string", required: true, unique: true },
+      description: { type: "string", required: false },
+      enabled: { type: "boolean", required: true, defaultValue: true },
+      createdBy: { type: "string", required: false },
+      updatedBy: { type: "string", required: false },
+      disabledAt: { type: "number", required: false },
+      disabledBy: { type: "string", required: false },
+      createdAt: { type: "number", required: true },
+      updatedAt: { type: "number", required: true },
+    });
+  });
+});
+
+describe("resource server OpenAPI schemas", () => {
+  it("does not expose Better Auth-only field metadata", () => {
+    expect(JSON.stringify(resourceServerOpenApiSchema)).not.toContain("betterAuth");
+  });
+
+  it("documents create description as optional string, not nullable", () => {
+    const schema = createResourceServerOpenApiRequestBody.content["application/json"].schema;
+    expect(schema).toEqual(
+      expect.objectContaining({
+        required: ["organizationId", "slug", "name", "audience"],
+      }),
+    );
+    expect(schema).toHaveProperty(["properties", "description", "type"], "string");
   });
 });

@@ -1,6 +1,6 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { admin, jwt, organization } from "better-auth/plugins";
+import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
 import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./admin/access";
 import { invalidateResourceAudiences } from "./adapters/audiences";
@@ -109,6 +109,7 @@ export function getAuthOptions(
         authorize: async (organizationId, userId, role, adapter) =>
           isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
+      openAPI(),
     ],
   } satisfies BetterAuthOptions;
 }

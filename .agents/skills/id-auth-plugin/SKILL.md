@@ -1,32 +1,31 @@
+---
+name: id-auth-plugin
+description: Maintain custom Better Auth plugins in this repository. Use when creating, reviewing, refactoring, or testing code under workers/core/src/auth/plugins/**, especially plugin schema definitions, createAuthEndpoint handlers, plugin options, OpenAPI metadata, and resource-server plugin patterns.
+---
+
 # id Auth Plugin
 
-Use this skill when creating, reviewing, or refactoring custom Better Auth plugins in this repository.
+Use this skill for custom Better Auth plugin work in `/home/quanghuy1242/pjs/auth`.
 
-## Four-File Layout
+## Required Reference
 
-Every plugin under `workers/core/src/auth/plugins/<name>/` uses this structure:
+Read `workers/core/src/auth/plugins/README.md` before changing plugin structure, adding a plugin, or refactoring shared plugin patterns. Treat it as the detailed guideline for file layout, ownership boundaries, and promotion rules.
 
-```text
-index.ts       Better Auth plugin factory, schema, and endpoint wiring only
-types.ts       Plugin option types, adapter context types, injected callback types
-validation.ts  Zod schemas for request bodies and parsed input types
-operations.ts  Business-rule helpers, row types, payload builders, assertions
-```
+For the current concrete template, also read `workers/core/src/auth/plugins/resource-server/README.md` when working on `id-resource-server` or modeling a new plugin after it.
 
-`index.ts` exports the plugin factory returning `BetterAuthPlugin`. It may contain the BA `schema` block and `createAuthEndpoint` registrations. It must not contain business logic, helper functions, inline adapter types, authorization helpers, or payload builders.
+## Core Rules
 
-`types.ts` owns plugin-level types. Adapter context types live here, not inline in `index.ts`.
+- Keep custom plugins inside the `auth/` boundary: Better Auth schema, `createAuthEndpoint`, adapter context, validation, and plugin-local helpers.
+- Do not add standalone Drizzle schemas, repositories, domain entities, or application use cases for Better Auth-owned plugin tables.
+- Keep `index.ts` as the Better Auth contract surface: plugin factory, schema registration, explicit endpoint declarations.
+- Keep `schema.ts` as the data/API shape surface: canonical Zod model, request schemas, derived Better Auth field map, and OpenAPI fragments.
+- Keep `types.ts` for runtime composition hooks injected by `get-auth.ts`; do not merge callback options into `schema.ts`.
+- Keep `operations.ts` for helper logic that can be unit-tested without a Better Auth request context.
+- Inject authorization callbacks from `workers/core/src/auth/get-auth.ts`; never import `auth/admin/access.ts` directly inside a plugin.
 
-`validation.ts` owns Zod validation only. It should not import Better Auth.
+## Validation
 
-`operations.ts` owns pure helper functions. All exported functions in `operations.ts` must have JSDoc explaining behavior and thrown errors.
-
-## Authorization
-
-Authorization callbacks are injected from `workers/core/src/auth/get-auth.ts`. A plugin must not import `auth/admin/access.ts` directly. This keeps the plugin reusable and keeps platform/org policy composition in the auth factory.
-
-## Tests
-
-Unit-test `validation.ts` and `operations.ts` without a Better Auth context.
-
-Integration-test endpoint handlers through `auth.handler()` using a real `betterAuth(getAuthOptions(...))` instance. Endpoint tests should exercise session behavior, adapter reads/writes, and authorization boundaries through Better Auth rather than calling handler internals.
+- Unit-test schema derivation and operation helpers without Better Auth context.
+- Integration-test endpoint handlers through `auth.handler()` using `betterAuth(getAuthOptions(...))`.
+- Run `pnpm check` after code changes.
+- Run `pnpm advise` after substantial plugin refactors and handle new findings according to repo guidance.

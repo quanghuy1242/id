@@ -4,7 +4,7 @@ export type AuthRouteContract = {
   readonly name: string;
   readonly path: string;
   readonly method: "DELETE" | "GET" | "PATCH" | "POST";
-  readonly source: "better-auth" | "jwt-plugin" | "oauth-provider-plugin" | "id-resource-server-plugin";
+  readonly source: "better-auth" | "jwt-plugin" | "oauth-provider-plugin" | "id-resource-server-plugin" | "open-api-plugin";
 };
 
 export const authRouteMap = [
@@ -36,6 +36,18 @@ export const authRouteMap = [
     path: "/api/auth/oauth2/client/rotate-secret",
     method: "POST",
     source: "oauth-provider-plugin",
+  },
+  {
+    name: "generateOpenAPISchema",
+    path: "/api/auth/open-api/generate-schema",
+    method: "GET",
+    source: "open-api-plugin",
+  },
+  {
+    name: "openAPIReference",
+    path: "/api/auth/reference",
+    method: "GET",
+    source: "open-api-plugin",
   },
   {
     name: "createResourceServer",

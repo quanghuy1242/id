@@ -20,28 +20,38 @@ Every plugin follows this layout:
 
 ```
 plugins/<name>/
-├── index.ts       — plugin factory: BA schema definition + endpoint wiring (no business logic)
-├── types.ts       — `PluginOptions` type (callbacks, hooks)
-├── validation.ts  — Zod schemas for request body validation
-├── operations.ts  — pure helpers: auth assertions, payload builders, row types
+├── index.ts       — plugin factory: BA schema registration + explicit endpoint wiring
+├── schema.ts      — canonical Zod model, request schemas, BA field map, OpenAPI fragments
+├── types.ts       — `PluginOptions` type and composition hooks
+├── operations.ts  — auth assertions, uniqueness checks, and payload builders
 └── README.md      — (optional) plugin-specific docs
 ```
 
 ### Rules
 
-- **`index.ts`** exports a single function that returns `BetterAuthPlugin`. It contains the BA `schema` block and `createAuthEndpoint` calls — nothing else. Handlers are thin: extract session → call helpers → adapter call → JSON response.
-- **`types.ts`** exports only the options type. Cross-cutting authorization callbacks go here so `get-auth.ts` can compose them.
-- **`validation.ts`** contains Zod validation schemas for HTTP request bodies. No BA imports.
-- **`operations.ts`** contains pure business-rule functions: row types, timestamp stamping, payload construction, and authorization assertion wrappers. Authorization itself is injected via a callback from `get-auth.ts` — operations.ts never imports from `auth/admin/access.ts`.
+- **`index.ts`** exports a single function that returns `BetterAuthPlugin`. It registers the BA `schema` block and `createAuthEndpoint` calls. Endpoint declarations should stay explicit even when there are several CRUD routes; handlers stay thin: extract session → call helpers → adapter call → JSON response.
+- **`schema.ts`** is the data/API source of truth. Prefer one canonical Zod row schema, derive request body schemas from its fields, derive the BA field map once at module scope, and precompute OpenAPI schema fragments once at module scope. Strip internal metadata from public OpenAPI output.
+- **`types.ts`** exports plugin options and narrow runtime hook types. Keep this separate from `schema.ts`: composition callbacks are runtime wiring, not persisted/request data shape.
+- **`operations.ts`** contains business-rule helpers: payload builders, timestamp stamping, uniqueness checks, and authorization assertion wrappers. Authorization itself is injected via a callback from `get-auth.ts`; operations never import from `auth/admin/access.ts`.
 - The BA model name (e.g. `"resourceServer"`) lives in `src/shared/constants.ts` as a `SCREAMING_SNAKE_CASE` const. Both the plugin and the raw-D1 store (`infrastructure/persistence/`) import it from there.
 - Model names must include JSDoc per architecture lint (`constants-jsdoc`).
+- Custom plugin modules may use JSDoc at architectural boundaries. Keep comments focused on ownership and invariants rather than narrating each assignment.
 
 ## Writing a new plugin
 
-1. Create `plugins/<name>/` with the four files above.
-2. Define the BA schema block in `index.ts`. Use `schema: { <table>: { fields: { ... } } }` matching the canonical BA field DSL.
-3. Export `PluginOptions` from `types.ts`. Include `authorize` as a callback — never import `isPlatformAdmin` / `hasOrganizationAccess` directly. Let `get-auth.ts` compose and inject the access check.
-4. Write Zod request validation in `validation.ts`.
-5. Put business helpers (row type, payload builders, assertion wrappers) in `operations.ts`.
-6. Register the plugin in `get-auth.ts` under the `plugins` array, passing the `authorize` callback composed from `auth/admin/access.ts`.
-7. Write tests in `workers/core/tests/auth/<name>-*.test.ts`. Unit-test validation and operations without a BA context. BA endpoint handlers are integration-tested separately.
+1. Create `plugins/<name>/` with the files above.
+2. Define the canonical row schema and request body schemas in `schema.ts`. Put Better Auth-only storage hints in `.meta().betterAuth`, then strip those hints from generated OpenAPI output.
+3. Derive and export module-scope artifacts from `schema.ts`: `<name>BetterAuthFields`, OpenAPI response schemas, and OpenAPI request bodies. Add snapshot-style tests for the derived BA field map.
+4. Define the BA schema block in `index.ts` using the precomputed field map. Define endpoint metadata constants at module scope, then wire explicit `createAuthEndpoint` calls inside the plugin factory.
+5. Export `PluginOptions` from `types.ts`. Include `authorize` as a callback when access depends on platform or organization policy. Never import `isPlatformAdmin` / `hasOrganizationAccess` directly inside the plugin.
+6. Put helper logic in `operations.ts`: payload construction, authorization wrappers, uniqueness checks, and adapter-row helpers.
+7. Register the plugin in `get-auth.ts` under the `plugins` array, passing callbacks composed from the appropriate auth boundary modules.
+8. Write tests in `workers/core/tests/auth/<name>-*.test.ts`. Unit-test schema derivation and operations without a BA context. BA endpoint handlers are integration-tested separately.
+
+## Resource-server implementation notes
+
+`id-resource-server` is the current template for custom Better Auth plugins in this repo:
+
+- `schema.ts` owns the canonical resource-server Zod model and exports the precomputed BA field map. That keeps schema walking and OpenAPI conversion out of the per-request plugin factory path in warm Cloudflare Worker isolates.
+- `index.ts` still contains six endpoint declarations. That is acceptable because these are the actual Better Auth contract declarations; extracting them into a generic CRUD builder would hide route-specific validation, authorization, and cache-invalidation behavior.
+- `types.ts` remains separate from `schema.ts` because plugin options are runtime composition hooks. If this pattern is promoted to `packages/`, schema generation utilities can move first; app-specific callbacks should stay at the auth-worker boundary.

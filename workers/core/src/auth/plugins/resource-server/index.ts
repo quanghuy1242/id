@@ -2,7 +2,6 @@ import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api
 import type { BetterAuthPlugin } from "better-auth";
 import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
 import type { AdapterContext, ResourceServerPluginOptions } from "./types";
-import { createResourceServerBody, updateResourceServerBody } from "./validation";
 import {
   assertResourceServerAccess,
   assertUniqueSlug,
@@ -10,35 +9,81 @@ import {
   buildDisablePayload,
   buildUpdatePayload,
   canAccessResourceServer,
-  type ResourceServerRow,
 } from "./operations";
+import {
+  resourceServerBetterAuthFields,
+  resourceServerOpenApiSchema,
+  listResourceServersOpenApiSchema,
+  deleteResourceServerOpenApiSchema,
+  resourceServerEndpointMeta,
+  createResourceServerBody,
+  createResourceServerOpenApiRequestBody,
+  updateResourceServerBody,
+  updateResourceServerOpenApiRequestBody,
+  type ResourceServerRow,
+} from "./schema";
 
 export type { ResourceServerPluginOptions } from "./types";
 
+const createResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Create a new resource server",
+  requestBody: createResourceServerOpenApiRequestBody,
+  responseSchema: resourceServerOpenApiSchema,
+  responseDescription: "Resource server created successfully",
+});
+
+const listResourceServersMetadata = resourceServerEndpointMeta({
+  description: "List all resource servers user has access to",
+  responseSchema: listResourceServersOpenApiSchema,
+  responseDescription: "List of resource servers",
+});
+
+const getResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Get a resource server by ID",
+  hasIdParam: true,
+  responseSchema: resourceServerOpenApiSchema,
+  responseDescription: "Resource server details",
+});
+
+const updateResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Update a resource server by ID",
+  hasIdParam: true,
+  requestBody: updateResourceServerOpenApiRequestBody,
+  responseSchema: resourceServerOpenApiSchema,
+  responseDescription: "Resource server updated successfully",
+});
+
+const deleteResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Delete a resource server by ID",
+  hasIdParam: true,
+  responseSchema: deleteResourceServerOpenApiSchema,
+  responseDescription: "Resource server deleted successfully",
+});
+
+const disableResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Disable a resource server by ID",
+  hasIdParam: true,
+  responseSchema: resourceServerOpenApiSchema,
+  responseDescription: "Resource server disabled successfully",
+});
+
+/** Better Auth plugin that owns resource-server persistence and admin endpoints. */
 export const idResourceServer = (options: ResourceServerPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-resource-server",
   schema: {
     resourceServer: {
-      fields: {
-        organizationId: { type: "string", required: true, references: { model: "organization", field: "id" } },
-        slug:           { type: "string", required: true },
-        name:           { type: "string", required: true },
-        audience:       { type: "string", required: true, unique: true },
-        description:    { type: "string", required: false },
-        enabled:        { type: "boolean", required: true, defaultValue: true },
-        createdBy:      { type: "string", required: false },
-        updatedBy:      { type: "string", required: false },
-        disabledAt:     { type: "number", required: false },
-        disabledBy:     { type: "string", required: false },
-        createdAt:      { type: "number", required: true },
-        updatedAt:      { type: "number", required: true },
-      },
+      fields: resourceServerBetterAuthFields,
     },
   },
   endpoints: {
     createResourceServer: createAuthEndpoint(
       "/admin/resource-servers",
-      { method: "POST", use: [sessionMiddleware], body: createResourceServerBody },
+      {
+        method: "POST",
+        use: [sessionMiddleware],
+        body: createResourceServerBody,
+        metadata: createResourceServerMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
@@ -63,7 +108,11 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
 
     listResourceServers: createAuthEndpoint(
       "/admin/resource-servers",
-      { method: "GET", use: [sessionMiddleware] },
+      {
+        method: "GET",
+        use: [sessionMiddleware],
+        metadata: listResourceServersMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
@@ -92,7 +141,11 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
 
     getResourceServer: createAuthEndpoint(
       "/admin/resource-servers/:id",
-      { method: "GET", use: [sessionMiddleware] },
+      {
+        method: "GET",
+        use: [sessionMiddleware],
+        metadata: getResourceServerMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
@@ -112,7 +165,12 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
 
     updateResourceServer: createAuthEndpoint(
       "/admin/resource-servers/:id",
-      { method: "PATCH", use: [sessionMiddleware], body: updateResourceServerBody },
+      {
+        method: "PATCH",
+        use: [sessionMiddleware],
+        body: updateResourceServerBody,
+        metadata: updateResourceServerMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
@@ -146,7 +204,11 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
 
     deleteResourceServer: createAuthEndpoint(
       "/admin/resource-servers/:id",
-      { method: "DELETE", use: [sessionMiddleware] },
+      {
+        method: "DELETE",
+        use: [sessionMiddleware],
+        metadata: deleteResourceServerMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
@@ -176,7 +238,11 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
 
     disableResourceServer: createAuthEndpoint(
       "/admin/resource-servers/:id/disable",
-      { method: "POST", use: [sessionMiddleware] },
+      {
+        method: "POST",
+        use: [sessionMiddleware],
+        metadata: disableResourceServerMetadata,
+      },
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");

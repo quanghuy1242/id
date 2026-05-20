@@ -1,3 +1,13 @@
+/**
+ * Plugin integration types.
+ *
+ * Keep these separate from `schema.ts`: schema owns data shapes and generated
+ * API metadata, while this file owns runtime hooks injected by `get-auth.ts`.
+ * That separation keeps future custom plugins easy to lift into shared
+ * templates without coupling persistence shape to composition callbacks.
+ */
+
+/** Minimal adapter surface needed for plugin-local uniqueness checks. */
 export type AdapterContext = {
   readonly findMany: <T>(params: {
     model: string;

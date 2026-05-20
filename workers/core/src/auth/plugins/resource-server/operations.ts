@@ -1,24 +1,15 @@
 import { APIError } from "better-auth/api";
 import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
-import type { CreateResourceServerBody, UpdateResourceServerBody } from "./validation";
 import type { AdapterContext, ResourceServerPluginOptions } from "./types";
+import type { CreateResourceServerBody, UpdateResourceServerBody, ResourceServerRow } from "./schema";
 
-/** Shape of a row returned by the Better Auth adapter for the `resourceServer` model. */
-export type ResourceServerRow = {
-  readonly id: string;
-  readonly organizationId: string;
-  readonly slug: string;
-  readonly name: string;
-  readonly audience: string;
-  readonly description?: string;
-  readonly enabled: boolean;
-  readonly createdBy?: string;
-  readonly updatedBy?: string;
-  readonly disabledAt?: number;
-  readonly disabledBy?: string;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-};
+/**
+ * Operation helpers for the Better Auth resource-server plugin.
+ *
+ * These helpers are deliberately framework-light: no Hono imports, no Drizzle,
+ * and no direct access-policy imports. Endpoint handlers pass adapter/session
+ * data in, and `get-auth.ts` injects the actual authorization callback.
+ */
 
 export type AuthorizeFn = NonNullable<ResourceServerPluginOptions["authorize"]>;
 
