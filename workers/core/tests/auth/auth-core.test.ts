@@ -5,7 +5,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { authPluginConfig } from "../../src/auth/config";
 import { getAuthOptions } from "../../src/auth/get-auth";
-import { createCapturedAuthEmailSender } from "../../src/auth/adapters/test-email";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
 

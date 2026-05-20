@@ -35,6 +35,54 @@
       "file": "workers/core/src/auth/plugins/resource-server/index.ts",
       "rule": "code-quality/duplicate-block",
       "reason": "Plugin endpoint handlers follow identical pattern: findOne, check NOT_FOUND, assert access, update/delete, invalidate cache. Structural similarity is intentional in BA plugin endpoints."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/api/[...path]/route.ts",
+      "rule": "ai-slop/thin-wrapper",
+      "reason": "API route functions are proxy entry points that delegate directly to core-id via service bindings."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/api/[...path]/route.ts",
+      "rule": "ai-slop/hallucinated-import",
+      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/api/auth/[...path]/route.ts",
+      "rule": "ai-slop/thin-wrapper",
+      "reason": "API route functions are proxy entry points that delegate directly to core-id via service bindings."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/api/auth/[...path]/route.ts",
+      "rule": "ai-slop/hallucinated-import",
+      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/health/route.ts",
+      "rule": "ai-slop/hallucinated-import",
+      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/vite.config.ts",
+      "rule": "ai-slop/hallucinated-import",
+      "reason": "vite is imported in configuration and resolved through transitive monorepo dependencies."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/layout.tsx",
+      "rule": "ai-slop/unused-import",
+      "reason": "_styles import is required to load global css while complying with oxlint unassigned-import rules."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/lib/src/constants.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment explains the cross-reference design contract of OAuth query parameters."
     }
   ]
 }

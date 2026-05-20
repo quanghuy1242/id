@@ -231,6 +231,8 @@ The `idPipeline` plugin dispatches hook scripts as Dynamic Workers:
 
 The first batch scaffolds `ui-id` with a health-check page and service binding to `core-id`. Full admin pages and the admin dashboard are deferred.
 
+**Temporary OAuth page scaffold:** `workers/ui/src/main.ts` currently serves raw HTML/CSS/JavaScript for `/admin/login` and `/admin/consent`. This is a first-release browser OAuth testing scaffold only. Phase 7 must replace these routes with proper Vinext App Router pages using `@id/ui` primitives such as `Page`, `Stack`, `Panel`, and `Button`. The replacement pages must live under `workers/ui/src/app/admin/login/` and `workers/ui/src/app/admin/consent/` so the `ui-route-composition` lint rule covers them.
+
 **Architecture note (2026-05-20):** The inline `GET /api/admin/dashboard` endpoint was removed during the Phase 5.7 architecture cleanup (see `002_implementation-sequence.md`). When the dashboard is reimplemented, it must follow the clean-architecture pattern: domain entity/interface, application use case, infrastructure repository (via BA adapter), http route handler with `requireActor(c)`. `app.ts` no longer exists; route registration goes through `composition/create-app.ts` and `http/routes/*.routes.ts`.
 
 **Other deferred architecture layers:**

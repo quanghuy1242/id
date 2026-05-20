@@ -57,6 +57,8 @@ Versions are pinned in `package.json`. Verified package metadata on May 19, 2026
 - `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
 - Better Auth-owned tables are never defined in `workers/core/src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
 - Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path.
+- Raw D1 access is forbidden outside `workers/core/src/infrastructure/persistence/`. Even there, it is only allowed when the Better Auth adapter is genuinely unavailable. The canonical case is audience loading before the Better Auth OAuth Provider can be constructed. New raw-D1 infrastructure files need JSDoc explaining the chicken-and-egg reason.
+- Custom Better Auth plugin conventions are documented in [.agents/skills/id-auth-plugin/SKILL.md](.agents/skills/id-auth-plugin/SKILL.md).
 - Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
 
 ## Local Setup

@@ -1,3 +1,10 @@
+export type AdapterContext = {
+  readonly findMany: <T>(params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown }>;
+  }) => Promise<T[]>;
+};
+
 /** Options accepted by the `idResourceServer` BA plugin factory. */
 export type ResourceServerPluginOptions = {
   /** Called after any mutation that changes the set of enabled audiences. */

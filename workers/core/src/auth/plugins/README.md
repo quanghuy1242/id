@@ -40,7 +40,7 @@ plugins/<name>/
 
 1. Create `plugins/<name>/` with the four files above.
 2. Define the BA schema block in `index.ts`. Use `schema: { <table>: { fields: { ... } } }` matching the canonical BA field DSL.
-3. Export `PluginOptions` from `types.ts`. Include `authorize` as a callback — never import `hasAdminAccess` / `hasOrganizationAccess` directly. Let `get-auth.ts` compose and inject the access check.
+3. Export `PluginOptions` from `types.ts`. Include `authorize` as a callback — never import `isPlatformAdmin` / `hasOrganizationAccess` directly. Let `get-auth.ts` compose and inject the access check.
 4. Write Zod request validation in `validation.ts`.
 5. Put business helpers (row type, payload builders, assertion wrappers) in `operations.ts`.
 6. Register the plugin in `get-auth.ts` under the `plugins` array, passing the `authorize` callback composed from `auth/admin/access.ts`.

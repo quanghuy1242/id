@@ -1,14 +1,12 @@
 {
   "name": "id-ui",
-  "main": "src/main.ts",
+  "main": "vinext/server/app-router-entry",
   "compatibility_date": "2026-05-19",
+  "compatibility_flags": ["nodejs_compat"],
   "services": [
     {
       "binding": "CORE_ID",
       "service": "id-core"
     }
-  ],
-  "assets": {
-    "directory": "./dist/client"
-  }
+  ]
 }

@@ -1,4 +1,4 @@
-import type { AuthEmailMessage, AuthEmailSender } from "./auth-email";
+import type { AuthEmailMessage, AuthEmailSender } from "../../src/auth/types";
 
 export type CapturedAuthEmailSender = AuthEmailSender & {
   readonly messages: readonly AuthEmailMessage[];

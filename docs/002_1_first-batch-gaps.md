@@ -418,7 +418,7 @@ Recommended files:
 |---|---|
 | `workers/core/src/auth/adapters/sender-email.ts` | Low-level Sender API client using `fetch`. |
 | `workers/core/src/auth/adapters/auth-email.ts` | Auth-specific verification/reset message builders and sender abstraction. |
-| `workers/core/src/auth/adapters/test-email.ts` | In-memory capture helper for tests, if needed. |
+| `workers/core/tests/helpers/test-email.ts` | In-memory capture helper for tests, if needed. |
 | `workers/core/src/config/env.ts` | Add `SENDER_API_TOKEN`, `EMAIL_FROM`, `EMAIL_FROM_NAME`. |
 | `workers/core/src/auth/get-auth.ts` | Use injected auth email sender in Better Auth callbacks. |
 | `workers/core/src/http/routes/auth-mount.ts` | Pass `c.executionCtx.waitUntil(...)` or equivalent background task runner into the auth factory. |

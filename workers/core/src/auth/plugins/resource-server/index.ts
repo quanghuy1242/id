@@ -1,10 +1,11 @@
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
-import type { ResourceServerPluginOptions } from "./types";
+import type { AdapterContext, ResourceServerPluginOptions } from "./types";
 import { createResourceServerBody, updateResourceServerBody } from "./validation";
 import {
   assertResourceServerAccess,
+  assertUniqueSlug,
   buildCreatePayload,
   buildDisablePayload,
   buildUpdatePayload,
@@ -13,32 +14,6 @@ import {
 } from "./operations";
 
 export type { ResourceServerPluginOptions } from "./types";
-
-type AdapterContext = {
-  readonly findMany: <T>(params: {
-    model: string;
-    where?: Array<{ field: string; value: unknown }>;
-  }) => Promise<T[]>;
-};
-
-async function assertUniqueSlug(
-  adapter: AdapterContext,
-  organizationId: string,
-  slug: string,
-  ignoreId?: string,
-): Promise<void> {
-  const rows = await adapter.findMany<ResourceServerRow>({
-    model: RESOURCE_SERVER_MODEL,
-    where: [
-      { field: "organizationId", value: organizationId },
-      { field: "slug", value: slug },
-    ],
-  });
-
-  if (rows.some((row) => row.id !== ignoreId)) {
-    throw new APIError("BAD_REQUEST", { message: "Resource server slug already exists in organization" });
-  }
-}
 
 export const idResourceServer = (options: ResourceServerPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-resource-server",

@@ -1,5 +1,6 @@
-import { renderAuthEmail, type AuthEmailMessage, type AuthEmailSender } from "./auth-email";
-import { SenderEmailError } from "../../shared/errors";
+import { renderAuthEmail } from "./auth-email-render";
+import { SenderEmailError, type SenderRateLimitMetadata } from "../../shared/errors";
+import type { AuthEmailMessage, AuthEmailSender } from "../types";
 
 const senderTransactionalUrl = "https://api.sender.net/v2/message/send";
 
@@ -7,13 +8,6 @@ export type SenderEmailConfig = {
   readonly apiToken: string;
   readonly fromEmail: string;
   readonly fromName: string;
-};
-
-export type SenderRateLimitMetadata = {
-  readonly retryAfter?: string;
-  readonly limit?: string;
-  readonly remaining?: string;
-  readonly reset?: string;
 };
 
 type SenderApiResponse = {

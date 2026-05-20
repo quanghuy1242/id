@@ -1,6 +1,7 @@
 import { APIError } from "better-auth/api";
+import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
 import type { CreateResourceServerBody, UpdateResourceServerBody } from "./validation";
-import type { ResourceServerPluginOptions } from "./types";
+import type { AdapterContext, ResourceServerPluginOptions } from "./types";
 
 /** Shape of a row returned by the Better Auth adapter for the `resourceServer` model. */
 export type ResourceServerRow = {
@@ -22,9 +23,11 @@ export type ResourceServerRow = {
 export type AuthorizeFn = NonNullable<ResourceServerPluginOptions["authorize"]>;
 
 /**
- * Calls the injected authorization callback. Throws FORBIDDEN when the
- * callback is absent or returns `false`, indicating the session user is
- * not permitted to mutate resource servers in the given organization.
+ * Calls the injected authorization callback.
+ *
+ * Throws FORBIDDEN when the callback is absent or returns `false`, indicating
+ * the session user is not permitted to read or mutate resource servers in the
+ * given organization.
  */
 export async function assertResourceServerAccess(
   authorize: AuthorizeFn | undefined,
@@ -38,6 +41,12 @@ export async function assertResourceServerAccess(
   }
 }
 
+/**
+ * Checks whether a session user can see a resource-server row.
+ *
+ * Returns `false` when the injected authorization callback is absent or denies
+ * access. This is used by list/get endpoints to filter or hide rows.
+ */
 export async function canAccessResourceServer(
   authorize: AuthorizeFn | undefined,
   row: Pick<ResourceServerRow, "organizationId">,
@@ -46,6 +55,32 @@ export async function canAccessResourceServer(
   adapter: unknown,
 ): Promise<boolean> {
   return Boolean(authorize && (await authorize(row.organizationId, userId, role, adapter)));
+}
+
+/**
+ * Ensures slug uniqueness inside one organization.
+ *
+ * Throws BAD_REQUEST when another resource server with the same slug already
+ * exists in the organization. `ignoreId` allows updates to keep the current
+ * row's slug.
+ */
+export async function assertUniqueSlug(
+  adapter: AdapterContext,
+  organizationId: string,
+  slug: string,
+  ignoreId?: string,
+): Promise<void> {
+  const rows = await adapter.findMany<ResourceServerRow>({
+    model: RESOURCE_SERVER_MODEL,
+    where: [
+      { field: "organizationId", value: organizationId },
+      { field: "slug", value: slug },
+    ],
+  });
+
+  if (rows.some((row) => row.id !== ignoreId)) {
+    throw new APIError("BAD_REQUEST", { message: "Resource server slug already exists in organization" });
+  }
 }
 
 /**
