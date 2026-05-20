@@ -120,7 +120,7 @@ jobs:
         run: pnpm deploy:core:dry-run
 
   deploy-ui-dry-run:
-    needs: migrate-dry-run
+    needs: deploy-core-dry-run
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

@@ -1289,6 +1289,52 @@ var noDirectDbAccessRule = {
   },
 };
 
+// ─── Rule 25: route-path-contract ─────────────────────────────────────────
+var CORE_FORBIDDEN_PATH_PREFIX = "/admin/";
+var CORE_ALLOWED_PATH_PREFIX = "/api/admin/";
+var UI_FORBIDDEN_PATH_PREFIX = "/api/";
+
+function extractRoutePathFromAppCall(node) {
+  if (node.type !== "CallExpression") return null;
+  var callee = node.callee;
+  if (callee.type !== "MemberExpression" || callee.computed) return null;
+  if (callee.object.type !== "Identifier" || callee.object.name !== "app") return null;
+  var method = getPropertyName(callee.property);
+  if (!ROUTE_METHODS.has(method) && method !== "all" && method !== "on") return null;
+  var pathArg = node.arguments[method === "on" ? 1 : 0];
+  if (!pathArg || pathArg.type !== "Literal" || typeof pathArg.value !== "string") return null;
+  return { method: method, path: pathArg.value, node: pathArg };
+}
+
+var routePathContractRule = {
+  meta: { type: "problem", docs: { description: "Route handlers must not serve paths owned by the other worker" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+    var isCore = filename.includes("/workers/core/src/");
+    var isUi = filename.includes("/workers/ui/src/");
+    if (!isCore && !isUi) return {};
+
+    return {
+      CallExpression: function (node) {
+        var info = extractRoutePathFromAppCall(node);
+        if (!info) return;
+
+        if (isCore) {
+          if (info.path.startsWith(CORE_FORBIDDEN_PATH_PREFIX) && !info.path.startsWith(CORE_ALLOWED_PATH_PREFIX)) {
+            context.report({ node: info.node, message: "core-id must not serve /admin/* paths. Admin UI assets belong to ui-id. Use /api/admin/ prefix for BA plugin admin endpoints." });
+          }
+        }
+
+        if (isUi) {
+          if (info.path.startsWith(UI_FORBIDDEN_PATH_PREFIX)) {
+            context.report({ node: info.node, message: "ui-id must not serve /api/* paths. Auth, OAuth, and admin API endpoints belong to core-id. Use CORE_ID service binding proxy for API calls." });
+          }
+        }
+      },
+    };
+  },
+};
+
 // ─── Plugin ───────────────────────────────────────────────────────────────
 var plugin = {
   meta: { name: "architecture" },
@@ -1313,6 +1359,7 @@ var plugin = {
     "auth-boundary": authBoundaryRule,
     "ui-route-composition": uiRouteCompositionRule,
     "no-direct-db-access": noDirectDbAccessRule,
+    "route-path-contract": routePathContractRule,
   },
 };
 

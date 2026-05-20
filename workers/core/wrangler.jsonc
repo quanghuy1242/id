@@ -21,5 +21,9 @@
     "BETTER_AUTH_URL": "https://id.quanghuy.dev",
     "BETTER_AUTH_COOKIE_DOMAIN": ".quanghuy.dev",
     "EMAIL_FROM_NAME": "id"
-  }
+  },
+  "routes": [
+    // Claims the entire subdomain — Cloudflare auto-creates DNS. No manual record needed.
+    { "pattern": "id.quanghuy.dev", "custom_domain": true }
+  ]
 }

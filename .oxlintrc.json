@@ -63,7 +63,8 @@
     "architecture/packages-lib-isolation": "error",
     "architecture/auth-boundary": "error",
     "architecture/ui-route-composition": "error",
-    "architecture/no-direct-db-access": "error"
+    "architecture/no-direct-db-access": "error",
+    "architecture/route-path-contract": "error"
   },
   "overrides": [
     {
@@ -89,6 +90,7 @@
         "architecture/auth-boundary": "off",
         "architecture/ui-route-composition": "off",
         "architecture/no-direct-db-access": "off",
+        "architecture/route-path-contract": "off",
         "no-console": "off",
         "no-await-in-loop": "off"
       }
@@ -115,6 +117,7 @@
         "architecture/packages-lib-isolation": "off",
         "architecture/auth-boundary": "off",
         "architecture/no-direct-db-access": "off",
+        "architecture/route-path-contract": "off",
         "no-console": "off"
       }
     }
