@@ -8,6 +8,20 @@
       "when": 1779205328767,
       "tag": "0000_brown_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1779272207893,
+      "tag": "0001_free_switch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779272328873,
+      "tag": "0002_drop_platform_role",
+      "breakpoints": true
     }
   ]
 }

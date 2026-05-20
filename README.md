@@ -99,10 +99,10 @@ Create `.dev.vars` from the committed example:
 cp .dev.vars.example .dev.vars
 ```
 
-4. Generate and apply local migrations:
+4. Generate schema and apply local migrations:
 
 ```bash
-pnpm db:generate --yes
+pnpm db:generate
 pnpm db:migrate:local
 ```
 
@@ -144,10 +144,23 @@ Public `POST /api/auth/sign-up/email` is disabled. Admins create users through B
 
 Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
 
-Generate BA schema (built-in + plugin tables):
+Generate BA schema (built-in + plugin tables) — this writes the Drizzle schema file:
 
 ```bash
 pnpm db:generate
+```
+
+If the schema changed, generate a **named migration** for the changes:
+
+```bash
+pnpm db:migration:new <descriptive_name>
+```
+
+Example:
+
+```bash
+pnpm db:migration:new drop_platform_role
+pnpm db:migration:new add_admin_plugin_role
 ```
 
 Apply to local D1:

@@ -22,6 +22,7 @@
     "advise:dupes": "fallow dupes --mode semantic --min-tokens 150 --min-lines 10 --skip-local --ignore-imports --format compact --quiet",
     "advise:json": "aislop scan --json --exclude node_modules,dist,coverage,.wrangler,migrations",
     "db:generate": "npx @better-auth/cli generate --config workers/core/src/auth/cli.ts --output workers/core/src/db/auth-schema.ts --yes && drizzle-kit generate",
+    "db:migration:new": "drizzle-kit generate --name",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
