@@ -192,6 +192,7 @@ pnpm auth:api:logout
 `pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
 `pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks stay under `/admin/*`, including `/admin/health`, because production only routes `/admin/*` to `ui-id`.
+`pnpm deploy:ui:dry-run` mirrors the Cloudflare deploy path: it builds from `workers/ui`, lets Vinext/@cloudflare/vite-plugin generate `workers/ui/dist/server/wrangler.json`, then runs Wrangler deploy with `--dry-run`.
 
 ## Deployment
 

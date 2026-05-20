@@ -16,7 +16,7 @@ Pipeline order:
 4. `pnpm deploy:ui`
 5. `pnpm smoke:remote`
 
-The GitHub Actions workflow in `.github/workflows/ci.yml` runs `pnpm check` on push/PR and provides a manual deployment job that follows the same order.
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs `pnpm check` on push/PR and deploy dry-runs. UI dry-run builds inside `workers/ui`, uses Vinext's generated `dist/server/wrangler.json`, then calls Wrangler deploy with `--dry-run`, matching the real `pnpm deploy:ui` path.
 
 Production browser OAuth is supported on the `*.quanghuy.dev` deployment only. Preview `*.workers.dev` URLs are API-only because browsers cannot share Better Auth cookies on the `workers.dev` public suffix.
 

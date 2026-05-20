@@ -1194,10 +1194,13 @@ packages:
 ```jsonc
 {
   "name": "id-ui",
-  "main": "src/main.ts",
+  "main": "vinext/server/app-router-entry",
   "compatibility_date": "2026-05-19",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "./dist/client"
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
   }
 }
 ```
@@ -1223,7 +1226,9 @@ packages:
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
     "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
-    "deploy:ui": "vinext deploy --cwd workers/ui"
+    "deploy:core:dry-run": "wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core",
+    "deploy:ui": "cd workers/ui && vinext build && wrangler deploy",
+    "deploy:ui:dry-run": "cd workers/ui && vinext build && wrangler deploy --dry-run --outdir ../../dist/ui"
   }
 }
 ```

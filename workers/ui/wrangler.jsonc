@@ -3,6 +3,11 @@
   "main": "vinext/server/app-router-entry",
   "compatibility_date": "2026-05-19",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
   "routes": [
     // Route for UI administration pages (login, consent flow screen, and management forms)
     { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" }
