@@ -1,34 +1,39 @@
-import type { ReactNode } from "react";
+import type { ElementType, ReactNode } from "react";
 
-type TextLevel = "h1" | "h2" | "h3" | "body" | "caption";
+type TextVariant = "h1" | "h2" | "h3" | "body" | "caption";
 
 type TextProps = {
-  readonly level?: TextLevel;
+  readonly variant?: TextVariant;
+  readonly as?: ElementType;
   readonly children: ReactNode;
 };
 
-export function Text({ level = "body", children }: TextProps) {
-  if (level === "h1") {
-    return <h1 className="text-2xl font-bold leading-tight text-base-content m-0">{children}</h1>;
-  }
-  if (level === "h2") {
-    return <h2 className="text-xl font-semibold leading-tight text-base-content m-0">{children}</h2>;
-  }
-  if (level === "h3") {
-    return <h3 className="text-lg font-semibold leading-tight text-base-content m-0">{children}</h3>;
-  }
-  if (level === "caption") {
-    return <p className="text-xs font-normal text-base-content/60 m-0">{children}</p>;
-  }
-  return <p className="text-sm font-normal leading-relaxed text-base-content/90 m-0">{children}</p>;
+const textClasses: Record<TextVariant, string> = {
+  h1: "text-2xl font-bold leading-tight text-base-content m-0",
+  h2: "text-xl font-semibold leading-tight text-base-content m-0",
+  h3: "text-lg font-semibold leading-tight text-base-content m-0",
+  body: "text-sm font-normal leading-relaxed text-base-content/90 m-0",
+  caption: "text-xs font-normal text-base-content/60 m-0",
+};
+
+const defaultElement: Record<TextVariant, ElementType> = {
+  h1: "h1",
+  h2: "h2",
+  h3: "h3",
+  body: "p",
+  caption: "p",
+};
+
+export function Text({ variant = "body", as, children }: TextProps) {
+  const Component = as ?? defaultElement[variant];
+  return <Component className={textClasses[variant]}>{children}</Component>;
 }
 
-export function Heading({ level = "h2", children }: TextProps) {
-  if (level === "h1") {
-    return <h1 className="text-2xl font-bold leading-tight text-base-content m-0">{children}</h1>;
-  }
-  if (level === "h3") {
-    return <h3 className="text-lg font-semibold leading-tight text-base-content m-0">{children}</h3>;
-  }
-  return <h2 className="text-xl font-semibold leading-tight text-base-content m-0">{children}</h2>;
+type HeadingProps = {
+  readonly level?: "h1" | "h2" | "h3";
+  readonly children: ReactNode;
+};
+
+export function Heading({ level = "h2", children }: HeadingProps) {
+  return <Text variant={level}>{children}</Text>;
 }

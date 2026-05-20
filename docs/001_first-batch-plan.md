@@ -205,7 +205,7 @@ Verification on 2026-05-19:
 - `pnpm lint` passes with the architecture plugin loaded through `.oxlintrc.json`.
 - `pnpm check:dup` passes with `Fallow mild duplication: 0.0%`.
 - `pnpm typecheck` passes.
-- `pnpm test` passes, including Better Auth contract, auth-core flow, OAuth client/M2M token flow, JWKS proof, resource-audience cache, resource-server plugin smoke, service-binding/proxy, resource-token verifier, log redaction, and admin authorization tests.
+- `pnpm test` passes, including Better Auth contract, auth-core flow, OAuth client/M2M token flow, JWKS proof, resource-audience cache, resource-server plugin smoke, route ownership, resource-token verifier, log redaction, and admin authorization tests.
 - `pnpm check` passes. There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint` and therefore by `pnpm check`.
 
 That means Phase 0 through Phase 5 implementation code is present. Remote deployment remains an operator action gated by Cloudflare credentials and the runbook/CI workflow.
@@ -288,7 +288,7 @@ The first batch can run on Workers/D1/KV, but implementation should keep databas
 
 ### 4.1 Runtime Shape
 
-The target service uses two Cloudflare Workers. `core-id` serves auth APIs, OAuth/OIDC endpoints, metadata routes, Better Auth plugin endpoints, and any custom Hono admin APIs. `ui-id` serves the admin UI scaffold and calls `core-id` through the `CORE_ID` service binding; full admin UI pages are deferred (see `docs/002_implementation-sequence.md`).
+The target service uses two Cloudflare Workers on the same hostname. `core-id` serves auth APIs, OAuth/OIDC endpoints, metadata routes, Better Auth plugin endpoints, and any custom Hono admin APIs. `ui-id` serves only `/admin/*` admin UI routes. Hosted auth pages call same-origin core `/api/auth/*` endpoints directly; full admin UI pages are deferred (see `docs/002_implementation-sequence.md`).
 
 Primary libraries:
 
@@ -810,8 +810,9 @@ core-id worker (primary — auth, OAuth, admin API)
 └── /reset-password                     reset page
 
 ui-id worker (admin dashboard scaffold)
-├── /admin/*                            health-check page + future admin UI
-└── CORE_ID service binding ──────────→ core-id (internal)
+├── /admin/*                            hosted auth/admin UI pages
+├── /admin/health                       UI worker health
+└── /admin/api                          placeholder for future UI-owned BFF endpoints
 ```
 
 Use Hono to route requests and pass Cloudflare bindings into the Better Auth factory.
@@ -1265,13 +1266,14 @@ Acceptance criteria:
 Scaffold the UI Worker with minimal content:
 
 - Vinext App Router project skeleton with Lumina component stubs.
-- A health-check page at `/admin` that confirms the worker is running and can reach `core-id` via service binding.
+- A health-check route at `/admin/health` that confirms the worker is running.
+- A placeholder `/admin/api` endpoint for future UI-owned BFF behavior.
 - No full admin pages implemented.
 
 Acceptance criteria:
 
 - `ui-id` Worker deploys and serves `/admin`.
-- `/admin` can call `core-id`'s admin API through the `CORE_ID` service binding and display a successful response.
+- hosted login and consent pages call same-origin core `/api/auth/*` endpoints directly.
 - All admin CRUD operations on `core-id` are documented and testable via API (curl, integration tests) without the UI.
 
 ### 12.5 Resource Server Integration
@@ -1582,7 +1584,7 @@ Static checks:
 - [ ] `prompt=create` redirects to sign-up page and resumes flow
 - [ ] Post-login org selection flow works for org-scoped scopes
 - [ ] `org_id` is injected into JWT claims for org-scoped tokens
-- [ ] Admin UI Worker is scaffolded with a health-check page and service binding to `core-id`
+- [ ] Admin UI Worker is scaffolded under `/admin/*` with a health-check route and BFF placeholder
 - [ ] Admin API is protected by platform role (`superadmin`/`admin`) and org role checks
 - [ ] Admin API allows CRUD of organizations, OAuth clients, and resource servers (testable via API)
 - [ ] Admin API allows viewing and revoking consents (testable via API)
@@ -1638,7 +1640,7 @@ The new `id` service is deployed as two Cloudflare Workers backed by D1 and Bett
 - OAuth Provider for authorization code, client credentials, refresh, consent, revocation, introspection, and userinfo;
 - JWT/JWKS support for locally verifiable API access tokens;
 - an `idResourceServer` plugin providing resource server management through Better Auth's plugin system;
-- an admin API as the primary management surface; a scaffolded admin UI Worker with service binding is prepared for the next batch.
+- an admin API as the primary management surface; a scaffolded admin UI Worker under `/admin/*` is prepared for the next batch.
 
 What it deliberately does differently from `auther`:
 

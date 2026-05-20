@@ -195,7 +195,7 @@ Dynamic Workers spin up Workers at runtime to execute arbitrary JS code in a san
 - Configure bindings, network access, limits per execution.
 - No cold start — Workers runtime, not containers.
 - Attach Tail Workers for observability.
-- Combined with RPC service bindings for typed communication with `core-id`.
+- Can be combined with explicit Worker bindings later if a future plugin needs private typed runtime communication with `core-id`.
 
 **Why Dynamic Workers, not containers (Sandbox SDK):**
 - Dynamic Workers are lighter — JS runtime, not Ubuntu Linux.
@@ -229,7 +229,7 @@ The `idPipeline` plugin dispatches hook scripts as Dynamic Workers:
 
 ### 6.1 Deferred From First Batch
 
-The first batch scaffolds `ui-id` with a health-check page and service binding to `core-id`. Full admin pages and the admin dashboard are deferred.
+The first batch scaffolds `ui-id` under `/admin/*` with hosted login/consent pages, `/admin/health`, and a `/admin/api` placeholder. Full admin pages and the admin dashboard are deferred.
 
 **Temporary OAuth page scaffold:** `workers/ui/src/main.ts` currently serves raw HTML/CSS/JavaScript for `/admin/login` and `/admin/consent`. This is a first-release browser OAuth testing scaffold only. Phase 7 must replace these routes with proper Vinext App Router pages using `@id/ui` primitives such as `Page`, `Stack`, `Panel`, and `Button`. The replacement pages must live under `workers/ui/src/app/admin/login/` and `workers/ui/src/app/admin/consent/` so the `ui-route-composition` lint rule covers them.
 
@@ -294,7 +294,7 @@ All admin pages follow the Lumina UI system from `/home/quanghuy1242/pjs/books/d
 
 ### 6.3 Data Flow
 
-The admin UI calls `core-id`'s admin API through the `CORE_ID` service binding. No D1 access. No Better Auth instance. Pure presentation.
+The admin UI calls same-origin `core-id` public API routes directly from browser pages unless a future UI-owned `/admin/api` BFF endpoint needs server-side shaping. No D1 access. No Better Auth instance. Pure presentation.
 
 ## 7. Deferred OAuth Browser Pages
 

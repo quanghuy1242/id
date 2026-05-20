@@ -67,7 +67,9 @@ When docs and code disagree, fix code or stop and ask if the docs are ambiguous.
 `workers/ui` contains admin presentation:
 
 - Vinext/App Router route files
-- service binding calls through explicit UI-side helpers
+- public App Router routes only under `/admin/**`
+- direct browser calls to same-origin core `/api/auth/*` endpoints for hosted auth pages
+- `/admin/api` reserved for future UI-owned BFF endpoints, not for catch-all core proxying
 - no Better Auth, Drizzle, Jose, D1/KV binding types, or imports from `workers/core`
 
 `packages/lib` contains framework-free shared contracts:
@@ -168,7 +170,7 @@ Better Auth is a runtime integration boundary:
 
 ## Worker And Package Boundary Rules
 
-- `worker-isolation`: core and UI workers never import each other. Use service bindings at runtime.
+- `worker-isolation`: core and UI workers never import each other. Browser calls use same-origin route ownership at runtime.
 - `core-no-ui-deps`: core never imports React, React DOM, Vinext, Vite UI plugins, React Aria, Lucide React, or `@id/ui`.
 - `ui-no-auth-deps`: UI never imports Better Auth, Drizzle, Jose, D1/KV types, or core source.
 - `packages-lib-isolation`: `packages/lib` remains framework-free and only imports relative files or itself.

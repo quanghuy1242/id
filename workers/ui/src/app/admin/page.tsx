@@ -1,10 +1,10 @@
-import { Page, PageBody, PageHeader, Panel, Stack, Heading } from "@id/ui";
+import { Page, PageBody, PageHeader, Panel, Stack, Text } from "@id/ui";
 
 export default function AdminPage() {
   return (
     <Page layout="dashboard">
       <PageHeader>
-        <Heading level="h1">id admin</Heading>
+        <Text variant="h1">id admin</Text>
       </PageHeader>
       <PageBody>
         <Stack>

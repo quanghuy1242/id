@@ -135,7 +135,7 @@ Observed working or directly tested areas:
 | Resource-server payload builders and validation are tested | `workers/core/tests/auth/resource-server-operations.test.ts`, `workers/core/tests/auth/resource-server-validation.test.ts` |
 | KV resource-audience cache hit/miss/invalidate | `workers/core/tests/auth/audiences.test.ts` |
 | Downstream JWT verifier helper | `packages/lib/src/resource-token-verifier.ts`, `workers/core/tests/auth/resource-token-verifier.test.ts` |
-| Two-worker service binding smoke | `workers/ui/tests/service-binding.test.ts` |
+| Two-worker route ownership | `architecture/route-path-contract`, `scripts/remote-smoke.mjs` |
 | Architecture gates | `.oxlintrc.json`, `scripts/oxlint-js-plugins/architecture.js`, `workers/core/tests/oxlint-rules.test.ts` |
 
 ### 3.2 Email Current State

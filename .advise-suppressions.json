@@ -38,36 +38,6 @@
     },
     {
       "tool": "aislop",
-      "file": "workers/ui/src/app/admin/api/[...path]/route.ts",
-      "rule": "ai-slop/thin-wrapper",
-      "reason": "API route functions are proxy entry points that delegate directly to core-id via service bindings."
-    },
-    {
-      "tool": "aislop",
-      "file": "workers/ui/src/app/admin/api/[...path]/route.ts",
-      "rule": "ai-slop/hallucinated-import",
-      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
-    },
-    {
-      "tool": "aislop",
-      "file": "workers/ui/src/app/api/auth/[...path]/route.ts",
-      "rule": "ai-slop/thin-wrapper",
-      "reason": "API route functions are proxy entry points that delegate directly to core-id via service bindings."
-    },
-    {
-      "tool": "aislop",
-      "file": "workers/ui/src/app/api/auth/[...path]/route.ts",
-      "rule": "ai-slop/hallucinated-import",
-      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
-    },
-    {
-      "tool": "aislop",
-      "file": "workers/ui/src/app/health/route.ts",
-      "rule": "ai-slop/hallucinated-import",
-      "reason": "cloudflare:workers is a built-in Cloudflare Worker environment module, not an npm dependency."
-    },
-    {
-      "tool": "aislop",
       "file": "workers/ui/vite.config.ts",
       "rule": "ai-slop/hallucinated-import",
       "reason": "vite is imported in configuration and resolved through transitive monorepo dependencies."

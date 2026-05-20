@@ -5,7 +5,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens, admin API
-- `ui-id` Worker — admin UI scaffold with service binding to `core-id` (full admin pages deferred)
+- `ui-id` Worker — admin UI scaffold under `/admin/*` with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
 
@@ -111,10 +111,9 @@ pnpm db:migrate:local
 ```bash
 pnpm dev:core                    # core-id Worker
 pnpm dev:ui                      # ui-id Worker (Vinext dev)
-pnpm dev:stack:ui                # both Workers with service binding (UI primary)
 ```
 
-`dev:stack:ui` runs `core-id` and `ui-id` together locally with a service binding so `/admin` can call `core-id` through `CORE_ID`.
+In production, route specificity sends `/admin/*` to `ui-id` and `/api/auth/*` plus metadata routes to `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
 
 ## First Admin And API-Only Operation
 
@@ -192,7 +191,7 @@ pnpm auth:api:logout
 
 `pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
-`pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`.
+`pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks stay under `/admin/*`, including `/admin/health`, because production only routes `/admin/*` to `ui-id`.
 
 ## Deployment
 

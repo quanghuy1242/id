@@ -27,8 +27,6 @@
 > - Better Auth JWT plugin docs, checked on 2026-05-19: <https://better-auth.com/docs/plugins/jwt>
 > - Better Auth Organization plugin docs, checked on 2026-05-19: <https://better-auth.com/docs/plugins/organization>
 > - Better Auth database docs, checked on 2026-05-19: <https://www.better-auth.com/docs/concepts/database>
-> - Cloudflare Workers service bindings docs, checked on 2026-05-19: <https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/>
-> - Cloudflare Workers multi-Worker local development docs, checked on 2026-05-19: <https://developers.cloudflare.com/workers/development-testing/multi-workers/>
 > - Cloudflare D1 Worker API docs, checked on 2026-05-19: <https://developers.cloudflare.com/d1/worker-api/d1-database/>
 > - Vinext repository docs, checked on 2026-05-19: <https://github.com/cloudflare/vinext>
 >
@@ -134,8 +132,6 @@ Verified external claims:
 - Better Auth JWT plugin exposes `/jwks` relative to the Better Auth base path by default, supports custom `jwksPath`, and supports key rotation via `rotationInterval` and `gracePeriod`. With the repo's default `/api/auth` base path, the public default is `/api/auth/jwks`. Source: [Better Auth JWT](https://better-auth.com/docs/plugins/jwt) and installed `better-auth@1.6.11` types.
 - Better Auth database docs show Cloudflare Workers/D1 examples using a D1 binding in runtime config and CLI/schema generation paths for Cloudflare projects. Source: [Better Auth database docs](https://www.better-auth.com/docs/concepts/database).
 - Package metadata and pinned package files checked on 2026-05-19: `better-auth@1.6.11`, `@better-auth/oauth-provider@1.6.11`, `vinext@0.0.50`, and `wrangler@4.93.0`.
-- Cloudflare service bindings allow one Worker to call another without a public URL, support both HTTP-style `fetch()` and RPC-style calls, and are configured on the caller Worker. Source: [Cloudflare service bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/).
-- Cloudflare documents running multiple Workers locally with multiple `-c` config flags; the first config is the primary HTTP Worker and the rest are accessible through service bindings. Source: [Cloudflare multi-Worker development](https://developers.cloudflare.com/workers/development-testing/multi-workers/).
 - D1 `batch()` executes statements as a transaction and aborts or rolls back the whole sequence on failure. Source: [Cloudflare D1 Worker API](https://developers.cloudflare.com/d1/worker-api/d1-database/).
 - Vinext currently documents Cloudflare Worker deployment for App Router and Pages Router, but it is still an experimental project. Source: [cloudflare/vinext](https://github.com/cloudflare/vinext).
 
@@ -162,8 +158,8 @@ The original hexagonal/clean architecture is good enough for `core-id`, but thre
 2. UI boundary:
    Admin route files must not draw UI directly. The route-file rules are strict and must become a mechanical gate, not just code review guidance.
 
-3. Service binding boundary:
-   Service binding traffic is internal transport, not trust. `core-id` admin routes must authorize every request even when called through `CORE_ID`.
+3. Route ownership boundary:
+   `ui-id` must only define public App Router routes under `/admin/*`. Core auth/API routes remain owned by `core-id`; UI pages call those endpoints directly through same-origin browser requests.
 
 ## 3. Root Layout
 
@@ -258,7 +254,7 @@ The tree below is the target shape at first-batch maturity. The current scaffold
 
 ## 4. Worker Topology
 
-Two Cloudflare Workers deploy independently and communicate at runtime through service bindings, not through source imports.
+Two Cloudflare Workers deploy independently on the same public hostname. Route specificity, not source imports or UI-side catch-all proxying, connects the browser to the correct Worker.
 
 ```text
 Internet
@@ -270,7 +266,6 @@ Internet
     ├──> https://id.quanghuy.dev/api/admin/*      ──> core-id worker
     │
     └──> https://id.quanghuy.dev/admin/*          ──> ui-id worker
-                                                       └── CORE_ID service binding ──> core-id
 ```
 
 Route specificity is part of the architecture. `/admin/*` is the UI Worker. Auth, OAuth, metadata, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
@@ -321,12 +316,13 @@ Responsibility:
 
 - serve the admin dashboard.
 - render admin pages for dashboard, organizations, OAuth clients, resource servers, users, consents, and settings.
-- call `core-id` admin APIs through service binding on server-side UI paths or through public admin endpoints from browser code, depending on the session flow.
+- call `core-id` through same-origin public core routes such as `/api/auth/*` when browser pages need Better Auth endpoints.
+- reserve `/admin/api/*` for future UI-owned BFF endpoints that need server-side shaping; it must not be a catch-all proxy for core auth/API routes.
 - never own auth state, token signing, D1 schema, or Better Auth initialization.
 
 Bindings:
 
-- `CORE_ID` — service binding to `core-id`.
+- no private Worker-to-Worker binding to `core-id` in first batch.
 - no D1.
 - no KV unless a later document adds UI-specific cache storage.
 - no Better Auth instance.
@@ -362,7 +358,7 @@ Workers are build-time isolated and runtime-communicating. The rule is absolute.
 
 ### 4.4 Local Multi-Worker Development
 
-Cloudflare supports service bindings in local development and supports multiple Worker configs in one `wrangler dev` command. Because only the first config is exposed as the primary HTTP Worker, the repo must include scripts for both common local modes.
+Cloudflare route specificity is the production integration boundary: `/admin/*` is served by `ui-id`, while `/api/auth/*`, metadata, and root health routes are served by `core-id`. Local development can run each Worker independently; full same-host routing is verified through deployment smoke tests.
 
 ```json
 {
@@ -377,8 +373,9 @@ Cloudflare supports service bindings in local development and supports multiple 
 
 Acceptance requirement:
 
-- `dev:stack:ui` proves `/admin` can call `core-id` through `CORE_ID`.
-- `dev:stack:core` proves core routes can run while the UI Worker is available as a secondary service.
+- `dev:ui` proves `/admin` pages render without core bindings.
+- `dev:core` proves auth and API routes run independently.
+- remote smoke proves same-host route ownership for core `/api/*` and UI `/admin/*`.
 
 ## 5. Shared Packages
 
@@ -1199,12 +1196,6 @@ packages:
   "name": "id-ui",
   "main": "src/main.ts",
   "compatibility_date": "2026-05-19",
-  "services": [
-    {
-      "binding": "CORE_ID",
-      "service": "id-core"
-    }
-  ],
   "assets": {
     "directory": "./dist/client"
   }
@@ -1261,6 +1252,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |
+| UI route ownership | UI App Router public routes stay under `/admin/**`; root `layout.tsx` and `globals.css` are the only root app exceptions | Oxlint `route-path-contract` |
 | UI route composition | no raw admin route UI | Oxlint `ui-route-composition` through `pnpm lint` |
 | Duplication | <3% mild duplication | `check:dup` |
 | Types | strict and no explicit `any` | TypeScript + oxlint |
@@ -1295,7 +1287,7 @@ Acceptance:
 - KV cache miss falls back to D1 (correct but slower);
 - schema generation command is finalized.
 
-### Spike C: Two Workers And Service Binding
+### Spike C: Two Workers And Route Ownership
 
 Purpose: prove Cloudflare topology.
 
@@ -1303,8 +1295,9 @@ Acceptance:
 
 - `core-id` starts independently;
 - `ui-id` starts independently;
-- `dev:stack:ui` renders `/admin` and calls `core-id`;
-- deployed service binding order is documented: deploy `id-core` before `id-ui`.
+- `/admin/*` is served by `ui-id`;
+- `/api/auth/*`, metadata, and `/health` are served by `core-id`;
+- UI App Router route ownership is enforced mechanically so future files cannot create public UI routes outside `/admin/**`.
 
 ### Spike D: UI Composition Gate
 
@@ -1361,7 +1354,7 @@ UI tests:
 
 - `/admin` render.
 - app shell render.
-- service binding API call path.
+- UI route ownership failing fixtures.
 - unauthorized admin state.
 - UI composition failing fixtures.
 
@@ -1386,7 +1379,7 @@ Required repository outcomes:
 - [ ] `packages/lib` exists and remains framework-free.
 - [ ] `workers/core` has full clean architecture layers plus `src/auth`.
 - [ ] `workers/ui` has Vinext admin pages and no auth/persistence/signing imports.
-- [ ] two-worker local dev works through service bindings.
+- [ ] two-worker route ownership is documented and smoke-tested.
 - [ ] deployed route ownership is documented and tested.
 
 Required enforcement outcomes:
@@ -1415,12 +1408,12 @@ Required auth/platform outcomes:
 - [ ] OAuth Provider routes are tested.
 - [ ] JWKS default/custom path decision is tested.
 - [ ] resource-bound JWT access token is verified by JWKS.
-- [ ] service binding communication is tested locally.
+- [ ] same-host route ownership is tested remotely.
 
 ## 17. Final Model
 
 `id` is a strict two-worker identity-provider monorepo.
 
-`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation and calls `core-id`; it never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
+`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
 
-The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route composition enforcement, and service-binding authorization invariant.
+The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route ownership/composition enforcement, and strict worker authorization invariant.

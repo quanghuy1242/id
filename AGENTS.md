@@ -19,7 +19,7 @@ The oxlint plugin at `scripts/oxlint-js-plugins/architecture.js` enforces clean-
 Core rules:
 
 - `workers/core` owns Better Auth, OAuth, D1/KV, JWKS, admin APIs, and domain/application rules.
-- `workers/ui` owns admin presentation and calls core through the `CORE_ID` service binding; it must not import Better Auth, Drizzle, Jose, D1/KV types, or core source.
+- `workers/ui` owns admin presentation under `/admin/*`; hosted UI pages call same-origin core `/api/auth/*` endpoints directly. It must not import Better Auth, Drizzle, Jose, D1/KV types, or core source.
 - Workers never import each other. Shared contracts live in `packages/`.
 - `packages/lib` is framework-free.
 - Better Auth imports belong in `workers/core/src/auth/**`, approved core mounting files, or tests.
@@ -62,7 +62,7 @@ When new findings appear, handle them autonomously:
 
 - Worker tests live under `workers/*/tests`.
 - `@/*` maps to each worker's own `src/*` in tsconfig and Vitest aliases.
-- Do not use external services in tests. Mock Better Auth, D1/KV, service bindings, and JWKS boundaries where the phase does not explicitly require local Wrangler integration.
+- Do not use external services in tests. Mock Better Auth, D1/KV, route ownership, and JWKS boundaries where the phase does not explicitly require local Wrangler integration.
 
 ## Package Manager
 

@@ -1293,6 +1293,10 @@ var noDirectDbAccessRule = {
 var CORE_FORBIDDEN_PATH_PREFIX = "/admin/";
 var CORE_ALLOWED_PATH_PREFIX = "/api/admin/";
 var UI_FORBIDDEN_PATH_PREFIX = "/api/";
+var UI_APP_ROOT = "/workers/ui/src/app/";
+var UI_ALLOWED_APP_ROUTE_PREFIX = "admin/";
+var UI_ROOT_ALLOWED_FILES = new Set(["layout.tsx", "globals.css"]);
+var UI_ROUTE_OWNERSHIP_FILES = new Set(["page.tsx", "route.ts", "layout.tsx"]);
 
 function extractRoutePathFromAppCall(node) {
   if (node.type !== "CallExpression") return null;
@@ -1315,6 +1319,23 @@ var routePathContractRule = {
     if (!isCore && !isUi) return {};
 
     return {
+      Program: function (node) {
+        if (!isUi) return;
+        var appIndex = filename.indexOf(UI_APP_ROOT);
+        if (appIndex === -1) return;
+
+        var appPath = filename.slice(appIndex + UI_APP_ROOT.length);
+        if (UI_ROOT_ALLOWED_FILES.has(appPath)) return;
+        if (appPath.startsWith(UI_ALLOWED_APP_ROUTE_PREFIX)) return;
+
+        var basename = appPath.split("/").pop();
+        if (!UI_ROUTE_OWNERSHIP_FILES.has(basename)) return;
+
+        context.report({
+          node: node,
+          message: "ui-id may only define public App Router routes under workers/ui/src/app/admin/**. Core owns /api/* and root health/auth routes; keep UI-owned routes under /admin/*.",
+        });
+      },
       CallExpression: function (node) {
         var info = extractRoutePathFromAppCall(node);
         if (!info) return;
@@ -1327,7 +1348,7 @@ var routePathContractRule = {
 
         if (isUi) {
           if (info.path.startsWith(UI_FORBIDDEN_PATH_PREFIX)) {
-            context.report({ node: info.node, message: "ui-id must not serve /api/* paths. Auth, OAuth, and admin API endpoints belong to core-id. Use CORE_ID service binding proxy for API calls." });
+            context.report({ node: info.node, message: "ui-id must not serve /api/* paths. Auth, OAuth, and admin API endpoints belong to core-id. UI-owned BFF endpoints must live under /admin/api/*." });
           }
         }
       },

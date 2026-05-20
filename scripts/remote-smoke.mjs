@@ -20,6 +20,6 @@ await expectOk(new URL("/health", coreUrl));
 await expectOk(new URL("/api/auth/jwks", coreUrl));
 await expectOk(new URL("/.well-known/oauth-authorization-server/api/auth", coreUrl));
 await expectOk(new URL("/admin", uiUrl));
+await expectOk(new URL("/admin/health", uiUrl));
 
 console.log("remote smoke checks passed");
-

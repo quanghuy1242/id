@@ -134,7 +134,7 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 
 ## Phase 3 — Two Workers Proved
 
-**This phase is non-negotiable.** The two-worker topology with service binding must be proven locally. If `dev:stack:ui` cannot route `/admin` traffic through `CORE_ID`, or React leaks into the core bundle — stop and ask. Do not proceed with a single-worker fallback or ignore bundle contamination.
+**This phase is non-negotiable.** The two-worker topology must be proven without falling back to a single Worker. If `/admin/*` cannot stay owned by `ui-id`, `/api/auth/*` cannot stay owned by `core-id`, or React leaks into the core bundle — stop and ask.
 
 **Phase 1 enforcement is active.** UI composition is already part of `pnpm lint` through `architecture/ui-route-composition`; there is no separate `pnpm check:ui` script in the current package.
 
@@ -142,13 +142,13 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 
 - [x] Start/bundle proof for `core-id`: `pnpm wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core` succeeds.
 - [x] Verify core routes are mounted under `/api/auth/*`; root well-known metadata aliases are mounted for OAuth discovery.
-- [x] Keep `dev:ui` and `dev:stack:ui` scripts; no separate `check:ui`.
-- [x] Prove `/admin` on `ui-id` calls `core-id` through the `CORE_ID` service binding in `workers/ui/tests/service-binding.test.ts`.
+- [x] Keep `dev:ui`; no separate `check:ui`.
+- [x] Prove UI App Router ownership rejects public routes outside `/admin/**`.
 - [x] Verify React does NOT appear in core-id dry-run output (`rg "react|react-dom" dist/core` returns no matches).
 - [x] Add `nodejs_compat` to `core-id` after Wrangler surfaced Better Auth's `node:async_hooks` runtime dependency.
 - [x] Document deployment order: `id-core` before `id-ui`.
 
-**Gate:** service binding call succeeds in local dev.
+**Gate:** route ownership is enforced by lint and remote smoke checks core `/api/*` plus UI `/admin/*`.
 
 ### 3.2 UI Composition Gate (000 Spike E)
 
@@ -230,8 +230,8 @@ All must be satisfied before Phase 5 is complete.
 Full admin pages are deferred per `001_first-batch-plan.md` Section 10. First batch delivers:
 
 - [x] Vinext App Router scaffold in `workers/ui/` with `packages/ui` component stubs
-- [x] Health-check page at `/admin` that confirms the worker runs and can reach `core-id` via `CORE_ID` service binding
-- [x] Service binding proxy for admin API calls under `/admin/api/*`
+- [x] Health-check route at `/admin/health` that confirms the UI worker runs under the routable `/admin/*` surface
+- [x] Placeholder `/admin/api` endpoint reserved for future UI-owned BFF behavior; current hosted auth pages call core `/api/auth/*` directly
 - [x] All admin pages pass `pnpm lint` with `architecture/ui-route-composition` active
 
 Admin CRUD operations on `core-id` are tested via integration tests and documented for API-level operation until the full UI is built.
