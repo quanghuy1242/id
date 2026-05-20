@@ -1,7 +1,8 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, jwt, organization } from "better-auth/plugins";
-import { hasAdminAccess, hasOrganizationAccess } from "./admin/access";
+
+import { hasAdminAccess, hasOrganizationAccess, type AdminDbAdapter } from "./admin/access";
 import { invalidateResourceAudiences } from "./adapters/audiences";
 import { authPluginConfig } from "./config";
 import { idResourceServer } from "./plugins/resource-server";
@@ -109,9 +110,9 @@ export function getAuthOptions(env: AuthOptionsEnv, validAudiences: readonly str
       }),
       idResourceServer({
         invalidateAudienceCache: () => invalidateResourceAudiences(env.KV),
-        authorize: async ({ organizationId, session, adapter }) =>
-          hasAdminAccess(adapter, session.user.id, session.user.platformRole) ||
-          hasOrganizationAccess(adapter, session.user.id, organizationId),
+        authorize: async (organizationId, userId, platformRole, adapter) =>
+          hasAdminAccess(adapter as AdminDbAdapter, userId, platformRole) ||
+          hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId),
       }),
     ],
   } satisfies BetterAuthOptions;

@@ -1,5 +1,6 @@
 import type { ResourceAudienceRow } from "../../auth/adapters/audiences";
 import type { CoreEnv } from "../../config/env";
+import { RESOURCE_SERVER_MODEL } from "../../shared/constants";
 
 /**
  * Loads enabled resource server audience rows from D1.
@@ -16,7 +17,7 @@ import type { CoreEnv } from "../../config/env";
  */
 export async function loadEnabledResourceAudienceRows(db: CoreEnv["DB"]): Promise<readonly ResourceAudienceRow[]> {
   const result = await db
-    .prepare('select "audience", "enabled" from "resourceServer" where "enabled" = ? order by "audience" asc')
+    .prepare(`select "audience", "enabled" from "${RESOURCE_SERVER_MODEL}" where "enabled" = ? order by "audience" asc`)
     .bind(1)
     .all<ResourceAudienceRow>();
 
