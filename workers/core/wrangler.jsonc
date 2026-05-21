@@ -7,20 +7,21 @@
     {
       "binding": "DB",
       "database_name": "id",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "836dec3c-b1fe-49e5-aa9c-d2d526fd7991",
       "migrations_dir": "../../migrations"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "00000000000000000000000000000000"
+      "id": "975380b09c864d7a8b86cfd27432f697"
     }
   ],
   "vars": {
     "BETTER_AUTH_URL": "https://id.quanghuy.dev",
     "BETTER_AUTH_COOKIE_DOMAIN": ".quanghuy.dev",
-    "EMAIL_FROM_NAME": "id"
+    "EMAIL_FROM": "noreply@quanghuy.dev",
+    "EMAIL_FROM_NAME": "Quang Huy"
   },
   "routes": [
     // Claims the entire subdomain — Cloudflare auto-creates DNS. No manual record needed.

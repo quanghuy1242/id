@@ -196,24 +196,37 @@ There is intentionally no separate `check:ui`; UI composition is enforced by `pn
 
 ## Deployment
 
-CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check`; manual dispatch with `deploy=true` runs:
+CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check` + dry-run deployments. Manual dispatch via **Actions → CI & Deploy → Run workflow** with `deploy=true` runs the full deploy pipeline:
 
-1. `pnpm check` — lint, dup gate, UI composition, typecheck, tests
-2. `pnpm db:migrate:remote`
-3. `pnpm deploy:core`
-4. `pnpm deploy:ui`
-5. `pnpm smoke:remote`
+1. `pnpm check` — lint, dup gate, typecheck, tests
+2. Migration dry-run (local SQLite)
+3. Core + UI dry-run deploys
+4. Set secrets from GitHub → Cloudflare via `wrangler secret put`
+5. `pnpm db:migrate:remote`
+6. `pnpm deploy:core`
+7. `pnpm deploy:ui`
+8. `pnpm smoke:remote`
 
-Required GitHub secrets:
+All secrets are read from GitHub Secrets at deploy time. No manual `wrangler secret put` needed.
+
+**Required GitHub secrets** (set at repo → Settings → Secrets and variables → Actions):
 
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with Workers and D1:Edit permissions
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
-- `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret
+- `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret (min 32 chars)
 - `SENDER_API_TOKEN` — Sender transactional API token
+
+Non-secret vars committed in `workers/core/wrangler.jsonc`:
+
 - `EMAIL_FROM` — verified Sender `from.email`
-- `ID_BOOTSTRAP_TOKEN` — temporary one-time bootstrap token; remove or rotate after first admin creation
+- `EMAIL_FROM_NAME` — sender display name
+- `BETTER_AUTH_COOKIE_DOMAIN` — shared cookie domain (e.g. `.quanghuy.dev`)
 
-Required GitHub variables:
+One-time bootstrap (run manually once, then delete the secret):
 
-- `ID_CORE_URL` — deployed core Worker base URL
-- `ID_UI_URL` — deployed UI Worker base URL
+- `ID_BOOTSTRAP_TOKEN` — temporary token for first admin creation
+
+**Required GitHub variables** (repo → Settings → Secrets and variables → Actions → Variables):
+
+- `ID_CORE_URL` — deployed core Worker base URL (e.g. `https://id.quanghuy.dev`)
+- `ID_UI_URL` — deployed UI Worker base URL (e.g. `https://id.quanghuy.dev`)

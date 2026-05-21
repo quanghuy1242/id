@@ -48,7 +48,7 @@ jobs:
       - name: Run CI check
         run: pnpm check
 
-  migrate-dry-run:
+  migrate-remote:
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -79,11 +79,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Apply D1 migrations locally (dry-run proof)
-        run: pnpm db:migrate:local
+      - name: Apply D1 migrations remotely
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm db:migrate:remote
 
-  deploy-core-dry-run:
-    needs: migrate-dry-run
+  deploy-core:
+    needs: migrate-remote
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -116,11 +119,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Dry-run core-id worker deploy
-        run: pnpm deploy:core:dry-run
+      - name: Validate required core deploy secrets
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          SENDER_API_TOKEN: ${{ secrets.SENDER_API_TOKEN }}
+          ID_BOOTSTRAP_TOKEN: ${{ secrets.ID_BOOTSTRAP_TOKEN }}
+        run: |
+          for var in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN BETTER_AUTH_SECRET SENDER_API_TOKEN ID_BOOTSTRAP_TOKEN; do
+            if [ -z "${!var}" ]; then
+              echo "::error::$var is missing"
+              exit 1
+            fi
+          done
 
-  deploy-ui-dry-run:
-    needs: deploy-core-dry-run
+      - name: Deploy core-id worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          SENDER_API_TOKEN: ${{ secrets.SENDER_API_TOKEN }}
+          ID_BOOTSTRAP_TOKEN: ${{ secrets.ID_BOOTSTRAP_TOKEN }}
+        run: pnpm deploy:core
+
+  deploy-ui:
+    needs: deploy-core
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -153,5 +178,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Dry-run ui-id worker deploy
-        run: pnpm deploy:ui:dry-run
+      - name: Validate required ui deploy secrets
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          for var in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
+            if [ -z "${!var}" ]; then
+              echo "::error::$var is missing"
+              exit 1
+            fi
+          done
+
+      - name: Deploy ui-id worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm deploy:ui
