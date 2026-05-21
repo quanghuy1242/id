@@ -18,6 +18,7 @@ The oxlint plugin at `scripts/oxlint-js-plugins/architecture.js` enforces clean-
 
 Core rules:
 
+- **OAuth2/OIDC standard compliance**: This repo implements OAuth2.1/OIDC as specified by the standards. Suggesting custom workarounds (manual token revocation outside the protocol, non-standard logout propagation, patching plugin internals) is forbidden. If a user request goes against the standard, explain why it is not standard practice and describe the correct standards-based flow instead. The word "ugly" in feedback means the suggestion violated this rule.
 - `workers/core` owns Better Auth, OAuth, D1/KV, JWKS, admin APIs, and domain/application rules.
 - `workers/ui` owns admin presentation under `/admin/*`; hosted UI pages call same-origin core `/api/auth/*` endpoints directly. It must not import Better Auth, Drizzle, Jose, D1/KV types, or core source.
 - Workers never import each other. Shared contracts live in `packages/`.

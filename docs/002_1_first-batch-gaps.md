@@ -218,7 +218,7 @@ Observed drift:
 
 - `docs/002_implementation-sequence.md` still says the dashboard endpoint exists in Phase 5.3, then later says it was removed in Phase 5.7.
 - `docs/004_admin-api-reference.md` documents `GET /api/admin/dashboard`, but no route is registered in `workers/core/src/composition/create-app.ts`.
-- `docs/006_resource-server-jwt-guide.md` says the helper source is `workers/core/src/auth/resource-token-verifier.ts`; the actual helper is `packages/lib/src/resource-token-verifier.ts`.
+- `docs/006_resource-server-jwt-guide.md` previously said the helper source was `workers/core/src/auth/resource-token-verifier.ts`; this was corrected on 2026-05-21 to `packages/lib/src/resource-token-verifier.ts`.
 - `README.md` says `docs/007_cloudflare-deployment-runbooks.md` includes Email Service setup, but the runbook only mentions "any email provider secrets".
 - `.github/workflows/ci.yml` runs checks, local D1 migration proof, and deploy dry-runs. It does not implement the manual deploy job described in `README.md`.
 - `scripts/remote-smoke.mjs` verifies health, JWKS, metadata, and `/admin`, but it does not verify sign-up email, admin bootstrap, OAuth browser flow, token exchange, or resource-server runtime audience loading.

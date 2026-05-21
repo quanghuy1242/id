@@ -15,7 +15,7 @@ Every downstream API must validate:
 
 ## Helper
 
-The source helper is `workers/core/src/auth/resource-token-verifier.ts`. It accepts issuer, JWKS URL, expected audience, required scopes, optional organization id, and the bearer token. It returns the verified subject, audience, scopes, and organization id.
+The source helper is `packages/lib/src/resource-token-verifier.ts`. It accepts issuer, JWKS URL, expected audience, required scopes, optional organization id, and the bearer token. It returns the verified subject, audience, scopes, and organization id.
 
 Example:
 
@@ -42,4 +42,3 @@ Never log bearer tokens, authorization codes, refresh tokens, client secrets, or
 ## Test Fixture
 
 `workers/core/tests/auth/resource-token-verifier.test.ts` signs a fixture JWT, serves a fixture JWKS, verifies audience/scope/org claims, and proves the JSON failure response shape.
-
