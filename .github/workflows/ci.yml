@@ -140,7 +140,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config workers/core/wrangler.jsonc
+          workingDirectory: workers/core
+          command: deploy --config wrangler.jsonc
           secrets: |
             BETTER_AUTH_SECRET
             SENDER_API_TOKEN
