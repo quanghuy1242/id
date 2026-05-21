@@ -1423,11 +1423,11 @@ var authPluginFolderShapeRule = {
 };
 
 // ─── Rule 29: route-path-contract ─────────────────────────────────────────
-var CORE_FORBIDDEN_PATH_PREFIX = "/admin/";
+var CORE_FORBIDDEN_PATH_PREFIXES = ["/admin/", "/login", "/consent"];
 var CORE_ALLOWED_PATH_PREFIX = "/api/admin/";
 var UI_FORBIDDEN_PATH_PREFIX = "/api/";
 var UI_APP_ROOT = "/workers/ui/src/app/";
-var UI_ALLOWED_APP_ROUTE_PREFIX = "admin/";
+var UI_ALLOWED_APP_ROUTE_PREFIXES = ["admin/", "login/", "consent/"];
 var UI_ROOT_ALLOWED_FILES = new Set(["layout.tsx", "globals.css"]);
 var UI_ROUTE_OWNERSHIP_FILES = new Set(["page.tsx", "route.ts", "layout.tsx"]);
 
@@ -1459,14 +1459,14 @@ var routePathContractRule = {
 
         var appPath = filename.slice(appIndex + UI_APP_ROOT.length);
         if (UI_ROOT_ALLOWED_FILES.has(appPath)) return;
-        if (appPath.startsWith(UI_ALLOWED_APP_ROUTE_PREFIX)) return;
+        if (UI_ALLOWED_APP_ROUTE_PREFIXES.some(function (p) { return appPath.startsWith(p); })) return;
 
         var basename = appPath.split("/").pop();
         if (!UI_ROUTE_OWNERSHIP_FILES.has(basename)) return;
 
         context.report({
           node: node,
-          message: "ui-id may only define public App Router routes under workers/ui/src/app/admin/**. Core owns /api/* and root health/auth routes; keep UI-owned routes under /admin/*.",
+          message: "ui-id may only define public App Router routes under workers/ui/src/app/{admin,login,consent}/**. Core owns /api/* and root health/auth routes; keep UI-owned routes under /login, /consent, or /admin/*.",
         });
       },
       CallExpression: function (node) {
@@ -1474,8 +1474,9 @@ var routePathContractRule = {
         if (!info) return;
 
         if (isCore) {
-          if (info.path.startsWith(CORE_FORBIDDEN_PATH_PREFIX) && !info.path.startsWith(CORE_ALLOWED_PATH_PREFIX)) {
-            context.report({ node: info.node, message: "core-id must not serve /admin/* paths. Admin UI assets belong to ui-id. Better Auth plugin admin endpoints mount under /api/auth/admin/*." });
+          var forbidden = CORE_FORBIDDEN_PATH_PREFIXES.some(function (p) { return info.path.startsWith(p); });
+          if (forbidden && !info.path.startsWith(CORE_ALLOWED_PATH_PREFIX)) {
+            context.report({ node: info.node, message: "core-id must not serve /login, /consent, or /admin/* paths. Auth pages belong to ui-id. Better Auth plugin admin endpoints mount under /api/auth/admin/*." });
           }
         }
 

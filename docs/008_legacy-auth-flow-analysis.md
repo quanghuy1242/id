@@ -331,7 +331,7 @@ The correct rule is: **browser JavaScript gets no raw OAuth tokens and applicati
 | `grant_types` | `"authorization_code"`, `"refresh_token"` | Code exchange for login. Refresh token for silent token rotation without re-authentication. |
 | `scope` | includes `offline_access` | Required by Better Auth to issue a `refresh_token`. Without this, the user must re-authenticate every ~3 hours. |
 | `enable_end_session` | `true` | Enables RP-Initiated Logout and causes the ID token to carry `sid`, which Better Auth requires during `/oauth2/end-session`. |
-| `skip_consent` | `true` for first-party `content-ui` | Avoids a consent prompt for the trusted first-party app. Keep `/admin/consent` as fallback for non-trusted clients. |
+| `skip_consent` | `true` for first-party `content-ui` | Avoids a consent prompt for the trusted first-party app. Keep `/consent` as fallback for non-trusted clients. |
 
 The `redirect_uris` and `post_logout_redirect_uris` values must exactly match the routes implemented by `content-ui`. The paths below use `/auth/callback` and `/auth/logout/callback` as the target contract.
 

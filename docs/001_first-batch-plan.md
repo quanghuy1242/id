@@ -810,7 +810,9 @@ core-id worker (primary — auth, OAuth, admin API)
 └── /reset-password                     reset page
 
 ui-id worker (admin dashboard scaffold)
-├── /admin/*                            hosted auth/admin UI pages
+├── /login                              OAuth login page
+├── /consent                            OAuth consent page
+├── /admin/*                            admin UI pages
 ├── /admin/health                       UI worker health
 ├── /admin/api                          placeholder for future UI-owned BFF endpoints
 ├── /assets/*                           client-side JS/CSS bundles

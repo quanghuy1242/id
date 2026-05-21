@@ -208,7 +208,7 @@ All must be satisfied before Phase 5 is complete.
 
 - [x] `oauthProvider` plugin with config from Phase 2
 - [x] Authorization code + PKCE S256 is configured through installed OAuth Provider route/schema; full browser redirect UX pages are scaffold targets.
-- [x] Consent page route configured at `/admin/consent`; OAuth Provider consent endpoints are documented.
+- [x] Consent page route configured at `/consent`; OAuth Provider consent endpoints are documented.
 - [x] OAuth client CRUD through Better Auth server/session APIs (admin-API first, UI-ready, not config)
 - [x] `client_credentials` grant for M2M
 - [x] Refresh token support configured through grant types

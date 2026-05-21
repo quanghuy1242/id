@@ -168,8 +168,8 @@ Configured OAuth UI paths:
 
 | Flow | Config | Current UI state |
 |---|---|---|
-| Login | `loginPage: "/admin/login"` | Missing |
-| Consent | `consentPage: "/admin/consent"` | Missing |
+| Login | `loginPage: "/login"` | Done |
+| Consent | `consentPage: "/consent"` | Done |
 | Prompt create | `signup.page: "/admin/sign-up"` | Missing and should be removed from first-release config |
 | Select account | `selectAccount.page: "/admin/select-account"` | Missing and should be removed from first-release config |
 | Post-login org selection | `postLogin.page: "/admin/select-organization"` | Missing and should be removed from first-release config |
@@ -256,8 +256,8 @@ Better Auth behavior verified from docs and installed package:
 Required target:
 
 - Build only the two minimal hosted auth pages needed for first release, not a full admin UI:
-  - `/admin/login` or a renamed `/login` page that posts to `/api/auth/sign-in/email` with `oauth_query`;
-  - `/admin/consent` or a renamed `/consent` page that calls `/api/auth/oauth2/consent` as a hardcoded fallback for any future non-trusted client.
+  - `/login` page that posts to `/api/auth/sign-in/email` with `oauth_query`;
+  - `/consent` page that calls `/api/auth/oauth2/consent` as a hardcoded fallback for any future non-trusted client.
 - For first-party `content-ui`, prefer setting `skip_consent: true` on the OAuth client through Better Auth's restricted admin create/update path, not through hard-coded source lists.
 - For any non-trusted client, consent page is required.
 - Remove `signup`, `selectAccount`, and `postLogin` OAuth page configuration from `workers/core/src/auth/get-auth.ts` until those pages are actually built. Their product intent belongs in `docs/003_future-implementation.md`.
@@ -775,7 +775,7 @@ Assertions:
 - Minimal hosted login page preserves and submits the signed `oauth_query`.
 - Minimal hosted consent page calls `/api/auth/oauth2/consent` and follows its returned `redirect_uri`.
 - `prompt=create`, `prompt=select_account`, and post-login org selection are not configured in first release unless their pages exist.
-- First-party trusted client does not hit missing `/admin/consent`.
+- First-party trusted client does not hit missing `/consent`.
 
 ### T9. Cookie And Preview Boundary
 
@@ -1061,8 +1061,8 @@ Acceptance criteria:
 
 Scope:
 
-- `workers/ui/src/app/admin/login/**` or a renamed hosted auth route
-- `workers/ui/src/app/admin/consent/**` or a renamed hosted auth route
+- `workers/ui/src/app/login/**`
+- `workers/ui/src/app/consent/**`
 - `workers/ui/src/main.ts`
 - `workers/core/src/auth/get-auth.ts`
 - `workers/core/tests/auth/oauth-auth-code.test.ts`
@@ -1071,7 +1071,7 @@ Scope:
 
 Tasks:
 
-- [ ] Decide route names. Current config uses `/admin/login` and `/admin/consent`; keep them or rename both config and docs together.
+- [x] Route names resolved. Login and consent pages are at `/login` and `/consent` respectively.
 - [ ] Build a minimal login page that preserves the signed OAuth query and posts it as `oauth_query` to `/api/auth/sign-in/email`.
 - [ ] Build a minimal hardcoded consent fallback page that displays client/scopes and calls `/api/auth/oauth2/consent`.
 - [ ] Remove `signup`, `selectAccount`, and `postLogin` from `oauthProvider(...)` options until those pages exist.

@@ -83,8 +83,8 @@ export function getAuthOptions(
         },
       }),
       oauthProvider({
-        loginPage: "/admin/login",
-        consentPage: "/admin/consent",
+        loginPage: "/login",
+        consentPage: "/consent",
         ...oauthTokenLifetimeConfig,
         scopes: [...authPluginConfig.oauthScopes],
         grantTypes: [...authPluginConfig.oauthGrantTypes],

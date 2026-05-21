@@ -33,7 +33,7 @@ resource=https://api.example.com
 state=<csrf-state>
 ```
 
-4. The user is redirected to `/admin/login`, signs in, completes `/admin/consent` unless the client is trusted, and returns to the redirect URI with `code` and `state`.
+4. The user is redirected to `/login`, signs in, completes `/consent` unless the client is trusted, and returns to the redirect URI with `code` and `state`.
 5. Exchange the code at `/api/auth/oauth2/token` using `grant_type=authorization_code`, the `code_verifier`, the same `redirect_uri`, the requested `resource`, and confidential-client credentials when applicable.
 
 When `resource` is present and matches an enabled resource server audience, the access token is JWKS-verifiable. Without `resource`, callers must treat the token as opaque and validate through the authorization server.

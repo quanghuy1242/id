@@ -140,7 +140,7 @@ async function authorizeAndSignIn(auth: ReturnType<typeof betterAuth>, clientId:
   const loginRedirect = await auth.handler(new Request(authorize));
   expect(loginRedirect.status).toBe(302);
   const loginUrl = new URL(loginRedirect.headers.get("location") ?? "", "https://id.example.test");
-  expect(loginUrl.pathname).toBe("/admin/login");
+  expect(loginUrl.pathname).toBe("/login");
 
   const signIn = await auth.handler(
     new Request("https://id.example.test/api/auth/sign-in/email", {

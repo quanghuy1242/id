@@ -264,8 +264,10 @@ Internet
     ├──> https://id.quanghuy.dev/oauth2/*         ──> core-id worker
     ├──> https://id.quanghuy.dev/.well-known/*    ──> core-id worker
     ├──> https://id.quanghuy.dev/api/admin/*      ──> core-id worker
-    ├──> https://id.quanghuy.dev/admin/*          ──> ui-id worker
-    └──> https://id.quanghuy.dev/assets/*         ──> ui-id worker (client-side JS/CSS bundles)
+    ├──> https://id.quanghuy.dev/login              ──> ui-id worker (OAuth login page)
+    ├──> https://id.quanghuy.dev/consent            ──> ui-id worker (OAuth consent page)
+    ├──> https://id.quanghuy.dev/admin/*            ──> ui-id worker
+    └──> https://id.quanghuy.dev/assets/*           ──> ui-id worker (client-side JS/CSS bundles)
 
 Route specificity is part of the architecture. `/admin/*` and `/assets/*` are the UI Worker. Auth, OAuth, metadata, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
 
