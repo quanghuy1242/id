@@ -112,9 +112,10 @@ The helper is intentionally curl-like. It accepts method, path, and optional inl
 1. Stop new deployments.
 2. Rotate `BETTER_AUTH_SECRET` only if auth state is also compromised.
 3. Reduce JWKS grace period in config only with an explicit incident patch.
-4. Deploy `core-id`.
-5. Ask resource servers to refresh JWKS cache.
-6. Run a sign/verify smoke with `/api/auth/jwks`.
+4. If emergency key visibility matters, temporarily reduce `JWKS_CACHE_MAX_AGE_SECONDS` before deploy; `/api/auth/jwks` is cached by the Worker Cache API per Cloudflare colo.
+5. Deploy `core-id`.
+6. Ask resource servers to refresh JWKS cache.
+7. Run a sign/verify smoke with `/api/auth/jwks`.
 
 ## D1 Migration Failure
 

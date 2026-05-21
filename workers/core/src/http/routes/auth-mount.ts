@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { CoreEnv } from "../../config/env";
 import { authPathNeedsResourceAudiences, createAuthForRequest } from "../../auth/get-auth";
 import type { AuthRuntimeOptions } from "../../auth/types";
+import { authPathIsJwks, withJwksCache } from "../../auth/adapters/jwks-cache";
 
 export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/api/auth/*", async (c) => {
@@ -17,9 +18,17 @@ export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
       // Hono unit tests do not always provide a Worker ExecutionContext.
     }
 
+    const requestUrl = new URL(c.req.url);
+    if (c.req.method === "GET" && authPathIsJwks(requestUrl.pathname)) {
+      return withJwksCache(c.req.raw, runtime, async () => {
+        const auth = await createAuthForRequest(c.env, runtime);
+        return auth.handler(c.req.raw);
+      });
+    }
+
     const auth = await createAuthForRequest(c.env, runtime, {
       // Only resource-validating OAuth routes should pay audience cache/D1 cost.
-      loadResourceAudiences: authPathNeedsResourceAudiences(new URL(c.req.url).pathname),
+      loadResourceAudiences: authPathNeedsResourceAudiences(requestUrl.pathname),
     });
     return auth.handler(c.req.raw);
   });

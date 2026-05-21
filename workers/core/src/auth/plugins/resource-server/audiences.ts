@@ -1,4 +1,5 @@
 import { authPluginConfig } from "../../config";
+import { createMemoryTtlCache } from "../../adapters/memory-cache";
 import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
 import type { BackgroundTaskRunner } from "../../types";
 import type { CoreEnv } from "../../../config/env";
@@ -25,12 +26,7 @@ type AudienceCacheOptions = {
   readonly backgroundTaskRunner?: BackgroundTaskRunner;
 };
 
-type MemoryAudienceCache = {
-  readonly audiences: readonly string[];
-  readonly expiresAt: number;
-};
-
-let memoryAudienceCache: MemoryAudienceCache | null = null;
+const memoryAudienceCache = createMemoryTtlCache<readonly string[]>(RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS);
 
 function parseCachedAudiences(value: string | null): readonly string[] | null {
   if (value === null) {
@@ -49,25 +45,6 @@ function parseCachedAudiences(value: string | null): readonly string[] | null {
   }
 
   return parsed;
-}
-
-function readMemoryAudienceCache(now: number): readonly string[] | null {
-  if (!memoryAudienceCache || memoryAudienceCache.expiresAt <= now) {
-    return null;
-  }
-
-  return memoryAudienceCache.audiences;
-}
-
-function writeMemoryAudienceCache(audiences: readonly string[], now: number): void {
-  memoryAudienceCache = {
-    audiences,
-    expiresAt: now + RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS,
-  };
-}
-
-function clearMemoryAudienceCache(): void {
-  memoryAudienceCache = null;
 }
 
 function enabledAudiences(rows: readonly ResourceAudienceRow[]): readonly string[] {
@@ -89,7 +66,7 @@ export async function loadResourceAudiencesFromCache(
   options: AudienceCacheOptions = {},
 ): Promise<AudienceLoadResult> {
   const now = Date.now();
-  const memoryCached = readMemoryAudienceCache(now);
+  const memoryCached = memoryAudienceCache.get(now);
   if (memoryCached) {
     return { audiences: memoryCached, source: "memory" };
   }
@@ -100,12 +77,12 @@ export async function loadResourceAudiencesFromCache(
     }),
   );
   if (cached) {
-    writeMemoryAudienceCache(cached, now);
+    memoryAudienceCache.set(cached, now);
     return { audiences: cached, source: "cache" };
   }
 
   const audiences = enabledAudiences(await loadRows());
-  writeMemoryAudienceCache(audiences, now);
+  memoryAudienceCache.set(audiences, now);
 
   const cacheWrite = kv.put(authPluginConfig.resourceAudienceCacheKey, JSON.stringify(audiences), {
     expirationTtl: authPluginConfig.resourceAudienceCacheTtlSeconds,
@@ -137,6 +114,6 @@ export function loadResourceServerAudiences(
 export async function invalidateResourceServerAudiences(env: Pick<ResourceAudienceEnv, "KV">): Promise<void> {
   // Keep admin mutations strict: local memory is cleared immediately, then the
   // cross-isolate KV cache is invalidated for later requests in other isolates.
-  clearMemoryAudienceCache();
+  memoryAudienceCache.clear();
   await env.KV.delete(authPluginConfig.resourceAudienceCacheKey);
 }

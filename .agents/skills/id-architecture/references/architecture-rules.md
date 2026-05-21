@@ -53,8 +53,16 @@ When docs and code disagree, fix code or stop and ask if the docs are ambiguous.
 
 - Better Auth factory and CLI/schema-generation export
 - Better Auth plugin config
+- reusable auth adapters for Cache API, KV secondary storage, memory TTL caches, password hashing, email delivery, and other Better Auth runtime support
 - custom Better Auth plugin schemas and endpoints
 - no domain/application leakage of Better Auth imports
+
+Auth adapter rule:
+
+- Reusable auth-runtime mechanics live under `workers/core/src/auth/adapters/**`.
+- Do not inline Cloudflare Cache API wrappers, generic memory TTL cache state, KV secondary-storage wrappers, password hashing, or email-provider mechanics inside route files or plugin runtime companions.
+- HTTP route files should decide which adapter applies to a request; adapters should own the low-level cache/storage mechanics.
+- Better Auth plugin runtime companions may own plugin-specific policy, normalization, D1 fallback, and invalidation, but should delegate generic cache behavior to adapters.
 
 `workers/core/src/shared` is intentionally small:
 

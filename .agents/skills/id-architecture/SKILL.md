@@ -1,6 +1,8 @@
 ---
-name: id-architecture
-description: Use this skill when working in the id repository architecture: docs, Workers, Better Auth boundaries, OAuth/JWKS, admin APIs, shared packages, UI worker boundaries, tests, or deployment workflow.
+name: "id-architecture"
+description: "Use this skill when working in the id repository architecture: docs, Workers, Better Auth boundaries, OAuth/JWKS, admin APIs, shared packages, UI worker boundaries, tests, or deployment workflow."
+metadata:
+  short-description: "Maintain id repo architecture"
 ---
 
 # id Architecture
@@ -53,6 +55,9 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 
 ## Pattern Reminders
 
+- Put reusable auth-runtime mechanics in `workers/core/src/auth/adapters/**`. Route files and plugin runtime companions may call adapters, but should not inline Cache API wrappers, TTL memory-cache bookkeeping, secondary-storage wrappers, password hashing, email sending, or other reusable auth infrastructure mechanics.
+- Keep HTTP route files focused on routing and request orchestration. For example, JWKS response caching belongs in an auth adapter, while `auth-mount.ts` only decides when to use it.
+- Keep plugin runtime companions focused on plugin-owned policy and data loading. For example, `resource-server/audiences.ts` owns the audience lifecycle, but generic memory TTL behavior belongs in an adapter.
 - Entity classes use private constructor, `create`, `reconstitute`, getters, mutator methods, and `toSnapshot()`.
 - Persistence mappers live only in `workers/core/src/infrastructure/repositories/mappers/*.mapper.ts` and explicitly map fields.
 - Repositories use `CrudAdapter` only for Hono-owned Drizzle resources.
@@ -68,4 +73,4 @@ Match checks to the change:
 - Source or config changes: run the narrow relevant check first, then `pnpm lint`, `pnpm check:dup`, `pnpm typecheck`, and `pnpm test`.
 - Substantial source changes: run `pnpm advise` and handle or suppress findings according to `AGENTS.md`.
 
-Known current status from 2026-05-19 docs review: Phase 0 scaffold exists; Phase 1 enforcement is wired but not clean until current `pnpm lint` and `pnpm test` failures are fixed without loosening rules.
+Current status changes quickly; trust the repo checks over stale skill prose. Run the relevant focused test first, then `pnpm check`, and run `pnpm advise` after substantial source changes.
