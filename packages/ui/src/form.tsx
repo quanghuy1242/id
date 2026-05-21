@@ -5,6 +5,7 @@ type TextInputProps = {
   readonly autoComplete?: string;
   readonly required?: boolean;
   readonly defaultValue?: string;
+  readonly error?: string;
 };
 
 export function TextInput({
@@ -14,6 +15,7 @@ export function TextInput({
   autoComplete,
   required,
   defaultValue,
+  error,
 }: TextInputProps) {
   return (
     <label htmlFor={name} className="form-control w-full gap-1">
@@ -26,8 +28,10 @@ export function TextInput({
         required={required}
         defaultValue={defaultValue}
         aria-label={label}
-        className="input input-bordered input-sm w-full bg-base-100 text-base-content focus:input-primary"
+        aria-invalid={error ? true : undefined}
+        className={`input input-bordered input-sm w-full bg-base-100 text-base-content focus:input-primary${error ? " input-error" : ""}`}
       />
+      {error && <span className="validator-hint text-error">{error}</span>}
     </label>
   );
 }

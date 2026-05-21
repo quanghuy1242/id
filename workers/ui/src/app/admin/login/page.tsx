@@ -1,17 +1,15 @@
-import { Page, PageBody, PageHeader, Panel, Text } from "@id/ui";
+import { Page, Panel, Stack, Text } from "@id/ui";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
     <Page>
-      <PageHeader>
-        <Text variant="h1">Sign in</Text>
-      </PageHeader>
-      <PageBody>
-        <Panel>
+      <Panel>
+        <Stack>
+          <Text variant="h1">Sign in</Text>
           <LoginForm />
-        </Panel>
-      </PageBody>
+        </Stack>
+      </Panel>
     </Page>
   );
 }
