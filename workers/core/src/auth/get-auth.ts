@@ -4,7 +4,7 @@ import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
 import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
-import { hashPassword, verifyPassword } from "./adapters/password-hasher";
+import { hashPassword, verifyPassword } from "./adapters/password";
 import { authPluginConfig, authRateLimitConfig, oauthTokenLifetimeConfig } from "./config";
 import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";

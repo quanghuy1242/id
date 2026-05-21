@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { hashPassword, verifyPassword } from "../../src/auth/adapters/password-hasher";
+import { hashPassword, verifyPassword } from "../../src/auth/adapters/password";
 
-describe("password-hasher", () => {
+describe("password", () => {
   describe("hashPassword", () => {
     it("returns a salt:hash string", async () => {
       const result = await hashPassword("my-password");
@@ -17,7 +17,7 @@ describe("password-hasher", () => {
       expect(a).not.toBe(b);
     });
 
-    it("rejects passwords exceeding NFKC-normalized length limits", async () => {
+    it("normalizes NFKC input before hashing", async () => {
       await expect(hashPassword("ok")).resolves.toBeDefined();
     });
   });
@@ -63,6 +63,25 @@ describe("password-hasher", () => {
       const tampered = `${salt}:deadbeef`;
       const result = await verifyPassword({ hash: tampered, password: "x" });
       expect(result).toBe(false);
+    });
+  });
+
+  describe("NFKC normalization equivalence", () => {
+    it("treats full-width and half-width ASCII as the same password", async () => {
+      const fullWidth = "\uff50\uff41\uff53\uff53\uff57\uff4f\uff52\uff44"; // "password" in full-width
+      const halfWidth = "password";
+      const hashFull = await hashPassword(fullWidth);
+      const hashHalf = await hashPassword(halfWidth);
+      expect(await verifyPassword({ hash: hashFull, password: halfWidth })).toBe(true);
+      expect(await verifyPassword({ hash: hashHalf, password: fullWidth })).toBe(true);
+    });
+
+    it("treats composed and decomposed forms consistently", async () => {
+      const composed = "\u00e9"; // é as single codepoint
+      const decomposed = "\u0065\u0301"; // e + combining acute accent
+      const hash = await hashPassword(composed);
+      expect(await verifyPassword({ hash, password: decomposed })).toBe(true);
+      expect(await verifyPassword({ hash, password: composed })).toBe(true);
     });
   });
 

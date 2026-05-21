@@ -3,6 +3,18 @@ import { randomBytes, scrypt } from "node:crypto";
 const scryptConfig = { N: 16384, r: 16, p: 1, dkLen: 64 } as const;
 const scryptMaxmem = 128 * scryptConfig.N * scryptConfig.r * 2;
 
+/**
+ * Hashes a password using `node:crypto.scrypt` with a random 16-byte salt.
+ *
+ * The stored format is `salt:derivedKey` where both parts are hex-encoded.
+ * Passwords are NFKC-normalized before hashing so that visually equivalent
+ * Unicode forms (full-width / half-width, composed / decomposed) produce
+ * the same hash.
+ *
+ * This is wired into Better Auth via `emailAndPassword.password.hash` so that
+ * the Worker runtime uses native `node:crypto.scrypt` instead of Better Auth's
+ * generic pure-JavaScript fallback (`@noble/hashes/scryptAsync`).
+ */
 export function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const salt = randomBytes(16).toString("hex");
@@ -19,6 +31,15 @@ export function hashPassword(password: string): Promise<string> {
   });
 }
 
+/**
+ * Verifies a password against a scrypt hash produced by {@link hashPassword}.
+ *
+ * The `hash` parameter is expected in `salt:derivedKey` hex format. Malformed
+ * or truncated hashes return `false` rather than throwing. The incoming
+ * password is NFKC-normalized to match the normalization applied during hashing.
+ *
+ * This is wired into Better Auth via `emailAndPassword.password.verify`.
+ */
 export function verifyPassword({
   hash,
   password,
