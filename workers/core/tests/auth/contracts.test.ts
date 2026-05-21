@@ -4,7 +4,7 @@ import { authRouteMap } from "./fixtures/route-contracts";
 import { authPluginConfig } from "../../src/auth/config";
 import type { BetterAuthOptions } from "better-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
-import { getAuthOptions } from "../../src/auth/get-auth";
+import { authPathNeedsResourceAudiences, getAuthOptions } from "../../src/auth/get-auth";
 
 const oauthProviderTypeSource = readFileSync(
   "node_modules/@better-auth/oauth-provider/dist/oauth-BqWgUea8.d.mts",
@@ -85,8 +85,16 @@ describe("Better Auth installed contract", () => {
       enabled: true,
       domain: ".quanghuy.dev",
     });
-    expect(options.rateLimit?.storage).toBe("secondary-storage");
+    expect(options.rateLimit).toEqual({ enabled: false });
     expect(options.plugins?.some((plugin) => plugin.id === "id-resource-server")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "oauth-provider")).toBe(true);
+  });
+
+  it("loads resource audiences only for OAuth endpoints that validate resource parameters", () => {
+    expect(authPathNeedsResourceAudiences("/api/auth/oauth2/authorize")).toBe(true);
+    expect(authPathNeedsResourceAudiences("/api/auth/oauth2/token")).toBe(true);
+    expect(authPathNeedsResourceAudiences("/api/auth/jwks")).toBe(false);
+    expect(authPathNeedsResourceAudiences("/api/auth/.well-known/openid-configuration")).toBe(false);
+    expect(authPathNeedsResourceAudiences("/api/auth/session")).toBe(false);
   });
 });

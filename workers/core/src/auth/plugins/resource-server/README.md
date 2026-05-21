@@ -20,4 +20,4 @@ Future custom Better Auth plugins should follow this shape before introducing a 
 
 Module-scope schema artifacts are intentional. In Cloudflare Workers they are created when an isolate evaluates the module, while the plugin factory may still be called for each request-scoped Better Auth instance.
 
-The audience runtime is intentionally plugin-owned even though it runs before Better Auth is constructed. `@better-auth/oauth-provider` currently accepts `validAudiences` as a static `string[]`, so `createAuthForRequest(...)` must load the current audience list first. The KV cache is the normal read path; D1 is only used when the cache is missing or invalid.
+The audience runtime is intentionally plugin-owned even though it runs before Better Auth is constructed. `@better-auth/oauth-provider` currently accepts `validAudiences` as a static `string[]`, so `createAuthForRequest(...)` loads the current audience list only for OAuth routes that validate resource parameters. A short per-isolate memory cache protects warm requests from KV reads; KV is the cross-isolate read path; D1 is only used when both caches are missing or invalid.

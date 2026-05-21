@@ -53,6 +53,12 @@
       "file": "packages/lib/src/constants.ts",
       "rule": "ai-slop/narrative-comment",
       "reason": "Comment explains the cross-reference design contract of OAuth query parameters."
+    },
+    {
+      "tool": "aislop",
+      "file": "scripts/bootstrap_admin.py",
+      "rule": "security/hardcoded-secret",
+      "reason": "False positive on getpass prompt text; no password or secret value is hardcoded."
     }
   ]
 }

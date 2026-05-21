@@ -1,13 +1,25 @@
 import type { Hono } from "hono";
 import type { CoreEnv } from "../../config/env";
-import { createAuthForRequest } from "../../auth/get-auth";
+import { authPathNeedsResourceAudiences, createAuthForRequest } from "../../auth/get-auth";
+import type { AuthRuntimeOptions } from "../../auth/types";
 
 export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/api/auth/*", async (c) => {
-    const auth = await createAuthForRequest(c.env, {
-      backgroundTaskRunner: {
-        waitUntil: (task) => c.executionCtx.waitUntil(task),
-      },
+    let runtime: AuthRuntimeOptions = {};
+    try {
+      const executionCtx = c.executionCtx;
+      runtime = {
+        backgroundTaskRunner: {
+          waitUntil: (task) => executionCtx.waitUntil(task),
+        },
+      };
+    } catch {
+      // Hono unit tests do not always provide a Worker ExecutionContext.
+    }
+
+    const auth = await createAuthForRequest(c.env, runtime, {
+      // Only resource-validating OAuth routes should pay audience cache/D1 cost.
+      loadResourceAudiences: authPathNeedsResourceAudiences(new URL(c.req.url).pathname),
     });
     return auth.handler(c.req.raw);
   });

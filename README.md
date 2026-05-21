@@ -76,7 +76,7 @@ pnpm install
 wrangler d1 create id
 # → copy the returned UUID into workers/core/wrangler.jsonc database_id
 
-# KV namespace for secondary storage (rate limiting, session cache)
+# KV namespace for auth secondary storage and resource-server audience cache
 wrangler kv:namespace create id-kv
 # → copy the returned ID into workers/core/wrangler.jsonc kv_namespaces
 ```

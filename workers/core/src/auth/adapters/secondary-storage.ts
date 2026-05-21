@@ -1,7 +1,7 @@
 import type { SecondaryStorage } from "better-auth";
 
 export type BetterAuthKvStorage = {
-  readonly get: (key: string) => Promise<string | null>;
+  readonly get: (key: string, options?: { readonly cacheTtl?: number }) => Promise<string | null>;
   readonly put: (key: string, value: string, options?: { readonly expirationTtl?: number }) => Promise<unknown>;
   readonly delete: (key: string) => Promise<unknown>;
 };

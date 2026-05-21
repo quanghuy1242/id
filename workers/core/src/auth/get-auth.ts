@@ -5,7 +5,7 @@ import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
 import { hashPassword, verifyPassword } from "./adapters/password";
-import { authPluginConfig, authRateLimitConfig, oauthTokenLifetimeConfig } from "./config";
+import { authPluginConfig, oauthTokenLifetimeConfig } from "./config";
 import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -20,8 +20,34 @@ export function getAuth(
   return betterAuth(getAuthOptions(env, validAudiences, runtime));
 }
 
-export async function createAuthForRequest(env: CoreEnv, runtime: AuthRuntimeOptions = {}) {
-  const loaded = await loadResourceServerAudiences(env);
+export type CreateAuthForRequestOptions = {
+  readonly loadResourceAudiences?: boolean;
+};
+
+/**
+ * OAuth Provider accepts validAudiences only when the plugin is constructed.
+ * Loading them for every Better Auth request makes public routes like JWKS and
+ * discovery pay a KV/D1 cost they do not need, so only resource-validating
+ * OAuth endpoints opt into the pre-auth audience load.
+ */
+export function authPathNeedsResourceAudiences(pathname: string): boolean {
+  const authPath = pathname.startsWith(authPluginConfig.issuerPath)
+    ? pathname.slice(authPluginConfig.issuerPath.length)
+    : pathname;
+
+  return authPath === "/oauth2/authorize" || authPath === "/oauth2/token";
+}
+
+export async function createAuthForRequest(
+  env: CoreEnv,
+  runtime: AuthRuntimeOptions = {},
+  options: CreateAuthForRequestOptions = {},
+) {
+  if (!options.loadResourceAudiences) {
+    return getAuth(env, [], runtime);
+  }
+
+  const loaded = await loadResourceServerAudiences(env, runtime.backgroundTaskRunner);
   return getAuth(env, loaded.audiences, runtime);
 }
 
@@ -48,7 +74,10 @@ export function getAuthOptions(
         ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
       },
     },
-    rateLimit: authRateLimitConfig,
+    rateLimit: {
+      // Edge rules own throttling; BA counters would add per-request storage I/O.
+      enabled: false,
+    },
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,

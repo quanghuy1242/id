@@ -57,6 +57,6 @@ plugins/<name>/
 `id-resource-server` is the current template for custom Better Auth plugins in this repo:
 
 - `schema.ts` owns the canonical resource-server Zod model and exports the precomputed BA field map. That keeps schema walking and OpenAPI conversion out of the per-request plugin factory path in warm Cloudflare Worker isolates.
-- `audiences.ts` owns the pre-auth OAuth audience runtime. It reads enabled resource-server audiences from KV first, falls back to the plugin-owned D1 query on cache miss, writes the same KV key with TTL, and exposes invalidation for mutation endpoints.
+- `audiences.ts` owns the pre-auth OAuth audience runtime. It uses a short per-isolate memory cache before KV, falls back to the plugin-owned D1 query on cache miss, writes the same KV key with TTL, and exposes invalidation for mutation endpoints. Auth route mounting should call it only for OAuth endpoints that validate resource audiences.
 - `index.ts` still contains six endpoint declarations. That is acceptable because these are the actual Better Auth contract declarations; extracting them into a generic CRUD builder would hide route-specific validation, authorization, and cache-invalidation behavior.
 - `types.ts` remains separate from `schema.ts` because plugin options are runtime composition hooks. If this pattern is promoted to `packages/`, schema generation utilities can move first; app-specific callbacks should stay at the auth-worker boundary.

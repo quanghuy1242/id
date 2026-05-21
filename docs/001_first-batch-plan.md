@@ -302,7 +302,7 @@ Bindings:
 | Binding | Purpose |
 |---|---|
 | `DB` | D1 database for Better Auth tables and plugin-owned custom tables |
-| `KV` | Secondary storage for rate limiting/session cache where Better Auth integration supports it |
+| `KV` | Better Auth secondary storage plus the resource-server audience cache; Better Auth rate limiting stays disabled in favor of Cloudflare edge rate limits |
 | `BETTER_AUTH_SECRET` | Better Auth secret, rotated non-destructively when supported |
 | `BETTER_AUTH_URL` | Public issuer/base URL |
 | Email provider secrets | Verification and password-reset delivery |
@@ -674,7 +674,7 @@ Expected table groups:
 | Organization | organization, member, invitation, team/team member if enabled, dynamic role tables if enabled |
 | OAuth Provider | OAuth clients, access tokens, refresh tokens, consents, authorization/request state as generated |
 | JWT/JWKS | signing key storage used by the JWT plugin |
-| Rate limiting | Better Auth rate-limit storage if database-backed |
+| Rate limiting | Not stored in Better Auth tables; Cloudflare edge rate limiting is the first-line control |
 
 Implementation rule:
 

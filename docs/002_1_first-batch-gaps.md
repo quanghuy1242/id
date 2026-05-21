@@ -112,7 +112,7 @@ Required before `content-api` integration:
 | P0 | Production session cookie config is missing | `id.quanghuy.dev` and `content.quanghuy.dev` need a shared parent-domain session cookie, and `id` must not collide with legacy `auther` cookie names during migration. |
 | P0 | OAuth token lifetimes and refresh rotation are not asserted | Defaults are one-hour access tokens and 30-day refresh tokens; first release wants 3-hour access tokens, 7-day refresh tokens, and replay rejection coverage. |
 | P1 | No Wrangler-gated generic operator request path | API-only operation should not require a UI, raw API-key env vars, or custom commands for every Better Auth endpoint. |
-| P1 | Rate limiting is not explicitly configured | Better Auth has production defaults, but the repo should set Cloudflare IP headers and stricter auth/token endpoint rules intentionally. |
+| P1 | Edge rate limiting needs deployment evidence | Better Auth rate limiting is intentionally disabled to avoid per-request KV/D1 writes; Cloudflare edge rate limiting must remain configured outside the Worker. |
 | P1 | Resource-server audit fields can be spoofed or bypassed | `createdBy` is accepted from request body and `PATCH enabled` can bypass disable audit fields. |
 | P1 | Docs drift from code | Dashboard route is documented in some places after being removed; README/runbook/workflow deployment claims are inconsistent. |
 | P1 | Missing OAuth/OIDC tests | PKCE, refresh, introspection, revocation, userinfo, token type behavior, prompt flows, and org invitations are not covered. |
@@ -380,7 +380,7 @@ Acceptance criteria:
 |---|---|---|
 | Custom `platformRole` duplicates Better Auth Admin `user.role` | Official Admin plugin endpoints and local policy can disagree. | Use native `user.role` as platform access source of truth; keep org membership roles separate. |
 | No generic API-only operator helper | Operators may fall back to ad hoc curl, UI work, or endpoint-specific scripts. | Add a thin request helper that calls arbitrary paths, gates on `pnpm wrangler whoami`, and does not accept raw admin API keys through env vars or command arguments. |
-| No explicit Better Auth rate-limit config | Defaults may be okay in production, but Cloudflare IP headers and stricter auth/token rules are not intentional. | Configure `advanced.ipAddress.ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"]` and `rateLimit` with `storage: "secondary-storage"`. |
+| Edge rate limiting is external to the Worker | Better Auth rate limiting was removed from the Worker hot path to avoid KV/D1 counter writes. | Keep Cloudflare edge rate limiting configured for auth/token abuse patterns and document the deployed rules in the runbook. |
 | OAuth token type behavior untested | Downstream apps may treat opaque tokens as JWTs. | Test `resource` present -> JWT; no `resource` -> opaque/server-validated token. |
 | Refresh/introspection/revocation untested | Incident and long-lived session behavior is unproven. | Add endpoint tests with real issued tokens, including refresh-token rotation and old-token replay rejection. |
 | UserInfo untested | OIDC client integration may fail late. | Test `/api/auth/oauth2/userinfo` with `openid email profile`. |
@@ -1156,20 +1156,18 @@ Acceptance criteria:
 - Audit fields are actor-owned and cannot be spoofed by request body.
 - Disable/re-enable behavior has one audited path.
 
-### P1-B. Configure Rate Limiting
+### P1-B. Document Edge Rate Limiting
 
 Scope:
 
-- `workers/core/src/auth/get-auth.ts`
-- `workers/core/tests/auth/rate-limit.test.ts`
+- Cloudflare dashboard/API rate-limit rules
+- `docs/007_cloudflare-deployment-runbooks.md`
 
 Tasks:
 
-- [ ] Add `advanced.ipAddress.ipAddressHeaders` for Cloudflare.
-- [ ] Add `rateLimit.enabled: true`.
-- [ ] Use `storage: "secondary-storage"` so KV backs serverless rate-limit state.
-- [ ] Set explicit global and custom rules for `/sign-in/email`, `/sign-up/email`, `/request-password-reset`, `/oauth2/token`, `/oauth2/authorize`, `/oauth2/introspect`, `/oauth2/revoke`, and `/oauth2/create-client`.
-- [ ] Add tests for a strict endpoint rule.
+- [x] Keep Better Auth rate limiting disabled in Worker code so auth requests do not write rate-limit counters to KV/D1.
+- [ ] Document the Cloudflare edge rate-limit rules that protect `/sign-in/email`, `/request-password-reset`, `/send-verification-email`, `/oauth2/token`, and client-management endpoints.
+- [ ] Add an operational check for rate-limit events in Cloudflare observability.
 
 Acceptance criteria:
 
@@ -1307,7 +1305,7 @@ Manual/smoke verification:
 - [ ] Refresh-token grant returns a rotated refresh token and old refresh-token replay is rejected in tests.
 - [ ] Resource-server read/list endpoints enforce platform/org visibility.
 - [ ] Runtime resource-server audience creation/disable behavior is proven through the actual Worker route path.
-- [ ] Rate limiting is explicitly configured for Cloudflare Workers.
+- [ ] Edge rate limiting is documented for the deployed Cloudflare zone.
 - [ ] Resource-server audit fields cannot be spoofed or bypassed.
 - [ ] Missing OAuth/OIDC tests are added or the corresponding flows are removed from first-release claims.
 - [ ] README and runbooks match the implemented commands, routes, and deployment workflow.

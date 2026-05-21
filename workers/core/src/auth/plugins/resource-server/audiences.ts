@@ -1,7 +1,8 @@
 import { authPluginConfig } from "../../config";
 import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
+import type { BackgroundTaskRunner } from "../../types";
 import type { CoreEnv } from "../../../config/env";
-import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
+import { RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS, RESOURCE_SERVER_MODEL } from "../../../shared/constants";
 
 export type ResourceAudienceRow = {
   readonly audience: string;
@@ -10,7 +11,7 @@ export type ResourceAudienceRow = {
 
 export type AudienceLoadResult = {
   readonly audiences: readonly string[];
-  readonly source: "cache" | "store";
+  readonly source: "cache" | "memory" | "store";
 };
 
 type ResourceAudienceEnv = {
@@ -20,17 +21,53 @@ type ResourceAudienceEnv = {
 
 type ResourceAudienceLoader = () => Promise<readonly ResourceAudienceRow[]>;
 
+type AudienceCacheOptions = {
+  readonly backgroundTaskRunner?: BackgroundTaskRunner;
+};
+
+type MemoryAudienceCache = {
+  readonly audiences: readonly string[];
+  readonly expiresAt: number;
+};
+
+let memoryAudienceCache: MemoryAudienceCache | null = null;
+
 function parseCachedAudiences(value: string | null): readonly string[] | null {
   if (value === null) {
     return null;
   }
 
-  const parsed: unknown = JSON.parse(value);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
+
   if (!Array.isArray(parsed) || !parsed.every((item): item is string => typeof item === "string")) {
     return null;
   }
 
   return parsed;
+}
+
+function readMemoryAudienceCache(now: number): readonly string[] | null {
+  if (!memoryAudienceCache || memoryAudienceCache.expiresAt <= now) {
+    return null;
+  }
+
+  return memoryAudienceCache.audiences;
+}
+
+function writeMemoryAudienceCache(audiences: readonly string[], now: number): void {
+  memoryAudienceCache = {
+    audiences,
+    expiresAt: now + RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS,
+  };
+}
+
+function clearMemoryAudienceCache(): void {
+  memoryAudienceCache = null;
 }
 
 function enabledAudiences(rows: readonly ResourceAudienceRow[]): readonly string[] {
@@ -49,23 +86,57 @@ async function loadEnabledResourceAudienceRows(db: CoreEnv["DB"]): Promise<reado
 export async function loadResourceAudiencesFromCache(
   kv: BetterAuthKvStorage,
   loadRows: ResourceAudienceLoader,
+  options: AudienceCacheOptions = {},
 ): Promise<AudienceLoadResult> {
-  const cached = parseCachedAudiences(await kv.get(authPluginConfig.resourceAudienceCacheKey));
+  const now = Date.now();
+  const memoryCached = readMemoryAudienceCache(now);
+  if (memoryCached) {
+    return { audiences: memoryCached, source: "memory" };
+  }
+
+  const cached = parseCachedAudiences(
+    await kv.get(authPluginConfig.resourceAudienceCacheKey, {
+      cacheTtl: authPluginConfig.resourceAudienceCacheTtlSeconds,
+    }),
+  );
   if (cached) {
+    writeMemoryAudienceCache(cached, now);
     return { audiences: cached, source: "cache" };
   }
 
   const audiences = enabledAudiences(await loadRows());
-  await kv.put(authPluginConfig.resourceAudienceCacheKey, JSON.stringify(audiences), {
+  writeMemoryAudienceCache(audiences, now);
+
+  const cacheWrite = kv.put(authPluginConfig.resourceAudienceCacheKey, JSON.stringify(audiences), {
     expirationTtl: authPluginConfig.resourceAudienceCacheTtlSeconds,
   });
+
+  if (options.backgroundTaskRunner) {
+    // D1 validation is done; KV refill is best-effort and can run after response.
+    options.backgroundTaskRunner.waitUntil(cacheWrite.catch(() => undefined));
+  } else {
+    await cacheWrite;
+  }
+
   return { audiences, source: "store" };
 }
 
-export function loadResourceServerAudiences(env: ResourceAudienceEnv): Promise<AudienceLoadResult> {
-  return loadResourceAudiencesFromCache(env.KV, () => loadEnabledResourceAudienceRows(env.DB));
+/**
+ * Load enabled OAuth resource audiences before constructing Better Auth for the
+ * small set of OAuth routes that validate `resource`. The resourceServer table
+ * is plugin-owned, so this raw D1 fallback intentionally stays in the plugin
+ * runtime companion rather than infrastructure repositories.
+ */
+export function loadResourceServerAudiences(
+  env: ResourceAudienceEnv,
+  backgroundTaskRunner?: BackgroundTaskRunner,
+): Promise<AudienceLoadResult> {
+  return loadResourceAudiencesFromCache(env.KV, () => loadEnabledResourceAudienceRows(env.DB), { backgroundTaskRunner });
 }
 
 export async function invalidateResourceServerAudiences(env: Pick<ResourceAudienceEnv, "KV">): Promise<void> {
+  // Keep admin mutations strict: local memory is cleared immediately, then the
+  // cross-isolate KV cache is invalidated for later requests in other isolates.
+  clearMemoryAudienceCache();
   await env.KV.delete(authPluginConfig.resourceAudienceCacheKey);
 }
