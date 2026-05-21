@@ -72,6 +72,12 @@
   },
   "overrides": [
     {
+      "files": ["workers/ui/src/app/layout.tsx"],
+      "rules": {
+        "import/no-unassigned-import": "off"
+      }
+    },
+    {
       "files": ["workers/**/tests/**/*.ts"],
       "rules": {
         "architecture/layer-imports": "off",
