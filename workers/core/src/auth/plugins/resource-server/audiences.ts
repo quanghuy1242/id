@@ -1,5 +1,7 @@
-import { authPluginConfig } from "../config";
-import type { BetterAuthKvStorage } from "./secondary-storage";
+import { authPluginConfig } from "../../config";
+import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
+import type { CoreEnv } from "../../../config/env";
+import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
 
 export type ResourceAudienceRow = {
   readonly audience: string;
@@ -11,7 +13,12 @@ export type AudienceLoadResult = {
   readonly source: "cache" | "store";
 };
 
-export type ResourceAudienceLoader = () => Promise<readonly ResourceAudienceRow[]>;
+type ResourceAudienceEnv = {
+  readonly DB: CoreEnv["DB"];
+  readonly KV: BetterAuthKvStorage;
+};
+
+type ResourceAudienceLoader = () => Promise<readonly ResourceAudienceRow[]>;
 
 function parseCachedAudiences(value: string | null): readonly string[] | null {
   if (value === null) {
@@ -30,7 +37,16 @@ function enabledAudiences(rows: readonly ResourceAudienceRow[]): readonly string
   return [...new Set(rows.filter((row) => row.enabled).map((row) => row.audience))].sort();
 }
 
-export async function loadResourceAudiences(
+async function loadEnabledResourceAudienceRows(db: CoreEnv["DB"]): Promise<readonly ResourceAudienceRow[]> {
+  const result = await db
+    .prepare(`select "audience", "enabled" from "${RESOURCE_SERVER_MODEL}" where "enabled" = ? order by "audience" asc`)
+    .bind(1)
+    .all<ResourceAudienceRow>();
+
+  return result.results ?? [];
+}
+
+export async function loadResourceAudiencesFromCache(
   kv: BetterAuthKvStorage,
   loadRows: ResourceAudienceLoader,
 ): Promise<AudienceLoadResult> {
@@ -46,6 +62,10 @@ export async function loadResourceAudiences(
   return { audiences, source: "store" };
 }
 
-export async function invalidateResourceAudiences(kv: BetterAuthKvStorage): Promise<void> {
-  await kv.delete(authPluginConfig.resourceAudienceCacheKey);
+export function loadResourceServerAudiences(env: ResourceAudienceEnv): Promise<AudienceLoadResult> {
+  return loadResourceAudiencesFromCache(env.KV, () => loadEnabledResourceAudienceRows(env.DB));
+}
+
+export async function invalidateResourceServerAudiences(env: Pick<ResourceAudienceEnv, "KV">): Promise<void> {
+  await env.KV.delete(authPluginConfig.resourceAudienceCacheKey);
 }

@@ -1,6 +1,6 @@
 # Plugin-First Auth Architecture Refactor Plan
 
-> Status: implementation-grade architecture and refactor plan
+> Status: implemented
 >
 > Date: 2026-05-21
 >
@@ -50,6 +50,10 @@
 > - Custom auth-owned tables should be Better Auth plugin schemas, not standalone Drizzle/domain/application stacks.
 > - Hono remains the Worker router and mount shell, but auth-domain behavior should move under `workers/core/src/auth/**`.
 > - The resource-server audience KV cache is required behavior and must be preserved.
+>
+> Implementation note:
+>
+> - Sections describing "current state" preserve the pre-refactor baseline that motivated this plan. Section 15 records the completed implementation.
 
 ## Table Of Contents
 
@@ -99,6 +103,7 @@
 - [12. Test And Verification Plan](#12-test-and-verification-plan)
 - [13. Definition Of Done](#13-definition-of-done)
 - [14. Final Model](#14-final-model)
+- [15. Implementation Result](#15-implementation-result)
 
 ## 1. Goal
 
@@ -592,13 +597,13 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Add `workers/core/src/auth/plugins/resource-server/audiences.ts`.
-- [ ] Move `ResourceAudienceRow`, `AudienceLoadResult`, cache parsing, normalization, `loadResourceAudiences`, and `invalidateResourceAudiences` into the new module under resource-server naming.
-- [ ] Move the SQL query from `resource-server-store.ts` into the new module.
-- [ ] Delete `workers/core/src/auth/adapters/audiences.ts` if no callers remain.
-- [ ] Delete `workers/core/src/infrastructure/persistence/resource-server-store.ts` if no callers remain.
-- [ ] Update `workers/core/src/auth/plugins/resource-server/index.ts` or `get-auth.ts` to call `invalidateResourceServerAudiences(...)`.
-- [ ] Update tests to import from the new module.
+- [x] Add `workers/core/src/auth/plugins/resource-server/audiences.ts`.
+- [x] Move `ResourceAudienceRow`, `AudienceLoadResult`, cache parsing, normalization, `loadResourceAudiences`, and `invalidateResourceAudiences` into the new module under resource-server naming.
+- [x] Move the SQL query from `resource-server-store.ts` into the new module.
+- [x] Delete `workers/core/src/auth/adapters/audiences.ts` if no callers remain.
+- [x] Delete `workers/core/src/infrastructure/persistence/resource-server-store.ts` if no callers remain.
+- [x] Update `workers/core/src/auth/plugins/resource-server/index.ts` or `get-auth.ts` to call `invalidateResourceServerAudiences(...)`.
+- [x] Update tests to import from the new module.
 
 Tests:
 
@@ -621,12 +626,12 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Add a helper such as `createAuthForRequest(env, runtime)` in `workers/core/src/auth/get-auth.ts` or `workers/core/src/auth/create-auth-for-request.ts`.
-- [ ] Inside the helper, call `loadResourceServerAudiences(env)` before `getAuth(...)`.
-- [ ] Keep `getAuthOptions(...)` testable for static option assertions.
-- [ ] Update `registerAuthRoutes(...)` to call the helper.
-- [ ] Update `registerWellKnownRoutes(...)` to call the helper and rewrite request paths.
-- [ ] Consider a local helper for well-known aliases to reduce repeated path rewrite code without hiding route ownership.
+- [x] Add a helper such as `createAuthForRequest(env, runtime)` in `workers/core/src/auth/get-auth.ts` or `workers/core/src/auth/create-auth-for-request.ts`.
+- [x] Inside the helper, call `loadResourceServerAudiences(env)` before `getAuth(...)`.
+- [x] Keep `getAuthOptions(...)` testable for static option assertions.
+- [x] Update `registerAuthRoutes(...)` to call the helper.
+- [x] Update `registerWellKnownRoutes(...)` to call the helper and rewrite request paths.
+- [x] Consider a local helper for well-known aliases to reduce repeated path rewrite code without hiding route ownership.
 
 Tests:
 
@@ -649,11 +654,11 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Confirm `auth/admin/actor.ts` has no production or test callers.
-- [ ] Delete `auth/admin/actor.ts` if unused.
-- [ ] Move `isPlatformAdmin`, `hasOrganizationAccess`, and `AdminDbAdapter` to `auth/policies/access.ts`.
-- [ ] Update imports in `get-auth.ts`.
-- [ ] Update docs that describe `requireActor(c)` as current behavior for Hono admin routes.
+- [x] Confirm `auth/admin/actor.ts` has no production or test callers.
+- [x] Delete `auth/admin/actor.ts` if unused.
+- [x] Move `isPlatformAdmin`, `hasOrganizationAccess`, and `AdminDbAdapter` to `auth/policies/access.ts`.
+- [x] Update imports in `get-auth.ts`.
+- [x] Update docs that describe `requireActor(c)` as current behavior for Hono admin routes.
 
 Tests:
 
@@ -674,10 +679,10 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Move `authRouteMap` to `workers/core/tests/auth/fixtures/route-contracts.ts` or equivalent.
-- [ ] Update `workers/core/tests/auth/contracts.test.ts`.
-- [ ] Delete `workers/core/src/auth/contracts.ts` when no source imports remain.
-- [ ] Consider a future generated route/openapi assertion to replace manual entries.
+- [x] Move `authRouteMap` to `workers/core/tests/auth/fixtures/route-contracts.ts` or equivalent.
+- [x] Update `workers/core/tests/auth/contracts.test.ts`.
+- [x] Delete `workers/core/src/auth/contracts.ts` when no source imports remain.
+- [x] Consider a future generated route/openapi assertion to replace manual entries.
 
 Tests:
 
@@ -698,10 +703,10 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Update `workers/core/src/auth/plugins/README.md` with a "Zod boundary rule" section.
-- [ ] Keep `types.ts` TS-only for plugin options and callback types.
-- [ ] For future plugin rows, require a canonical `<plugin>Schema` in `schema.ts`.
-- [ ] Add tests for derived Better Auth fields and OpenAPI metadata where a plugin owns a schema.
+- [x] Update `workers/core/src/auth/plugins/README.md` with a "Zod boundary rule" section.
+- [x] Keep `types.ts` TS-only for plugin options and callback types.
+- [x] For future plugin rows, require a canonical `<plugin>Schema` in `schema.ts`.
+- [x] Add tests for derived Better Auth fields and OpenAPI metadata where a plugin owns a schema.
 
 Tests:
 
@@ -720,12 +725,12 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Add a rule that forbids new Hono `/api/admin/*` auth-domain CRUD routes unless the file is explicitly allowlisted.
-- [ ] Add a rule that forbids importing plugin-owned model constants into `workers/core/src/infrastructure/persistence/**`, except approved migration/bootstrap cases.
-- [ ] Add a rule that forbids `workers/core/src/auth/contracts.ts` or flags production test fixtures under `src`.
-- [ ] Add a rule or advisory check that custom auth plugin folders contain `index.ts`, `schema.ts`, `operations.ts`, `types.ts`, and `README.md`.
-- [ ] Keep Better Auth import restrictions intact.
-- [ ] Add architecture lint fixture tests if the local lint plugin supports them.
+- [x] Add a rule that forbids new Hono `/api/admin/*` auth-domain CRUD routes unless the file is explicitly allowlisted.
+- [x] Add a rule that forbids importing plugin-owned model constants into `workers/core/src/infrastructure/persistence/**`, except approved migration/bootstrap cases.
+- [x] Add a rule that forbids `workers/core/src/auth/contracts.ts` or flags production test fixtures under `src`.
+- [x] Add a rule or advisory check that custom auth plugin folders contain `index.ts`, `schema.ts`, `operations.ts`, `types.ts`, and `README.md`.
+- [x] Keep Better Auth import restrictions intact.
+- [x] Add architecture lint fixture tests if the local lint plugin supports them.
 
 Tests:
 
@@ -746,11 +751,11 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Update `workers/core/src/auth/plugins/README.md`.
-- [ ] Update `workers/core/src/auth/plugins/resource-server/README.md`.
-- [ ] Update `docs/000_repo-architecture.md` sections that imply resource-server CRUD should be Hono/domain/application based.
-- [ ] Update `docs/001_first-batch-plan.md` only where current implementation notes conflict with plugin-first ownership.
-- [ ] Keep this `009_...` document as the implementation plan until completed.
+- [x] Update `workers/core/src/auth/plugins/README.md`.
+- [x] Update `workers/core/src/auth/plugins/resource-server/README.md`.
+- [x] Update `docs/000_repo-architecture.md` sections that imply resource-server CRUD should be Hono/domain/application based.
+- [x] Update `docs/001_first-batch-plan.md` only where current implementation notes conflict with plugin-first ownership.
+- [x] Keep this `009_...` document as the implementation plan until completed.
 
 Tests:
 
@@ -812,11 +817,11 @@ Scope:
 
 Tasks:
 
-- [ ] Create the plugin-owned audience module.
-- [ ] Move KV cache read/write/invalidation into the module.
-- [ ] Move the pre-auth D1 enabled-audience query into the module.
-- [ ] Preserve cache key, TTL, dedupe, filtering, sorting, and result source behavior.
-- [ ] Remove obsolete files after imports are moved.
+- [x] Create the plugin-owned audience module.
+- [x] Move KV cache read/write/invalidation into the module.
+- [x] Move the pre-auth D1 enabled-audience query into the module.
+- [x] Preserve cache key, TTL, dedupe, filtering, sorting, and result source behavior.
+- [x] Remove obsolete files after imports are moved.
 
 Acceptance criteria:
 
@@ -839,10 +844,10 @@ Scope:
 
 Tasks:
 
-- [ ] Add an auth composition helper that loads resource audiences and constructs Better Auth.
-- [ ] Replace direct audience/store imports in `auth-mount.ts`.
-- [ ] Keep `waitUntil` support for background tasks.
-- [ ] Keep well-known alias behavior.
+- [x] Add an auth composition helper that loads resource audiences and constructs Better Auth.
+- [x] Replace direct audience/store imports in `auth-mount.ts`.
+- [x] Keep `waitUntil` support for background tasks.
+- [x] Keep well-known alias behavior.
 
 Acceptance criteria:
 
@@ -866,10 +871,10 @@ Scope:
 
 Tasks:
 
-- [ ] Confirm `auth/admin/actor.ts` is unused.
-- [ ] Delete unused actor code.
-- [ ] Move active policy helpers to `auth/policies/access.ts` or plugin-local policy module.
-- [ ] Update `get-auth.ts` imports.
+- [x] Confirm `auth/admin/actor.ts` is unused.
+- [x] Delete unused actor code.
+- [x] Move active policy helpers to `auth/policies/access.ts` or plugin-local policy module.
+- [x] Update `get-auth.ts` imports.
 
 Acceptance criteria:
 
@@ -891,9 +896,9 @@ Scope:
 
 Tasks:
 
-- [ ] Move `authRouteMap` to a test fixture.
-- [ ] Update tests.
-- [ ] Delete production `contracts.ts` if no runtime imports remain.
+- [x] Move `authRouteMap` to a test fixture.
+- [x] Update tests.
+- [x] Delete production `contracts.ts` if no runtime imports remain.
 
 Acceptance criteria:
 
@@ -917,11 +922,11 @@ Scope:
 
 Tasks:
 
-- [ ] Document plugin-owned pre-auth runtime companions.
-- [ ] Document the resource-server audience KV cache.
-- [ ] Document when raw pre-auth D1 reads are allowed.
-- [ ] Document Zod runtime boundary rules.
-- [ ] Remove or qualify stale Hono admin actor language where it conflicts with plugin-owned auth behavior.
+- [x] Document plugin-owned pre-auth runtime companions.
+- [x] Document the resource-server audience KV cache.
+- [x] Document when raw pre-auth D1 reads are allowed.
+- [x] Document Zod runtime boundary rules.
+- [x] Remove or qualify stale Hono admin actor language where it conflicts with plugin-owned auth behavior.
 
 Acceptance criteria:
 
@@ -942,11 +947,11 @@ Scope:
 
 Tasks:
 
-- [ ] Add rule coverage for plugin-owned table persistence outside auth plugins.
-- [ ] Add rule coverage for new Hono auth-domain CRUD routes.
-- [ ] Add rule coverage for test fixtures under production `src`.
-- [ ] Add rule coverage for custom plugin folder shape where practical.
-- [ ] Keep suppressions focused and documented.
+- [x] Add rule coverage for plugin-owned table persistence outside auth plugins.
+- [x] Add rule coverage for new Hono auth-domain CRUD routes.
+- [x] Add rule coverage for test fixtures under production `src`.
+- [x] Add rule coverage for custom plugin folder shape where practical.
+- [x] Keep suppressions focused and documented.
 
 Acceptance criteria:
 
@@ -1015,3 +1020,23 @@ The final architecture keeps Better Auth as the auth framework and Hono as the W
 `id-resource-server` owns the `resourceServer` table, its Better Auth endpoints, its Zod contracts, and its OAuth audience lifecycle. Because OAuth Provider requires `validAudiences` before Better Auth exists, the resource-server plugin area also owns a small pre-auth runtime companion. That companion keeps the KV cache, performs the approved raw D1 fallback read only on cache miss, and exposes invalidation for plugin mutations.
 
 This preserves Better Auth's model instead of rebuilding auth around Hono routes, while still handling the real initialization constraint imposed by OAuth Provider's current `validAudiences?: string[]` API.
+
+## 15. Implementation Result
+
+Implemented on 2026-05-21.
+
+Completed changes:
+
+- Moved resource-server audience loading, KV cache handling, invalidation, and the approved pre-auth D1 fallback to `workers/core/src/auth/plugins/resource-server/audiences.ts`.
+- Replaced `auth-mount.ts` resource-server orchestration with `createAuthForRequest(...)`.
+- Removed `workers/core/src/auth/adapters/audiences.ts`, `workers/core/src/infrastructure/persistence/resource-server-store.ts`, `workers/core/src/auth/admin/access.ts`, `workers/core/src/auth/admin/actor.ts`, and production `workers/core/src/auth/contracts.ts`.
+- Moved active admin policy helpers to `workers/core/src/auth/policies/access.ts`.
+- Moved route contract data to `workers/core/tests/auth/fixtures/route-contracts.ts`.
+- Updated plugin, architecture, and skill guidance for plugin-owned runtime companions and the resource-server KV cache.
+- Added oxlint enforcement for plugin-owned table boundaries, test-only auth route contracts, Hono admin route allowlisting, plugin folder shape, and the narrowed raw-D1 exception.
+
+Verification:
+
+- Temporary negative lint fixtures proved the new architecture rules fail for forbidden shapes, then were removed.
+- `pnpm check` passed.
+- `pnpm advise` passed with only existing suppressed findings.

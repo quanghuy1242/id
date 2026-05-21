@@ -10,6 +10,7 @@ This plugin owns the `resourceServer` Better Auth model and the `/api/auth/admin
 
 - `schema.ts` is the source of truth for shapes. It defines the canonical Zod row schema, derives request body schemas, derives the Better Auth field map, and precomputes OpenAPI fragments.
 - `index.ts` is the Better Auth contract. It registers the plugin schema and the six explicit endpoints. The endpoint blocks remain visible because each route has distinct validation, authorization, and cache-invalidation behavior.
+- `audiences.ts` owns the pre-auth OAuth audience runtime. It keeps the KV cache, performs the approved D1 fallback query before Better Auth exists, and exposes cache invalidation for plugin mutations.
 - `operations.ts` holds testable helper logic: authorization wrappers, uniqueness checks, and create/update/disable payload builders.
 - `types.ts` holds plugin options and runtime hooks injected from `get-auth.ts`. Keep this separate from `schema.ts`; callbacks are composition concerns, not data-shape concerns.
 
@@ -18,3 +19,5 @@ This plugin owns the `resourceServer` Better Auth model and the `/api/auth/admin
 Future custom Better Auth plugins should follow this shape before introducing a shared abstraction. Promote only stable utilities, such as Zod-to-BA field mapping or OpenAPI cleanup, after a second plugin proves the same needs. Do not extract a generic CRUD endpoint builder unless route-specific behavior becomes truly identical.
 
 Module-scope schema artifacts are intentional. In Cloudflare Workers they are created when an isolate evaluates the module, while the plugin factory may still be called for each request-scoped Better Auth instance.
+
+The audience runtime is intentionally plugin-owned even though it runs before Better Auth is constructed. `@better-auth/oauth-provider` currently accepts `validAudiences` as a static `string[]`, so `createAuthForRequest(...)` must load the current audience list first. The KV cache is the normal read path; D1 is only used when the cache is missing or invalid.

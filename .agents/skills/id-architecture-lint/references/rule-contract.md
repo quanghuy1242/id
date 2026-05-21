@@ -36,7 +36,11 @@ Every new rule must include:
 - `architecture/ui-no-auth-deps`: UI worker source must not import auth, persistence, signing dependencies, or D1/KV binding types.
 - `architecture/packages-lib-isolation`: `packages/lib` must remain framework-free.
 - `architecture/auth-boundary`: Better Auth imports stay inside approved core auth boundary files and tests.
-- `architecture/no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/` and `auth/cli.ts`. Use Better Auth adapter APIs or infrastructure/persistence for D1 access.
+- `architecture/no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/`, `auth/cli.ts`, and the exact resource-server audience companion at `auth/plugins/resource-server/audiences.ts`. Use Better Auth adapter APIs for plugin CRUD.
+- `architecture/plugin-owned-table-boundary`: plugin-owned table model constants must not be imported into generic `infrastructure/persistence/**`; runtime exceptions for plugin tables stay inside the owning plugin directory.
+- `architecture/auth-test-contract-fixtures`: test-only auth route contracts must not live in production `workers/core/src/auth/**` or be imported by production source.
+- `architecture/hono-admin-route-allowlist`: Hono `/api/admin/*` route literals are limited to allowlisted aggregate workflows; auth-owned CRUD belongs in Better Auth plugin endpoints under `/api/auth/admin/*`.
+- `architecture/auth-plugin-folder-shape`: custom Better Auth plugin folders must include `schema.ts`, `operations.ts`, `types.ts`, and `README.md` next to `index.ts`.
 - `architecture/route-path-contract`: Hono route literals and UI App Router filesystem routes must stay within worker ownership. Core must not serve `/admin/*`; UI must not define public App Router routes outside `workers/ui/src/app/admin/**` except root `layout.tsx` and `globals.css`. UI-owned BFF placeholders are allowed under `/admin/api`, while core auth/API routes remain under core-owned `/api/*`.
 
 ## Required Sync Points

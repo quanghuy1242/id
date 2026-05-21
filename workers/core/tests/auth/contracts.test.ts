@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { authRouteMap } from "../../src/auth/contracts";
+import { authRouteMap } from "./fixtures/route-contracts";
 import { authPluginConfig } from "../../src/auth/config";
 import type { BetterAuthOptions } from "better-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";

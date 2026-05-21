@@ -46,6 +46,7 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 - First-batch custom table: `idResourceServer` owns `resource_servers` through plugin `schema`.
 - Plugin CRUD uses `createAuthEndpoint` and Better Auth endpoint context/adapter APIs.
 - Plugin endpoints mount under the Better Auth base path, expected as `/api/auth/admin/resource-servers...` with the current base path.
+- Plugin-owned pre-auth runtime companions stay under the owning plugin directory. `auth/plugins/resource-server/audiences.ts` owns the resource-server audience KV cache and the approved D1 fallback needed before `oauthProvider({ validAudiences })` is constructed.
 - Do not add `workers/core/src/infrastructure/db/schema.ts` tables for first-batch custom data.
 - Do not create `CrudAdapter`, mapper, repository, or entity layers for plugin-owned CRUD.
 - Hono `/api/admin/*` routes are for aggregate reads or non-BA-owned workflows; they call `requireActor(c)`, call one use case, and present output.

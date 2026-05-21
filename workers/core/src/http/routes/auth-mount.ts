@@ -1,13 +1,10 @@
 import type { Hono } from "hono";
 import type { CoreEnv } from "../../config/env";
-import { getAuth } from "../../auth/get-auth";
-import { loadResourceAudiences } from "../../auth/adapters/audiences";
-import { loadEnabledResourceAudienceRows } from "../../infrastructure/persistence/resource-server-store";
+import { createAuthForRequest } from "../../auth/get-auth";
 
 export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/api/auth/*", async (c) => {
-    const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences, {
+    const auth = await createAuthForRequest(c.env, {
       backgroundTaskRunner: {
         waitUntil: (task) => c.executionCtx.waitUntil(task),
       },
@@ -16,33 +13,24 @@ export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   });
 }
 
+async function handleWellKnownAlias(env: CoreEnv, request: Request, path: string): Promise<Response> {
+  const auth = await createAuthForRequest(env);
+  const url = new URL(request.url);
+  url.pathname = path;
+  return auth.handler(new Request(url, request));
+}
+
 export function registerWellKnownRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/.well-known/oauth-authorization-server", async (c) => {
-    const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences);
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/.well-known/oauth-authorization-server";
-    return auth.handler(new Request(url, c.req.raw));
+    return handleWellKnownAlias(c.env, c.req.raw, "/api/auth/.well-known/oauth-authorization-server");
   });
   app.all("/.well-known/oauth-authorization-server/api/auth", async (c) => {
-    const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences);
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/.well-known/oauth-authorization-server";
-    return auth.handler(new Request(url, c.req.raw));
+    return handleWellKnownAlias(c.env, c.req.raw, "/api/auth/.well-known/oauth-authorization-server");
   });
   app.all("/.well-known/openid-configuration", async (c) => {
-    const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences);
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/.well-known/openid-configuration";
-    return auth.handler(new Request(url, c.req.raw));
+    return handleWellKnownAlias(c.env, c.req.raw, "/api/auth/.well-known/openid-configuration");
   });
   app.all("/.well-known/openid-configuration/api/auth", async (c) => {
-    const loaded = await loadResourceAudiences(c.env.KV, () => loadEnabledResourceAudienceRows(c.env.DB));
-    const auth = getAuth(c.env, loaded.audiences);
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/.well-known/openid-configuration";
-    return auth.handler(new Request(url, c.req.raw));
+    return handleWellKnownAlias(c.env, c.req.raw, "/api/auth/.well-known/openid-configuration");
   });
 }

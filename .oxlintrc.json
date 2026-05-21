@@ -64,6 +64,10 @@
     "architecture/auth-boundary": "error",
     "architecture/ui-route-composition": "error",
     "architecture/no-direct-db-access": "error",
+    "architecture/plugin-owned-table-boundary": "error",
+    "architecture/auth-test-contract-fixtures": "error",
+    "architecture/hono-admin-route-allowlist": "error",
+    "architecture/auth-plugin-folder-shape": "error",
     "architecture/route-path-contract": "error"
   },
   "overrides": [
@@ -90,6 +94,10 @@
         "architecture/auth-boundary": "off",
         "architecture/ui-route-composition": "off",
         "architecture/no-direct-db-access": "off",
+        "architecture/plugin-owned-table-boundary": "off",
+        "architecture/auth-test-contract-fixtures": "off",
+        "architecture/hono-admin-route-allowlist": "off",
+        "architecture/auth-plugin-folder-shape": "off",
         "architecture/route-path-contract": "off",
         "no-console": "off",
         "no-await-in-loop": "off"
@@ -117,6 +125,10 @@
         "architecture/packages-lib-isolation": "off",
         "architecture/auth-boundary": "off",
         "architecture/no-direct-db-access": "off",
+        "architecture/plugin-owned-table-boundary": "off",
+        "architecture/auth-test-contract-fixtures": "off",
+        "architecture/hono-admin-route-allowlist": "off",
+        "architecture/auth-plugin-folder-shape": "off",
         "architecture/route-path-contract": "off",
         "no-console": "off"
       }

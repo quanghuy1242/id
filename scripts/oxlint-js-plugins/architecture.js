@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 var STORAGE_ERROR_PATTERNS = [
   /UNIQUE constraint failed/i,
   /\bSQLite\b/i,
@@ -41,6 +43,20 @@ function extractImportSource(node) {
     return node.source.value;
   }
   return null;
+}
+
+function getImportedNames(node) {
+  var names = [];
+  if (!node.specifiers) return names;
+  for (var i = 0; i < node.specifiers.length; i++) {
+    var specifier = node.specifiers[i];
+    if (specifier.type !== "ImportSpecifier") continue;
+    var imported = specifier.imported;
+    if (!imported) continue;
+    if (imported.type === "Identifier") names.push(imported.name);
+    if (imported.type === "Literal" && typeof imported.value === "string") names.push(imported.value);
+  }
+  return names;
 }
 
 function getPropertyName(node) {
@@ -1251,12 +1267,13 @@ var DB_METHODS = new Set(["prepare", "batch", "exec"]);
 function isApprovedDbAccessFile(filename) {
   if (filename.includes("/workers/core/src/infrastructure/")) return true;
   if (filename.endsWith("workers/core/src/auth/cli.ts")) return true;
+  if (filename.endsWith("workers/core/src/auth/plugins/resource-server/audiences.ts")) return true;
   if (filename.includes("/workers/core/tests/")) return true;
   return false;
 }
 
 var noDirectDbAccessRule = {
-  meta: { type: "problem", docs: { description: "Raw D1/WRONG?database access is forbidden outside infrastructure; use Better Auth adapter APIs instead" } },
+  meta: { type: "problem", docs: { description: "Raw D1 database access is forbidden outside approved persistence boundaries; use Better Auth adapter APIs instead" } },
   create: function (context) {
     var filename = context.filename || context.physicalFilename || "";
     if (!filename.includes("/workers/core/src/")) return {};
@@ -1276,20 +1293,136 @@ var noDirectDbAccessRule = {
           getPropertyName(object.object.property) === "env";
 
         if (isEnvDb || isEnvDbViaC) {
-          context.report({ node: node, message: "Direct " + method + "() on env.DB is forbidden outside infrastructure. Use Better Auth adapter APIs or infrastructure/persistence for D1 access." });
+          context.report({ node: node, message: "Direct " + method + "() on env.DB is forbidden outside infrastructure, auth/cli.ts, or the resource-server audience companion. Use Better Auth adapter APIs for plugin CRUD." });
           return;
         }
 
         var isIdentifier = object.type === "Identifier";
         if (isIdentifier) {
-          context.report({ node: node, message: "Direct " + method + "() on a database handle is forbidden outside infrastructure. Use Better Auth adapter APIs or infrastructure/persistence for D1 access." });
+          context.report({ node: node, message: "Direct " + method + "() on a database handle is forbidden outside infrastructure, auth/cli.ts, or the resource-server audience companion. Use Better Auth adapter APIs for plugin CRUD." });
         }
       },
     };
   },
 };
 
-// ─── Rule 25: route-path-contract ─────────────────────────────────────────
+// ─── Rule 25: plugin-owned-table-boundary ─────────────────────────────────
+var PLUGIN_MODEL_CONSTANTS = new Set(["RESOURCE_SERVER_MODEL"]);
+
+var pluginOwnedTableBoundaryRule = {
+  meta: { type: "problem", docs: { description: "Better Auth plugin-owned table constants must not be used from generic infrastructure persistence" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+    if (!filename.includes("/workers/core/src/infrastructure/persistence/")) return {};
+
+    return {
+      ImportDeclaration: function (node) {
+        var spec = extractImportSource(node);
+        if (!spec || !spec.endsWith("/shared/constants")) return;
+        var names = getImportedNames(node);
+        for (var i = 0; i < names.length; i++) {
+          if (PLUGIN_MODEL_CONSTANTS.has(names[i])) {
+            context.report({
+              node: node.source,
+              message: "Plugin-owned table model `" + names[i] + "` must not be used from infrastructure/persistence. Keep plugin table runtime access inside workers/core/src/auth/plugins/<plugin>/.",
+            });
+          }
+        }
+      },
+    };
+  },
+};
+
+// ─── Rule 26: auth-test-contract-fixtures ─────────────────────────────────
+var authTestContractFixturesRule = {
+  meta: { type: "problem", docs: { description: "Test-only auth route contracts must not live in production auth source" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+
+    return {
+      Program: function (node) {
+        if (filename.endsWith("/workers/core/src/auth/contracts.ts")) {
+          context.report({
+            node: node,
+            message: "Auth route contract fixtures are test-only. Put them under workers/core/tests/auth/fixtures/, not production auth source.",
+          });
+        }
+      },
+      ImportDeclaration: function (node) {
+        if (filename.includes("/workers/core/tests/")) return;
+        var spec = extractImportSource(node);
+        if (spec && spec.includes("/auth/contracts")) {
+          context.report({
+            node: node.source,
+            message: "Production source must not import test-only auth route contracts.",
+          });
+        }
+      },
+    };
+  },
+};
+
+// ─── Rule 27: hono-admin-route-allowlist ──────────────────────────────────
+var HONO_ADMIN_ROUTE_ALLOWLIST = new Set(["/api/admin/dashboard"]);
+
+var honoAdminRouteAllowlistRule = {
+  meta: { type: "problem", docs: { description: "Hono /api/admin routes are reserved for allowlisted aggregate workflows; plugin CRUD belongs in Better Auth plugins" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+    if (!filename.includes("/workers/core/src/http/routes/")) return {};
+
+    return {
+      CallExpression: function (node) {
+        var info = extractRoutePathFromAppCall(node);
+        if (!info) return;
+        if (!info.path.startsWith("/api/admin/")) return;
+        if (HONO_ADMIN_ROUTE_ALLOWLIST.has(info.path)) return;
+
+        context.report({
+          node: info.node,
+          message: "Hono /api/admin/* routes are reserved for allowlisted aggregate workflows. Put auth-owned CRUD under a Better Auth plugin endpoint mounted at /api/auth/admin/*.",
+        });
+      },
+    };
+  },
+};
+
+// ─── Rule 28: auth-plugin-folder-shape ────────────────────────────────────
+function getAuthPluginIndexDir(filename) {
+  var marker = "/workers/core/src/auth/plugins/";
+  var index = filename.indexOf(marker);
+  if (index === -1) return null;
+  if (!filename.endsWith("/index.ts")) return null;
+  var after = filename.slice(index + marker.length);
+  if (after.split("/").length !== 2) return null;
+  return filename.slice(0, filename.length - "/index.ts".length);
+}
+
+var authPluginFolderShapeRule = {
+  meta: { type: "problem", docs: { description: "Custom Better Auth plugin folders must include the standard implementation files" } },
+  create: function (context) {
+    var filename = context.filename || context.physicalFilename || "";
+    var dir = getAuthPluginIndexDir(filename);
+    if (!dir) return {};
+
+    return {
+      Program: function (node) {
+        var requiredFiles = ["schema.ts", "operations.ts", "types.ts", "README.md"];
+        for (var i = 0; i < requiredFiles.length; i++) {
+          var requiredFile = requiredFiles[i];
+          if (!existsSync(dir + "/" + requiredFile)) {
+            context.report({
+              node: node,
+              message: "Custom Better Auth plugin folders must include " + requiredFile + " next to index.ts.",
+            });
+          }
+        }
+      },
+    };
+  },
+};
+
+// ─── Rule 29: route-path-contract ─────────────────────────────────────────
 var CORE_FORBIDDEN_PATH_PREFIX = "/admin/";
 var CORE_ALLOWED_PATH_PREFIX = "/api/admin/";
 var UI_FORBIDDEN_PATH_PREFIX = "/api/";
@@ -1342,7 +1475,7 @@ var routePathContractRule = {
 
         if (isCore) {
           if (info.path.startsWith(CORE_FORBIDDEN_PATH_PREFIX) && !info.path.startsWith(CORE_ALLOWED_PATH_PREFIX)) {
-            context.report({ node: info.node, message: "core-id must not serve /admin/* paths. Admin UI assets belong to ui-id. Use /api/admin/ prefix for BA plugin admin endpoints." });
+            context.report({ node: info.node, message: "core-id must not serve /admin/* paths. Admin UI assets belong to ui-id. Better Auth plugin admin endpoints mount under /api/auth/admin/*." });
           }
         }
 
@@ -1380,6 +1513,10 @@ var plugin = {
     "auth-boundary": authBoundaryRule,
     "ui-route-composition": uiRouteCompositionRule,
     "no-direct-db-access": noDirectDbAccessRule,
+    "plugin-owned-table-boundary": pluginOwnedTableBoundaryRule,
+    "auth-test-contract-fixtures": authTestContractFixturesRule,
+    "hono-admin-route-allowlist": honoAdminRouteAllowlistRule,
+    "auth-plugin-folder-shape": authPluginFolderShapeRule,
     "route-path-contract": routePathContractRule,
   },
 };

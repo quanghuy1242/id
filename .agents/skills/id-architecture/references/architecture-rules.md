@@ -175,6 +175,10 @@ Better Auth is a runtime integration boundary:
 - `ui-no-auth-deps`: UI never imports Better Auth, Drizzle, Jose, D1/KV types, or core source.
 - `packages-lib-isolation`: `packages/lib` remains framework-free and only imports relative files or itself.
 - `auth-boundary`: Better Auth imports stay in approved core auth boundary files.
+- `plugin-owned-table-boundary`: plugin-owned table model constants must not be imported into generic `infrastructure/persistence/**`; runtime exceptions for plugin tables stay inside the owning plugin directory.
+- `auth-test-contract-fixtures`: test-only auth route contracts must not live in production `workers/core/src/auth/**`.
+- `hono-admin-route-allowlist`: Hono `/api/admin/*` route literals are limited to allowlisted aggregate workflows; auth-owned CRUD belongs in Better Auth plugin endpoints under `/api/auth/admin/*`.
+- `auth-plugin-folder-shape`: custom Better Auth plugin folders must include `schema.ts`, `operations.ts`, `types.ts`, and `README.md` next to `index.ts`.
 
 ## Route Handler Rules
 
@@ -201,7 +205,8 @@ Rules:
 
 ## Database Access Rule
 
-- `no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/` and `auth/cli.ts`. Use Better Auth adapter APIs or infrastructure/persistence for D1 access.
+- `no-direct-db-access`: raw D1 `.prepare()`, `.batch()`, `.exec()` is forbidden outside `infrastructure/`, `auth/cli.ts`, and the exact resource-server audience companion at `auth/plugins/resource-server/audiences.ts`.
+- Plugin-owned CRUD uses Better Auth adapter APIs. The resource-server audience companion is an approved pre-auth exception because OAuth Provider needs `validAudiences` before Better Auth endpoint context exists.
 
 The Phase 3 UI gate must fail admin route files for:
 

@@ -1015,6 +1015,7 @@ const idResourceServer = () => ({
 - BA's endpoint context exposes the adapter for plugin models — no `CrudAdapter`, mapper, repository, or manual D1 query is needed for plugin-owned CRUD.
 - Schema upgrades are managed by BA's migration system, not by custom migration scripts that may drift.
 - Plugin endpoints are registered on the BA handler automatically under the Better Auth base path. With the repo's default base path, resource-server admin endpoints should be shaped under `/api/auth/admin/resource-servers...`, not as standalone Hono `/api/admin/resource-servers` routes unless an explicit compatibility alias is added and tested.
+- Plugin-owned pre-auth runtime companions are allowed when Better Auth requires data before endpoint context exists. `auth/plugins/resource-server/audiences.ts` is the approved example: it owns the resource-server audience KV cache and the raw-D1 fallback needed to provide `oauthProvider({ validAudiences })`.
 
 **`workers/core/src/infrastructure/db/schema.ts` remains empty.** All table definitions belong to BA plugins.
 
@@ -1087,7 +1088,11 @@ Id-specific rules, all hard errors:
 | 17 | `packages-lib-isolation` | framework/runtime imports in `packages/lib` |
 | 18 | `auth-boundary` | Better Auth imports outside approved core files |
 | 19 | `ui-route-composition` | raw HTML/classes/fetch/core imports in admin route files |
-| 20 | `no-direct-db-access` | raw D1 `.prepare()`/`.batch()`/`.exec()` outside infrastructure |
+| 20 | `no-direct-db-access` | raw D1 `.prepare()`/`.batch()`/`.exec()` outside approved persistence boundaries |
+| 21 | `plugin-owned-table-boundary` | plugin-owned table constants leaking into generic infrastructure persistence |
+| 22 | `auth-test-contract-fixtures` | test-only auth route fixtures in production auth source |
+| 23 | `hono-admin-route-allowlist` | Hono-first `/api/admin/*` auth CRUD instead of BA plugin endpoints |
+| 24 | `auth-plugin-folder-shape` | incomplete custom Better Auth plugin folder templates |
 
 Built-in hard rules:
 
@@ -1251,9 +1256,9 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Entity classes | private constructor, create, reconstitute, toSnapshot | Oxlint `entity-class` |
 | Serialization | no raw entity spreading/stringifying | Oxlint `no-raw-entity-serialization` |
 | Routes | one use case, presenter output, no direct env access | Oxlint `route-handler-boundary` |
-| Admin auth | admin API routes require actor (review-enforced, not mechanical) | Code review |
+| Admin auth | Hono admin aggregate routes require actor; plugin-owned auth CRUD uses Better Auth session middleware and plugin policy callbacks | Code review + oxlint route allowlist |
 | Repositories | CrudAdapter and mapper workflow only | Oxlint `repository-workflow` |
-| Database access | raw D1 `.prepare()`/`.batch()`/`.exec()` only in infrastructure | Oxlint `no-direct-db-access` |
+| Database access | raw D1 `.prepare()`/`.batch()`/`.exec()` only in infrastructure, auth CLI, or the resource-server audience companion | Oxlint `no-direct-db-access` |
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |

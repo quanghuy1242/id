@@ -98,7 +98,7 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 ### 2.1 Route Map And API Shape (000 Spike C + 001 Spike 1)
 
 - [x] Scaffold a minimal Better Auth instance using `getAuth(env, validAudiences)` factory.
-- [x] Generate/commit a route map in `workers/core/src/auth/contracts.ts` — public paths are under `/api/auth`.
+- [x] Generate/commit a route-map test fixture in `workers/core/tests/auth/fixtures/route-contracts.ts` — public paths are under `/api/auth`.
 - [x] Prove `/oauth2/userinfo` path (not `/userinfo`) from installed package types.
 - [x] Prove OAuth Provider client CRUD server API names (`createOAuthClient`, `updateOAuthClient`, `deleteOAuthClient`) from installed package types.
 - [x] Correct sign-up claim: installed `better-auth@1.6.11` email/password config exposes `disableSignUp`; the OAuth Provider prompt-create page setting is `signUp`, not `signup`.
@@ -255,10 +255,10 @@ Admin CRUD operations on `core-id` are tested via integration tests and document
 
 Post-Phase 5 cleanup to bring the implementation closer to the `000_repo-architecture.md` constitution:
 
-- [x] Added `architecture/no-direct-db-access` oxlint rule (Rule 24) — raw D1 `.prepare()`, `.batch()`, `.exec()` outside `infrastructure/` and `cli.ts` is now a hard error.
+- [x] Added `architecture/no-direct-db-access` oxlint rule (Rule 24) — raw D1 `.prepare()`, `.batch()`, `.exec()` outside `infrastructure/`, `cli.ts`, and the resource-server audience companion is now a hard error.
 - [x] Refactored `admin-access.ts` and plugin authorize callback to use Better Auth adapter APIs (`findMany`) instead of raw `env.DB.prepare().bind().first()`.
-- [x] Reorganized `auth/` directory: adapters (`audiences.ts`, `secondary-storage.ts`, `storage-email.ts`) grouped under `auth/adapters/`; admin operations (`admin/access.ts`, `admin/actor.ts`) grouped under `auth/admin/`.
-- [x] Moved `resource-server-store.ts` to `infrastructure/persistence/` — legitimate infrastructure code that needs raw D1 for audience loading before the Better Auth instance exists.
+- [x] Reorganized `auth/` directory: storage/email adapters remain under `auth/adapters/`; active auth policy helpers live under `auth/policies/`; plugin-owned runtime companions live under their plugin directories.
+- [x] Moved resource-server audience loading to `auth/plugins/resource-server/audiences.ts` — the plugin owns the KV cache, invalidation, and the approved raw-D1 fallback needed before the Better Auth instance exists.
 - [x] Moved `resource-token-verifier.ts` to `packages/lib/src/` — framework-free downstream verification utility; added `jose` to `packages/lib` dependencies and allowed it in `packages-lib-isolation`.
 - [x] Removed inline admin dashboard endpoint (`GET /api/admin/dashboard`) — was built without clean-architecture layers; deferred to Phase 7 with proper domain/application/infrastructure implementation.
 - [x] Split `app.ts` (was 80 lines, one-file god) into `composition/create-app.ts` (wiring), `http/routes/health.routes.ts`, `http/routes/auth-mount.ts` (BA handler + well-known mounting).

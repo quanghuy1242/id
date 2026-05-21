@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { authPluginConfig } from "../../src/auth/config";
-import { invalidateResourceAudiences, loadResourceAudiences } from "../../src/auth/adapters/audiences";
+import {
+  invalidateResourceServerAudiences,
+  loadResourceServerAudiences,
+  loadResourceAudiencesFromCache,
+} from "../../src/auth/plugins/resource-server/audiences";
 
 type StoredValue = {
   readonly value: string;
@@ -27,7 +31,7 @@ describe("resource audience cache", () => {
     const { kv, values } = createKv();
     values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify(["https://api.example.test"]) });
 
-    const result = await loadResourceAudiences(kv, async () => {
+    const result = await loadResourceAudiencesFromCache(kv, async () => {
       throw new Error("store should not be read on cache hit");
     });
 
@@ -37,7 +41,7 @@ describe("resource audience cache", () => {
   it("loads enabled audiences from the store and writes the KV cache", async () => {
     const { kv, values } = createKv();
 
-    const result = await loadResourceAudiences(kv, async () => [
+    const result = await loadResourceAudiencesFromCache(kv, async () => [
       { audience: "https://disabled.example.test", enabled: false },
       { audience: "https://api.example.test", enabled: true },
       { audience: "https://api.example.test", enabled: true },
@@ -54,11 +58,51 @@ describe("resource audience cache", () => {
     });
   });
 
+  it("treats malformed KV values as cache misses", async () => {
+    const { kv, values } = createKv();
+    values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify({ audience: "https://api.example.test" }) });
+
+    const result = await loadResourceAudiencesFromCache(kv, async () => [
+      { audience: "https://api.example.test", enabled: true },
+    ]);
+
+    expect(result).toEqual({ audiences: ["https://api.example.test"], source: "store" });
+  });
+
+  it("loads enabled audiences from the plugin-owned D1 query on KV miss", async () => {
+    const { kv } = createKv();
+    const db = {
+      prepare: (sql: string) => {
+        expect(sql).toContain('from "resourceServer"');
+        return {
+          bind: (enabled: number) => {
+            expect(enabled).toBe(1);
+            return {
+              all: async () => ({
+                results: [
+                  { audience: "https://api.example.test", enabled: true },
+                  { audience: "https://mcp.example.test", enabled: true },
+                ],
+              }),
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const result = await loadResourceServerAudiences({ DB: db, KV: kv });
+
+    expect(result).toEqual({
+      audiences: ["https://api.example.test", "https://mcp.example.test"],
+      source: "store",
+    });
+  });
+
   it("invalidates the audience cache after plugin-owned resource server mutation", async () => {
     const { kv, values } = createKv();
     values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify(["https://api.example.test"]) });
 
-    await invalidateResourceAudiences(kv);
+    await invalidateResourceServerAudiences({ KV: kv });
 
     expect(values.has(authPluginConfig.resourceAudienceCacheKey)).toBe(false);
   });

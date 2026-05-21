@@ -26,6 +26,7 @@
 - [5. Pipeline Hook System](#5-pipeline-hook-system)
 - [6. Full Admin UI](#6-full-admin-ui)
 - [7. Deferred OAuth Browser Pages](#7-deferred-oauth-browser-pages)
+- [8. Deferred Admin Authorization Model](#8-deferred-admin-authorization-model)
 
 ## 1. Plugin Architecture Strategy
 
@@ -238,8 +239,8 @@ The first batch scaffolds `ui-id` under `/admin/*` with hosted login/consent pag
 **Other deferred architecture layers:**
 - `domain/admin/` — empty directory for future Hono-owned domain entities and repository interfaces.
 - `application/admin/authorization.ts` — `authorizeAdminAction(actor, action, orgId?)` is implemented and tested but has zero production callers after the dashboard was removed. The four `AdminAction` values (`listAnyOrganization`, `mutateAnyOrganization`, `manageOwnOrganization`, `delegateOwnOrganization`) map to the authorization model from Phase 4 and will be wired in Phase 7 when Hono admin routes call `requireActor(c)` → `authorizeAdminAction(actor, action, orgId)` before use cases.
-- `auth/admin/actor.ts` — `loadAdminActor(env, adapter, headers)` loads an `AuthenticatedAdminActor` from session + membership data via Better Auth adapter. Implemented but unused after dashboard removal. Phase 7 admin routes will call this inside `requireActor(c)`.
-- `infrastructure/` — currently only `persistence/resource-server-store.ts` (legitimate raw-D1 audience loader for Better Auth factory). Future Hono-owned resources will need repositories/mappers under `infrastructure/repositories/`.
+- `auth/admin/actor.ts` — removed during the plugin-first auth cleanup because it had no production caller. Future Hono-owned admin routes should add actor loading with the request-scoped container work instead of reviving stale code.
+- `infrastructure/` — currently no resource-server persistence module. The resource-server audience loader moved to `auth/plugins/resource-server/audiences.ts` because the table is plugin-owned. Future Hono-owned resources will need repositories/mappers under `infrastructure/repositories/`.
 - `composition/` — currently only `create-app.ts` with Hono wiring. Phase 7 will add a request-scoped DI container (`create-request-container.ts`) that wires repositories into use cases and sets `c.set('container', container)` via Hono middleware.
 
 ### Deferred Admin Code Catalog (Phase 7)
@@ -249,7 +250,7 @@ These files exist and are tested but have no production callers. They are preser
 | File | Export | Purpose | Status |
 |---|---|---|---|
 | `application/admin/authorization.ts` | `authorizeAdminAction`, `AdminActor`, `AdminAction`, `PlatformRole`, `OrganizationRole` | Server-side authorization decisions per actor+action+org | Tested |
-| `auth/admin/actor.ts` | `loadAdminActor`, `AuthenticatedAdminActor` | Load actor from session + membership data via BA adapter | Implemented |
+| `auth/admin/actor.ts` | Removed | Future actor loading should be rebuilt with the Phase 7 request-scoped container | Removed |
 | `shared/http-status.ts` | `HTTP_UNAUTHORIZED` (401), `HTTP_FORBIDDEN` (403), `HTTP_OK` (200) | Named HTTP status constants | In use by health route |
 | `domain/admin/` | (empty) | Future domain entities and repository interfaces | Scaffold only |
 
@@ -310,3 +311,50 @@ Deferred pages and flows:
 | Password recovery UX | Better Auth password reset callbacks/pages | `/forgot-password`, `/reset-password` | Email delivery is P0, but a polished hosted reset UX can follow if first release handles reset through API/direct links. |
 
 Re-enable each option only in the same change that adds the page and tests the redirect-resume behavior. The tests should prove the page preserves Better Auth's signed OAuth query or continuation parameters and calls the expected Better Auth endpoint before resuming authorization.
+
+## 8. Deferred Admin Authorization Model
+
+A preliminary `AdminActor` / `authorizeAdminAction` RBAC model lived in `workers/core/src/application/admin/authorization.ts` with tests at `workers/core/tests/application/admin-authorization.test.ts`. Both files were removed on 2026-05-21 because the first batch ships with inline `isPlatformAdmin` / `hasOrganizationAccess` checks in Better Auth plugin callbacks.
+
+**What was removed:**
+
+```ts
+type PlatformRole = "admin" | "user";
+type OrganizationRole = "admin" | "member" | "owner";
+
+type AdminActor = {
+  readonly userId: string;
+  readonly platformRole: PlatformRole;
+  readonly organizations: readonly {
+    readonly organizationId: string;
+    readonly role: OrganizationRole;
+  }[];
+};
+
+type AdminAction =
+  | "listAnyOrganization"
+  | "mutateAnyOrganization"
+  | "manageOwnOrganization"
+  | "delegateOwnOrganization";
+
+function authorizeAdminAction(
+  actor: AdminActor | null,
+  action: AdminAction,
+  organizationId?: string,
+): AuthorizationDecision;
+```
+
+**When to reintroduce:**
+
+- When admin endpoints grow beyond CRUD on a single `resourceServer` table and nested authorization patterns (organization-scoped actions with role delegation) need a centralized decision point.
+- When the CEL policy engine (Section 2) is ready to replace the imperative `authorizeAdminAction` function.
+- When `requireActor(c)` in [admin routes](/workers/core/src/http/routes/admin/) needs more granular action names than "platform admin vs not."
+
+**How to restore:**
+
+1. Copy the types and function from the [git history](https://github.com/) (commit prior to 2026-05-21 deletion).
+2. Copy the test suite from the same history.
+3. Wire `authorizeAdminAction` into `requireActor` or the use-case layer.
+4. Add a snapshot test proving the allowed/denied decision table matches the current release's access rules.
+
+Do not reintroduce the file without also updating `docs/000_repo-architecture.md` if the file placement or layer boundaries change.

@@ -2,10 +2,10 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
-import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./admin/access";
-import { invalidateResourceAudiences } from "./adapters/audiences";
+import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
 import { authPluginConfig, authRateLimitConfig, oauthTokenLifetimeConfig } from "./config";
+import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
 import type { AuthOptionsEnv, AuthRuntimeOptions } from "./types";
@@ -17,6 +17,11 @@ export function getAuth(
   runtime: AuthRuntimeOptions = {},
 ) {
   return betterAuth(getAuthOptions(env, validAudiences, runtime));
+}
+
+export async function createAuthForRequest(env: CoreEnv, runtime: AuthRuntimeOptions = {}) {
+  const loaded = await loadResourceServerAudiences(env);
+  return getAuth(env, loaded.audiences, runtime);
 }
 
 export function getAuthOptions(
@@ -105,7 +110,7 @@ export function getAuthOptions(
         }),
       }),
       idResourceServer({
-        invalidateAudienceCache: () => invalidateResourceAudiences(env.KV),
+        invalidateAudienceCache: () => invalidateResourceServerAudiences(env),
         authorize: async (organizationId, userId, role, adapter) =>
           isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),

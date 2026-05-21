@@ -21,11 +21,13 @@ For the current concrete template, also read `workers/core/src/auth/plugins/reso
 - Keep `schema.ts` as the data/API shape surface: canonical Zod model, request schemas, derived Better Auth field map, and OpenAPI fragments.
 - Keep `types.ts` for runtime composition hooks injected by `get-auth.ts`; do not merge callback options into `schema.ts`.
 - Keep `operations.ts` for helper logic that can be unit-tested without a Better Auth request context.
-- Inject authorization callbacks from `workers/core/src/auth/get-auth.ts`; never import `auth/admin/access.ts` directly inside a plugin.
+- Keep plugin-owned pre-auth runtime companions inside the plugin directory when Better Auth needs data before endpoint context exists, such as the resource-server audience KV cache and D1 fallback.
+- Inject authorization callbacks from `workers/core/src/auth/get-auth.ts`; never import `auth/policies/access.ts` directly inside a plugin.
 
 ## Validation
 
 - Unit-test schema derivation and operation helpers without Better Auth context.
+- Unit-test plugin runtime companions such as audience cache hit/miss/invalidation behavior without a Better Auth context.
 - Integration-test endpoint handlers through `auth.handler()` using `betterAuth(getAuthOptions(...))`.
 - Run `pnpm check` after code changes.
 - Run `pnpm advise` after substantial plugin refactors and handle new findings according to repo guidance.
