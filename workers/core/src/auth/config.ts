@@ -39,7 +39,7 @@ export const oauthTokenLifetimeConfig = {
 export const authPluginConfig = {
   issuerPath: "/api/auth",
   resourceAudienceCacheKey: "id-resource-servers:audiences",
-  resourceAudienceCacheTtlSeconds: 60,
+  resourceAudienceCacheTtlSeconds: 86_400,
   emailVerificationStoragePrefix: "id-email:verification:",
   passwordResetStoragePrefix: "id-email:password-reset:",
   jwksPath: "/jwks",
