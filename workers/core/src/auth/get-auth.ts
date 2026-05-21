@@ -4,6 +4,7 @@ import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
 import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
+import { hashPassword, verifyPassword } from "./adapters/password-hasher";
 import { authPluginConfig, authRateLimitConfig, oauthTokenLifetimeConfig } from "./config";
 import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
@@ -63,6 +64,10 @@ export function getAuthOptions(
       requireEmailVerification: true,
       sendResetPassword: ({ user, url }) =>
         sendAuthEmail(emailSender, { kind: "password-reset", to: user.email, url }, runtime.backgroundTaskRunner),
+      password: {
+        hash: hashPassword,
+        verify: verifyPassword,
+      },
     },
     plugins: [
       organization(),
