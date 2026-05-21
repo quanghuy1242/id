@@ -136,13 +136,20 @@ jobs:
           done
 
       - name: Deploy core-id worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.92.0
+          command: deploy --config workers/core/wrangler.jsonc
+          secrets: |
+            BETTER_AUTH_SECRET
+            SENDER_API_TOKEN
+            ID_BOOTSTRAP_TOKEN
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           SENDER_API_TOKEN: ${{ secrets.SENDER_API_TOKEN }}
           ID_BOOTSTRAP_TOKEN: ${{ secrets.ID_BOOTSTRAP_TOKEN }}
-        run: pnpm deploy:core
 
   deploy-ui:
     needs: deploy-core
