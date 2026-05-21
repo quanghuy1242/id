@@ -70,6 +70,6 @@ When new findings appear, handle them autonomously:
 
 ## Rules
 
-1. Always keep README.md up to date when public commands, topology, or setup changes.
+1. Always keep README.md up to date when public commands, topology, or setup changes. (hard gate — do not skip)
 2. When work from a planning document is completed, update status metadata or implementation notes in that document when the document asks for it.
 3. Name planning documents with a leading numbered prefix in the `xxx_...` format so their sequence stays trackable.

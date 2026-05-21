@@ -4,7 +4,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 
 This repo implements the first-batch documented scope:
 
-- `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens, admin API, Better Auth OpenAPI reference
+- `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens, admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`)
 - `ui-id` Worker — admin UI scaffold under `/admin/*` with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
