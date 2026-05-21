@@ -5,7 +5,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens, admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`)
-- `ui-id` Worker — admin UI scaffold under `/admin/*` with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
+- `ui-id` Worker — admin UI scaffold under `/admin/*`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
 
@@ -113,7 +113,7 @@ pnpm dev:core                    # core-id Worker
 pnpm dev:ui                      # ui-id Worker (Vinext dev)
 ```
 
-In production, route specificity sends `/admin/*` to `ui-id` and `/api/auth/*` plus metadata routes to `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
+In production, route specificity sends `/admin/*` and `/assets/*` to `ui-id` and `/api/auth/*` plus metadata routes to `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
 
 ## First Admin And API-Only Operation
 

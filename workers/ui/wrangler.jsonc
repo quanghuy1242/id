@@ -11,6 +11,8 @@
   },
   "routes": [
     // Route for UI administration pages (login, consent flow screen, and management forms)
-    { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" }
+    { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" },
+    // Client-side assets (JS, CSS) referenced by admin pages
+    { "pattern": "id.quanghuy.dev/assets/*", "zone_name": "quanghuy.dev" }
   ]
 }

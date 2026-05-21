@@ -288,7 +288,7 @@ The first batch can run on Workers/D1/KV, but implementation should keep databas
 
 ### 4.1 Runtime Shape
 
-The target service uses two Cloudflare Workers on the same hostname. `core-id` serves auth APIs, OAuth/OIDC endpoints, metadata routes, Better Auth plugin endpoints, and any custom Hono admin APIs. `ui-id` serves only `/admin/*` admin UI routes. Hosted auth pages call same-origin core `/api/auth/*` endpoints directly; full admin UI pages are deferred (see `docs/002_implementation-sequence.md`).
+The target service uses two Cloudflare Workers on the same hostname. `core-id` serves auth APIs, OAuth/OIDC endpoints, metadata routes, Better Auth plugin endpoints, and any custom Hono admin APIs. `ui-id` serves `/admin/*` admin UI routes and `/assets/*` client-side bundles. Hosted auth pages call same-origin core `/api/auth/*` endpoints directly; full admin UI pages are deferred (see `docs/002_implementation-sequence.md`).
 
 Primary libraries:
 
@@ -812,7 +812,8 @@ core-id worker (primary — auth, OAuth, admin API)
 ui-id worker (admin dashboard scaffold)
 ├── /admin/*                            hosted auth/admin UI pages
 ├── /admin/health                       UI worker health
-└── /admin/api                          placeholder for future UI-owned BFF endpoints
+├── /admin/api                          placeholder for future UI-owned BFF endpoints
+├── /assets/*                           client-side JS/CSS bundles
 ```
 
 Use Hono to route requests and pass Cloudflare bindings into the Better Auth factory.
