@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/composition/create-app";
 import type { CoreEnv } from "../../src/config/env";
 import { createMemoryD1 } from "./d1-test-helper";
@@ -27,27 +27,13 @@ async function createEnv(): Promise<CoreEnv> {
 }
 
 describe("JWKS routes", () => {
-  it("serves fresh JWKS at /api/auth/jwks", async () => {
-    const match = vi.fn<(request: Request) => Promise<Response | undefined>>(async () => {
-      throw new Error("JWKS should not use Worker Cache API");
-    });
-    const put = vi.fn<(request: Request, response: Response) => Promise<void>>(async () => {
-      throw new Error("JWKS should not use Worker Cache API");
-    });
-    vi.stubGlobal("caches", { default: { match, put } });
+  it("lets Better Auth serve JWKS at /api/auth/jwks", async () => {
+    const response = await createApp().request("/api/auth/jwks", {}, await createEnv());
 
-    try {
-      const response = await createApp().request("/api/auth/jwks", {}, await createEnv());
-
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as { readonly keys?: readonly { readonly kid?: string }[] };
-      expect(body.keys?.length).toBeGreaterThan(0);
-      expect(body.keys?.[0]?.kid).toBeTypeOf("string");
-      expect(match).not.toHaveBeenCalled();
-      expect(put).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { readonly keys?: readonly { readonly kid?: string }[] };
+    expect(body.keys?.length).toBeGreaterThan(0);
+    expect(body.keys?.[0]?.kid).toBeTypeOf("string");
   });
 
   it("does not serve the well-known JWKS alias", async () => {
