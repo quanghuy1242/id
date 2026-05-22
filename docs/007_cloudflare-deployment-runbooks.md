@@ -112,7 +112,7 @@ The helper is intentionally curl-like. It accepts method, path, and optional inl
 1. Stop new deployments.
 2. Rotate `BETTER_AUTH_SECRET` only if auth state is also compromised.
 3. Reduce JWKS grace period in config only with an explicit incident patch.
-4. If emergency key visibility matters, temporarily reduce `JWKS_CACHE_MAX_AGE_SECONDS` before deploy; `/api/auth/jwks` is cached by the Worker Cache API per Cloudflare colo.
+4. Do not cache JWKS in the core Worker; Better Auth rotates signing keys lazily when a token is signed after the rotation interval, so the JWKS route must be able to publish the new `kid` immediately.
 5. Deploy `core-id`.
 6. Ask resource servers to refresh JWKS cache.
 7. Run a sign/verify smoke with `/api/auth/jwks`.

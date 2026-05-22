@@ -142,7 +142,7 @@ These are corrections to facts or wording, not loosened architecture decisions:
 - `001_first-batch-plan.md` now explicitly uses the two-Worker topology for repository shape; if feature wording and topology wording ever conflict, this document remains the repository/topology source of truth.
 - The repo path is `/home/quanghuy1242/pjs/auth`; examples may refer to the product/package name `id`, but implementation paths should use the actual repo path.
 - UserInfo should be documented as `/oauth2/userinfo` from Better Auth OAuth Provider. Depending on Better Auth base path/mounting, the public URL may include the auth base path; tests must assert the final route map.
-- Better Auth JWT's default JWKS endpoint is `/jwks` relative to the Better Auth base path; with `/api/auth` as base path, the public default is `/api/auth/jwks`. Custom OIDC-style paths such as `/.well-known/jwks.json` require explicit `jwksPath` configuration and route-map tests.
+- Better Auth JWT's default JWKS endpoint is `/jwks` relative to the Better Auth base path; with `/api/auth` as base path, the canonical public route is `/api/auth/jwks`. Changing the canonical route through `jwksPath` requires route-map tests.
 - The OAuth Provider sign-up prompt docs show `signUp` in configuration. Do not invent `signup` or other option names.
 - `validAudiences`, custom token claims, JWKS rotation, and route mounting must be proven by the pinned installed packages before feature work proceeds. This proof is required because exact TypeScript option shapes matter, not because the architecture is optional.
 - The root URL `/` should be owned by `core-id` by default. It can redirect to `/admin` or return service metadata, but `ui-id` must not become the default catch-all owner of auth/API paths.
@@ -1328,7 +1328,7 @@ Acceptance:
 |---|---|---|
 | Topology drift between docs | Implementer scaffolds wrong topology | Keep `000`, `001`, and `002` aligned on the two-Worker topology. |
 | Better Auth route mismatch | UI/tests target stale endpoint names | Spike C route-map tests. |
-| JWKS path confusion | resource servers fetch wrong key URL | Decide default base-path JWKS route (`/api/auth/jwks` with current base path) vs custom `/.well-known/jwks.json` and test discovery. |
+| JWKS path confusion | resource servers fetch wrong key URL | Use the default base-path JWKS route (`/api/auth/jwks` with current base path) and test discovery metadata. |
 | Dynamic audiences unsupported | Admin-managed resource servers cannot feed provider config | Installed types require synchronous `string[]`; load KV/D1 audiences before constructing the request-scoped provider and test the cache path. |
 | Better Auth Node built-ins in Workers | core bundle imports `node:async_hooks` and fails at runtime | `workers/core/wrangler.jsonc` must include `compatibility_flags = ["nodejs_compat"]`; dry-run deploy verifies the bundle. |
 | Service binding trust bypass | internal UI call skips auth | core admin API authorizes every request. |

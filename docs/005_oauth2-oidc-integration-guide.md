@@ -14,7 +14,7 @@ Use the well-known metadata routes before configuring an app:
 - `GET /.well-known/openid-configuration/api/auth`
 - `GET /api/auth/jwks`
 
-The root well-known OAuth metadata route is an alias to Better Auth's base-path metadata route so OAuth clients can discover the issuer correctly.
+The root well-known OAuth metadata route is an alias to Better Auth's base-path metadata route so OAuth clients can discover the issuer correctly. Discovery metadata advertises `/api/auth/jwks` as `jwks_uri`; clients should follow metadata instead of assuming a well-known JWKS filename.
 
 ## Authorization Code With PKCE
 

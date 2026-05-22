@@ -114,6 +114,10 @@ export function getAuthOptions(
       oauthProvider({
         loginPage: "/login",
         consentPage: "/consent",
+        silenceWarnings: {
+          oauthAuthServerConfig: true,
+          openidConfig: true,
+        },
         ...oauthTokenLifetimeConfig,
         scopes: [...authPluginConfig.oauthScopes],
         grantTypes: [...authPluginConfig.oauthGrantTypes],

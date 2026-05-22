@@ -752,13 +752,12 @@ Serve standards-friendly metadata:
 |---|---|
 | `/.well-known/oauth-authorization-server` | OAuth authorization server metadata |
 | `/.well-known/openid-configuration` | OIDC discovery where OIDC is used |
-| `/.well-known/jwks.json` | JWKS if supported/configured directly |
 | `/.well-known/oauth-protected-resource` | Protected resource metadata on resource servers, not necessarily on the IdP |
 
 Implementation requirement:
 
 - Discovery metadata must advertise the actual issuer, authorization endpoint, token endpoint, JWKS URI, supported grants, supported response types, supported auth methods, supported scopes, and resource-indicator behavior.
-- If Better Auth serves JWKS under `/api/auth/jwks`, metadata must point there or the Worker must provide a compatible alias at `/.well-known/jwks.json`.
+- Better Auth serves JWKS under `/api/auth/jwks`; discovery metadata must point there. Do not add a `/.well-known/jwks.json` alias unless a concrete client requires it and the route is tested.
 
 ### 7.3 Custom Admin APIs
 
@@ -1579,8 +1578,8 @@ Static checks:
 - [ ] Resource server can verify JWT locally using JWKS endpoint
 - [ ] Backend service can authenticate via client_credentials grant (M2M)
 - [ ] M2M token does not contain user context or OIDC scopes
-- [ ] JWKS key rotation behavior is configured and tested
-- [ ] Old JWKS keys remain valid during the configured grace period
+- [x] JWKS key rotation behavior is configured and tested
+- [x] Old JWKS keys remain valid during the configured grace period
 - [ ] Consent screen is shown for non-trusted clients
 - [ ] Trusted clients skip consent where configured
 - [ ] `prompt=select_account` works with multiple device sessions
@@ -1613,7 +1612,7 @@ Static checks:
 - [ ] OAuth2 refresh_token flow end-to-end test where refresh tokens are enabled
 - [ ] Token revocation test
 - [ ] Admin UI access control tests (superadmin, admin, org owner, member)
-- [ ] JWKS rotation test (old key valid during grace period, new key used for new tokens)
+- [x] JWKS rotation test (old key valid during grace period, new key used for new tokens)
 - [ ] Organization isolation test (user in org A cannot access org B's clients/resources)
 - [ ] Rate limit test for repeated auth attempts
 - [ ] Metadata route tests
