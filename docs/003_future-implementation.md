@@ -12,6 +12,7 @@
 >
 > - `docs/000_repo-architecture.md`
 > - `docs/001_first-batch-plan.md`
+> - `docs/010_organization-teams-oauth-flow.md`
 > - CEL specification — `https://github.com/google/cel-spec`
 > - Cloudflare Workers Analytics Engine — `https://developers.cloudflare.com/analytics/analytics-engine/`
 > - Cloudflare Dynamic Workers — `https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/`
@@ -27,6 +28,7 @@
 - [6. Full Admin UI](#6-full-admin-ui)
 - [7. Deferred OAuth Browser Pages](#7-deferred-oauth-browser-pages)
 - [8. Deferred Admin Authorization Model](#8-deferred-admin-authorization-model)
+- [9. API-First Authorization Policy And Tooling](#9-api-first-authorization-policy-and-tooling)
 
 ## 1. Plugin Architecture Strategy
 
@@ -44,6 +46,7 @@ All future features are Better Auth plugins, not standalone custom code. The fir
 | Plugin | Table | Purpose |
 |---|---|---|
 | `idResourceServer` | `resourceServer` | First batch — resource server management |
+| `idAuthorizationPolicy` | `policyResource`, `policyAction`, `policyRole`, `policyRolePermission`, `policyMemberRoleAssignment`, `policyTeamRoleAssignment`, `policyOAuthScope` | API-first, UI-ready product authorization policy and OAuth scope catalog |
 | `idCelPolicy` | `celPolicy` | CEL-based ABAC policy evaluation |
 | `idOnboarding` | (extends org plugin) | Registration contexts, invite tokens |
 | `idMetrics` | (no table) | Analytics Engine writes via BA hooks |
@@ -57,6 +60,7 @@ plugins: [
   jwt(config.jwt),
   oauthProvider({ ... }),
   idResourceServer(),
+  idAuthorizationPolicy(config.policy), // Future API-first policy plugin
   idCelPolicy(config.cel),        // Future
   idOnboarding(config.onboarding), // Future
   idPipeline(config.pipeline),     // Future
@@ -358,3 +362,55 @@ function authorizeAdminAction(
 4. Add a snapshot test proving the allowed/denied decision table matches the current release's access rules.
 
 Do not reintroduce the file without also updating `docs/000_repo-architecture.md` if the file placement or layer boundaries change.
+
+## 9. API-First Authorization Policy And Tooling
+
+`docs/010_organization-teams-oauth-flow.md` defines the target shape for UI-ready product authorization policy. The implementation should be API-first: build the Better Auth plugin, endpoint contracts, preload runtime, token issuance checks, scripts/tooling, and tests before building admin UI pages.
+
+### 9.1 Required API-First Work
+
+The future `idAuthorizationPolicy` plugin should own:
+
+- product permission resources and actions;
+- product roles;
+- role-permission bindings;
+- direct member role assignments;
+- team role assignments as a bridge until Better Auth ships native team role assignment;
+- OAuth scope catalog rows and scope-to-permission mappings.
+
+The first implementation should expose `/api/auth/admin/policy/...` endpoints and integration tests. Admin UI pages under `/admin/*` are a later consumer of these endpoints, not a prerequisite for the API/plugin work.
+
+### 9.2 Scripts And Tooling Reminders
+
+The existing architecture lint rule `architecture/no-direct-db-access` currently allowlists raw D1 fallback only for:
+
+```text
+workers/core/src/auth/plugins/resource-server/audiences.ts
+```
+
+The authorization policy scope catalog needs the same kind of plugin-owned preload companion because `oauthProvider({ scopes })` requires enabled scopes before Better Auth is constructed. When adding `workers/core/src/auth/plugins/authorization-policy/scopes.ts`, update:
+
+- `scripts/oxlint-js-plugins/architecture.js` — allow approved plugin-owned preload companions, not only the resource-server audience companion.
+- The lint error text in the same rule — make it mention approved plugin-owned preload companions.
+- Any architecture lint fixtures or tests if the repo adds them before this work lands.
+- `scripts/auth-api.mjs` and `scripts/auth-api-shared.mjs` only if API smoke helpers are needed before admin UI exists.
+- `scripts/remote-smoke.mjs` after policy endpoints exist, so remote smoke can prove DB-backed scopes participate in OAuth token issuance.
+
+Keep the boundary strict:
+
+- Plugin CRUD must use the Better Auth adapter.
+- Raw D1 fallback is allowed only in preload companions that must run before Better Auth exists.
+- Do not weaken the rule globally to make policy work pass lint.
+
+### 9.3 Deferred Admin UI
+
+Full admin UI for policy management remains part of Section 6. It should not block:
+
+- plugin schemas;
+- policy CRUD endpoints;
+- DB-backed OAuth scope preload;
+- token issuance policy checks;
+- resource API verification guidance;
+- architecture script updates.
+
+When the UI work starts, it should call the existing `/api/auth/admin/policy/...` endpoints rather than introducing UI-owned policy state or D1 access.

@@ -1,4 +1,4 @@
-# UI-Managed Authorization Policy, Teams, And OAuth Token Flow
+# API-Managed, UI-Ready Authorization Policy, Teams, And OAuth Token Flow
 
 > Status: implementation-grade proposal
 >
@@ -14,7 +14,7 @@
 > - future `workers/core/src/auth/plugins/authorization-policy/**`
 > - `workers/core/src/http/routes/auth-mount.ts`
 > - `workers/core/src/db/auth-schema.ts`
-> - admin UI pages under `workers/ui/src/app/admin/**`
+> - admin UI pages under `workers/ui/src/app/admin/**` — deferred until the API is implemented
 >
 > Source docs:
 >
@@ -48,7 +48,7 @@
 >
 > Assumptions:
 >
-> - Product authorization policy must be manageable through UI and database state. Product resources, actions, roles, role permissions, scope mappings, and team role assignments must not be hardcoded as product policy config.
+> - Product authorization policy must be manageable through API-backed database state first, then through UI. Product resources, actions, roles, role permissions, scope mappings, and team role assignments must not be hardcoded as product policy config.
 > - Better Auth remains the source of truth for identity, sessions, organizations, members, teams, OAuth clients, OAuth Provider, JWT signing, and JWKS.
 > - The repo may add Better Auth plugins for application-specific policy data, the same way `idResourceServer` adds resource-server audience management.
 > - "Custom" means two different things in this document: patching or bypassing Better Auth internals is forbidden; plugin-owned schema plus preload/glue through public Better Auth extension points is allowed and preferred.
@@ -67,7 +67,7 @@
   - [3.5 OAuth Provider Scope And Token Hooks](#35-oauth-provider-scope-and-token-hooks)
 - [4. Target Model](#4-target-model)
   - [4.1 Ownership Boundaries](#41-ownership-boundaries)
-  - [4.2 UI-Managed Policy Plugin](#42-ui-managed-policy-plugin)
+  - [4.2 API-First Policy Plugin](#42-api-first-policy-plugin)
   - [4.3 OAuth Scope Catalog Preload](#43-oauth-scope-catalog-preload)
   - [4.4 Token Issuance Authorization Gate](#44-token-issuance-authorization-gate)
   - [4.5 Resource API Verification Model](#45-resource-api-verification-model)
@@ -87,14 +87,14 @@
   - [6.6 `policyTeamRoleAssignment`](#66-policyteamroleassignment)
   - [6.7 `policyOAuthScope`](#67-policyoauthscope)
 - [7. Runtime Flows](#7-runtime-flows)
-  - [7.1 Admin Policy Management Flow](#71-admin-policy-management-flow)
+  - [7.1 Admin Policy API Management Flow](#71-admin-policy-api-management-flow)
   - [7.2 OAuth Authorization Code With PKCE](#72-oauth-authorization-code-with-pkce)
   - [7.3 Refresh Token Flow](#73-refresh-token-flow)
   - [7.4 Resource API Request Flow](#74-resource-api-request-flow)
 - [8. Implementation Strategy](#8-implementation-strategy)
   - [8.1 Plugin Layout](#81-plugin-layout)
   - [8.2 Auth Composition Changes](#82-auth-composition-changes)
-  - [8.3 Admin UI Surfaces](#83-admin-ui-surfaces)
+  - [8.3 Deferred Admin UI Surfaces](#83-deferred-admin-ui-surfaces)
   - [8.4 Cache And Invalidation](#84-cache-and-invalidation)
 - [9. Migration And Rollout](#9-migration-and-rollout)
 - [10. Edge Cases And Failure Modes](#10-edge-cases-and-failure-modes)
@@ -103,7 +103,7 @@
   - [P1-B. Add Scope Catalog Preload Runtime](#p1-b-add-scope-catalog-preload-runtime)
   - [P1-C. Add Token Issuance Policy Check](#p1-c-add-token-issuance-policy-check)
   - [P1-D. Enable Better Auth Teams](#p1-d-enable-better-auth-teams)
-  - [P1-E. Add Admin UI For Policy Management](#p1-e-add-admin-ui-for-policy-management)
+  - [P1-E. Update Architecture Scripts And Developer Tooling](#p1-e-update-architecture-scripts-and-developer-tooling)
   - [P1-F. Add Resource API Verification Guidance](#p1-f-add-resource-api-verification-guidance)
 - [12. Future Backlog](#12-future-backlog)
 - [13. Test And Verification Plan](#13-test-and-verification-plan)
@@ -112,12 +112,12 @@
 
 ## 1. Goal
 
-Build a UI-managed authorization policy system that stays aligned with Better Auth and OAuth.
+Build an API-first, UI-ready authorization policy system that stays aligned with Better Auth and OAuth.
 
 The desired product behavior is:
 
-- Admin users can create product permissions such as `book.read`, `book.update`, `chapter.read`, and `chapter.publish` through UI-backed database state.
-- Admin users can create roles such as `writer`, `reviewer`, or `publisher` through UI-backed database state.
+- Admin/API callers can create product permissions such as `book.read`, `book.update`, `chapter.read`, and `chapter.publish` through database-backed policy endpoints.
+- Admin/API callers can create roles such as `writer`, `reviewer`, or `publisher` through database-backed policy endpoints.
 - Admin users can bind permissions to roles, assign roles to organization members, and assign roles to teams.
 - OAuth clients request scopes such as `book:read` or `chapter:publish`.
 - `core-id` only issues scopes that the OAuth client is allowed to request and the user is allowed to receive for the selected organization.
@@ -130,10 +130,11 @@ Non-goals:
 - Do not replace Better Auth users, sessions, organizations, members, teams, OAuth clients, JWT signing, or JWKS.
 - Do not rely on hardcoded product permission config as the long-term policy store.
 - Do not use `packages/lib/src/resource-token-verifier.ts` as the conceptual design center. Resource API verification is described generically in this document.
+- Do not implement the full admin UI in the API-first phase. UI is a later consumer of the same policy endpoints.
 
 Short version:
 
-Use Better Auth for auth and OAuth. Add an `idAuthorizationPolicy` Better Auth plugin for UI-managed product authorization policy. Load OAuth scopes from its plugin-owned tables the same way `idResourceServer` loads resource audiences. Use `customAccessTokenClaims` as the token issuance authorization gate.
+Use Better Auth for auth and OAuth. Add an `idAuthorizationPolicy` Better Auth plugin for API-managed product authorization policy that is ready for a future admin UI. Load OAuth scopes from its plugin-owned tables the same way `idResourceServer` loads resource audiences. Use `customAccessTokenClaims` as the token issuance authorization gate.
 
 ## 2. Vocabulary
 
@@ -177,7 +178,7 @@ Use these meanings consistently:
 | Platform role | `user.role = "admin"` | Better Auth `admin` plugin | Global platform administration |
 | BA organization role | `member.role = "owner"` | Better Auth `organization` plugin | Organization administration of BA-owned org resources |
 
-The target model does not require `book` or `chapter` to appear in source code. Those resources can be rows created through UI.
+The target model does not require `book` or `chapter` to appear in source code. Those resources can be rows created through policy APIs first and future admin UI later.
 
 ## 3. Current-State Findings
 
@@ -261,7 +262,7 @@ Better Auth also supports dynamic access control. The docs state that dynamic ac
 Conclusion for this repo:
 
 - Better Auth dynamic access control is useful for apps that accept a code-defined permission vocabulary.
-- This repo has a hard requirement that product permissions must be UI-managed and database-backed, not hardcoded product config.
+- This repo has a hard requirement that product permissions must be API/UI-managed and database-backed, not hardcoded product config.
 - Therefore product authorization policy should be owned by an `idAuthorizationPolicy` plugin, not by hardcoded `createAccessControl` statements.
 - Better Auth organization roles remain useful for controlling organization administration and membership management.
 
@@ -324,9 +325,9 @@ Better Auth owns:
 
 New `idAuthorizationPolicy` owns:
 
-- UI-managed product permission resources;
-- UI-managed product permission actions;
-- UI-managed product roles;
+- API/UI-managed product permission resources;
+- API/UI-managed product permission actions;
+- API/UI-managed product roles;
 - role-permission bindings;
 - member product role assignments;
 - team product role assignments;
@@ -339,7 +340,7 @@ Resource APIs own:
 - local JWT verification using issuer metadata and JWKS;
 - route-level checks for `aud`, `org_id`, and required OAuth scope.
 
-### 4.2 UI-Managed Policy Plugin
+### 4.2 API-First Policy Plugin
 
 Add a Better Auth plugin under:
 
@@ -364,6 +365,8 @@ Responsibilities:
 - Provide runtime companions for preloading OAuth scopes and reading policy mappings.
 
 This mirrors `workers/core/src/auth/plugins/resource-server/**`.
+
+The first implementation should stop at API and tests. The admin UI will call the same endpoints in a later phase.
 
 ### 4.3 OAuth Scope Catalog Preload
 
@@ -482,7 +485,7 @@ Decision:
 
 Rationale:
 
-- The product requirement is UI-managed policy.
+- The product requirement is API/UI-managed policy.
 - Better Auth dynamic access control still requires an `ac` instance that declares the permission vocabulary in source code.
 - That makes it a poor fit for product permissions that must be fully UI-managed.
 
@@ -550,7 +553,7 @@ The exact model names should live in `workers/core/src/shared/constants.ts` with
 
 ### 6.1 `policyResource`
 
-Represents a UI-managed product resource.
+Represents an API/UI-managed product resource.
 
 Fields:
 
@@ -573,7 +576,7 @@ Constraints:
 
 ### 6.2 `policyAction`
 
-Represents a UI-managed action under a product resource.
+Represents an API/UI-managed action under a product resource.
 
 Fields:
 
@@ -595,7 +598,7 @@ Constraints:
 
 ### 6.3 `policyRole`
 
-Represents a UI-managed product role.
+Represents an API/UI-managed product role.
 
 Fields:
 
@@ -678,7 +681,7 @@ Constraints:
 
 ### 6.7 `policyOAuthScope`
 
-Defines a UI-managed OAuth scope and maps it to a required product permission.
+Defines an API/UI-managed OAuth scope and maps it to a required product permission.
 
 Fields:
 
@@ -701,9 +704,9 @@ Constraints:
 
 ## 7. Runtime Flows
 
-### 7.1 Admin Policy Management Flow
+### 7.1 Admin Policy API Management Flow
 
-Admin UI calls Better Auth plugin endpoints:
+The API-first release exposes Better Auth plugin endpoints. Initial consumers are tests, scripts, and direct API callers. Admin UI is deferred and will call the same endpoints later.
 
 ```text
 POST   /api/auth/admin/policy/resources
@@ -899,9 +902,11 @@ This should return `true` for:
 
 It can replace or wrap `authPathNeedsResourceAudiences`.
 
-### 8.3 Admin UI Surfaces
+### 8.3 Deferred Admin UI Surfaces
 
-Admin UI should expose the following workflows under `/admin/*`:
+Admin UI is not part of the first implementation phase for this plan. It should be built after the plugin APIs, cache invalidation, token issuance checks, and resource API guidance are in place.
+
+The later admin UI should expose the following workflows under `/admin/*`:
 
 - Permission resources and actions.
 - Roles.
@@ -950,6 +955,7 @@ Phase 1:
 - Add `idAuthorizationPolicy` plugin schema and endpoints.
 - Keep existing static `authPluginConfig.oauthScopes` as fallback.
 - Add tests for schema maps and endpoint authorization.
+- Update architecture scripts so the new plugin-owned preload companion is allowed to perform its approved raw D1 fallback.
 
 Phase 2:
 
@@ -967,12 +973,14 @@ Phase 3:
 Phase 4:
 
 - Enable Better Auth teams.
-- Add team role assignment UI and effective role resolution.
+- Add team role assignment endpoints and effective role resolution.
+- API-first deliverable is team role assignment endpoints and tests. Full UI can remain deferred.
 
 Phase 5:
 
 - Remove static product scopes from `authPluginConfig`.
 - Update docs and README if public commands or setup changed.
+- Build admin UI pages after the API has stabilized.
 
 Rollback:
 
@@ -1103,7 +1111,7 @@ Tasks:
 
 - [ ] Enable `organization({ teams: { enabled: true } })`.
 - [ ] Generate/apply Better Auth schema changes for `team`, `teamMember`, `session.activeTeamId`, and `invitation.teamId`.
-- [ ] Add route contract tests for team endpoints that matter to admin UI.
+- [ ] Add route contract tests for team endpoints that matter to policy APIs.
 - [ ] Verify installed schema uses `teamMember.userId`.
 
 Acceptance criteria:
@@ -1117,34 +1125,36 @@ Tests:
 - Team create/list/add-member/remove-member integration tests.
 - Effective role resolution test through team membership.
 
-### P1-E. Add Admin UI For Policy Management
+### P1-E. Update Architecture Scripts And Developer Tooling
 
 Scope:
 
-- `workers/ui/src/app/admin/**`
-- `packages/ui/**` as needed
+- `scripts/oxlint-js-plugins/architecture.js`
+- `scripts/auth-api.mjs`
+- `scripts/auth-api-shared.mjs`
+- `scripts/remote-smoke.mjs`
+- `docs/003_future-implementation.md`
 
 Tasks:
 
-- [ ] Add policy navigation under admin.
-- [ ] Add resources/actions management.
-- [ ] Add roles and role-permission editor.
-- [ ] Add member role assignment view.
-- [ ] Add team role assignment view.
-- [ ] Add OAuth scope mapping view.
+- [ ] Update `architecture/no-direct-db-access` so approved plugin-owned preload companions are allowed, not only `resource-server/audiences.ts`.
+- [ ] Keep raw D1 fallback limited to runtime companions such as `authorization-policy/scopes.ts`; plugin CRUD must still use the Better Auth adapter.
+- [ ] Update lint error text so it names approved plugin-owned preload companions, not only the resource-server audience companion.
+- [ ] Extend API helper scripts only if policy endpoint smoke workflows are needed before admin UI exists.
+- [ ] Extend remote smoke coverage to prove DB-backed OAuth scopes can be loaded and used in token issuance.
+- [ ] Keep `docs/003_future-implementation.md` synchronized with the deferred admin UI and scripts/tooling reminders.
 
 Acceptance criteria:
 
-- Admin can create product permissions without code changes.
-- Admin can create roles and bind permissions.
-- Admin can assign roles to teams and members.
-- Admin can create/disable OAuth scopes.
+- Architecture lint still blocks raw D1 access everywhere except approved persistence and plugin-owned preload companions.
+- The new authorization policy preload file does not require architecture-rule weakening.
+- API smoke tooling can exercise the policy endpoints without waiting for admin UI.
 
 Tests:
 
-- UI route/component tests where existing framework supports them.
-- Manual smoke through local dev server.
-- Core endpoint tests remain source of truth for security.
+- `pnpm lint`
+- focused architecture lint fixture/update if fixtures exist
+- remote smoke script after policy endpoints exist
 
 ### P1-F. Add Resource API Verification Guidance
 
@@ -1170,6 +1180,7 @@ Tests:
 
 ## 12. Future Backlog
 
+- Build the full admin UI for policy management after the API-first implementation stabilizes.
 - Migrate `policyTeamRoleAssignment` to Better Auth native team role assignment if issue #4493 lands with an acceptable API.
 - Add policy export/import for environment promotion.
 - Add policy audit log with before/after diffs.
@@ -1200,7 +1211,7 @@ Focused test groups:
 - Refresh flow tests after policy change.
 - Team effective-role tests.
 - Admin endpoint authorization tests.
-- UI smoke tests for policy management pages.
+- API smoke tests for policy management endpoints.
 
 Contract tests should prove:
 
@@ -1215,9 +1226,9 @@ Contract tests should prove:
 ## 14. Definition Of Done
 
 - `idAuthorizationPolicy` plugin exists under `workers/core/src/auth/plugins/authorization-policy/**`.
-- Product permission resources/actions are UI-managed DB rows.
-- Product roles and role-permission bindings are UI-managed DB rows.
-- Member and team product role assignments are UI-managed DB rows.
+- Product permission resources/actions are API/UI-managed DB rows.
+- Product roles and role-permission bindings are API/UI-managed DB rows.
+- Member and team product role assignments are API/UI-managed DB rows.
 - Product OAuth scopes are DB-backed and preloaded for OAuth routes.
 - `oauthProvider({ scopes })` receives built-in protocol scopes plus DB-loaded product scopes.
 - Token issuance rejects requested scopes that current user policy does not permit.
@@ -1227,6 +1238,7 @@ Contract tests should prove:
 - No Better Auth internals are patched or monkey-patched.
 - No product permission vocabulary remains hardcoded as the long-term policy source.
 - README is updated if public commands, setup, or topology change.
+- Architecture scripts allow the new plugin-owned preload companion without weakening plugin CRUD boundaries.
 - `pnpm check` passes.
 - `pnpm advise` is clean or has justified suppressions according to `AGENTS.md`.
 
@@ -1244,7 +1256,7 @@ idResourceServer plugin
   owns resource audiences and preloads validAudiences
 
 idAuthorizationPolicy plugin
-  owns UI-managed product permissions, roles, assignments, and OAuth scopes
+  owns API/UI-managed product permissions, roles, assignments, and OAuth scopes
   preloads scopes like resource-server preloads audiences
   checks requested scopes during token issuance
 
@@ -1252,4 +1264,4 @@ Resource APIs
   verify JWTs and enforce aud + org_id + scope
 ```
 
-This satisfies the hard requirement that product policy is managed through UI and database state, while keeping all integration points inside Better Auth's public plugin and OAuth extension model.
+This satisfies the hard requirement that product policy is managed through API/UI and database state, while keeping all integration points inside Better Auth's public plugin and OAuth extension model. The first implementation should focus on plugin APIs, preload, token issuance checks, scripts/tooling, and tests; the admin UI is a deferred consumer of those APIs.
