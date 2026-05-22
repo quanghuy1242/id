@@ -28,7 +28,7 @@
 - [6. Full Admin UI](#6-full-admin-ui)
 - [7. Deferred OAuth Browser Pages](#7-deferred-oauth-browser-pages)
 - [8. Deferred Admin Authorization Model](#8-deferred-admin-authorization-model)
-- [9. API-First Authorization Policy And Tooling](#9-api-first-authorization-policy-and-tooling)
+- [9. API-First Scope Catalog, Token Claims, And Tooling](#9-api-first-scope-catalog-token-claims-and-tooling)
 
 ## 1. Plugin Architecture Strategy
 
@@ -46,7 +46,7 @@ All future features are Better Auth plugins, not standalone custom code. The fir
 | Plugin | Table | Purpose |
 |---|---|---|
 | `idResourceServer` | `resourceServer` | First batch — resource server management |
-| `idAuthorizationPolicy` | `policyResource`, `policyAction`, `policyRole`, `policyRolePermission`, `policyMemberRoleAssignment`, `policyTeamRoleAssignment`, `policyOAuthScope` | API-first, UI-ready product authorization policy and OAuth scope catalog |
+| `idOAuthScopeCatalog` | `oauthResourceScope`, `oauthClientOrganizationGrant` | API-first, UI-ready resource-server-bound OAuth scope catalog and optional M2M organization grants |
 | `idCelPolicy` | `celPolicy` | CEL-based ABAC policy evaluation |
 | `idOnboarding` | (extends org plugin) | Registration contexts, invite tokens |
 | `idMetrics` | (no table) | Analytics Engine writes via BA hooks |
@@ -60,7 +60,7 @@ plugins: [
   jwt(config.jwt),
   oauthProvider({ ... }),
   idResourceServer(),
-  idAuthorizationPolicy(config.policy), // Future API-first policy plugin
+  idOAuthScopeCatalog(config.oauthScopes), // Future API-first scope catalog plugin
   idCelPolicy(config.cel),        // Future
   idOnboarding(config.onboarding), // Future
   idPipeline(config.pipeline),     // Future
@@ -363,22 +363,22 @@ function authorizeAdminAction(
 
 Do not reintroduce the file without also updating `docs/000_repo-architecture.md` if the file placement or layer boundaries change.
 
-## 9. API-First Authorization Policy And Tooling
+## 9. API-First Scope Catalog, Token Claims, And Tooling
 
-`docs/010_organization-teams-oauth-flow.md` defines the target shape for UI-ready product authorization policy. The implementation should be API-first: build the Better Auth plugin, endpoint contracts, preload runtime, token issuance checks, scripts/tooling, and tests before building admin UI pages.
+`docs/010_organization-teams-oauth-flow.md` defines the target shape for generic `id` capabilities that resource APIs need. The implementation should be API-first: enable Better Auth teams, build the resource-server-bound OAuth scope catalog plugin, publish token claim contracts, add token issuance checks, update scripts/tooling, and test those contracts before building admin UI pages.
 
 ### 9.1 Required API-First Work
 
-The future `idAuthorizationPolicy` plugin should own:
+The future `idOAuthScopeCatalog` plugin should own:
 
-- product permission resources and actions;
-- product roles;
-- role-permission bindings;
-- direct member role assignments;
-- team role assignments as a bridge until Better Auth ships native team role assignment;
-- OAuth scope catalog rows and scope-to-permission mappings.
+- `oauthResourceScope` rows: OAuth scopes bound to a specific `resourceServer.id`;
+- `oauthClientOrganizationGrant` rows if org-scoped M2M tokens are supported;
+- scope preload and invalidation for `/oauth2/authorize` and `/oauth2/token`;
+- generic token issuance checks for audience, scope, organization, team claims, and client eligibility.
 
-The first implementation should expose `/api/auth/admin/policy/...` endpoints and integration tests. Admin UI pages under `/admin/*` are a later consumer of these endpoints, not a prerequisite for the API/plugin work.
+The first implementation should expose API/plugin contracts and integration tests. Admin UI pages under `/admin/*` are a later consumer of these endpoints, not a prerequisite for the API/plugin work.
+
+This future work must not add Content IAM to `id`. Product roles, product permissions, role-permission mappings, concrete grants, resource hierarchy/inheritance, final `ContentPolicy.can(...)`, and product policy audit events belong in the resource API.
 
 ### 9.2 Scripts And Tooling Reminders
 
@@ -388,13 +388,13 @@ The existing architecture lint rule `architecture/no-direct-db-access` currently
 workers/core/src/auth/plugins/resource-server/audiences.ts
 ```
 
-The authorization policy scope catalog needs the same kind of plugin-owned preload companion because `oauthProvider({ scopes })` requires enabled scopes before Better Auth is constructed. When adding `workers/core/src/auth/plugins/authorization-policy/scopes.ts`, update:
+The OAuth scope catalog needs the same kind of plugin-owned preload companion because `oauthProvider({ scopes })` requires enabled scopes before Better Auth is constructed. When adding `workers/core/src/auth/plugins/oauth-scope-catalog/scopes.ts`, update:
 
 - `scripts/oxlint-js-plugins/architecture.js` — allow approved plugin-owned preload companions, not only the resource-server audience companion.
 - The lint error text in the same rule — make it mention approved plugin-owned preload companions.
 - Any architecture lint fixtures or tests if the repo adds them before this work lands.
 - `scripts/auth-api.mjs` and `scripts/auth-api-shared.mjs` only if API smoke helpers are needed before admin UI exists.
-- `scripts/remote-smoke.mjs` after policy endpoints exist, so remote smoke can prove DB-backed scopes participate in OAuth token issuance.
+- `scripts/remote-smoke.mjs` after scope/team/token endpoints exist, so remote smoke can prove DB-backed scopes participate in OAuth token issuance.
 
 Keep the boundary strict:
 
@@ -404,13 +404,14 @@ Keep the boundary strict:
 
 ### 9.3 Deferred Admin UI
 
-Full admin UI for policy management remains part of Section 6. It should not block:
+Full admin UI remains part of Section 6. It should not block:
 
-- plugin schemas;
-- policy CRUD endpoints;
+- Better Auth team enablement;
+- token claim contracts;
+- plugin schemas for resource-server-bound OAuth scopes or M2M org grants;
 - DB-backed OAuth scope preload;
-- token issuance policy checks;
+- token issuance checks;
 - resource API verification guidance;
 - architecture script updates.
 
-When the UI work starts, it should call the existing `/api/auth/admin/policy/...` endpoints rather than introducing UI-owned policy state or D1 access.
+When the UI work starts, it should call `id` API endpoints for generic teams, OAuth clients, audiences, scopes, and M2M grants. It must not introduce UI-owned D1 access or product policy state inside `id`.
