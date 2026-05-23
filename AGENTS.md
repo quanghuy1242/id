@@ -74,4 +74,4 @@ When new findings appear, handle them autonomously:
 1. Always keep README.md up to date when public commands, topology, or setup changes. (hard gate — do not skip)
 2. When work from a planning document is completed, update status metadata or implementation notes in that document when the document asks for it.
 3. Name planning documents with a leading numbered prefix in the `xxx_...` format so their sequence stays trackable.
-4. Never craft migration SQL or snapshot files manually. Always run `pnpm exec drizzle-kit generate` after changing `workers/core/src/db/auth-schema.ts` or any plugin-owned table definitions. Hand-written SQL drifts the journal, snapshot, and column ordering away from Drizzle's expected state and breaks future `drizzle-kit generate` runs.
+4. Never craft migration SQL or snapshot files manually. After changing `workers/core/src/db/auth-schema.ts` or any plugin-owned table definitions, run `pnpm db:generate`. Hand-written SQL drifts the journal, snapshot, and column ordering away from Drizzle's expected state and breaks future runs.
