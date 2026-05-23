@@ -11,6 +11,7 @@ import * as authSchema from "../../src/db/auth-schema";
 
 type RawSqlite = {
   readonly exec: (sql: string) => void;
+  readonly prepare: (sql: string) => { readonly get: () => unknown };
 };
 
 type TokenResponse = {
@@ -47,6 +48,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   };
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
   return raw;
 }
 
@@ -59,7 +61,15 @@ async function createAuth(raw: RawSqlite) {
         DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
         KV: createKv(),
       },
-      ["https://api.example.test"],
+      {
+        validAudiences: ["https://api.example.test"],
+        scopes: ["content:read", "content:write", "content:share"],
+        scopeRows: [
+          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:read" },
+          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
+          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:share" },
+        ],
+      },
     ),
   );
 }
@@ -72,8 +82,8 @@ function codeChallenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-async function createUser(auth: ReturnType<typeof betterAuth>): Promise<void> {
-  await auth.api.createUser({
+async function createUser(auth: ReturnType<typeof betterAuth>): Promise<string> {
+  const created = await auth.api.createUser({
     body: {
       name: "Alice",
       email: "alice@example.test",
@@ -81,6 +91,7 @@ async function createUser(auth: ReturnType<typeof betterAuth>): Promise<void> {
       data: { emailVerified: true },
     },
   });
+  return created.user.id;
 }
 
 async function signInAdmin(auth: ReturnType<typeof betterAuth>): Promise<string> {
@@ -118,7 +129,7 @@ async function createTrustedClient(auth: ReturnType<typeof betterAuth>) {
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      scope: "openid email profile offline_access api:read",
+      scope: "openid email profile offline_access content:read",
       type: "native",
       require_pkce: true,
       skip_consent: true,
@@ -126,18 +137,23 @@ async function createTrustedClient(auth: ReturnType<typeof betterAuth>) {
   });
 }
 
-async function authorizeAndSignIn(auth: ReturnType<typeof betterAuth>, clientId: string, verifier: string) {
+async function authorizeAndSignIn(
+  auth: ReturnType<typeof betterAuth>,
+  clientId: string,
+  verifier: string,
+  context = "direct-share",
+) {
   const authorize = new URL("https://id.example.test/api/auth/oauth2/authorize");
   authorize.searchParams.set("response_type", "code");
   authorize.searchParams.set("client_id", clientId);
   authorize.searchParams.set("redirect_uri", "https://content.quanghuy.dev/callback");
-  authorize.searchParams.set("scope", "openid email profile offline_access api:read");
+  authorize.searchParams.set("scope", "openid email profile offline_access content:read");
   authorize.searchParams.set("state", "state_1");
   authorize.searchParams.set("resource", "https://api.example.test");
   authorize.searchParams.set("code_challenge", codeChallenge(verifier));
   authorize.searchParams.set("code_challenge_method", "S256");
 
-  const loginRedirect = await auth.handler(new Request(authorize));
+  const loginRedirect = await auth.handler(new Request(authorize, { headers: { "x-id-oauth-context": context } }));
   expect(loginRedirect.status).toBe(302);
   const loginUrl = new URL(loginRedirect.headers.get("location") ?? "", "https://id.example.test");
   expect(loginUrl.pathname).toBe("/login");
@@ -145,7 +161,7 @@ async function authorizeAndSignIn(auth: ReturnType<typeof betterAuth>, clientId:
   const signIn = await auth.handler(
     new Request("https://id.example.test/api/auth/sign-in/email", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-id-oauth-context": context },
       body: JSON.stringify({
         email: "alice@example.test",
         password: "password123",
@@ -198,7 +214,7 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     expect(tokenResponse.status).toBe(200);
     const token = (await tokenResponse.json()) as TokenResponse;
     expect(token.token_type).toBe("Bearer");
-    expect(token.expires_in).toBe(10_800);
+    expect(token.expires_in).toBe(900);
     expect(token.refresh_token).toEqual(expect.any(String));
 
     const jwksResponse = await auth.handler(new Request("https://id.example.test/api/auth/jwks"));
@@ -212,7 +228,8 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     ).resolves.toMatchObject({
       payload: expect.objectContaining({
         aud: expect.arrayContaining(["https://api.example.test"]),
-        scope: "openid email profile offline_access api:read",
+        scope: "openid email profile offline_access content:read",
+        team_ids: [],
       }),
     });
 
@@ -224,6 +241,7 @@ describe("OAuth authorization-code and refresh-token flows", () => {
           grant_type: "refresh_token",
           client_id: client.client_id,
           refresh_token: token.refresh_token ?? "",
+          resource: "https://api.example.test",
         }),
       }),
     );
@@ -231,6 +249,8 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     const refreshed = (await refresh.json()) as TokenResponse;
     expect(refreshed.refresh_token).toEqual(expect.any(String));
     expect(refreshed.refresh_token).not.toBe(token.refresh_token);
+    expect(decodeJwt(refreshed.access_token)).toEqual(expect.objectContaining({ team_ids: [] }));
+    expect(decodeJwt(refreshed.access_token).org_id).toBeUndefined();
 
     const replay = await auth.handler(
       new Request("https://id.example.test/api/auth/oauth2/token", {
@@ -245,4 +265,5 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     );
     expect(replay.status).toBe(400);
   });
+
 });

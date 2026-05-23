@@ -79,6 +79,7 @@ export async function createMemoryD1(): Promise<{ readonly db: D1Database; reado
   };
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
 
   const db: D1Database = {
     prepare(query) {

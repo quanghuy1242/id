@@ -60,7 +60,7 @@ plugins: [
   jwt(config.jwt),
   oauthProvider({ ... }),
   idResourceServer(),
-  idOAuthScopeCatalog(config.oauthScopes), // Future API-first scope catalog plugin
+  idOAuthScopeCatalog(config.oauthScopes),
   idCelPolicy(config.cel),        // Future
   idOnboarding(config.onboarding), // Future
   idPipeline(config.pipeline),     // Future
@@ -365,34 +365,35 @@ Do not reintroduce the file without also updating `docs/000_repo-architecture.md
 
 ## 9. API-First Scope Catalog, Token Claims, And Tooling
 
-`docs/010_organization-teams-oauth-flow.md` defines the target shape for generic `id` capabilities that resource APIs need. The implementation should be API-first: enable Better Auth teams, build the resource-server-bound OAuth scope catalog plugin, publish token claim contracts, add token issuance checks, update scripts/tooling, and test those contracts before building admin UI pages.
+`docs/010_organization-teams-oauth-flow.md` defines the target shape for generic `id` capabilities that resource APIs need. The API-first backend work has landed: Better Auth teams are enabled, `idOAuthScopeCatalog` owns resource-server-bound OAuth scopes and M2M org grants, `idPrincipalValidation` owns authenticated exact-ID validation, OAuth routes preload DB-backed scopes, and token issuance adds workspace/direct-share/team claims.
 
 ### 9.1 Required API-First Work
 
-The future `idOAuthScopeCatalog` plugin should own:
+The current `idOAuthScopeCatalog` plugin owns:
 
 - `oauthResourceScope` rows: OAuth scopes bound to a specific `resourceServer.id`;
 - `oauthClientOrganizationGrant` rows if org-scoped M2M tokens are supported;
-- scope preload and invalidation for `/oauth2/authorize` and `/oauth2/token`;
+- scope preload and invalidation for OAuth authorize/token and OAuth client scope-validation routes;
 - generic token issuance checks for audience, scope, organization, team claims, and client eligibility.
 
-The first implementation should expose API/plugin contracts and integration tests. Admin UI pages under `/admin/*` are a later consumer of these endpoints, not a prerequisite for the API/plugin work.
+The first implementation exposes API/plugin contracts and integration tests. Admin UI pages under `/admin/*` are a later consumer of these endpoints, not a prerequisite for the API/plugin work.
 
 This future work must not add Content IAM to `id`. Product roles, product permissions, role-permission mappings, concrete grants, resource hierarchy/inheritance, final `ContentPolicy.can(...)`, and product policy audit events belong in the resource API.
 
 ### 9.2 Scripts And Tooling Reminders
 
-The existing architecture lint rule `architecture/no-direct-db-access` currently allowlists raw D1 fallback only for:
+The architecture lint rule `architecture/no-direct-db-access` allowlists raw D1 fallback for approved plugin-owned runtime companions, including:
 
 ```text
 workers/core/src/auth/plugins/resource-server/audiences.ts
+workers/core/src/auth/plugins/oauth-scope-catalog/scopes.ts
+workers/core/src/auth/plugins/oauth-scope-catalog/grants.ts
+workers/core/src/auth/plugins/oauth-scope-catalog/authorization-context.ts
 ```
 
-The OAuth scope catalog needs the same kind of plugin-owned preload companion because `oauthProvider({ scopes })` requires enabled scopes before Better Auth is constructed. When adding `workers/core/src/auth/plugins/oauth-scope-catalog/scopes.ts`, update:
+The OAuth scope catalog uses the same plugin-owned preload pattern because `oauthProvider({ scopes })` requires enabled scopes before Better Auth is constructed. Future tooling work should update:
 
-- `scripts/oxlint-js-plugins/architecture.js` — allow approved plugin-owned preload companions, not only the resource-server audience companion.
-- The lint error text in the same rule — make it mention approved plugin-owned preload companions.
-- Any architecture lint fixtures or tests if the repo adds them before this work lands.
+- Any architecture lint fixtures or tests if the repo expands fixture coverage.
 - `scripts/auth-api.mjs` and `scripts/auth-api-shared.mjs` only if API smoke helpers are needed before admin UI exists.
 - `scripts/remote-smoke.mjs` after scope/team/token endpoints exist, so remote smoke can prove DB-backed scopes participate in OAuth token issuance.
 

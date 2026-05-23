@@ -4,7 +4,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 
 This repo implements the first-batch documented scope:
 
-- `core-id` Worker — email/password identity, sessions, organizations, OAuth2.1/OIDC provider, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`)
+- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), principal-validation API, admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`)
 - `ui-id` Worker — admin UI scaffold under `/admin/*`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
@@ -57,7 +57,7 @@ Versions are pinned in `package.json`. Verified package metadata on May 19, 2026
 - `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
 - Better Auth-owned tables are never defined in `workers/core/src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
 - Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path.
-- Raw D1 access is forbidden outside `workers/core/src/infrastructure/persistence/`. Even there, it is only allowed when the Better Auth adapter is genuinely unavailable. The canonical case is audience loading before the Better Auth OAuth Provider can be constructed. New raw-D1 infrastructure files need JSDoc explaining the chicken-and-egg reason.
+- Raw D1 access is forbidden outside `workers/core/src/infrastructure/persistence/`. Even there, it is only allowed when the Better Auth adapter is genuinely unavailable. Canonical auth-boundary exceptions are plugin-owned runtime companions that preload audiences, OAuth scopes/grants, or token team facts before the Better Auth OAuth Provider can be constructed. Plugin CRUD still uses the Better Auth adapter.
 - Custom Better Auth plugin conventions are documented in [.agents/skills/id-auth-plugin/SKILL.md](.agents/skills/id-auth-plugin/SKILL.md).
 - Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
 
@@ -133,7 +133,9 @@ After bootstrap, use a Better Auth admin session through the Wrangler-gated gene
 ```bash
 pnpm auth:api:login https://id.quanghuy.dev admin@example.com
 pnpm auth:api POST /api/auth/admin/create-user '{"email":"user@example.com","password":"long-random-password","name":"User"}'
-pnpm auth:api POST /api/auth/oauth2/create-client '{"client_name":"content-api","redirect_uris":["https://content.quanghuy.dev/callback"],"token_endpoint_auth_method":"client_secret_post","grant_types":["client_credentials"],"response_types":["code"],"scope":"api:read"}'
+pnpm auth:api POST /api/auth/admin/resource-servers '{"organizationId":"org_1","slug":"content-api","name":"Content API","audience":"https://content-api.example.com"}'
+pnpm auth:api POST /api/auth/admin/oauth-scopes '{"resourceServerId":"rs_content","scope":"content:read"}'
+pnpm auth:api POST /api/auth/oauth2/create-client '{"client_name":"content-api","redirect_uris":["https://content.quanghuy.dev/callback"],"token_endpoint_auth_method":"client_secret_post","grant_types":["client_credentials"],"response_types":["code"],"scope":"content:read"}'
 pnpm auth:api:logout
 ```
 

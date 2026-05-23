@@ -34,6 +34,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   };
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
   return raw;
 }
 
@@ -50,7 +51,7 @@ describe("Better Auth core flows", () => {
           DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
           KV: kv,
         },
-        [],
+        { validAudiences: [], scopes: [], scopeRows: [] },
         { emailSender },
       ),
     );

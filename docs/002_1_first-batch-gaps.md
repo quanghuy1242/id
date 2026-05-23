@@ -32,6 +32,7 @@
 > - Minimal hosted auth pages are still required if `content-ui` needs user sign-in through OAuth. Admin UI is not required for that. First release needs only login plus a small consent fallback.
 > - Public email/password sign-up is not part of the first release. Admin-only user creation should use Better Auth Admin `createUser`; `/api/auth/sign-up/email` must be disabled.
 > - Browser OAuth is production-domain only. Preview `*.workers.dev` deployments are API-only because shared parent-domain cookies are impossible on the public suffix.
+> - Update, 2026-05-23: `docs/010_organization-teams-oauth-flow.md` supersedes this document's older 3-hour user access-token target. User access tokens now use `expires_in = 900`; M2M access tokens remain on the separate 3-hour lifetime.
 
 ## Table Of Contents
 

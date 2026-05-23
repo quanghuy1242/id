@@ -111,9 +111,17 @@ export function loadResourceServerAudiences(
   return loadResourceAudiencesFromCache(env.KV, () => loadEnabledResourceAudienceRows(env.DB), { backgroundTaskRunner });
 }
 
-export async function invalidateResourceServerAudiences(env: Pick<ResourceAudienceEnv, "KV">): Promise<void> {
+export async function invalidateResourceServerAudiences(
+  env: Pick<ResourceAudienceEnv, "KV">,
+  backgroundTaskRunner?: BackgroundTaskRunner,
+): Promise<void> {
   // Keep admin mutations strict: local memory is cleared immediately, then the
   // cross-isolate KV cache is invalidated for later requests in other isolates.
   memoryAudienceCache.clear();
-  await env.KV.delete(authPluginConfig.resourceAudienceCacheKey);
+  const cacheDelete = env.KV.delete(authPluginConfig.resourceAudienceCacheKey);
+  if (backgroundTaskRunner) {
+    backgroundTaskRunner.waitUntil(cacheDelete.catch(() => undefined));
+  } else {
+    await cacheDelete;
+  }
 }

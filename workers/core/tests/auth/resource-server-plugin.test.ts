@@ -49,6 +49,7 @@ describe("idResourceServer plugin endpoint", () => {
     };
     const raw = new Database(":memory:");
     raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+    raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
     raw.exec(
       `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`,
     );
@@ -66,7 +67,7 @@ describe("idResourceServer plugin endpoint", () => {
           DB: db,
           KV: createKv(),
         },
-        [],
+        { validAudiences: [], scopes: [], scopeRows: [] },
       ),
     );
     const cookie = await signInSuperadmin(auth, raw);
@@ -101,6 +102,7 @@ describe("idResourceServer plugin endpoint", () => {
     };
     const raw = new Database(":memory:");
     raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+    raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
     raw.exec(
       `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_2', 'Other', 'other', 1700000000000);`,
     );

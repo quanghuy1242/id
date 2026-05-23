@@ -13,6 +13,8 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | Plugin | Path | Purpose |
 |---|---|---|
 | `id-resource-server` | `resource-server/` | Admin CRUD for resource-server records and audience cache invalidation |
+| `id-oauth-scope-catalog` | `oauth-scope-catalog/` | Admin CRUD for resource-server-bound OAuth scopes, M2M org grants, and runtime scope/grant preload |
+| `id-principal-validation` | `principal-validation/` | Authenticated exact-ID principal validation for downstream durable policy writes |
 
 ## File structure
 

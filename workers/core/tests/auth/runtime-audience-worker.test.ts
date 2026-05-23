@@ -93,6 +93,20 @@ describe("runtime resource audience integration", () => {
     expect(resource.status).toBe(200);
     const resourceServer = (await resource.json()) as { readonly id: string };
 
+    const scope = await app.request(
+      "/api/auth/admin/oauth-scopes",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          resourceServerId: resourceServer.id,
+          scope: "content:read",
+        }),
+      },
+      env,
+    );
+    expect(scope.status).toBe(200);
+
     const client = await app.request(
       "/api/auth/oauth2/create-client",
       {
@@ -104,7 +118,7 @@ describe("runtime resource audience integration", () => {
           token_endpoint_auth_method: "client_secret_post",
           grant_types: ["client_credentials"],
           response_types: ["code"],
-          scope: "api:read",
+          scope: "content:read",
         }),
       },
       env,
@@ -125,7 +139,7 @@ describe("runtime resource audience integration", () => {
           client_id: oauthClient.client_id,
           client_secret: oauthClient.client_secret,
           resource: "https://content-api.example.test",
-          scope: "api:read",
+          scope: "content:read",
         }),
       },
       env,
@@ -162,7 +176,7 @@ describe("runtime resource audience integration", () => {
           client_id: oauthClient.client_id,
           client_secret: oauthClient.client_secret,
           resource: "https://content-api.example.test",
-          scope: "api:read",
+          scope: "content:read",
         }),
       },
       env,

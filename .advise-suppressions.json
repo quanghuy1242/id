@@ -38,6 +38,24 @@
     },
     {
       "tool": "aislop",
+      "file": "workers/core/src/db/auth-schema.ts",
+      "rule": "complexity/file-too-large",
+      "reason": "Auth schema is generated/maintained as the single Better Auth and plugin table contract; splitting it would create schema drift."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/oauth-scope-catalog/index.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "OAuth scope catalog Better Auth endpoints are intentionally explicit and mirror resource-server plugin endpoint shape: validate, authorize, mutate through BA adapter, invalidate cache."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/oauth-scope-catalog/operations.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Create/update payload builders for scope and grant rows intentionally share timestamp and actor-stamping structure while preserving explicit row types."
+    },
+    {
+      "tool": "aislop",
       "file": "workers/ui/vite.config.ts",
       "rule": "ai-slop/hallucinated-import",
       "reason": "vite is imported in configuration and resolved through transitive monorepo dependencies."

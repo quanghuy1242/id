@@ -23,6 +23,16 @@ export type AuthRuntimeOptions = {
   readonly emailSender?: AuthEmailSender;
 };
 
+export type OAuthRuntimeCatalog = {
+  readonly validAudiences: readonly string[];
+  readonly scopes: readonly string[];
+  readonly scopeRows: readonly {
+    readonly resourceServerId: string;
+    readonly audience: string;
+    readonly scope: string;
+  }[];
+};
+
 export type AuthOptionsEnv = Omit<CoreEnv, "DB" | "KV"> & {
   readonly DB: BetterAuthOptions["database"];
   readonly KV: BetterAuthKvStorage;

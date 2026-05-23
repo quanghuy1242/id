@@ -1,6 +1,6 @@
 # Resource-Server Scopes, Teams, And Token Contract
 
-> Status: implementation-grade proposal
+> Status: P1-A through P1-G implemented in `id` on 2026-05-23
 >
 > Date: 2026-05-23
 >
@@ -55,7 +55,14 @@
 > - Resource APIs own product roles, product permissions, role-permission mappings, principal-role bindings, resource hierarchy/inheritance, final authorization decisions, and product policy audit events.
 > - Better Auth remains the source of truth for identity, sessions, organizations, members, teams, OAuth clients, OAuth Provider, JWT signing, and JWKS.
 > - "Custom" means two different things in this document: patching or bypassing Better Auth internals is forbidden; plugin-owned schema plus preload/glue through public Better Auth extension points is allowed and preferred.
-> - The target user access-token lifetime is 15 minutes for every user token, regardless of team membership. The currently implemented 3-hour lifetime remains a current-state fact until the configuration change is implemented.
+> - The implemented user access-token lifetime is 15 minutes for every user token, regardless of team membership. M2M access tokens remain on the separate 3-hour service-account lifetime.
+
+Implementation note, 2026-05-23:
+
+- P1-A through P1-G have been implemented in `id`.
+- Better Auth teams are enabled, `idOAuthScopeCatalog` owns `oauthResourceScope` and `oauthClientOrganizationGrant`, OAuth runtime preload loads audiences plus scopes, user access tokens use a uniform 900-second lifetime, direct-share uses the reserved internal reference marker, workspace tokens emit `org_id` and `team_ids`, M2M tokens expose `azp` and optionally `client_id`/`org_id`, and `idPrincipalValidation` exposes `/api/auth/principal-validation/**`.
+- Org-scoped M2M grant validation uses OAuth client metadata fields `id_client_id` and `organization_id` because the installed OAuth Provider hook intentionally passes client metadata to `customAccessTokenClaims`. The provider still emits stable `azp`; the metadata fields are the configured integration data that lets `id` validate the org grant before signing and optionally emit custom `client_id`/`org_id` claims.
+- Product IAM remains outside `id`; resource APIs still own roles, permissions, concrete grants, hierarchy, final policy decisions, and audit.
 
 ## Table Of Contents
 
@@ -273,14 +280,13 @@ Current facts:
 - Access tokens include `org_id`, `aud`, `scope`, and `sub`.
 - Access tokens do not include `team_ids`.
 - Current access-token claims assume the session's `activeOrganizationId`; there is no implemented explicit direct-share issuance context yet.
-- `workers/core/src/auth/config.ts` currently sets `accessTokenExpiresIn: 10_800` and `m2mAccessTokenExpiresIn: 10_800`, so already-issued access tokens can remain valid for 3 hours.
-- This plan changes the target **user** access-token lifetime to `900` seconds, or 15 minutes; that target is not implemented until `workers/core/src/auth/config.ts` and its tests are updated.
+- `workers/core/src/auth/config.ts` previously set `accessTokenExpiresIn: 10_800`; P1 implementation changed user access tokens to `900` seconds while retaining `m2mAccessTokenExpiresIn: 10_800`.
 - M2M tokens need a stable `azp` or `client_id` contract and org-scoped eligibility checks.
 
 Decision precedence:
 
-- The 15-minute user access-token target in this document supersedes the older 3-hour user-token target recorded in `docs/002_1_first-batch-gaps.md`.
-- `docs/005_oauth2-oidc-integration-guide.md` and existing OAuth tests continue to describe the current 3-hour implementation until the code change lands; they must be updated in the same implementation change as `workers/core/src/auth/config.ts`.
+- The 15-minute user access-token implementation supersedes the older 3-hour user-token target recorded in `docs/002_1_first-batch-gaps.md`.
+- `docs/005_oauth2-oidc-integration-guide.md` and OAuth tests were updated with the same implementation change as `workers/core/src/auth/config.ts`.
 
 ### 3.2 Resource-Server Audience Preload Pattern
 

@@ -68,7 +68,7 @@ Confidential client create body:
   "token_endpoint_auth_method": "client_secret_post",
   "grant_types": ["authorization_code", "refresh_token", "client_credentials"],
   "response_types": ["code"],
-  "scope": "openid profile email offline_access api:read"
+  "scope": "openid profile email offline_access content:read"
 }
 ```
 
@@ -82,9 +82,24 @@ Public client create body:
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
   "type": "user-agent-based",
-  "scope": "openid profile email offline_access api:read"
+  "scope": "openid profile email offline_access content:read"
 }
 ```
+
+Product/API scopes such as `content:read` must first exist as enabled `/api/auth/admin/oauth-scopes` rows bound to the target resource server.
+
+Org-scoped M2M clients must also include OAuth client metadata:
+
+```json
+{
+  "metadata": {
+    "id_client_id": "<same OAuth client ID>",
+    "organization_id": "org_1"
+  }
+}
+```
+
+Better Auth passes this metadata to token claim hooks, which lets `id` validate `oauthClientOrganizationGrant` before signing and then emit custom `client_id` and `org_id` claims. The final JWT still receives the stable OAuth client principal in `azp` from Better Auth.
 
 ## Organizations And Users
 
@@ -105,4 +120,3 @@ Consent operations are Better Auth OAuth Provider endpoints:
 - `GET /api/auth/oauth2/get-consents`
 - `POST /api/auth/oauth2/update-consent`
 - `POST /api/auth/oauth2/delete-consent`
-

@@ -75,7 +75,7 @@ describe("Better Auth installed contract", () => {
         DB: {} as unknown as BetterAuthOptions["database"],
         KV: {} as unknown as BetterAuthKvStorage,
       },
-      ["https://api.example.test"],
+      { validAudiences: ["https://api.example.test"], scopes: ["content:read"], scopeRows: [] },
     );
 
     expect(options.basePath).toBe("/api/auth");
@@ -87,12 +87,14 @@ describe("Better Auth installed contract", () => {
     });
     expect(options.rateLimit).toEqual({ enabled: false });
     expect(options.plugins?.some((plugin) => plugin.id === "id-resource-server")).toBe(true);
+    expect(options.plugins?.some((plugin) => plugin.id === "id-oauth-scope-catalog")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "oauth-provider")).toBe(true);
   });
 
   it("loads resource audiences only for OAuth endpoints that validate resource parameters", () => {
     expect(authPathNeedsResourceAudiences("/api/auth/oauth2/authorize")).toBe(true);
     expect(authPathNeedsResourceAudiences("/api/auth/oauth2/token")).toBe(true);
+    expect(authPathNeedsResourceAudiences("/api/auth/oauth2/create-client")).toBe(true);
     expect(authPathNeedsResourceAudiences("/api/auth/jwks")).toBe(false);
     expect(authPathNeedsResourceAudiences("/api/auth/.well-known/openid-configuration")).toBe(false);
     expect(authPathNeedsResourceAudiences("/api/auth/session")).toBe(false);

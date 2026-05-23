@@ -1268,6 +1268,9 @@ function isApprovedDbAccessFile(filename) {
   if (filename.includes("/workers/core/src/infrastructure/")) return true;
   if (filename.endsWith("workers/core/src/auth/cli.ts")) return true;
   if (filename.endsWith("workers/core/src/auth/plugins/resource-server/audiences.ts")) return true;
+  if (filename.endsWith("workers/core/src/auth/plugins/oauth-scope-catalog/scopes.ts")) return true;
+  if (filename.endsWith("workers/core/src/auth/plugins/oauth-scope-catalog/grants.ts")) return true;
+  if (filename.endsWith("workers/core/src/auth/plugins/oauth-scope-catalog/authorization-context.ts")) return true;
   if (filename.includes("/workers/core/tests/")) return true;
   return false;
 }
@@ -1293,13 +1296,13 @@ var noDirectDbAccessRule = {
           getPropertyName(object.object.property) === "env";
 
         if (isEnvDb || isEnvDbViaC) {
-          context.report({ node: node, message: "Direct " + method + "() on env.DB is forbidden outside infrastructure, auth/cli.ts, or the resource-server audience companion. Use Better Auth adapter APIs for plugin CRUD." });
+          context.report({ node: node, message: "Direct " + method + "() on env.DB is forbidden outside infrastructure, auth/cli.ts, or approved plugin-owned runtime preload companions. Use Better Auth adapter APIs for plugin CRUD." });
           return;
         }
 
         var isIdentifier = object.type === "Identifier";
         if (isIdentifier) {
-          context.report({ node: node, message: "Direct " + method + "() on a database handle is forbidden outside infrastructure, auth/cli.ts, or the resource-server audience companion. Use Better Auth adapter APIs for plugin CRUD." });
+          context.report({ node: node, message: "Direct " + method + "() on a database handle is forbidden outside infrastructure, auth/cli.ts, or approved plugin-owned runtime preload companions. Use Better Auth adapter APIs for plugin CRUD." });
         }
       },
     };
@@ -1307,7 +1310,11 @@ var noDirectDbAccessRule = {
 };
 
 // ─── Rule 25: plugin-owned-table-boundary ─────────────────────────────────
-var PLUGIN_MODEL_CONSTANTS = new Set(["RESOURCE_SERVER_MODEL"]);
+var PLUGIN_MODEL_CONSTANTS = new Set([
+  "RESOURCE_SERVER_MODEL",
+  "OAUTH_RESOURCE_SCOPE_MODEL",
+  "OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL",
+]);
 
 var pluginOwnedTableBoundaryRule = {
   meta: { type: "problem", docs: { description: "Better Auth plugin-owned table constants must not be used from generic infrastructure persistence" } },

@@ -42,7 +42,18 @@ async function createAuth(raw: RawSqlite, validAudiences: readonly string[] = []
         DB: db,
         KV: createKv(),
       },
-      validAudiences,
+      {
+        validAudiences,
+        scopes: ["content:write", "identity:principals:validate"],
+        scopeRows: [
+          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
+          {
+            resourceServerId: "rs_identity",
+            audience: "https://id.example.test/principal-validation",
+            scope: "identity:principals:validate",
+          },
+        ],
+      },
     ),
   );
 }
@@ -81,6 +92,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   };
   const raw = new Database(":memory:");
   raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
+  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
   raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`);
   return raw;
 }
@@ -101,7 +113,7 @@ describe("OAuth Provider flows", () => {
           token_endpoint_auth_method: "client_secret_post",
           grant_types: ["client_credentials"],
           response_types: ["code"],
-          scope: "api:read",
+          scope: "content:write",
         }),
       }),
     );
@@ -121,7 +133,7 @@ describe("OAuth Provider flows", () => {
           client_id: client.client_id,
           client_secret: client.client_secret,
           resource: "https://api.example.test",
-          scope: "api:read",
+          scope: "content:write",
         }),
       }),
     );
@@ -150,7 +162,10 @@ describe("OAuth Provider flows", () => {
       },
     );
     expect(payload.aud).toBe("https://api.example.test");
-    expect(payload.scope).toBe("api:read");
+    expect(payload.scope).toBe("content:write");
     expect(payload.sub).toBeUndefined();
+    expect(payload.azp).toBe(client.client_id);
+    expect(payload.client_id).toBeUndefined();
+    expect(payload.org_id).toBeUndefined();
   });
 });
