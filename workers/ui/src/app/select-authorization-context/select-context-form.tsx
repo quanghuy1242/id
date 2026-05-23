@@ -1,0 +1,102 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Inline, RadioGroup, Stack, Text } from "@id/ui";
+import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
+import { useOauthQuery, useOauthRequestDescription } from "@/lib/oauth-query";
+import { DIRECT_SHARE_VALUE, WORKSPACE_CONTEXT_PREFIX } from "@/shared/constants";
+
+type Organization = {
+  id: string;
+  name: string;
+};
+
+async function fetchOrganizations(): Promise<readonly Organization[]> {
+  try {
+    const res = await fetch("/api/auth/organization/list", { headers: { accept: "application/json" } });
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data as Organization[];
+  } catch {
+    return [];
+  }
+}
+
+export function SelectContextForm() {
+  const router = useRouter();
+  const oauthQuery = useOauthQuery();
+  const description = useOauthRequestDescription(oauthQuery);
+  const [organizations, setOrganizations] = useState<readonly Organization[]>([]);
+  const [selection, setSelection] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchOrganizations().then((orgs) => {
+      setOrganizations(orgs);
+      setSelection(orgs.length > 0 ? `${WORKSPACE_CONTEXT_PREFIX}${orgs[0].id}` : DIRECT_SHARE_VALUE);
+      return undefined;
+    });
+  }, []);
+
+  const handleContinue = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const body = await postAuthApi(
+        "/oauth2/continue",
+        { postLogin: true, [OAUTH_QUERY_PARAM]: oauthQuery },
+        { "x-id-oauth-context": selection },
+      );
+
+      const redirectUrl = body.redirect_uri || body.url || body.redirectURL;
+      if (redirectUrl) {
+        router.push(redirectUrl as string);
+        return;
+      }
+      setError((body.message || body.error || "Selection failed") as string);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const workspaceOptions = useMemo(
+    () =>
+      organizations.map((org) => ({
+        value: `${WORKSPACE_CONTEXT_PREFIX}${org.id}`,
+        label: org.name,
+      })),
+    [organizations],
+  );
+
+  const individualOptions = useMemo(
+    () => [{ value: DIRECT_SHARE_VALUE, label: "Direct share — individual collaborator" }],
+    [],
+  );
+
+  return (
+    <Stack>
+      <Text variant="body">{description}</Text>
+
+      {organizations.length > 0 ? (
+        <RadioGroup title="Workspace access" name="context-workspace" options={workspaceOptions} value={selection} onChange={setSelection} />
+      ) : (
+        <Text variant="caption">No organizations available.</Text>
+      )}
+
+      <RadioGroup title="Individual access" name="context-individual" options={individualOptions} value={selection} onChange={setSelection} />
+
+      {error && <Alert tone="error">{error}</Alert>}
+
+      <Inline justify="end">
+        <Button variant="primary" disabled={loading || !selection} onClick={handleContinue}>
+          {loading ? "Processing..." : "Continue"}
+        </Button>
+      </Inline>
+    </Stack>
+  );
+}

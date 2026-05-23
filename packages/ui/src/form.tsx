@@ -44,3 +44,38 @@ type HiddenInputProps = {
 export function HiddenInput({ name, value }: HiddenInputProps) {
   return <input type="hidden" name={name} value={value} />;
 }
+
+type RadioOption = {
+  readonly value: string;
+  readonly label: string;
+};
+
+type RadioGroupProps = {
+  readonly title: string;
+  readonly name: string;
+  readonly options: readonly RadioOption[];
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+};
+
+export function RadioGroup({ title, name, options, value, onChange }: RadioGroupProps) {
+  return (
+    <fieldset className="fieldset">
+      <legend className="fieldset-legend text-base-content/80">{title}</legend>
+      {options.map((option) => (
+        <label key={option.value} className="label cursor-pointer justify-start gap-3 py-0.5">
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            aria-label={option.label}
+            className="radio radio-xs radio-primary"
+            checked={value === option.value}
+            onChange={() => onChange(option.value)}
+          />
+          <span className="label-text">{option.label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}

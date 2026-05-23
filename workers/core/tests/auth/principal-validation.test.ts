@@ -238,6 +238,13 @@ describe("principal validation API", () => {
     );
     expect(sensitiveUser.status).toBe(404);
 
+    const nonexistentUser = await app.request(
+      "/api/auth/principal-validation/users/validate",
+      { method: "POST", headers, body: JSON.stringify({ userId: "user_missing" }) },
+      env,
+    );
+    expect(nonexistentUser.status).toBe(404);
+
     const memberUser = await app.request(
       "/api/auth/principal-validation/users/validate-organization-member",
       { method: "POST", headers, body: JSON.stringify({ userId: "user_member", organizationId: "org_content" }) },
@@ -258,6 +265,13 @@ describe("principal validation API", () => {
       env,
     );
     expect(crossOrgTeam.status).toBe(404);
+
+    const nonexistentTeam = await app.request(
+      "/api/auth/principal-validation/teams/validate-organization-team",
+      { method: "POST", headers, body: JSON.stringify({ teamId: "team_missing", organizationId: "org_content" }) },
+      env,
+    );
+    expect(nonexistentTeam.status).toBe(404);
 
     const serviceAccount = await app.request(
       "/api/auth/principal-validation/service-accounts/validate-organization-grant",

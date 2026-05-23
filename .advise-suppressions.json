@@ -77,6 +77,11 @@
       "file": "scripts/bootstrap_admin.py",
       "rule": "security/hardcoded-secret",
       "reason": "False positive on getpass prompt text; no password or secret value is hardcoded."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/oauth-scope-catalog/index.ts|workers/core/src/auth/plugins/resource-server/index.ts",
+      "reason": "Better Auth plugin endpoint handlers intentionally share explicit validate-authorize-mutate-invalidate structure across plugin-owned CRUD surfaces."
     }
   ]
 }

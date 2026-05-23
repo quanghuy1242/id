@@ -37,8 +37,9 @@ export function ConsentForm() {
         [OAUTH_QUERY_PARAM]: oauthQuery,
       });
 
-      if (body.redirect_uri) {
-        router.push(body.redirect_uri as string);
+      const redirectUrl = body.redirect_uri || body.url || body.redirectURL;
+      if (redirectUrl) {
+        router.push(redirectUrl as string);
         return;
       }
       setError((body.message || body.error || "Consent failed") as string);

@@ -172,6 +172,10 @@ export function Sidebar({ children }: SurfaceProps) {
   return <nav className="menu menu-sm w-64 bg-base-100 border-r border-base-300 p-3">{children}</nav>;
 }
 
-export function MobileDock({ children }: SurfaceProps) {
-  return <nav className="dock dock-sm lg:hidden">{children}</nav>;
+type MobileDockProps = SurfaceProps & {
+  readonly ariaLabel?: string;
+};
+
+export function MobileDock({ ariaLabel = "Primary mobile navigation", children }: MobileDockProps) {
+  return <nav aria-label={ariaLabel} className="dock dock-sm lg:hidden">{children}</nav>;
 }

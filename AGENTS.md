@@ -64,6 +64,7 @@ When new findings appear, handle them autonomously:
 - Worker tests live under `workers/*/tests`.
 - `@/*` maps to each worker's own `src/*` in tsconfig and Vitest aliases.
 - Do not use external services in tests. Mock Better Auth, D1/KV, route ownership, and JWKS boundaries where the phase does not explicitly require local Wrangler integration.
+- Run `pnpm lint` and `pnpm test` after any change — core or UI. The lint gate covers architecture invariants, UI route contracts, constants placement, and duplicate code; tests verify correctness across both workers and packages.
 
 ## Package Manager
 

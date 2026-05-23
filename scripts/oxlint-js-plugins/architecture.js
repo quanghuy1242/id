@@ -1434,7 +1434,7 @@ var CORE_FORBIDDEN_PATH_PREFIXES = ["/admin/", "/login", "/consent"];
 var CORE_ALLOWED_PATH_PREFIX = "/api/admin/";
 var UI_FORBIDDEN_PATH_PREFIX = "/api/";
 var UI_APP_ROOT = "/workers/ui/src/app/";
-var UI_ALLOWED_APP_ROUTE_PREFIXES = ["admin/", "login/", "consent/"];
+var UI_ALLOWED_APP_ROUTE_PREFIXES = ["admin/", "login/", "consent/", "select-authorization-context/"];
 var UI_ROOT_ALLOWED_FILES = new Set(["layout.tsx", "globals.css"]);
 var UI_ROUTE_OWNERSHIP_FILES = new Set(["page.tsx", "route.ts", "layout.tsx"]);
 
@@ -1473,7 +1473,7 @@ var routePathContractRule = {
 
         context.report({
           node: node,
-          message: "ui-id may only define public App Router routes under workers/ui/src/app/{admin,login,consent}/**. Core owns /api/* and root health/auth routes; keep UI-owned routes under /login, /consent, or /admin/*.",
+          message: "ui-id may only define public App Router routes under workers/ui/src/app/{admin,login,consent,select-authorization-context}/**. Core owns /api/* and root health/auth routes; keep UI-owned routes under /login, /consent, /select-authorization-context, or /admin/*.",
         });
       },
       CallExpression: function (node) {
