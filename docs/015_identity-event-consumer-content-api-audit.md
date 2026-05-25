@@ -10,7 +10,7 @@
 >
 > Source docs:
 >
-> - [013_identity-event-standards-and-decisions.md](013_identity-event-standards-and-decisions.md) — decisions D3 (adopt SSF+SET+RISC), D4 (CAEP gated), D5 (fence gated). "SSF" (Shared Signals Framework) is OpenID's renamed form of what the spec URL still calls "SSE Framework"; it is **not** HTML5 Server-Sent Events. See [013 §4.4](013_identity-event-standards-and-decisions.md#44-terminology-note-ssf-not-sse).
+> - [013_identity-event-standards-and-decisions.md](013_identity-event-standards-and-decisions.md) — decisions D3 (adopt SSF+SET+RISC), D4 (CAEP gated), D5 (fence gated). "SSF" is the final Shared Signals Framework name; it is **not** HTML5 Server-Sent Events. See [013 §4.4](013_identity-event-standards-and-decisions.md#44-terminology-note-ssf-not-sse).
 > - [014_identity-event-producer-id.md](014_identity-event-producer-id.md) — producer wire format and stream-config endpoints this consumer registers against
 > - `/home/quanghuy1242/pjs/content-api/.agents/skills/content-iam-usage/**` — current two-channel contract (JWT + write-time principal-validation)
 > - `/home/quanghuy1242/pjs/content-api/src/application/auth/authenticate-bearer-token.usecase.ts`
@@ -21,9 +21,9 @@
 > Standards references:
 >
 > - RFC 8417 — Security Event Token (SET)
-> - OpenID Shared Signals Framework 1.0
-> - OpenID RISC Profile 1.0
-> - OpenID CAEP Specification 1.0 — Phase 2 audit additions
+> - OpenID Shared Signals Framework 1.0 Final, <https://openid.net/specs/openid-sharedsignals-framework-1_0-final.html>
+> - OpenID RISC Profile 1.0 Final, <https://openid.net/specs/openid-risc-1_0-final.html>
+> - OpenID CAEP Specification 1.0 Final — Phase 2 audit additions, <https://openid.net/specs/openid-caep-1_0-final.html>
 >
 > Related docs:
 >
@@ -93,7 +93,8 @@ content-api receiver
    │        (cheap reject path; defends the expensive JWS verify from spoofed POSTs)
    │   2. parse JWS, verify signature against id SET-signing JWKS (separate from id's
    │        OAuth ID-token JWKS — see [014 §4.3](014_identity-event-producer-id.md#43-set-envelope-construction-and-signing-keyset))
-   │   3. verify iss, aud, iat replay window, single-event SHOULD-as-MUST
+   │   3. verify iss, aud, iat replay window, required sub_id and typ,
+   │        absent top-level sub/exp, and producer single-event contract
    │   4. enforce idempotency on jti
    │   5. dispatch event to typed handler
    │   6. handler writes reconciliation finding(s)
@@ -178,8 +179,8 @@ export const identityEventReceipts = {
   // primary key, equal to SET jti
   eventId: { type: "string", required: true, primaryKey: true },
   eventTypeUri: { type: "string", required: true },
-  subjectFormat: { type: "string", required: true },
-  subjectJson: { type: "string", required: true },
+  subjectIdentifierFormat: { type: "string", required: true },
+  subjectIdentifierJson: { type: "string", required: true }, // SSF sub_id
   occurredAt: { type: "date", required: true },
   receivedAt: { type: "date", required: true },
   signedIat: { type: "date", required: true },
@@ -195,9 +196,10 @@ export const identityReferenceFindings = {
   //   "user-disabled-with-bindings"
   //   "user-purged-with-bindings"
   //   "identifier-changed"
-  //   "sessions-revoked" (informational only)
+  //   "session-revoked" (informational only, Phase 2 CAEP)
   //   "team-deleted-with-bindings"  (Phase 2)
-  //   "service-account-credential-changed" (Phase 2)
+  //   "service-account-credential-revoked" (Phase 2 CAEP)
+  //   "service-account-disabled" (Phase 2 repo extension)
   principalType: { type: "string", required: true }, // user | team | service-account
   principalId: { type: "string", required: true },
   organizationId: { type: "string" }, // nullable
@@ -226,17 +228,17 @@ Findings are write-once-on-event; updates only flip `status` from `open` to `res
 
 **Recommended**: dedupe on `SET.jti`, which equals the producer outbox row primary key.
 
-**Rejected**: dedupe on `subject + event_type + iat`. This conflates separate events that happened to share a subject and timestamp.
+**Rejected**: dedupe on `sub_id + event_type + iat`. This conflates separate events that happened to share a Subject Identifier and timestamp.
 
 **Reasoning**: RFC 8417 mandates `jti` uniqueness, and the producer guarantees `jti = outbox.id` (doc 014 §4.3). Consumers should rely on the standard.
 
 ### 5.3 Direct-Share Bindings Survive Org Membership Removal
 
-**Recommended**: when (Phase 2) a CAEP `token-claims-change` event removes a user from an organization, the audit finding flags only the **workspace-derived** authority for that user. Any `policy-binding` row that names the user as a direct-share principal remains valid and is not flagged.
+**Recommended**: when a Phase 2 repo-specific `organization-member-removed` or `team-member-removed` event removes a user's derived authority, the audit finding flags only the **workspace-derived** or team-derived authority for that user. Any `policy-binding` row that names the user as a direct-share principal remains valid and is not flagged.
 
 **Reasoning**: per [docs/010_organization-teams-oauth-flow.md](../docs/010_organization-teams-oauth-flow.md) and the `content-iam-usage` skill, a direct-share binding is a separate, intentional grant by the resource owner. Removing the user from the organization does not revoke that grant. Conflating them would produce false-positive findings and risk operator-driven binding deletion that contradicts product intent.
 
-**Phase 1 scope**: this rule is *not* exercised by Phase 1 handlers. RISC `account-disabled` / `account-purged` flag all bindings unconditionally because the *account itself* is the subject — there is no separate "workspace-derived vs. direct-share" question to ask when the user no longer exists. The rule is recorded here once so that the Phase 2 CAEP `token-claims-change` handler in §8 inherits it without duplicating the design discussion.
+**Phase 1 scope**: this rule is *not* exercised by Phase 1 handlers. RISC `account-disabled` / `account-purged` flag all bindings unconditionally because the *account itself* is the subject — there is no separate "workspace-derived vs. direct-share" question to ask when the user no longer exists. The rule is recorded here once so that the Phase 2 relationship-event handlers in §8 inherit it without duplicating the design discussion.
 
 ### 5.4 Audit Mode Does Not Auto-Delete Bindings
 
@@ -307,7 +309,8 @@ Target behavior:
 - Resolve the SET-signing JWKS from `ID_SET_JWKS_URL` (separate keyset from `ID_JWKS_URL` per [014 §4.3](014_identity-event-producer-id.md#43-set-envelope-construction-and-signing-keyset) — OAuth ID-token verification continues to use `ID_JWKS_URL` unchanged).
 - Verify with `jose.jwtVerify(token, setJwks, { issuer: ID_ISSUER, audience: CONTENT_API_AUDIENCE, typ: 'secevent+jwt' })`.
 - Reject if `iat` is more than `replayWindowSeconds` (default 300) older than wall-clock or in the future beyond a 30-second skew tolerance.
-- Reject if `events` is not a single-key object (RFC 8417 SHOULD; treated as MUST for first release).
+- Reject if `sub_id` is absent or malformed; reject if top-level JWT `sub` or `exp` is present, as required by SSF Final.
+- Reject if `events` is not a single-key object because doc 014 deliberately constrains this producer to one event type per SET; RFC 8417 itself permits related multi-event SETs.
 - Reject if `kid` not present in the SET JWKS.
 
 HMAC pre-check (runs before JWS parse):
@@ -330,6 +333,7 @@ Tests:
 - Unit test: SET signed by retired-but-still-published key verifies (JWKS grace period).
 - Unit test: SET signed by unknown key rejected.
 - Unit test: `iat` outside replay window rejected.
+- Unit test: SET missing `sub_id`, or carrying prohibited top-level `sub` / `exp`, rejected.
 - Unit test: multi-event SET rejected.
 
 ### 7.3 Idempotency Store
@@ -368,7 +372,7 @@ Target behavior:
 ```ts
 type EventHandler = (input: {
   eventId: string;
-  subject: SetSubject;
+  subjectIdentifier: SsfSubjectIdentifier;
   payload: Record<string, unknown>;
   occurredAt: Date;
   receivedAt: Date;
@@ -394,11 +398,12 @@ Handlers required for Phase 1:
 
 | Event URI | Handler behavior |
 |---|---|
-| `https://schemas.openid.net/secevent/risc/event-type/account-disabled` | Look up bindings/denials with `principalType = 'user'` AND `principalId = subject.id`. Insert one `identityReferenceFindings` row with `findingType = 'user-disabled-with-bindings'`, `affectedBindingCount = N`. If `N = 0`, do not insert a finding (the event is informational and no local state references the user). |
+| `https://schemas.openid.net/secevent/risc/event-type/account-disabled` | Look up bindings/denials with `principalType = 'user'` AND `principalId = sub_id.id`. Insert one `identityReferenceFindings` row with `findingType = 'user-disabled-with-bindings'`, `affectedBindingCount = N`. If `N = 0`, do not insert a finding (the event is informational and no local state references the user). |
 | `https://schemas.openid.net/secevent/risc/event-type/account-enabled` | Look up `open` findings of type `user-disabled-with-bindings` for this user. Auto-resolve them with `status = 'resolved'`, `notes = 'auto-resolved by account-enabled event'`. |
 | `https://schemas.openid.net/secevent/risc/event-type/account-purged` | Same lookup as `account-disabled` but `findingType = 'user-purged-with-bindings'`. Findings are permanent (no auto-resolve on a future re-create — that would require a separate event type). |
 | `https://schemas.openid.net/secevent/risc/event-type/identifier-changed` | Insert `findingType = 'identifier-changed'` with the old/new identifiers in `notes`. `affectedBindingCount` reflects bindings using the user's ID (unchanged by identifier rename, but operator should be aware). |
-| `https://schemas.openid.net/secevent/risc/event-type/sessions-revoked` | Insert `findingType = 'sessions-revoked'`, `affectedBindingCount = 0` (informational). Operators rarely need to act, but the record is useful for incident investigation. |
+
+Phase 1 intentionally has no session-revocation handler. RISC Final deprecates `sessions-revoked`; the CAEP `session-revoked` informational handler belongs to Phase 2.
 
 Implementation tasks:
 
@@ -492,8 +497,9 @@ Conditions to start: same as doc 014 §8 — gated on [013 D4](013_identity-even
 Scope:
 
 1. **Add handlers** for the Phase 2 event URIs to `event-dispatcher.ts`:
-   - `token-claims-change` → `findingType = 'token-claims-change'`. For org/team membership removal: flag workspace-derived authority for the affected user, respect the direct-share-survives rule (§5.3).
-   - `credential-change` → `findingType = 'service-account-credential-changed'`. Flag bindings with `principalType = 'service-account'` AND `principalId = client_id`.
+   - Repo-specific `organization-member-removed` / `team-member-removed` -> membership-removal findings. Flag only derived authority for the affected user and respect the direct-share-survives rule (§5.3). These are extensions because CAEP `token-claims-change` requires an identified affected token.
+   - `credential-change` -> `findingType = 'service-account-credential-revoked'` only for an actual client-secret revocation (`change_type: revoke`). Flag bindings with `principalType = 'service-account'` AND `principalId = client_id`.
+   - Repo-specific `oauth-client-disabled` -> `findingType = 'service-account-disabled'`. Flag bindings with `principalType = 'service-account'` AND `principalId = client_id`.
    - `session-revoked` → `findingType = 'session-revoked'`, informational only.
    - Repo-specific `team-deleted` → `findingType = 'team-deleted-with-bindings'`. Flag bindings with `principalType = 'team'` AND `principalId = team_id`.
    - Repo-specific `oauth-client-grant-disabled` → `findingType = 'oauth-grant-disabled'`. Flag bindings whose `client_id` + `organization_id` match the disabled grant.
@@ -535,12 +541,12 @@ Estimated work: ~1-2 days after the Phase 1 audit infrastructure is shipped.
 | SET `iat` outside replay window | 4xx, no receipt row. Indicates clock skew or replay attempt; operator investigation. |
 | SET `aud` is not `content-api`'s audience | 4xx. Misrouted by producer; alert. |
 | Unknown event-type URI | 2xx, receipt row written, no finding row, info log. Forward-compatible. |
-| Multi-event SET (more than one URI in `events`) | 4xx — producer is required to emit one event per SET (doc 014 §4.3). |
+| Multi-event SET (more than one URI in `events`) | 4xx under the doc 014 producer contract. RFC 8417 permits related multi-event SETs, but this deployment intentionally emits and accepts one event type per SET. |
 | Handler throws (e.g. DB connection lost mid-find-bindings) | 5xx, no receipt row committed, producer retries. |
 | `account-disabled` event for a user with no local bindings or denials | 2xx, receipt row written, no finding row. The user existed in `id` but was never referenced locally. |
 | `account-enabled` event arrives before `account-disabled` (out of order) | 2xx, receipt written, no `account-disabled` finding to auto-resolve. Acceptable — informational only. |
 | `account-purged` arrives before bindings were created (very rare) | 2xx, receipt written, finding row with `affectedBindingCount = 0`. Operator sees the trail in case future investigation references the purged user ID. |
-| Direct-share binding exists when org-membership-removed event arrives (Phase 2) | Finding flags only workspace-derived authority (§5.3). Direct-share binding is not flagged. |
+| Direct-share binding exists when `organization-member-removed` arrives (Phase 2) | Finding flags only workspace-derived authority (§5.3). Direct-share binding is not flagged. |
 | Receiver is up, but the operator hasn't yet created the subscription in `id` | No events arrive. Local state has no inbound effect. Behavior is identical to today. |
 | Receiver is down (e.g. deployment in progress) | Producer Queue retries with backoff (doc 014 §4.5). On the next successful POST, all queued events arrive in order (per-jti idempotency handles any double-send). |
 | Producer publishes the same event to two subscriptions and `content-api` is one of them | `content-api` receives one SET with one `aud` value. The deduplication is by `jti`, which is the same across deliveries to different subscribers (one outbox row → many deliveries, each delivery is its own POST). |
@@ -583,7 +589,7 @@ Phase 2 audit consumer is done when:
 
 - §8 handlers shipped behind feature flag `IDENTITY_EVENTS_CAEP_ENABLED`.
 - Handler tests cover each new event URI.
-- The direct-share-survives rule (§5.3) is exercised by tests for `token-claims-change` with org/team membership delta.
+- The direct-share-survives rule (§5.3) is exercised by tests for repo-specific organization/team membership-removal events.
 - No change to `ContentPolicy.can()` — verified by the property-style test in §11.
 
 ## 13. Final Model
@@ -599,8 +605,7 @@ POST /webhooks/id-events
   │     ├── account-disabled    → flag bindings for user
   │     ├── account-enabled     → auto-resolve disabled findings
   │     ├── account-purged      → flag bindings for user (permanent)
-  │     ├── identifier-changed  → flag with old/new identifier
-  │     └── sessions-revoked    → informational record only
+  │     └── identifier-changed  → flag with old/new identifier
   ├── persist receipt
   └── return 2xx
 
@@ -618,7 +623,6 @@ src/application/identity/
     account-enabled.handler.ts
     account-purged.handler.ts
     identifier-changed.handler.ts
-    sessions-revoked.handler.ts
   list-findings.usecase.ts
   resolve-finding.usecase.ts
 

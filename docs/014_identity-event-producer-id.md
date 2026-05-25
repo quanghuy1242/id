@@ -18,9 +18,9 @@
 > Standards references:
 >
 > - RFC 8417 — Security Event Token (SET)
-> - OpenID Shared Signals Framework 1.0 — stream configuration and delivery semantics
-> - OpenID RISC Profile 1.0 — Phase 1 event vocabulary
-> - OpenID CAEP Specification 1.0 — Phase 2 event vocabulary
+> - OpenID Shared Signals Framework 1.0 Final — stream configuration and delivery semantics, <https://openid.net/specs/openid-sharedsignals-framework-1_0-final.html>
+> - OpenID RISC Profile 1.0 Final — Phase 1 event vocabulary, <https://openid.net/specs/openid-risc-1_0-final.html>
+> - OpenID CAEP Specification 1.0 Final — Phase 2 event vocabulary, <https://openid.net/specs/openid-caep-1_0-final.html>
 >
 > Related docs:
 >
@@ -77,7 +77,7 @@ Implement the producer side of the identity event channel in `id` so that succes
 
 Outcomes for Phase 1:
 
-- New `idIdentityEvents` Better Auth plugin owns fence-eligible source mutations (user disable, user delete, sessions revoke, OAuth client disable, OAuth grant disable, resource server disable) via *own-the-mutation* plugin endpoints. Each composes the source-table mutation and the outbox insert into a single `env.DB.batch([...])` for atomic capture (decision §5.1).
+- New `idIdentityEvents` Better Auth plugin owns Phase 1 fence-eligible source mutations (user disable and user delete) via *own-the-mutation* plugin endpoints. Each composes the source-table mutation and the outbox insert into a single `env.DB.batch([...])` for atomic capture (decision §5.1).
 - For BA-internal mutations the plugin does not own (identifier changes), `databaseHooks` best-effort capture supplies audit-only events.
 - Immediate `QUEUE.send` from the outbox writer (decision §5.7) drives the fast delivery path. A low-frequency cron sweeper recovers the rare orphans where queue-send failed post-commit.
 - A separate SET-signing keystore (decision §5.6), distinct from the OAuth ID-token JWKS, signs SETs. Published at `/api/auth/ssf/jwks`.
@@ -144,7 +144,7 @@ All BA hooks listed above are *after-fact*: they fire after Better Auth has comm
 
 ### 3.3 Existing OAuth Endpoints
 
-[workers/core/src/auth/oauth-provider.ts](workers/core/src/auth/oauth-provider.ts) configures `@better-auth/oauth-provider` with the endpoints documented in [013 §3.3](013_identity-event-standards-and-decisions.md#33-existing-oauth-standards-surface). The relevant endpoints for capturing OAuth-client lifecycle changes are exposed by the OAuth Provider plugin and supplemented by `idOAuthScopeCatalog` admin endpoints under `/api/auth/admin/oauth-scopes` and `/api/auth/admin/oauth-grants`. These are the capture points for `credential-change` / repo-specific client-grant-disabled events.
+[workers/core/src/auth/oauth-provider.ts](workers/core/src/auth/oauth-provider.ts) configures `@better-auth/oauth-provider` with the endpoints documented in [013 §3.3](013_identity-event-standards-and-decisions.md#33-existing-oauth-standards-surface). The relevant endpoints for capturing OAuth-client lifecycle changes are exposed by the OAuth Provider plugin and supplemented by `idOAuthScopeCatalog` admin endpoints under `/api/auth/admin/oauth-scopes` and `/api/auth/admin/oauth-grants`. These are the capture points for the repo-specific client-disabled / client-grant-disabled events, or CAEP `credential-change` only when an actual credential is revoked.
 
 ### 3.4 Existing Migration And DB Conventions
 
@@ -187,7 +187,7 @@ The plugin does **not**:
 
 The atomicity gap is: a Better Auth `after*` hook callback runs *after* the source mutation commits. If the event row is written from inside that callback, the source mutation can commit while the event write fails, leaving the identity change unobserved. Worse: D1 has no nested transactions, and BA's `before` hooks do not expose the in-flight adapter transaction handle to plugin code in a way that would let us share it.
 
-The fix this design adopts is **"own the source mutation" + D1 batch atomicity**: for the small set of fence-eligible mutations (user disable, user delete, sessions revoke, OAuth client disable, OAuth grant disable, resource server disable), `idIdentityEvents` exposes its own plugin endpoints that:
+The fix this design adopts is **"own the source mutation" + D1 batch atomicity**: for Phase 1 fence-eligible mutations (user disable and user delete), `idIdentityEvents` exposes its own plugin endpoints that:
 
 1. Authorize the operator (same checks BA would have applied).
 2. Compose **both** the source-table mutation and the outbox insert into a single `env.DB.batch([...])` call. D1 batch executes its statements atomically — either all rows commit or none do.
@@ -200,7 +200,7 @@ env.DB.batch([
   prepare("UPDATE user SET banned = 1, ban_reason = ?, ban_expires = ? WHERE id = ?"),
   // outbox insert — committed atomically with the source mutation
   prepare(`INSERT INTO identityEventOutbox
-           (id, event_type_uri, subject, occurred_at, payload, status)
+           (id, event_type_uri, subject_identifier, occurred_at, payload, status)
            VALUES (?, 'https://schemas.openid.net/secevent/risc/event-type/account-disabled',
                    ?, ?, ?, 'pending')`),
 ])
@@ -216,7 +216,7 @@ The **sweeper** (a low-frequency cron, e.g. every 10 minutes) does *not* drive t
 
 ### 4.3 SET Envelope Construction And Signing Keyset
 
-Per RFC 8417, every emitted event is a JWS-signed JWT with this minimum claim set:
+Per RFC 8417 and the SSF Final profile, every emitted event is a JWS-signed JWT with this minimum claim set:
 
 ```json
 {
@@ -224,12 +224,13 @@ Per RFC 8417, every emitted event is a JWS-signed JWT with this minimum claim se
   "aud": ["<subscriber-resource-audience>"],
   "iat": 1779697800,
   "jti": "evt_01HXYZ...",
+  "toe": 1779697799,
+  "sub_id": {
+    "format": "opaque",
+    "id": "user_alice"
+  },
   "events": {
     "https://schemas.openid.net/secevent/risc/event-type/account-disabled": {
-      "subject": {
-        "format": "opaque",
-        "id": "user_alice"
-      },
       "reason": "admin_disabled"
     }
   }
@@ -240,23 +241,24 @@ Rules:
 
 - `iss` is the canonical issuer URL — same value as the OAuth ID Token issuer (`https://id.<host>/api/auth`).
 - `aud` is the subscriber's `resource` audience (the value `content-api` already verifies as `aud` on its bearer tokens). One SET targets one subscriber audience.
-- `iat` is the moment the SET is signed, not the moment of the identity mutation. The mutation's effective time is carried in `event_payload.occurred_at` or in CAEP's standard `event_timestamp` field (Phase 2).
+- `iat` is the moment the SET is signed, not the moment of the identity mutation. The optional RFC 8417 `toe` claim carries the time of the state change; for CAEP events the required event payload `event_timestamp` represents the same effective event time.
 - `jti` is the stable, primary-keyed `outbox.id`, used by the consumer for idempotency.
-- `events` is a single-key object: one SET, one event type, one subject (per RFC 8417 §1.2 "SHOULD" guidance; multi-event SETs are not used).
-- Signing: `RS256` using a **separate SET-signing keyset**, distinct from the OAuth ID-token JWKS at `/api/auth/jwks` (decision §5.6). Published at `/api/auth/ssf/jwks`. The `kid` header references the current SET-signing key; rotation and grace policies mirror the OAuth keyset but the key material does not overlap.
+- `sub_id` is mandatory for SSF SETs and identifies the subject in a top-level Subject Identifier. The top-level JWT `sub` and `exp` claims MUST NOT be present.
+- `events` is a single-key object as this producer's implementation policy. RFC 8417 itself permits multiple event-type URIs for aspects of one logical state transition.
+- Signing: `RS256` using a **separate SET-signing keyset**, distinct from the OAuth ID-token JWKS at `/api/auth/jwks` (decision §5.6). Published at `/api/auth/ssf/jwks`. The JOSE header includes `typ: "secevent+jwt"` and `kid` references the current SET-signing key; rotation and grace policies mirror the OAuth keyset but the key material does not overlap.
 
 **Keyset separation rationale** (B): RFC 8725 §3.5 and RFC 8417 §6.2 recommend separating signing-key purposes. Mixing SET signing with OAuth ID-token signing means a compromise in one path invalidates both. Better Auth's `jwt` plugin owns the OAuth JWKS only; SET signing requires a dedicated key store and a dedicated JWKS endpoint. Implementation cost is one additional rotating-key store and one extra route; consumer cost is one extra JWKS URL env var. See §5.6 for the decision record.
 
 Subject formats:
 
-| Event scope | `subject.format` | `subject.id` |
+| Event scope | `sub_id.format` | Subject Identifier contents |
 |---|---|---|
 | Account-scoped (user) | `opaque` | `user_id` |
-| Tenant-scoped (org-member) | `aliases` with `org_id` + `user_id` keys (CAEP convention) | composite |
-| Team-scoped (team-member) | `aliases` with `org_id` + `team_id` + `user_id` keys | composite |
+| Tenant-scoped (org-member) | `complex` | component identifiers for `org_id` and `user_id` |
+| Team-scoped (team-member) | `complex` | component identifiers for `org_id`, `team_id`, and `user_id` |
 | Client-scoped | `opaque` | `client_id` |
 
-Repo-specific event payloads (team-deleted, client-grant-disabled) follow the same subject conventions but use the namespaced URI from [013 §7](013_identity-event-standards-and-decisions.md#7-event-vocabulary-mapping).
+Repo-specific event payloads (organization-member-removed, team-member-removed, client-disabled, team-deleted, client-grant-disabled) follow the same `sub_id` conventions but use the namespaced URI from [013 §7](013_identity-event-standards-and-decisions.md#7-event-vocabulary-mapping).
 
 ### 4.4 SSF Stream-Config Endpoints
 
@@ -312,7 +314,7 @@ Security:
 
 ### 5.1 Own-The-Mutation + D1 Batch Outbox Over Best-Effort Hooks
 
-**Recommended (A.1)**: for fence-eligible source mutations (user disable, user delete, sessions revoke, OAuth client disable, OAuth grant disable, resource server disable), `idIdentityEvents` plugin endpoints own the mutation and use `env.DB.batch([mutationSql, outboxInsertSql])` to commit source row + outbox row atomically. Immediately afterward, the same request handler invokes `env.QUEUE.send({ outboxId })` for low-latency dispatch. A low-frequency sweeper cron picks up the rare orphan where the batch committed but the queue send failed.
+**Recommended (A.1)**: for Phase 1 fence-eligible source mutations (user disable and user delete), `idIdentityEvents` plugin endpoints own the mutation and use `env.DB.batch([mutationSql, outboxInsertSql])` to commit source row + outbox row atomically. Phase 2 applies the same pattern to approved CAEP or repository-specific enforcement events. Immediately afterward, the same request handler invokes `env.QUEUE.send({ outboxId })` for low-latency dispatch. A low-frequency sweeper cron picks up the rare orphan where the batch committed but the queue send failed.
 
 **Rejected — fire-and-forget inside BA hook**. The BA `after*` hook fires after commit, so there is no atomic relationship between the source mutation and the dispatch. A worker restart or hook exception loses events.
 
@@ -394,7 +396,7 @@ Sequence work so each step is reviewable in isolation:
 
 1. **Plugin skeleton + schema generation** — empty plugin, four tables (`identityEventSubscription` with HMAC columns, `identityEventOutbox`, `identityEventDelivery`, `setSigningKey`), generate migration. No behavior yet.
 2. **SET-signing keyset + `/api/auth/ssf/jwks`** — bootstrap the separate keystore (§5.6), expose the JWKS endpoint, add a key-rotation cron mirroring the OAuth keyset's lazy rotation pattern.
-3. **Own-the-mutation plugin endpoints + D1 batch** — for `banUser`, `deleteUser`, `revokeAllSessions`, `disableOAuthClient`, `disableOAuthClientOrganizationGrant`, `disableResourceServer`: implement endpoints that authorize the operator, build the D1 batch (source mutation + outbox insert), and invoke `QUEUE.send` after commit. These replace the corresponding BA admin paths for these mutations.
+3. **Own-the-mutation plugin endpoints + D1 batch** — for Phase 1 `banUser` and `deleteUser`: implement endpoints that authorize the operator, build the D1 batch (source mutation + outbox insert), and invoke `QUEUE.send` after commit. Phase 2 adds atomic capture for session revocation and approved client/grant extensions. These replace the corresponding BA admin paths only when their event phase is enabled.
 4. **`databaseHooks` best-effort fallback** — for BA-owned mutations we do not take over (identifier changes via `updateUser`), wire `databaseHooks.user.update.before` to write a best-effort outbox row in a separate D1 transaction. Document these as audit-only (not fence-eligible).
 5. **SET envelope builder** — pure function that converts an outbox row to a JWS-signed SET using the SET-signing keystore. Header includes `typ: secevent+jwt`.
 6. **SSF stream-config endpoints** — admin-only CRUD over `identityEventSubscription` under `/api/auth/ssf/streams`, plus the HMAC rotation endpoint.
@@ -453,8 +455,8 @@ export const setSigningKey = {
 export const identityEventOutbox = {
   id: { type: "string", required: true, primaryKey: true }, // jti
   eventTypeUri: { type: "string", required: true },
-  subjectFormat: { type: "string", required: true },
-  subjectJson: { type: "string", required: true }, // serialized subject object
+  subjectIdentifierFormat: { type: "string", required: true },
+  subjectIdentifierJson: { type: "string", required: true }, // serialized SSF sub_id object
   payloadJson: { type: "string", required: true }, // serialized event payload
   occurredAt: { type: "date", required: true },
   sourceMutation: { type: "string", required: true }, // free-form audit label
@@ -502,7 +504,7 @@ Target behavior:
 type IdentityEventPublisher = {
   appendEvent(input: {
     eventTypeUri: string;
-    subject: SetSubject;
+    subjectIdentifier: SsfSubjectIdentifier;
     payload: Record<string, unknown>;
     occurredAt: Date;
     sourceMutation: string;
@@ -516,7 +518,7 @@ Implementation tasks:
 
 - [ ] Add `outbox.ts` with the `IdentityEventPublisher` factory.
 - [ ] Add `publisher.ts` that composes the publisher and any future filters.
-- [ ] Add `types.ts` with `SetSubject` and event-type-URI constants.
+- [ ] Add `types.ts` with `SsfSubjectIdentifier` and event-type-URI constants.
 - [ ] Export `createIdentityEventPublisher(authContext)` from the plugin.
 
 Tests:
@@ -537,7 +539,8 @@ Target behavior — Phase 1 fence-eligible events, captured atomically via D1 ba
 | Admin user disable | `POST /api/auth/identity-events/admin/users/:id/disable` | `https://schemas.openid.net/secevent/risc/event-type/account-disabled` |
 | Admin user enable | `POST /api/auth/identity-events/admin/users/:id/enable` | `https://schemas.openid.net/secevent/risc/event-type/account-enabled` |
 | User hard delete | `POST /api/auth/identity-events/admin/users/:id/delete` | `https://schemas.openid.net/secevent/risc/event-type/account-purged` |
-| Bulk session revoke for a user | `POST /api/auth/identity-events/admin/users/:id/revoke-sessions` | `https://schemas.openid.net/secevent/risc/event-type/sessions-revoked` |
+
+Bulk session revocation is not part of Phase 1: RISC Final deprecates `sessions-revoked`, and the standards-compliant CAEP `session-revoked` event is introduced in Phase 2 (§8).
 
 Each endpoint:
 
@@ -550,13 +553,13 @@ Each endpoint:
 Implementation tasks:
 
 - [ ] In `outbox.ts`, expose `buildOutboxInsertStatement(env, eventInput): D1PreparedStatement`.
-- [ ] In `index.ts`, register the four `createAuthEndpoint` handlers above, each calling `env.DB.batch([<sourceMutation>, buildOutboxInsertStatement(...)])` and then `env.QUEUE.send({ outboxId })`.
+- [ ] In `index.ts`, register the three `createAuthEndpoint` handlers above, each calling `env.DB.batch([<sourceMutation>, buildOutboxInsertStatement(...)])` and then `env.QUEUE.send({ outboxId })`.
 - [ ] Verify behavioral parity with BA's equivalent endpoints (identical authorization, identical response, identical cache invalidation). Cover with integration tests against a fresh local D1.
 - [ ] Document the supplanted BA endpoints in the plugin README so future maintainers do not accidentally re-enable them.
 
 Tests:
 
-- Integration test: own-the-mutation disable → exactly one outbox row with URI `account-disabled` and `subject.id = user_id`, source row updated, queue message produced.
+- Integration test: own-the-mutation disable -> exactly one outbox row with URI `account-disabled` and `sub_id.id = user_id`, source row updated, queue message produced.
 - Integration test: own-the-mutation delete → outbox row with `account-purged`, source row deleted, atomicity verified (force a SQL error on the second statement; assert neither commits).
 - Integration test: queue send failure after batch commit → outbox row remains `pending`; sweeper picks it up on next run.
 
@@ -587,11 +590,11 @@ Tests:
 
 Current problem:
 
-- `idOAuthScopeCatalog` admin endpoints currently disable a resource scope or grant without emitting events. The capture point is needed primarily for Phase 2 (CAEP `credential-change`, repo-specific `oauth-client-grant-disabled`).
+- `idOAuthScopeCatalog` admin endpoints currently disable a resource scope or grant without emitting events. The capture point is needed primarily for Phase 2 (repo-specific `oauth-client-disabled` and `oauth-client-grant-disabled`; CAEP `credential-change` applies only if an actual client credential is revoked).
 
 Target behavior:
 
-- In Phase 1: prepare the integration point. No CAEP events are emitted yet (D4 gated), but the wiring is added so Phase 2 is a one-event-URI addition rather than a new code path.
+- In Phase 1: prepare the integration point. No Phase 2 events are emitted yet (D4 gated), but the wiring is added so Phase 2 is an event-URI addition rather than a new code path.
 - In `idOAuthScopeCatalog` and `idResourceServer` admin endpoints that perform "disable" mutations, accept an injected `IdentityEventPublisher` and call `appendEvent` from inside the BA-adapter transaction.
 
 Implementation tasks:
@@ -618,12 +621,12 @@ Implementation tasks:
 
 - [ ] Add `set-envelope.ts` with `buildSet` using the existing JWT signing helper from `@better-auth/jwt` or `jose`.
 - [ ] Header: `alg: RS256`, `kid: <current JWKS kid>`, `typ: secevent+jwt`.
-- [ ] Claims as specified in §4.3.
+- [ ] Claims as specified in §4.3, including mandatory `sub_id`; prohibit top-level `sub` and `exp`.
 - [ ] Unit-test against a known-good example signed payload, verified with `jose.jwtVerify` against the local JWKS endpoint.
 
 Tests:
 
-- Unit test verifying a built SET decodes to expected `iss`, `aud`, `jti`, single-key `events` object, and `typ: secevent+jwt`.
+- Unit test verifying a built SET decodes to expected `iss`, `aud`, `jti`, `sub_id`, single-key `events` object, and `typ: secevent+jwt`, without `sub` or `exp`.
 - Unit test verifying the SET signature validates against `/api/auth/jwks`.
 
 ### 7.6 SSF Stream Configuration Endpoints
@@ -738,22 +741,27 @@ Conditions to start (per [013 D4](013_identity-event-standards-and-decisions.md#
 Scope of the Phase 2 extension:
 
 1. **New event-type URIs in the allowlist**:
-   - `https://schemas.openid.net/secevent/caep/event-type/token-claims-change`
-   - `https://schemas.openid.net/secevent/caep/event-type/credential-change`
    - `https://schemas.openid.net/secevent/caep/event-type/session-revoked`
+   - `https://schemas.openid.net/secevent/caep/event-type/credential-change` only for an actual client-secret revocation
+   - Repo-specific: `https://id.<host>/secevent/event-type/organization-member-removed`
+   - Repo-specific: `https://id.<host>/secevent/event-type/team-member-removed`
+   - Repo-specific: `https://id.<host>/secevent/event-type/oauth-client-disabled`
    - Repo-specific: `https://id.<host>/secevent/event-type/team-deleted`
    - Repo-specific: `https://id.<host>/secevent/event-type/oauth-client-grant-disabled`
 
 2. **Additional capture points**:
-   - `organizationHooks.member.beforeRemove` → `token-claims-change` with `claims: { org_id: null }`.
-   - `organizationHooks.teamMember.beforeRemove` → `token-claims-change` with `claims: { team_ids: { remove: [team_id] } }`.
+   - `organizationHooks.member.beforeRemove` -> repo-specific `organization-member-removed`, because the mutation identifies a membership relationship rather than one already-issued token.
+   - `organizationHooks.teamMember.beforeRemove` -> repo-specific `team-member-removed`, for the same reason.
+   - own-the-mutation user-session revoke endpoint -> CAEP `session-revoked`; do not emit deprecated RISC `sessions-revoked`.
    - `organizationHooks.team.beforeDelete` → repo-specific `team-deleted`.
-   - `idOAuthScopeCatalog` disable-client → `credential-change` with `credential_type: client_secret`, `change_type: disabled`.
-   - `idOAuthScopeCatalog` disable-grant → repo-specific `oauth-client-grant-disabled` with `subject` carrying `client_id` + `organization_id` + `resource`.
+   - `idOAuthScopeCatalog` disable-client -> repo-specific `oauth-client-disabled`; if a separate operation revokes a secret, it may emit CAEP `credential-change` with mutually-supported `credential_type: client_secret`, `change_type: revoke`.
+   - `idOAuthScopeCatalog` disable-grant -> repo-specific `oauth-client-grant-disabled` with `sub_id` carrying `client_id` + `organization_id` + `resource`.
 
-3. **Optional CAEP fields in payload**:
-   - `event_timestamp` (CAEP) instead of producer-side `occurredAt`.
-   - `tokens_issued_before` (consumer fence enforcement, doc 016) carried in payload — producer emits one second past the source-mutation commit to give the fence a safe boundary.
+3. **CAEP event timing**:
+   - `event_timestamp` is required in each CAEP event payload and is derived from the state-change time recorded in the outbox.
+   - The producer does not emit a CAEP `tokens_issued_before` claim; CAEP Final defines no such claim. When Phase 3 enforcement is enabled, the consumer derives its local `tokens_issued_before` fence value from `event_timestamp` (doc 016).
+   - Approved repository-specific events carry the source state-change time through SET `toe`; Phase 3 derives its local fence cutoff from `toe` for those events.
+   - `token-claims-change` is not emitted for relationship changes in this plan: CAEP requires its Subject Identifier to identify the affected token, and `id` does not maintain an affected-issued-token inventory. If such tracking is added later, each token-targeted event must carry complete new claim state rather than a delta.
 
 4. **No changes** to SET envelope, transport, retry, DLQ, or stream-config endpoints. The infrastructure built in §7.1 through §7.9 is reused.
 
@@ -764,7 +772,7 @@ Estimated work: ~1-3 days once Phase 1 has shipped and stabilized.
 - Plugin tables ship in a single migration generated by `pnpm db:migration:new add_identity_events_plugin_tables`. The migration is additive — no existing table is altered. New tables: `identityEventSubscription` (with HMAC columns), `identityEventOutbox`, `identityEventDelivery`, `setSigningKey`.
 - Cloudflare Queues, Queue bindings, and the DLQ are added to [workers/core/wrangler.jsonc](workers/core/wrangler.jsonc) and provisioned via `wrangler queues create id-identity-events` and `wrangler queues create id-identity-events-dlq`. Provisioning runbook entries are added to [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md).
 - Cron trigger added to wrangler config: `"crons": ["*/10 * * * *"]` — sweeper only, every 10 minutes (decision §5.7). The fast path is the immediate `QUEUE.send` from the own-the-mutation endpoints.
-- The own-the-mutation endpoints in §7.3 supplant the equivalent BA admin endpoints (`banUser`, `removeUser`, `revokeUserSessions`, `unbanUser`). Document the supplant in the plugin README and update any internal tooling that calls the BA admin endpoints directly.
+- The Phase 1 own-the-mutation endpoints in §7.3 supplant the equivalent BA admin endpoints (`banUser`, `removeUser`, `unbanUser`). The `revokeUserSessions` replacement is introduced only with the Phase 2 CAEP `session-revoked` event. Document each supplant when its phase ships and update internal tooling that calls that BA endpoint directly.
 - Bootstrap the SET-signing keystore on first boot: generate an initial RS256 keypair, insert as `status = 'active'`, expose at `/api/auth/ssf/jwks`. Rotation policy mirrors the OAuth JWKS (configurable per [workers/core/src/auth/config.ts](workers/core/src/auth/config.ts)).
 - Deployment order: D1 migration → wrangler deploy core (with queues + new env vars) → bootstrap SET-signing key → operator creates first subscription via `POST /api/auth/ssf/streams` and records the returned HMAC secret in the subscriber configuration.
 - Rollback: feature flag `IDENTITY_EVENTS_ENABLED` (env var) gates the outbox writer **and** the own-the-mutation endpoints' dispatch step. With the flag off:

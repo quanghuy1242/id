@@ -19,7 +19,7 @@
 > Standards references:
 >
 > - RFC 8417 — Security Event Token (SET)
-> - OpenID CAEP Specification 1.0 — `tokens_issued_before` semantics
+> - OpenID CAEP Specification 1.0 Final — `event_timestamp` event timing, <https://openid.net/specs/openid-caep-1_0-final.html>
 >
 > Related docs:
 >
@@ -62,7 +62,7 @@
 
 ## 1. Goal And Conditional Status
 
-Add consumer-side enforcement to `content-api` so that, after a CAEP / RISC event commits, in-flight self-contained JWTs that *would otherwise verify locally* are denied at token-acceptance time, ahead of their natural expiry.
+Add consumer-side enforcement to `content-api` so that, after a RISC, CAEP, or approved repository-specific identity event commits, in-flight self-contained JWTs that *would otherwise verify locally* are denied at token-acceptance time, ahead of their natural expiry.
 
 **This document is conditional.** Per [013 D5](013_identity-event-standards-and-decisions.md#55-d5--fence-enforcement-is-gated-on-audit-insufficiency), fence enforcement is not first-release work. It is built only when both:
 
@@ -76,13 +76,13 @@ When implementation does begin, this doc is the design of record. Cross-referenc
 Outcomes when implemented:
 
 - `content-api` requires a verified `iat` on every accepted JWT.
-- A new local fence table records the highest `tokens_issued_before` observed per identity key.
+- A new local fence table records the highest consumer-derived `tokens_issued_before` cutoff per identity key.
 - `ContentPolicy.can()` is unchanged; denial happens earlier, in token-principal expansion.
 - A clear, documented delivery-bound revocation SLA replaces "immediate revocation" framing.
 
 Non-goals:
 
-- Changes to `id` — Phase 3 is consumer-only. Phase 2 producer work (CAEP event emission, doc 014 §8) is a prerequisite.
+- Changes to `id` — Phase 3 is consumer-only. Phase 2 producer work (CAEP and approved extension event emission, doc 014 §8) is a prerequisite.
 - Any change to the `account-disabled` / `account-enabled` re-enablement workflow other than via the operator override (§8.6).
 - Auto-deleting policy bindings when fences fire.
 
@@ -90,7 +90,7 @@ Non-goals:
 
 Implementation starts only when:
 
-- [ ] [013 D4](013_identity-event-standards-and-decisions.md#54-d4--caep-adoption-is-gated-on-the-m2m-decision) has been triggered, doc 014 §8 (producer CAEP additions) has shipped, and the producer is emitting `token-claims-change`, `credential-change`, plus repo-specific `team-deleted` and `oauth-client-grant-disabled` to `content-api`'s subscription.
+- [ ] [013 D4](013_identity-event-standards-and-decisions.md#54-d4--caep-adoption-is-gated-on-the-m2m-decision) has been triggered, doc 014 §8 (producer CAEP and extension additions) has shipped, and the producer is emitting repo-specific `organization-member-removed`, `team-member-removed`, `oauth-client-disabled`, `team-deleted`, and `oauth-client-grant-disabled` to `content-api`'s subscription; CAEP `credential-change` is included only when an actual credential is revoked.
 - [ ] Doc 015 §8 (consumer CAEP audit) has shipped.
 - [ ] A specific operational requirement has been recorded — for example: "service-account credential disable must stop honored tokens within N minutes," or "team-member removal must stop content-write authority within M minutes" — that audit visibility alone does not satisfy.
 - [ ] [013](013_identity-event-standards-and-decisions.md) is amended to reflect the new D5 outcome and SLA values.
@@ -114,7 +114,7 @@ ContentPolicy.can()                  expand-token-principals
                                        (possibly reduced) principal set
 ```
 
-A "fence" is a small local record saying: "for this principal kind + identifier, any token issued at or before `tokens_issued_before` must not be honored as that principal." Fences are written by the event handler (in the same transaction as the receipt insert) and read in the bearer-token use case path.
+A "fence" is a small local record saying: "for this principal kind + identifier, any token issued at or before `tokens_issued_before` must not be honored as that principal." `tokens_issued_before` is a consumer-side column derived from the state-change timestamp (`event_timestamp` for CAEP, or SET `toe` for RISC/repository-specific events); it is not a CAEP-defined claim. Fences are written by the event handler (in the same transaction as the receipt insert) and read in the bearer-token use case path.
 
 ## 4. Current-State Findings
 
@@ -152,7 +152,7 @@ else:
    principal admitted
 ```
 
-This is the standard CAEP fence pattern: post-event tokens are admitted because their `iat` is greater than `T_fence`; pre-event tokens are denied for the affected principal until natural expiry would have removed them anyway.
+This is the consumer's enforcement policy built from CAEP timing: post-event tokens are admitted because their `iat` is greater than `T_fence`; pre-event tokens are denied for the affected principal until natural expiry would have removed them anyway. CAEP standardizes the event, not this local fence table.
 
 ### 5.2 Fence Kinds
 
@@ -160,10 +160,10 @@ This is the standard CAEP fence pattern: post-event tokens are admitted because 
 |---|---|---|
 | `user-disabled` | `user_id` | RISC `account-disabled` |
 | `user-purged` | `user_id` | RISC `account-purged` (permanent) |
-| `workspace` | `org_id`, `user_id` | CAEP `token-claims-change` removing org membership |
-| `team` | `org_id`, `team_id`, `user_id` | CAEP `token-claims-change` removing team membership |
+| `workspace` | `org_id`, `user_id` | repo-specific `organization-member-removed` |
+| `team` | `org_id`, `team_id`, `user_id` | repo-specific `team-member-removed` |
 | `team-deleted` | `org_id`, `team_id` | repo-specific `team-deleted` |
-| `service-account-disabled` | `client_id` | CAEP `credential-change` with `credential_type: client_secret`, `change_type: disabled` |
+| `service-account-disabled` | `client_id` | repo-specific `oauth-client-disabled`, or CAEP `credential-change` only for an actual credential revocation with `change_type: revoke` |
 | `service-account-grant` | `client_id`, `org_id`, `resource` | repo-specific `oauth-client-grant-disabled` |
 
 `user-purged` is permanent — there is no inverse event. The other kinds are reversible via operator override (§8.6) or via a re-enabling event:
@@ -353,7 +353,7 @@ The implementation enforces this by structuring fences to match **principal kind
 ## 7. Implementation Strategy
 
 1. **Schema + migration** — add `identityInvalidationFences`.
-2. **Handler updates** — RISC and CAEP handlers (from docs 015 §7.5 and 015 §8) gain a fence-write step alongside their finding-write step, behind feature flag `IDENTITY_EVENTS_FENCE_ENABLED`.
+2. **Handler updates** — RISC, CAEP, and approved extension handlers (from docs 015 §7.5 and 015 §8) gain a fence-write step alongside their finding-write step, behind feature flag `IDENTITY_EVENTS_FENCE_ENABLED`.
 3. **`Actor` change** — require `iat`, carry through use case.
 4. **Token-principal expansion** — new pure function reading fence state.
 5. **Repository + caching** — fence read path is hot; cache by principal key with short TTL (e.g. 30s) and invalidate on local fence write.
@@ -400,14 +400,15 @@ Target behavior:
 
 | Handler | Fence written |
 |---|---|
-| `account-disabled` | kind `user-disabled`, key `user_id`, `tokens_issued_before` from event payload (or `received_at` if absent). |
+| `account-disabled` | kind `user-disabled`, key `user_id`, local `tokens_issued_before` derived from SET `toe`. |
 | `account-purged` | kind `user-purged`, key `user_id`. Permanent. |
 | `account-enabled` | **No automatic clear**. Finding flips to `resolved` (doc 015), but fence remains; operator clears explicitly. |
 | `identifier-changed` | No fence — identifier change does not invalidate authority on principal-ID basis. |
-| `sessions-revoked` | No fence — sessions are browser-side; JWTs are not session-bound. |
-| `token-claims-change` (org-removed) | kind `workspace`, key `(org_id, user_id)`. |
-| `token-claims-change` (team-removed) | kind `team`, key `(org_id, team_id, user_id)`. |
-| `credential-change` (client disabled) | kind `service-account-disabled`, key `client_id`. |
+| `session-revoked` (Phase 2 CAEP) | No fence — sessions are browser-side; JWTs are not session-bound. |
+| `organization-member-removed` (repo) | kind `workspace`, key `(org_id, user_id)`. |
+| `team-member-removed` (repo) | kind `team`, key `(org_id, team_id, user_id)`. |
+| `oauth-client-disabled` (repo) | kind `service-account-disabled`, key `client_id`. |
+| `credential-change` (actual client-secret revoke) | kind `service-account-disabled`, key `client_id`; accept only CAEP `change_type: revoke`. |
 | `team-deleted` (repo) | kind `team-deleted`, key `(org_id, team_id)`. |
 | `oauth-client-grant-disabled` (repo) | kind `service-account-grant`, key `(client_id, org_id, resource)`. |
 
@@ -415,7 +416,7 @@ Implementation tasks:
 
 - [ ] Extract fence-writing logic into a helper `WriteFenceFromEvent` in `src/application/identity/`.
 - [ ] Update each handler in `src/application/identity/handlers/` to call the helper when the feature flag is on.
-- [ ] Add `tokens_issued_before` extraction logic that reads CAEP's `event_timestamp` claim and falls back to `receivedAt - 1`.
+- [ ] Add local `tokens_issued_before` derivation logic: read required CAEP `event_timestamp` for CAEP fence-producing events and SET `toe` for RISC or repository-specific fence-producing events. Missing source event time is a malformed enforcement event; do not silently substitute receipt time.
 
 Tests:
 
@@ -561,7 +562,7 @@ Implementation tasks:
 | Token has no `iat` | Rejected by `AuthenticateBearerTokenUseCase` (`token_missing_iat`). Operationally: every `id`-issued token has `iat`, so this is a defense-in-depth gate. |
 | Event arrives before token issuance, then token arrives | Token's `iat` > fence's `tokensIssuedBefore` → admitted. Correct. |
 | Token issued, then event commits, then token presented | Token's `iat` ≤ fence's `tokensIssuedBefore` → principal excluded. Correct. |
-| Token and event commit in the same second | `iat <= tokens_issued_before` is true → token excluded. Fail-safe boundary, acceptable per CAEP convention. The producer is encouraged to set `tokens_issued_before = mutation_timestamp - 1` if it wants to allow same-second post-mutation tokens. |
+| Token and event commit in the same second | `iat <= tokens_issued_before` is true -> token excluded. This is the consumer's documented fail-closed boundary when it derives the cutoff from `event_timestamp` or `toe`; CAEP does not prescribe the fence comparison. |
 | Event delivery is delayed (producer DLQ backlog) | The fence does not exist yet at the consumer; tokens are admitted. After the event eventually commits, future presentations of the same token are denied. This is the documented SLA boundary (§8.7). |
 | Fence row written but operator immediately overrides | Subsequent expansion sees `clearedAt != null` → fence ignored → principal admitted. |
 | Multiple fences for the same key, different `tokens_issued_before` values | Use max. Older fences remain for audit; newer fence (higher value) governs. |

@@ -24,9 +24,9 @@
 > - RFC 7662 — OAuth 2.0 Token Introspection, <https://www.rfc-editor.org/rfc/rfc7662.html>
 > - RFC 7644 — System for Cross-domain Identity Management (SCIM 2.0) Protocol, <https://www.rfc-editor.org/rfc/rfc7644.html>
 > - RFC 8417 — Security Event Token (SET), <https://www.rfc-editor.org/rfc/rfc8417.html>
-> - OpenID Shared Signals Framework 1.0 (SSF; the spec URL still uses `sse` for historical reasons but the framework was renamed to SSF to avoid collision with HTML5 Server-Sent Events), <https://openid.net/specs/openid-sse-framework-1_0.html>
-> - OpenID RISC Profile 1.0, <https://openid.net/specs/openid-risc-profile-specification-1_0.html>
-> - OpenID CAEP Specification 1.0, <https://openid.net/specs/openid-caep-specification-1_0.html>
+> - OpenID Shared Signals Framework 1.0 Final (SSF), <https://openid.net/specs/openid-sharedsignals-framework-1_0-final.html>
+> - OpenID RISC Profile 1.0 Final, <https://openid.net/specs/openid-risc-1_0-final.html>
+> - OpenID CAEP Specification 1.0 Final, <https://openid.net/specs/openid-caep-1_0-final.html>
 > - OpenID Connect Back-Channel Logout 1.0, <https://openid.net/specs/openid-connect-backchannel-1_0.html>
 >
 > Related docs:
@@ -74,7 +74,7 @@ Outcomes:
 - A standards-classified answer to "how should IdP-owned principal lifecycle changes reach resource clients" per the taxonomy in `a.md`.
 - A recorded decision on the M2M access-token lifetime (10,800s today) versus alternatives.
 - A recorded decision on whether to adopt CAEP and consumer-side fences, and the conditions under which each is unlocked.
-- An explicit mapping from `docs/012_random_thoughts.md`'s invented event names to RISC / CAEP equivalents so the implementation docs cite standard URIs rather than reinventing a private namespace.
+- An explicit mapping from `docs/012_random_thoughts.md`'s invented event names to RISC / CAEP equivalents where their semantics fit, with explicitly-classified repository extensions where they do not.
 - An explicit, justified scope-out of RFC 7662 introspection (deferred), OIDC Back-Channel Logout (different problem), and SCIM (not adopted).
 
 This document is forever-relevant. Implementation docs 014-016 may evolve; the decisions in §5 should be referenced and amended in place when they change, not duplicated elsewhere.
@@ -149,15 +149,15 @@ There is no push channel today. Policy bindings in [src/infrastructure/db/schema
 ### 4.1 The Four Identity-Event Specs Compose, Not Compete
 
 ```text
-SET  = envelope        (RFC 8417: one signed JWT, one event)
+SET  = envelope        (RFC 8417: one signed JWT; usually one event)
 SSF  = transport       (OpenID Shared Signals Framework: subscription mgmt, push/poll delivery)
 RISC = vocabulary      (account lifecycle event URIs)
 CAEP = vocabulary      (session/access change event URIs)
 ```
 
-A producer ships **SETs over SSF delivery carrying RISC and/or CAEP event URIs in the `events` claim**. A consumer registers a stream via the SSF configuration endpoints, verifies SET signatures with the producer's JWKS, and acts on the embedded RISC/CAEP events. None of these specs is interchangeable with another; they layer.
+A producer ships **SETs over SSF delivery carrying RISC, CAEP, or explicitly registered repository-extension event URIs in the `events` claim**. A consumer registers a stream via the SSF configuration endpoints, verifies SET signatures with the producer's JWKS, and acts on its accepted event types. None of these specs is interchangeable with another; they layer.
 
-**SET (RFC 8417)**. A JWT carrying a single security event. Required claims include `iss`, `aud`, `iat`, `jti`, `events` (object keyed by event-type URI → event payload). Signed with JWS; the spec recommends `alg: RS256` or `ES256`. Defines envelope only — neither transport nor vocabulary.
+**SET (RFC 8417)**. A JWT carrying security-event information. Required claims include `iss`, `aud`, `iat`, `jti`, `events` (object keyed by event-type URI -> event payload). RFC 8417 permits multiple event-type URIs when they describe the same logical state transition, while this implementation emits one event type per SET as a local simplification. Signed with JWS; the spec recommends `alg: RS256` or `ES256`. Defines envelope only — neither transport nor vocabulary.
 
 **SSF (OpenID Shared Signals Framework 1.0)**. Defines:
 
@@ -165,6 +165,7 @@ A producer ships **SETs over SSF delivery carrying RISC and/or CAEP event URIs i
 - Two delivery modes: **PUSH** (transmitter POSTs SETs to receiver URL — a normal HTTPS request per event, *not* an HTML5 Server-Sent Events stream) and **POLL** (receiver pulls SETs from a queue endpoint). First-release implementations may pick one and document the other as later work.
 - Stream verification — synthetic event the subscriber must echo back to prove decode capability.
 - Stream control — enable/pause/disable/replace stream.
+- SSF SET profile constraints — each SET has a top-level `sub_id` Subject Identifier, MUST NOT use top-level JWT `sub` or `exp`, and carries JOSE header `typ: "secevent+jwt"`.
 
 **RISC (OpenID RISC Profile 1.0)**. Account-lifecycle vocabulary, event URIs under `https://schemas.openid.net/secevent/risc/event-type/`. Examples relevant here:
 
@@ -178,7 +179,7 @@ A producer ships **SETs over SSF delivery carrying RISC and/or CAEP event URIs i
 | `identifier-recycled` | Identifier reassigned to a different account |
 | `recovery-activated` | Recovery flow started |
 | `recovery-information-changed` | Recovery email/phone changed |
-| `sessions-revoked` | All sessions for a user invalidated |
+| `sessions-revoked` | Deprecated in the Final specification; new implementations use CAEP `session-revoked` |
 
 Adoption: Google, Microsoft, Okta exchange RISC events as the cross-provider account-lifecycle protocol.
 
@@ -186,9 +187,9 @@ Adoption: Google, Microsoft, Okta exchange RISC events as the cross-provider acc
 
 | Event URI | Use |
 |---|---|
-| `session-revoked` | Single session invalidated |
-| `token-claims-change` | Claims that affect authorization changed (e.g. `team_ids` mutation) |
-| `credential-change` | Password/key rotated |
+| `session-revoked` | One or more sessions matching the Subject Identifier invalidated |
+| `token-claims-change` | Claims in an identified token changed; the event `sub_id` identifies that token |
+| `credential-change` | Credential created, revoked, updated, or deleted (`change_type` only permits `create`, `revoke`, `update`, or `delete`) |
 | `assurance-level-change` | MFA assurance changed |
 | `device-compliance-change` | Device posture changed |
 
@@ -223,16 +224,16 @@ These specs are referenced for two reasons: (a) so future engineers do not misre
 | Better Auth user disable/delete hooks | Better Auth-supported capability | Use as event capture point inside producer. |
 | Plugin endpoint append-events in `oauth-scope-catalog` / `resource-server` | Better Auth-supported capability + repository-specific extension | Use as event capture point for OAuth grant/client disable events. |
 | Transactional outbox row in same DB transaction as identity mutation | Repository-specific extension | Use as the producer's atomicity mechanism. Standard industry pattern. |
-| Custom `identity.user.disabled.v1` / `oauth.client.disabled.v1` event names (from `docs/012_random_thoughts.md`) | Repository-specific extension that overlaps RISC/CAEP | **Reject** in favor of RISC/CAEP URIs. Reserve repo-specific URIs only for the two events with no RISC/CAEP equivalent (team-deleted, OAuth client-organization grant disabled). |
+| Custom relationship/client events (from `docs/012_random_thoughts.md`) | Mixed: user-disable overlaps RISC; membership change is not CAEP `token-claims-change` without an identified token; disabling an OAuth client is not CAEP `credential-change` unless a credential is actually revoked | **Reject** the user event in favor of RISC; define reviewed repo-specific URIs for member removal, client disable, team delete, and OAuth client-organization grant disable. |
 | Scheduled pull reconciliation sweep from `content-api` to `principal-validation` | Repository-specific extension | Acceptable; deferred in favor of push (per user preference). May be added later as a redundant safety net. |
-| `iat`-based denial fence on consumer | Repository-specific extension that implements CAEP enforcement | Adopt only when audit is insufficient (D5). |
+| `iat`-based denial fence on consumer | Repository-specific enforcement derived from accepted security events | Adopt only when audit is insufficient (D5). |
 | Public user-managed webhook marketplace (the old `auther` model) | Repository-specific extension | **Reject** for first release. Operator-provisioned subscriptions only. |
 | Per-request live validation on every API call from `content-api` to `id` | Inappropriate workaround | Reject — defeats self-contained JWTs. |
 | Mirror table of all IdP state inside `content-api` | Inappropriate workaround | Reject — introduces the consistency problem the event channel is meant to avoid. |
 
 ### 4.4 Terminology Note: SSF, Not "SSE"
 
-OpenID's Shared Signals Framework is referred to as **SSF** throughout docs 013-016. The spec URL (`openid-sse-framework-1_0.html`) retains the legacy "sse" segment for historical reasons, but the framework was renamed to SSF specifically to avoid collision with the unrelated HTML5 **Server-Sent Events** browser API (`text/event-stream`, `EventSource`). Nothing in this design uses HTML5 Server-Sent Events; SSF PUSH delivery is a plain HTTPS POST per event.
+OpenID's Shared Signals Framework is referred to as **SSF** throughout docs 013-016. The final specifications were published on **August 29, 2025** and use the final URL path `openid-sharedsignals-framework-1_0-final.html`; do not cite the pre-final `openid-sse-framework-1_0.html` path. Nothing in this design uses HTML5 **Server-Sent Events** (`text/event-stream`, `EventSource`); SSF PUSH delivery is a plain HTTPS POST per SET.
 
 URL paths in docs 014-015 follow this rename: `/api/auth/ssf/streams`, not `/api/auth/sse/streams`. Any future reference that says "SSE" without qualification should be treated as a doc bug.
 
@@ -265,7 +266,7 @@ Each decision is recorded with a unique ID. Subsequent docs reference these IDs 
 
 **Reasoning**:
 
-- RISC URIs map 1:1 onto the events `id` actually has to publish for account lifecycle (`account-disabled`, `account-purged`, identifier changes, sessions revoked). Inventing a parallel namespace would violate `a.md`'s rule against "unexamined custom identity platform."
+- RISC URIs map directly onto Phase 1 account lifecycle events (`account-disabled`, `account-purged`, identifier changes). RISC Final deprecates `sessions-revoked`; session revocation is deferred to Phase 2 using CAEP `session-revoked`.
 - SET is the only event envelope standardized at the IETF (RFC 8417) and is used by every existing RISC/CAEP producer. It is a JWT, so existing JWS verification code in `content-api` is reusable.
 - SSF defines subscription provisioning and delivery semantics so producer/consumer wire format is determined by the spec, not by this repo. This is critical for the "future second consumer" case (other resource APIs, audit pipelines, SIEM).
 
@@ -277,7 +278,7 @@ Each decision is recorded with a unique ID. Subsequent docs reference these IDs 
 
 ### 5.4 D4 — CAEP Adoption Is Gated On The M2M Decision
 
-**Decision**: add CAEP event types (`token-claims-change`, `credential-change`, `session-revoked`) only when there is a recorded requirement to invalidate already-issued tokens faster than D1's 10,800-second M2M expiry. Until that requirement is recorded, CAEP is not published.
+**Decision**: add CAEP event types (`session-revoked`, `credential-change` only for actual credential create/revoke/update/delete operations, and `token-claims-change` only if an affected token can be identified) only when there is a recorded requirement to invalidate already-issued tokens faster than D1's 10,800-second M2M expiry. Membership-removal and disabled-OAuth-client notifications are repository-specific events: the former targets an authorization relationship rather than one identified token, and the latter is not an allowed CAEP credential change type. Until that requirement is recorded, CAEP and these Phase 2 extensions are not published.
 
 **Reasoning**:
 
@@ -325,7 +326,7 @@ Each decision is recorded with a unique ID. Subsequent docs reference these IDs 
 | Question | Pick |
 |---|---|
 | "Is *this token* still active right now?" — needed for one or a few high-risk routes; per-request RTT to `id` is acceptable. | **D6 introspection**. Per-route opt-in. Adds latency per request on those routes only. Synchronous, no event channel required. |
-| "Should the consumer locally know to deny tokens with these claims for *some principal*?" — broad, applies to all routes evaluating the affected principal; no per-request RTT acceptable. | **D5 CAEP fence**. Producer-driven push. Zero per-request cost. Requires the event channel to be healthy; subject to delivery-bound SLA. |
+| "Should the consumer locally know to deny tokens with these claims for *some principal*?" — broad, applies to all routes evaluating the affected principal; no per-request RTT acceptable. | **D5 event-driven fence**. Producer-driven push based on accepted standard or approved extension events. Zero per-request cost. Requires the event channel to be healthy; subject to delivery-bound SLA. |
 
 Operationally: introspection is the right tool when one route needs the freshest possible answer and you can pay a round trip for it; the fence is the right tool when the *whole* consumer should react to an identity change. Do not adopt introspection globally as a substitute for the fence — the per-request cost becomes prohibitive at scale. Do not push a fence to solve a one-route freshness need — the operational footprint (event channel, producer, consumer fence table) is too large for a single hot path.
 
@@ -360,7 +361,7 @@ Phase 1 (D3) ── Producer ships SSF+SET+RISC; consumer audits only
    │
    │  advance only when: D4 conditions met
    ▼
-Phase 2 (D4) ── Producer additionally ships CAEP event types; consumer still audits
+Phase 2 (D4) ── Producer additionally ships CAEP and approved extension events; consumer still audits
    │
    │  advance only when: D5 conditions met
    ▼
@@ -370,8 +371,10 @@ Phase 3 (D5) ── Consumer adds fence table + iat-based denial logic
 | Phase | Producer scope | Consumer scope | Drives this doc |
 |---|---|---|---|
 | 1 | SSF stream-config endpoints; SET envelope; RISC event vocabulary; transactional outbox (D1 batch + own-the-mutation, see [014 §5.1](014_identity-event-producer-id.md#51-own-the-mutation-d1-batch-over-best-effort-hooks)); HMAC + JWS signing; retry + DLQ | SET receiver; HMAC pre-check + JWS verification; idempotency on `jti`; orphan-binding findings; no policy change | docs 014 + 015 |
-| 2 | Add CAEP event types reusing same outbox + delivery | Audit-only on new CAEP types; still no policy change | doc 014 (CAEP section) + doc 015 (CAEP audit section) |
+| 2 | Add CAEP and approved repository-specific event types reusing same outbox + delivery | Audit-only on new event types; still no policy change | doc 014 (CAEP section) + doc 015 (CAEP audit section) |
 | 3 | No new producer work | Add `iat` requirement on `AuthenticateBearerTokenUseCase`; add fence table; deny stale-claim tokens | doc 016 |
+
+Phase 1 intentionally does not signal session revocation or organization/team claim staleness: RISC Final deprecates `sessions-revoked`, and membership-removal extension events are reserved for Phase 2.
 
 ## 7. Event Vocabulary Mapping
 
@@ -381,16 +384,17 @@ When implementation begins, every event published by `id` must resolve to either
 |---|---|---|
 | User disabled | `https://schemas.openid.net/secevent/risc/event-type/account-disabled` | 1 (RISC) |
 | User deleted (hard) | `https://schemas.openid.net/secevent/risc/event-type/account-purged` | 1 (RISC) |
-| User sessions revoked | `https://schemas.openid.net/secevent/risc/event-type/sessions-revoked` | 1 (RISC) |
+| User sessions revoked | `https://schemas.openid.net/secevent/caep/event-type/session-revoked` (RISC `sessions-revoked` is deprecated) | 2 (CAEP) |
 | Identifier changed (email/username) | `https://schemas.openid.net/secevent/risc/event-type/identifier-changed` | 1 (RISC) |
 | Credential change required (forced password reset, MFA reset) | `https://schemas.openid.net/secevent/risc/event-type/account-credential-change-required` | 1 (RISC) |
-| Organization member removed | `https://schemas.openid.net/secevent/caep/event-type/token-claims-change` with `claims: { org_id: null }` | 2 (CAEP) |
-| Team member removed | `https://schemas.openid.net/secevent/caep/event-type/token-claims-change` with `claims: { team_ids: <delta> }` | 2 (CAEP) |
-| OAuth client disabled | `https://schemas.openid.net/secevent/caep/event-type/credential-change` with `credential_type: client_secret`, `change_type: disabled` | 2 (CAEP) |
+| Organization member removed | `https://id.<host>/secevent/event-type/organization-member-removed` — repo-specific relationship event; a CAEP `token-claims-change` alternative would require one event per identified token | 2 (repo extension) |
+| Team member removed | `https://id.<host>/secevent/event-type/team-member-removed` — repo-specific relationship event; if a future token-targeted CAEP mapping is added, `claims.team_ids` must carry the complete new claim state, not a delta | 2 (repo extension) |
+| OAuth client secret revoked | `https://schemas.openid.net/secevent/caep/event-type/credential-change` with mutually-supported `credential_type: client_secret`, `change_type: revoke` | 2 (CAEP) |
+| OAuth client disabled | `https://id.<host>/secevent/event-type/oauth-client-disabled` — repo-specific; disabling a client is not itself one of CAEP's credential change types | 2 (repo extension) |
 | Team deleted | `https://id.<host>/secevent/event-type/team-deleted` — repo-specific, no RISC/CAEP equivalent | 2 (repo extension) |
 | OAuth client-organization grant disabled | `https://id.<host>/secevent/event-type/oauth-client-grant-disabled` — repo-specific, no RISC/CAEP equivalent | 2 (repo extension) |
 
-The two repo-specific URIs are accepted under `a.md`'s rules because they describe `id`-specific authorization-grant concepts (Better Auth teams, plugin-owned client-organization grants) that have no direct equivalent in RISC or CAEP. They are classified explicitly as repo extensions in doc 014.
+The five repo-specific URIs are accepted under `a.md`'s rules because they describe `id`-specific authorization relationships or concepts (organization/team membership removal, disabled OAuth clients, deleted Better Auth teams, and plugin-owned client-organization grants) that are not represented by a matching RISC/CAEP event. They are classified explicitly as repo extensions in doc 014.
 
 Events explicitly **not** published in any phase: token issuance, sign-in success, sign-out, content binding/denial changes, resource reads, profile field updates (initially), OAuth scope catalog browse events. Rationale per category: token-issuance/sign-in/sign-out belong to metrics (Analytics Engine, per [docs/003_future-implementation.md](docs/003_future-implementation.md) §4) or OIDC RP session protocol (out of scope per D7); content binding/denial changes are product policy and would violate `a.md`'s "do not move product authorization into id" rule; profile updates can be added later when a consumer requirement exists.
 
@@ -412,8 +416,8 @@ This section enumerates only failure modes whose handling is a **decision** (and
 | `id`-side identity mutation succeeds but the event row never reaches the outbox | Falls back to D1's stale-authority window. No promise of sub-window enforcement. Producer must still alert (doc 014). |
 | Consumer receives a CAEP event type before D5 enforcement is shipped | Phase 2 audit-only behavior: event is logged, no policy effect. This is the *intended* behavior, not a bug. |
 | Consumer receives a RISC `account-purged` for a user with active direct-share bindings | Flagging only in Phase 1 (audit). In Phase 3 (D5 enforcement), denial is applied at token verification, but local product policy bindings are not silently deleted — operator workflow handles binding cleanup. |
-| A token issued *before* a CAEP `token-claims-change` event with `tokens_issued_before` claim is presented after the event commits | In Phase 3 only: denied via `iat <= tokens_issued_before` check. In Phase 1-2: accepted, because no fence exists yet. |
-| Producer wants to publish a non-RISC, non-CAEP event | Must be classified as repo extension per §4.3, must use the repo-namespaced URI scheme `https://id.<host>/secevent/event-type/<name>`, and must justify why no standard URI fits. The team-deleted and grant-disabled cases are the only two such events approved in Phase 2. |
+| A token issued before a Phase 2 membership-removal extension event is presented after the event commits | In Phase 3 only: the consumer derives a local fence cutoff from SET `toe` and denies via `iat <= fence.tokens_issued_before`. `tokens_issued_before` is local enforcement state, not a CAEP-defined claim. In Phase 1-2: accepted, because no fence exists yet. |
+| Producer wants to publish a non-RISC, non-CAEP event | Must be classified as repo extension per §4.3, must use the repo-namespaced URI scheme `https://id.<host>/secevent/event-type/<name>`, and must justify why no standard URI fits. Organization-member-removed, team-member-removed, client-disabled, team-deleted, and client-grant-disabled are the five cases approved in Phase 2. |
 | Subscriber asks for an event type the producer does not emit (e.g. profile change) | SSF stream config rejects on registration. Adding the event type is a future decision recorded here. |
 | Subscriber asks the producer to act as a SCIM server | Reject. D8 stands until the conditions to revisit are met. |
 | A new resource API beyond `content-api` requests a subscription | Allowed under the operator-provisioned model. The producer is generic across subscribers; doc 015's consumer-specific behaviors do not apply to other subscribers. |
@@ -448,19 +452,20 @@ Phase 1 (D3)                                             Phase 1 (D3)
   + SET envelope (RFC 8417)                                + SSF stream registration in id
   + SSF stream config /ssf/streams (OpenID SSF)            + HMAC pre-check + JWS signature verification
   + RISC event types (account-disabled,                    + Idempotency on jti
-    account-purged, sessions-revoked,                      + Orphan-binding findings storage
-    identifier-changed)                                    + Operator-visible reconciliation
+    account-purged, identifier-changed)                     + Orphan-binding findings storage
+                                                           + Operator-visible reconciliation
   + HMAC + JWS keys, replay window
   + Retry + DLQ
   + Operator-managed subscriptions
 
 Phase 2 (D4, conditional)                                Phase 2 (D4, conditional)
-  + CAEP event types                                       + Audit-only consumption of new CAEP types
-    (token-claims-change,                                  + No policy change
-     credential-change,
-     session-revoked)
+  + CAEP event types                                       + Audit-only consumption of new event types
+    (session-revoked; credential-change only               + No policy change
+     for actual credential revocation)
   + Repo-specific event URIs for
-    team-deleted, oauth-client-grant-disabled
+    organization-member-removed, team-member-removed,
+    oauth-client-disabled, team-deleted,
+    oauth-client-grant-disabled
 
 Phase 3 (D5, conditional)                                Phase 3 (D5, conditional)
   No producer change.                                      + Require verified iat on Actor
