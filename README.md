@@ -21,6 +21,10 @@ This implementation follows the planning and architecture documents:
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
 - [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, Sender email, API-only operation, incident runbooks
 - [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
+- [docs/013_identity-event-standards-and-decisions.md](docs/013_identity-event-standards-and-decisions.md) — standards landscape (SET/SSE/RISC/CAEP) and decision record for the identity event channel
+- [docs/014_identity-event-producer-id.md](docs/014_identity-event-producer-id.md) — producer-side implementation plan (`idIdentityEvents` plugin, transactional outbox, SET delivery)
+- [docs/015_identity-event-consumer-content-api-audit.md](docs/015_identity-event-consumer-content-api-audit.md) — consumer-side audit-mode plan for `content-api` (receipts, orphan-binding findings)
+- [docs/016_identity-event-consumer-content-api-fence-enforcement.md](docs/016_identity-event-consumer-content-api-fence-enforcement.md) — consumer-side fence enforcement plan (conditional, Phase 3)
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
