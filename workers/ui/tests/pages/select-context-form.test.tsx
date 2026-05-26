@@ -24,12 +24,12 @@ vi.mock("@id/lib", () => ({
   postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  global.fetch = mockFetch;
-});
-
 describe("SelectContextForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    global.fetch = mockFetch;
+  });
+
   it("renders request description", () => {
     render(<SelectContextForm />);
     expect(screen.getByText(/an application is requesting access/i)).toBeInTheDocument();

@@ -1,97 +1,128 @@
+import { execFile } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 const WORKSPACE = ".architecture-rule-workspace";
-
-beforeEach(() => {
-  rmSync(WORKSPACE, { force: true, recursive: true });
-});
 
 afterAll(() => {
   rmSync(WORKSPACE, { force: true, recursive: true });
 });
 
-function writeFixture(path: string, content: string) {
-  mkdirSync(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-  writeFileSync(path, content);
-  return path;
+function writeFixture(testDir: string, relPath: string, content: string): string {
+  const full = `${WORKSPACE}/${testDir}/${relPath}`;
+  mkdirSync(full.slice(0, full.lastIndexOf("/")), { recursive: true });
+  writeFileSync(full, content);
+  return full;
 }
 
-function runOxlint(path: string) {
-  return spawnSync("pnpm", ["oxlint", "--no-ignore", "-c", ".oxlintrc.json", path], {
-    encoding: "utf8",
+function runOxlint(path: string): Promise<{ readonly status: number; readonly output: string }> {
+  return new Promise((resolve) => {
+    execFile(
+      "node_modules/.bin/oxlint",
+      ["--no-ignore", "-c", ".oxlintrc.json", path],
+      { encoding: "utf8" },
+      (err, stdout, stderr) => {
+        resolve({ status: err ? ((err as { code?: number }).code ?? 1) : 0, output: stdout + stderr });
+      },
+    );
   });
 }
 
-describe("oxlint architecture rules", () => {
-  it("catches a layer-import violation (drizzle in domain)", () => {
+describe.concurrent("oxlint architecture rules", () => {
+  it("catches a layer-import violation (drizzle in domain)", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/core/src/domain/layer-import-violation.ts`,
+      "layer-import",
+      "workers/core/src/domain/layer-import-violation.ts",
       `import { sql } from "drizzle-orm";\nexport const value = sql;\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(layer-imports)");
+    expect(result.output).toContain("architecture(layer-imports)");
   });
 
-  it("catches a worker-isolation violation (core importing from ui)", () => {
+  it("catches a worker-isolation violation (core importing from ui)", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/core/src/app/worker-isolation-violation.ts`,
+      "worker-isolation",
+      "workers/core/src/app/worker-isolation-violation.ts",
       `import "../../../ui/src/main";\nexport const value = true;\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(worker-isolation)");
+    expect(result.output).toContain("architecture(worker-isolation)");
   });
 
-  it("catches a ui-route-composition violation (raw <div> in admin page)", () => {
+  it("catches a ui-route-composition violation (raw <div> in admin page)", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/ui/src/app/admin/page.tsx`,
+      "ui-route-div",
+      "workers/ui/src/app/admin/page.tsx",
       `export default function Page() {\n  return <div className="flex">bad</div>;\n}\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(ui-route-composition)");
+    expect(result.output).toContain("architecture(ui-route-composition)");
   });
 
-  it("catches fetch in ui admin route files", () => {
+  it("catches fetch in ui admin route files", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/ui/src/app/admin/fetch/page.tsx`,
+      "ui-route-fetch",
+      "workers/ui/src/app/admin/fetch/page.tsx",
       `import { Page } from "@id/ui";\nexport default async function PageFile() {\n  await fetch("/api/admin/dashboard");\n  return <Page>bad</Page>;\n}\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(ui-route-composition)");
+    expect(result.output).toContain("architecture(ui-route-composition)");
   });
 
-  it("catches ui imports from core worker source", () => {
+  it("catches ui imports from core worker source", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/ui/src/app/admin/core-import/page.tsx`,
+      "ui-core-import",
+      "workers/ui/src/app/admin/core-import/page.tsx",
       `import "../../../../core/src/main";\nimport { Page } from "@id/ui";\nexport default function PageFile() {\n  return <Page>bad</Page>;\n}\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(worker-isolation)");
+    expect(result.output).toContain("architecture(worker-isolation)");
   });
 
-  it("catches auth dependencies in ui source", () => {
+  it("catches auth dependencies in ui source", async () => {
     const fixture = writeFixture(
-      `${WORKSPACE}/workers/ui/src/app/admin/auth-import/page.tsx`,
+      "ui-auth-dep",
+      "workers/ui/src/app/admin/auth-import/page.tsx",
       `import { betterAuth } from "better-auth";\nimport { Page } from "@id/ui";\nexport default function PageFile() {\n  betterAuth;\n  return <Page>bad</Page>;\n}\n`,
     );
-    const result = runOxlint(fixture);
+    const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("architecture(ui-no-auth-deps)");
+    expect(result.output).toContain("architecture(ui-no-auth-deps)");
   });
 
-  it("passes cleanly on valid files", () => {
-    const result = runOxlint("workers/core/src/composition/create-app.ts");
+  it("catches magic numbers in auth source", async () => {
+    const fixture = writeFixture(
+      "auth-magic-number",
+      "workers/core/src/auth/adapters/magic-number.ts",
+      `export const settings = { ttlSeconds: 300 };\n`,
+    );
+    const result = await runOxlint(fixture);
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain("architecture(no-magic-numbers)");
+  });
+
+  it("allows documented constants in auth config", async () => {
+    const fixture = writeFixture(
+      "auth-config-constant",
+      "workers/core/src/auth/config.ts",
+      `/** Auth timeout for the fixture. */\nexport const AUTH_TIMEOUT_SECONDS = 300;\nexport const settings = { ttlSeconds: AUTH_TIMEOUT_SECONDS };\n`,
+    );
+    const result = await runOxlint(fixture);
     expect(result.status).toBe(0);
   });
 
-  it("passes cleanly on valid ui composition files", () => {
-    const result = runOxlint("workers/ui/src/app/admin/page.tsx");
+  it("passes cleanly on valid files", async () => {
+    const result = await runOxlint("workers/core/src/composition/create-app.ts");
+    expect(result.status).toBe(0);
+  });
+
+  it("passes cleanly on valid ui composition files", async () => {
+    const result = await runOxlint("workers/ui/src/app/admin/page.tsx");
     expect(result.status).toBe(0);
   });
 });

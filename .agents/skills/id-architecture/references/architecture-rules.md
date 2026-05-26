@@ -94,9 +94,10 @@ Auth adapter rule:
 
 Numeric literal values must be extracted to named constants:
 
-- Magic numbers (numeric literals except 0 and 1) are forbidden in core `application`, `domain`, `http`, and `shared` layers.
+- Magic numbers (numeric literals except 0 and 1) are forbidden in non-infrastructure core source layers: `application`, `domain`, `http`, `shared`, `auth`, `composition`, and `config`.
 - Cross-cutting constants belong in `workers/core/src/shared/constants.ts` or `packages/lib/src/constants.ts`.
 - Resource-specific constants belong in `workers/core/src/domain/<resource>/`.
+- Better Auth integration constants belong in `workers/core/src/auth/config.ts`.
 - Named constants must use `SCREAMING_SNAKE_CASE`.
 - 0 and 1 are exempt as universal base values.
 - Property keys, enum members, and type annotations are exempt as definition sites.

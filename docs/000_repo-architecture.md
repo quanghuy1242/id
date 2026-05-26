@@ -1079,6 +1079,8 @@ Content-api rules, all hard errors:
 | 12 | `constants-placement` | constants outside approved locations |
 | 13 | `constants-jsdoc` | undocumented exported constants |
 
+`no-magic-numbers` is adapted to this repo's Worker layout: it applies to non-infrastructure core source layers (`application`, `domain`, `http`, `shared`, `auth`, `composition`, and `config`) plus `packages/lib/src`. `auth/config.ts` is the approved Better Auth integration constant site; ordinary auth adapters/plugins should import named constants instead of inlining numeric policy/config literals.
+
 Id-specific rules, all hard errors:
 
 | # | Rule | What it prevents |

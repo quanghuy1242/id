@@ -897,14 +897,21 @@ function walkUpPastContainers(node) {
 }
 
 function isAllowedConstLocation(filename) {
-  return /\/src\/(shared|domain|infrastructure)\//.test(filename) || filename.includes("/packages/lib/src/");
+  return /\/src\/(shared|domain|infrastructure)\//.test(filename) ||
+    /\/workers\/core\/src\/auth\/config\.ts$/.test(filename) ||
+    filename.includes("/packages/lib/src/");
+}
+
+function checksMagicNumbers(filename) {
+  return /\/workers\/core\/src\/(application|domain|http|shared|auth|composition|config)\//.test(filename) ||
+    filename.includes("/packages/lib/src/");
 }
 
 var noMagicNumbersRule = {
-  meta: { type: "problem", docs: { description: "No magic numbers in application, domain, HTTP, and shared layers; extract to named constants" } },
+  meta: { type: "problem", docs: { description: "No magic numbers in non-infrastructure core source layers; extract to named constants" } },
   create: function (context) {
     var filename = context.filename || context.physicalFilename || "";
-    if (!/\/src\/(application|domain|http|shared)\//.test(filename)) return {};
+    if (!checksMagicNumbers(filename)) return {};
     if (/\/tests\//.test(filename)) return {};
 
     return {
@@ -929,7 +936,7 @@ var noMagicNumbersRule = {
 // ─── Rule 15: constants-placement ─────────────────────────────────────────
 
 var constantsPlacementRule = {
-  meta: { type: "problem", docs: { description: "SCREAMING_SNAKE_CASE const declarations must live in shared, domain, or infrastructure" } },
+  meta: { type: "problem", docs: { description: "SCREAMING_SNAKE_CASE const declarations must live in approved constant definition sites" } },
   create: function (context) {
     var filename = context.filename || context.physicalFilename || "";
     if (!/\/src\//.test(filename)) return {};
@@ -941,7 +948,7 @@ var constantsPlacementRule = {
         if (!isConstDeclarator(node)) return;
         if (!node.id || node.id.type !== "Identifier") return;
         if (!isSCREAMING_SNAKE(node.id.name)) return;
-        context.report({ node: node.id, message: "Constant " + node.id.name + " must live in src/shared/, src/domain/, or src/infrastructure/" });
+        context.report({ node: node.id, message: "Constant " + node.id.name + " must live in src/shared/, src/domain/, src/infrastructure/, auth/config.ts, or packages/lib/src/" });
       },
     };
   },

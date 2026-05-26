@@ -16,10 +16,9 @@ export default defineConfig({
   test: {
     name: "ui",
     environment: "jsdom",
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/all.test.ts"],
     passWithNoTests: true,
     setupFiles: [`${rootDir}tests/setup.ts`],
     globals: true,
   },
 });
-

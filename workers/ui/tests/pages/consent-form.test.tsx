@@ -29,12 +29,12 @@ vi.mock("@id/lib", () => ({
   postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockOauthQuery = "";
-});
-
 describe("ConsentForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOauthQuery = "";
+  });
+
   it("renders allow and deny buttons", () => {
     render(<ConsentForm />);
     expect(screen.getByRole("button", { name: /allow/i })).toBeInTheDocument();

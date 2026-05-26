@@ -23,12 +23,12 @@ vi.mock("@id/lib", () => ({
   postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockOauthQuery = "";
-});
-
 describe("LoginForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOauthQuery = "";
+  });
+
   it("renders email and password inputs", () => {
     render(<LoginForm />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();

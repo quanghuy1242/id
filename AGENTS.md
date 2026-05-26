@@ -67,6 +67,9 @@ When new findings appear, handle them autonomously:
 - Worker tests live under `workers/*/tests`.
 - `@/*` maps to each worker's own `src/*` in tsconfig and Vitest aliases.
 - Do not use external services in tests. Mock Better Auth, D1/KV, route ownership, and JWKS boundaries where the phase does not explicitly require local Wrangler integration.
+- Test performance depends on one barrel file per Vitest project: `workers/core/tests/all.test.ts` and `workers/ui/tests/all.test.ts`. Each worker config includes only its barrel. Add every new test file to the matching barrel; do not widen `include` back to `tests/**/*.test.*`, because that restores per-file environment/import overhead.
+- When a test file is imported by a barrel, top-level hooks become project-wide hooks. Keep `beforeAll`/`beforeEach` inside the relevant `describe(...)` block unless the hook is intentionally global for every test in that worker project.
+- Use `pnpm test --reporter=verbose 2>/dev/null | grep -E "tests/.*ms"` when troubleshooting latency. Treat repeated first-test jsdom costs, repeated database/app bootstrap, and repeated command subprocesses as candidates for shared setup or direct seeding.
 - Run `pnpm lint` and `pnpm test` after any change — core or UI. The lint gate covers architecture invariants, UI route contracts, constants placement, and duplicate code; tests verify correctness across both workers and packages.
 
 ## Package Manager

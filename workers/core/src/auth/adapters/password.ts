@@ -1,7 +1,26 @@
 import { randomBytes, scrypt } from "node:crypto";
+import {
+  PASSWORD_SCRYPT_DK_LEN,
+  PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES,
+  PASSWORD_SCRYPT_MAXMEM_MULTIPLIER,
+  PASSWORD_SCRYPT_N,
+  PASSWORD_SCRYPT_P,
+  PASSWORD_SCRYPT_R,
+  PASSWORD_SALT_BYTES,
+} from "../config";
 
-const scryptConfig = { N: 16384, r: 16, p: 1, dkLen: 64 } as const;
-const scryptMaxmem = 128 * scryptConfig.N * scryptConfig.r * 2;
+// Lower cost in the test runner so password tests finish in milliseconds instead of seconds.
+// Production always uses N=16384 (OWASP minimum for interactive logins).
+const scryptConfig = {
+  N: PASSWORD_SCRYPT_N,
+  r: PASSWORD_SCRYPT_R,
+  p: PASSWORD_SCRYPT_P,
+  dkLen: PASSWORD_SCRYPT_DK_LEN,
+} as const;
+const scryptMaxmem = PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES
+  * PASSWORD_SCRYPT_N
+  * scryptConfig.r
+  * PASSWORD_SCRYPT_MAXMEM_MULTIPLIER;
 
 /**
  * Hashes a password using `node:crypto.scrypt` with a random 16-byte salt.
@@ -17,7 +36,7 @@ const scryptMaxmem = 128 * scryptConfig.N * scryptConfig.r * 2;
  */
 export function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const salt = randomBytes(16).toString("hex");
+    const salt = randomBytes(PASSWORD_SALT_BYTES).toString("hex");
     scrypt(
       password.normalize("NFKC"),
       salt,

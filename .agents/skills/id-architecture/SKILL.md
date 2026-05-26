@@ -56,6 +56,7 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 ## Pattern Reminders
 
 - Put reusable auth-runtime mechanics in `workers/core/src/auth/adapters/**`. Route files and plugin runtime companions may call adapters, but should not inline Cache API wrappers, TTL memory-cache bookkeeping, secondary-storage wrappers, password hashing, email sending, or other reusable auth infrastructure mechanics.
+- Keep numeric policy/config values named in the approved constant sites. Better Auth integration constants belong in `workers/core/src/auth/config.ts`; ordinary auth adapters/plugins import them instead of inlining numbers.
 - Keep HTTP route files focused on routing and request orchestration. For example, JWKS response caching belongs in an auth adapter, while `auth-mount.ts` only decides when to use it.
 - Keep plugin runtime companions focused on plugin-owned policy and data loading. For example, `resource-server/audiences.ts` owns the audience lifecycle, but generic memory TTL behavior belongs in an adapter.
 - Entity classes use private constructor, `create`, `reconstitute`, getters, mutator methods, and `toSnapshot()`.

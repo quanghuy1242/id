@@ -1,3 +1,54 @@
+/** Browser authorization-code access-token lifetime, in seconds. */
+export const OAUTH_ACCESS_TOKEN_EXPIRES_SECONDS = 900;
+
+/** Machine-to-machine access-token lifetime, in seconds. */
+export const OAUTH_M2M_ACCESS_TOKEN_EXPIRES_SECONDS = 10_800;
+
+/** OAuth refresh-token lifetime, in seconds. */
+export const OAUTH_REFRESH_TOKEN_EXPIRES_SECONDS = 604_800;
+
+/** Runtime OAuth catalog cache TTL, in seconds. */
+export const OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS = 86_400;
+
+/** JWKS signing-key rotation interval, in seconds. */
+export const JWKS_ROTATION_INTERVAL_SECONDS = 86_400;
+
+/** JWKS retired-key grace period, in seconds. */
+export const JWKS_GRACE_PERIOD_SECONDS = 2_592_000;
+
+/** Maximum team IDs allowed in an issued access-token claim. */
+export const MAX_TOKEN_TEAM_IDS = 128;
+
+/** OAuth context-selection cache TTL, in seconds. */
+export const OAUTH_CONTEXT_SELECTION_TTL_SECONDS = 300;
+
+/** Test-only scrypt cost parameter for fast password hashing checks. */
+export const TEST_PASSWORD_SCRYPT_N = 64;
+
+/** Production scrypt cost parameter for interactive login password hashing. */
+export const PRODUCTION_PASSWORD_SCRYPT_N = 16_384;
+
+/** Runtime scrypt CPU/memory cost parameter for Better Auth password hashing. */
+export const PASSWORD_SCRYPT_N = process.env.VITEST ? TEST_PASSWORD_SCRYPT_N : PRODUCTION_PASSWORD_SCRYPT_N;
+
+/** Scrypt block-size parameter for Better Auth password hashing. */
+export const PASSWORD_SCRYPT_R = 16;
+
+/** Scrypt parallelization parameter for Better Auth password hashing. */
+export const PASSWORD_SCRYPT_P = 1;
+
+/** Scrypt derived-key byte length for Better Auth password hashing. */
+export const PASSWORD_SCRYPT_DK_LEN = 64;
+
+/** Random salt byte length for Better Auth password hashing. */
+export const PASSWORD_SALT_BYTES = 16;
+
+/** Scrypt max-memory base block size, in bytes. */
+export const PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES = 128;
+
+/** Safety multiplier for Node scrypt max-memory calculation. */
+export const PASSWORD_SCRYPT_MAXMEM_MULTIPLIER = 2;
+
 export type AuthPluginConfig = {
   readonly issuerPath: string;
   readonly resourceAudienceCacheKey: string;
@@ -23,9 +74,9 @@ export type AuthPluginConfig = {
 };
 
 export const oauthTokenLifetimeConfig = {
-  accessTokenExpiresIn: 900,
-  m2mAccessTokenExpiresIn: 10_800,
-  refreshTokenExpiresIn: 604_800,
+  accessTokenExpiresIn: OAUTH_ACCESS_TOKEN_EXPIRES_SECONDS,
+  m2mAccessTokenExpiresIn: OAUTH_M2M_ACCESS_TOKEN_EXPIRES_SECONDS,
+  refreshTokenExpiresIn: OAUTH_REFRESH_TOKEN_EXPIRES_SECONDS,
 } as const;
 
 /**
@@ -48,23 +99,23 @@ export const oauthTokenLifetimeConfig = {
 export const authPluginConfig = {
   issuerPath: "/api/auth",
   resourceAudienceCacheKey: "id-resource-servers:audiences",
-  resourceAudienceCacheTtlSeconds: 86_400,
+  resourceAudienceCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthScopeCacheKey: "id-oauth-scopes:enabled",
-  oauthScopeCacheTtlSeconds: 86_400,
+  oauthScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthGrantCachePrefix: "id-oauth-scopes:client-org-grants:",
-  oauthGrantCacheTtlSeconds: 86_400,
+  oauthGrantCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   teamMembershipCachePrefix: "id-teams:user:",
   emailVerificationStoragePrefix: "id-email:verification:",
   passwordResetStoragePrefix: "id-email:password-reset:",
   jwksPath: "/jwks",
-  jwksRotationIntervalSeconds: 86_400,
-  jwksGracePeriodSeconds: 2_592_000,
+  jwksRotationIntervalSeconds: JWKS_ROTATION_INTERVAL_SECONDS,
+  jwksGracePeriodSeconds: JWKS_GRACE_PERIOD_SECONDS,
   oauthProtocolScopes: ["openid", "profile", "email", "offline_access"],
   bootstrapOAuthScopes: ["org:read", "org:write"],
   oauthGrantTypes: ["authorization_code", "client_credentials", "refresh_token"],
   directShareReferenceId: "urn:id:oauth-context:direct-share",
   workspaceOnlyScopes: ["content:share"],
-  maxTokenTeamIds: 128,
+  maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
   principalValidationAudience: "https://id.quanghuy.dev/principal-validation",
   principalValidationScope: "identity:principals:validate",
 } as const satisfies AuthPluginConfig;

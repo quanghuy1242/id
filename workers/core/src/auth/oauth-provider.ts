@@ -1,5 +1,5 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { authPluginConfig, oauthTokenLifetimeConfig } from "./config";
+import { authPluginConfig, OAUTH_CONTEXT_SELECTION_TTL_SECONDS, oauthTokenLifetimeConfig } from "./config";
 import { assertClientOrganizationGrant } from "./plugins/oauth-scope-catalog/grants";
 import {
   assertDirectShareScopes,
@@ -82,7 +82,9 @@ export function createOAuthProviderPlugin(
         if (!hasProductScope(scopes)) return false;
         const selectedContext = headers.get("x-id-oauth-context");
         if (!selectedContext) return true;
-        await env.KV.put(authorizationSelectionKey(session.id), selectedContext, { expirationTtl: 300 });
+        await env.KV.put(authorizationSelectionKey(session.id), selectedContext, {
+          expirationTtl: OAUTH_CONTEXT_SELECTION_TTL_SECONDS,
+        });
         return false;
       },
       consentReferenceId: async ({ session, scopes }) => {
