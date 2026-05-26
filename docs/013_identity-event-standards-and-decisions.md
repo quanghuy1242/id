@@ -360,24 +360,43 @@ Operationally: introspection is the right tool when one route needs the freshest
 ## 6. Phased Rollout And Conditions To Advance
 
 ```text
-Phase 1 (D3) ── Producer ships SSF+SET+RISC; consumer audits only
-   │
-   │  advance only when: D4 conditions met
-   ▼
-Phase 2 (D4) ── Producer additionally ships CAEP and approved extension events; consumer still audits
-   │
-   │  advance only when: D5 conditions met
-   ▼
-Phase 3 (D5) ── Consumer adds fence table + iat-based denial logic
+Track A - standards correction and contract cleanup (docs 017 + 018)
+  A1. Correct the standards framing: SCIM read/query for directory facts;
+      OAuth client model for M2M; event channel remains separate.
+  A2. Implement doc 018's M2M correction in `id`.
+  A3. Implement doc 017's read-only SCIM plugin in `id`.
+  A4. Migrate `content-api` user/team/admin lookup to SCIM and its
+      service-account binding path to doc 018's OAuth-client contract.
+  A5. Deprecate and delete `principal-validation` only after both migrations
+      are complete and the deprecation window has passed.
+
+Track B - identity event channel (docs 014 + 015, optionally 016)
+  B1. Phase 1 (D3): producer ships SSF + SET + RISC; consumer audits only.
+  B2. Phase 2 (D4, conditional): producer additionally ships CAEP and the
+      approved repository-specific extension events; consumer still audits.
+  B3. Phase 3 (D5, conditional): consumer adds fence state and `iat`-based
+      denial logic.
 ```
 
-| Phase | Producer scope | Consumer scope | Drives this doc |
-|---|---|---|---|
-| 1 | SSF stream-config endpoints; SET envelope; RISC event vocabulary; transactional outbox (D1 batch + own-the-mutation, see [014 §5.1](014_identity-event-producer-id.md#51-own-the-mutation-d1-batch-over-best-effort-hooks)); HMAC + JWS signing; retry + DLQ | SET receiver; HMAC pre-check + JWS verification; idempotency on `jti`; orphan-binding findings; no policy change | docs 014 + 015 |
-| 2 | Add CAEP and approved repository-specific event types reusing same outbox + delivery | Audit-only on new event types; still no policy change | doc 014 (CAEP section) + doc 015 (CAEP audit section) |
-| 3 | No new producer work | Add `iat` requirement on `AuthenticateBearerTokenUseCase`; add fence table; deny stale-claim tokens | doc 016 |
+These tracks are related but not serialized:
 
-Phase 1 intentionally does not signal session revocation or organization/team claim staleness: RISC Final deprecates `sessions-revoked`, and membership-removal extension events are reserved for Phase 2.
+- Track A corrects the synchronous directory and M2M contracts. It is driven by [017](017_scim-directory-and-m2m-principal-contract.md) and [018](018_m2m-oauth-client-org-binding.md).
+- Track B builds the asynchronous event channel. It is driven by [014](014_identity-event-producer-id.md), [015](015_identity-event-consumer-content-api-audit.md), and only conditionally [016](016_identity-event-consumer-content-api-fence-enforcement.md).
+- Track B Phase 3 is not the "next default phase" of the overall program. It starts only after Track B Phase 2 has shipped and D5's explicit operational requirement is recorded.
+- Track A and Track B may be implemented in parallel, but their deploy sequences remain local to each track.
+
+| Track / phase | Scope | Conditions to advance | Execution docs |
+|---|---|---|---|
+| A1 | Correct doc language: SCIM read/query is the target synchronous directory contract; OAuth client credentials remains the M2M runtime contract; custom `principal-validation` is temporary only | Recorded in docs; no code dependency | doc 017 |
+| A2 | Adopt BA `referenceId`, `oauthClientResourceScope`, picker auth, and infra M2M clients | Must land before service-account principal-validation deletion and before `content-api` M2M adoption is complete | doc 018 |
+| A3 | Add read-only SCIM routes in `id` for users, org users, groups, and virtual org-admin groups | Can start after A1; does not depend on event-channel work | doc 017 |
+| A4 | Migrate `content-api` user/team/admin checks to SCIM and service-account attach flows to doc 018's OAuth-client contract | Requires A2 for the M2M side and A3 for the SCIM side | docs 017 + 018 |
+| A5 | Deprecate, facade, then remove `principal-validation` | Only after A4 is complete and the deprecation window has elapsed | docs 017 + 018 |
+| B1 | SSF stream-config endpoints; SET envelope; RISC event vocabulary; transactional outbox; HMAC + JWS signing; retry + DLQ; audit receiver, verification, idempotency, and findings | Default first release for the event channel | docs 014 + 015 |
+| B2 | Add CAEP and approved repository-specific event types reusing the same outbox + delivery; consumer remains audit-only | Only when D4 conditions are met | doc 014 §8 + doc 015 §8 |
+| B3 | Add `iat` requirement, fence table, and stale-token denial | Only when B2 is shipped and D5 conditions are met | doc 016 |
+
+Track B Phase 1 intentionally does not signal session revocation or organization/team claim staleness: RISC Final deprecates `sessions-revoked`, and membership-removal extension events are reserved for Track B Phase 2.
 
 ## 7. Event Vocabulary Mapping
 

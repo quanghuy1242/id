@@ -51,7 +51,7 @@
 >
 > - `id` stays a generic identity provider and OAuth authorization server. It must not become Content IAM.
 > - `id` owns OAuth clients, resource-server audiences, resource-server-bound OAuth scopes, JWT/JWKS, organization/team/client identity facts, and token issuance.
-> - `id` owns authenticated write-time validation of identity principals referenced by downstream policy writes; it does not decide downstream product policy.
+> - In the first-batch implementation, `id` owns authenticated write-time validation of identity principals referenced by downstream policy writes; it does not decide downstream product policy. This is a temporary compatibility surface, not the target long-term directory contract.
 > - Resource APIs own product roles, product permissions, role-permission mappings, principal-role bindings, resource hierarchy/inheritance, final authorization decisions, and product policy audit events.
 > - Better Auth remains the source of truth for identity, sessions, organizations, members, teams, OAuth clients, OAuth Provider, JWT signing, and JWKS.
 > - "Custom" means two different things in this document: patching or bypassing Better Auth internals is forbidden; plugin-owned schema plus preload/glue through public Better Auth extension points is allowed and preferred.
@@ -61,8 +61,14 @@ Implementation note, 2026-05-23:
 
 - P1-A through P1-G have been implemented in `id`.
 - Better Auth teams are enabled, `idOAuthScopeCatalog` owns `oauthResourceScope` and `oauthClientOrganizationGrant`, OAuth runtime preload loads audiences plus scopes, user access tokens use a uniform 900-second lifetime, direct-share uses the reserved internal reference marker, workspace tokens emit `org_id` and `team_ids`, M2M tokens expose `azp` and optionally `client_id`/`org_id`, and `idPrincipalValidation` exposes `/api/auth/principal-validation/**`.
-- Org-scoped M2M grant validation uses OAuth client metadata fields `id_client_id` and `organization_id` because the installed OAuth Provider hook intentionally passes client metadata to `customAccessTokenClaims`. The provider still emits stable `azp`; the metadata fields are the configured integration data that lets `id` validate the org grant before signing and optionally emit custom `client_id`/`org_id` claims.
+- Current code still uses OAuth client metadata fields `id_client_id` and `organization_id` for org-scoped M2M grant validation because the installed OAuth Provider hook passes client metadata to `customAccessTokenClaims`. This is current-state only. The target contract is the Better Auth-aligned model in [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md): `oauthClient.referenceId` ownership plus `oauthClientResourceScope`, with no authoritative `metadata.id_client_id` / `metadata.organization_id`.
 - Product IAM remains outside `id`; resource APIs still own roles, permissions, concrete grants, hierarchy, final policy decisions, and audit.
+
+Contract correction note, 2026-05-26:
+
+- This document records the first-batch implementation and rationale, but it is no longer the canonical long-term contract for synchronous principal lookup or service-account binding.
+- For user/team/admin synchronous lookup, use [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md): read-only SCIM is the target contract, and `principal-validation` is a migration shim only.
+- For service-account / OAuth-client ownership, token issuance, picker reads, and binding semantics, use [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md) as canonical.
 
 ## Table Of Contents
 
@@ -653,7 +659,12 @@ Resource APIs define and enforce their own product roles. OAuth scopes only gate
 
 ### 4.8 Authenticated Principal Validation For Policy Writes
 
-Content IAM policy writes create durable references to `id` principals. `id` must therefore offer authenticated exact-ID validation for these low-volume writes, without becoming a policy-decision service.
+This section documents the first-batch/current compatibility surface. It is not the target long-term contract.
+
+- User, org-user, team/group, and org-admin lookup should move to read-only SCIM per [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md).
+- Service-account/client binding semantics should move to the OAuth-client contract in [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md).
+
+Content IAM policy writes create durable references to `id` principals. In the first-batch implementation, `id` therefore offers authenticated exact-ID validation for these low-volume writes without becoming a policy-decision service.
 
 Semantic contract:
 
@@ -689,10 +700,12 @@ target service-account validation payload:
   id checks oauthClientOrganizationGrant for the resolved internal row
 ```
 
+The `validateServiceAccountForOrganization(...)` shape above is a current compatibility contract only. Its target replacement is the OAuth-client model in [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md), not SCIM core.
+
 Rules:
 
-- Exact-ID validation is sufficient in v1; this API must not accidentally become an end-user directory/search API.
-- The principal-validation API is used only during durable policy writes, not during ordinary `ContentPolicy.can(...)` checks.
+- Exact-ID validation is sufficient for the first-batch compatibility surface; it must not accidentally become an end-user directory/search API.
+- The principal-validation API is used only during durable policy writes, not during ordinary `ContentPolicy.can(...)` checks. It is a migration shim, not the target steady-state contract.
 - `validateOrganizationAdministrator` returns a generic Better Auth organization fact. `content-api` owns whether its workflow may bootstrap or recover `org.content_admin`.
 - An external ordinary binding may store `principal_id = id.sub` before the user has a local `content-api` user/profile row.
 
@@ -1192,7 +1205,7 @@ File responsibilities:
 - `types.ts`: plugin options and injected callbacks.
 - `README.md`: plugin ownership and runtime notes.
 
-Add an authenticated principal-validation endpoint family inside the `workers/core/src/auth/**` boundary. It may be a small endpoint-only Better Auth plugin or be composed beside the scope-catalog plugin, but it must reuse Better Auth identity/member/team facts and the M2M grant loader rather than creating policy tables. Its externally visible service-account input is the public OAuth `resource` audience, not internal `resourceServerId`.
+Add an authenticated principal-validation endpoint family inside the `workers/core/src/auth/**` boundary for the first-batch compatibility path. It may be a small endpoint-only Better Auth plugin or be composed beside the scope-catalog plugin, but it must reuse Better Auth identity/member/team facts and the M2M grant loader rather than creating policy tables. Its externally visible service-account input is the public OAuth `resource` audience, not internal `resourceServerId`. Long-term, this surface is superseded by [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md) for user/team/admin lookup and [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md) for service accounts.
 
 ### 7.2 Auth Composition Changes
 
@@ -1376,7 +1389,7 @@ Phase 4:
 
 Phase 5:
 
-- Add authenticated exact-ID principal-validation API for durable downstream policy writes, protected by a dedicated M2M audience and scope.
+- Add authenticated exact-ID principal-validation API for durable downstream policy writes, protected by a dedicated M2M audience and scope. This is the first-batch compatibility surface, not the target long-term directory contract.
 - Remove static product/API scopes from `authPluginConfig`.
 - Synchronize OAuth/token documentation that still describes the pre-change 3-hour user-token policy.
 - Update docs and README if public commands or setup changed.
@@ -1728,7 +1741,7 @@ Contract tests should prove:
 - Token issuance fails closed if `team_ids` exceeds the configured claim limit.
 - M2M access tokens expose stable `azp` or documented `client_id`.
 - Org-scoped M2M tokens include `org_id` and require explicit org/client eligibility if that flow is supported.
-- An authenticated principal-validation API exists for durable downstream policy writes, accepts public OAuth target resource audiences, and is not called for ordinary content authorization.
+- A temporary authenticated principal-validation API exists for durable downstream policy writes, accepts public OAuth target resource audiences, and is not called for ordinary content authorization.
 - Product roles, product permissions, role-permission mappings, concrete principal grants, resource hierarchy/inheritance, final `ContentPolicy.can(...)`, and content policy audit events are not modeled in `id`.
 - Resource APIs can enforce authorization with JWT signature, issuer, audience, selected workspace/direct-share context rules, scope, and their own object-policy checks.
 - No Better Auth internals are patched or monkey-patched.

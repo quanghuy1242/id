@@ -861,7 +861,7 @@ Tasks:
 
 - [x] Amend doc 013 D8 so it separates read-only SCIM lookup from full provisioning.
 - [x] Link doc 017 from the related docs section in docs 014-016.
-- [ ] Ensure docs never describe custom principal-validation plus RISC as a replacement for SCIM read/query.
+- [x] Ensure docs never describe custom principal-validation plus RISC as a replacement for SCIM read/query, outside quoted historical examples being corrected in this doc.
 
 Acceptance criteria:
 

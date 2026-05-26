@@ -76,7 +76,14 @@ Do not assume OAuth introspection automatically reloads current `team_ids`. If a
 
 ## Principal Validation For Policy Writes
 
-Durable policy writes that store `id` principal IDs should call the authenticated principal-validation API during the write:
+Today, durable policy writes that store `id` principal IDs still call the authenticated `principal-validation` API during the write. This is a temporary compatibility surface, not the target long-term contract.
+
+Target contract:
+
+- user, org-user, team/group, and org-admin lookup should move to read-only SCIM per [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md)
+- service-account/client binding semantics should move to the OAuth-client model in [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md)
+
+Current compatibility endpoints:
 
 - `POST /api/auth/principal-validation/users/validate`
 - `POST /api/auth/principal-validation/users/validate-organization-member`
@@ -84,12 +91,12 @@ Durable policy writes that store `id` principal IDs should call the authenticate
 - `POST /api/auth/principal-validation/service-accounts/validate-organization-grant`
 - `POST /api/auth/principal-validation/organization-administrators/validate`
 
-The caller uses a dedicated M2M token with:
+The current caller uses a dedicated M2M token with:
 
 - audience: the `id` principal-validation API audience
 - scope: `identity:principals:validate`
 
-Service-account target validation accepts the public target API `resource` audience, and `id` resolves it to the internal resource-server row before checking `oauthClientOrganizationGrant`.
+In the current compatibility path, service-account target validation accepts the public target API `resource` audience, and `id` resolves it to the internal resource-server row before checking `oauthClientOrganizationGrant`. That service-account path is superseded as the target design by [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md).
 
 ## Failure Policy
 
