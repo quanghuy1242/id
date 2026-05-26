@@ -83,3 +83,4 @@ When new findings appear, handle them autonomously:
 3. Name planning documents with a leading numbered prefix in the `xxx_...` format so their sequence stays trackable.
 4. Never craft migration SQL or snapshot files manually. After changing `workers/core/src/db/auth-schema.ts` or any plugin-owned table definitions, run `pnpm db:generate`. Hand-written SQL drifts the journal, snapshot, and column ordering away from Drizzle's expected state and breaks future runs.
 5. Remember that we support remote config avoid hard config at all cost, now hard config of client id or client name in this repo, those must be controled via database.
+6. During review, absolutely honor any user-provided implementation plan and do not change that plan; gather recommendations about edge cases, concurrent use cases, architectural design, or race conditions and present them to the user after plan-conforming code review and fixes, for explicit approval before implementation.
