@@ -47,6 +47,7 @@
   - [4.2 The Single Irreducible Repo Extension](#42-the-single-irreducible-repo-extension)
   - [4.3 Resource Server Identity Of A Service Account](#43-resource-server-identity-of-a-service-account)
   - [4.4 End-To-End M2M Flows](#44-end-to-end-m2m-flows)
+  - [4.5 Two Layers Of M2M Clients (Tenant vs Infrastructure)](#45-two-layers-of-m2m-clients-tenant-vs-infrastructure)
 - [5. Architecture Decisions](#5-architecture-decisions)
   - [5.1 D1 - Adopt BA `referenceId` For Client-To-Org Ownership](#51-d1---adopt-ba-referenceid-for-client-to-org-ownership)
   - [5.2 D2 - Replace Many-To-Many Grant Table With Per-(Client, Resource) Scope Subsets](#52-d2---replace-many-to-many-grant-table-with-per-client-resource-scope-subsets)
@@ -54,7 +55,8 @@
   - [5.4 D4 - Resource API Owns The Binding/Attach Authority](#54-d4---resource-api-owns-the-bindingattach-authority)
   - [5.5 D5 - Stop Storing `metadata.id_client_id` / `metadata.organization_id`](#55-d5---stop-storing-metadataid_client_id--metadataorganization_id)
   - [5.6 D6 - No SCIM Service-Account Resource Type](#56-d6---no-scim-service-account-resource-type)
-  - [5.7 Rejected Or Deferred Options](#57-rejected-or-deferred-options)
+  - [5.7 D7 - Infrastructure (RS↔AS) M2M Clients Are First-Class And Distinct From Tenant M2M](#57-d7---infrastructure-rsas-m2m-clients-are-first-class-and-distinct-from-tenant-m2m)
+  - [5.8 Rejected Or Deferred Options](#58-rejected-or-deferred-options)
 - [6. Implementation Strategy](#6-implementation-strategy)
 - [7. Detailed Implementation Plan](#7-detailed-implementation-plan)
   - [7.1 Wire Up `clientReference` In `oauth-provider.ts`](#71-wire-up-clientreference-in-oauth-providerts)
@@ -63,7 +65,8 @@
   - [7.4 Expose BA Client Read For Picker UX](#74-expose-ba-client-read-for-picker-ux)
   - [7.5 Apply `clientPrivileges` And RBAC](#75-apply-clientprivileges-and-rbac)
   - [7.6 `content-api` Binding Side](#76-content-api-binding-side)
-  - [7.7 Cross-Doc Updates](#77-cross-doc-updates)
+  - [7.7 Provision Infrastructure M2M Clients](#77-provision-infrastructure-m2m-clients)
+  - [7.8 Cross-Doc Updates](#78-cross-doc-updates)
 - [8. Migration And Rollout](#8-migration-and-rollout)
 - [9. Edge Cases And Failure Modes](#9-edge-cases-and-failure-modes)
 - [10. Implementation Backlog](#10-implementation-backlog)
@@ -397,6 +400,58 @@ Re-enable later:
   (D5 enforcement; see §5.5).
 ```
 
+### 4.5 Two Layers Of M2M Clients (Tenant vs Infrastructure)
+
+OAuth `client` is a role in the standard, not a class of entity. The same `oauthClient` table BA maintains serves two distinct roles in this system, and both must be modeled explicitly so operators do not invent a parallel mechanism for either.
+
+**Layer 1 - Tenant M2M client (the customer's service account).** Everything from §4.1 through §4.4 describes this layer. A tenant client is owned by an organization, calls **downstream resource servers** (e.g. `content-api`) at runtime, and is constrained by `oauthClientResourceScope`.
+
+**Layer 2 - Infrastructure M2M client (RS↔AS plumbing).** A resource server (or any other internal system) authenticating *as itself* to `id`. Used for:
+
+- `content-api` calling `id` SCIM endpoints (per doc 017) to resolve users, teams, and admins.
+- `content-api` calling `id`'s `/oauth2/get-client` for picker UX (per §5.3 / §7.4).
+- A future identity event consumer admin surface, RFC 7662 introspection callbacks, or any other RS-initiated call to `id`.
+
+Both layers use the same OAuth `client_credentials` grant, the same `oauthClient` row shape, and the same BA token endpoint. They differ only in metadata, ownership, and authorization rules:
+
+| Trait | Tenant M2M | Infrastructure M2M |
+|---|---|---|
+| `oauthClient.referenceId` | `<organizationId>` | `null` (no tenant owner) |
+| Created by | Org admin via session-scoped admin flow | Platform operator only (seeded at deploy, or via admin endpoint) |
+| Allowed scopes | Tenant-resource scopes (e.g. `content:read`) gated by `oauthClientResourceScope` | System scopes only (e.g. `scim:read`, `oauth:clients:read`, `events:produce`) |
+| Token audience | A downstream resource server (e.g. `content-api`) | `id` itself, or another internal system the client is permitted to call |
+| Authn method | `client_secret_basic` or `client_secret_post` | Prefer `private_key_jwt` or rotated `client_secret_basic`; secret material lives in Wrangler secret bindings |
+| `clientPrivileges` rule | Acts only on rows where `referenceId = caller.activeOrganizationId` | Created and managed by platform admins; org admins cannot read or list these clients |
+| Lifecycle event | `oauthClient.disabled` is a tenant-visible event (per doc 013) | Treated as an operational alert, not a tenant-facing identity event |
+
+Why one table is correct:
+
+- OAuth 2.1 and RFC 7591/7592 model "client" as a role; there is no separate registry for "system clients" in the standard.
+- BA's `referenceId` already gives us the wedge: `IS NULL` means the client is not owned by any tenant, which is exactly the infra case.
+- Splitting the table would force a parallel implementation of RFC 7591 metadata, JWKS, secret rotation, and `clientPrivileges` for the infra side. That is the "custom identity API on top of a standard mechanism" anti-pattern called out by `AGENTS.md`.
+
+Invariants that must hold across both layers (enforced by `clientPrivileges` + token-issuance hooks):
+
+1. A client with `referenceId IS NULL` cannot obtain any tenant-resource scope. If `aud` resolves to a downstream resource server with a tenant scope set, issuance returns `invalid_scope`.
+2. A client with `referenceId IS NOT NULL` cannot obtain any system scope (`scim:read`, `oauth:clients:read`, etc.). System scopes are not declarable in `oauthClientResourceScope`.
+3. Infra clients are not surfaced in the org admin's "service accounts" listing. The listing filter is `referenceId = activeOrganizationId`.
+4. SCIM (doc 017) does not list infra clients. Doc 017's `Users` and `Groups` resources only model human principals and teams.
+
+Important note on when an infra client is *not* needed:
+
+- For local JWT verification (RFC 9068-style, JWKS-based signature check, audience and issuer validation), `content-api` does **not** call `id` at runtime and therefore does **not** need an infra client. JWKS is public.
+- For signed identity events (docs 013-016), `content-api` validates the SET signature with `id`'s JWKS - again no infra client needed.
+- The infra client is required only when `content-api` (or another RS) makes an authenticated outbound call to `id`: SCIM reads, `/oauth2/get-client`, future introspection. The minimum infra-client scope set today is `scim:read` and `oauth:clients:read`.
+
+System scope catalog (current release):
+
+```text
+scim:read              -- doc 017: SCIM Users/Groups read & filter
+oauth:clients:read     -- §5.3 / §7.4: read non-secret client metadata for picker
+```
+
+Both scopes are declared as `oauthResourceScope` rows owned by `id` itself (audience = `id`). They are **not** declarable on a tenant resource server, which keeps invariant (2) above structural rather than runtime-checked.
+
 ## 5. Architecture Decisions
 
 ### 5.1 D1 - Adopt BA `referenceId` For Client-To-Org Ownership
@@ -475,7 +530,25 @@ The only `id` work required is to authorize this endpoint for M2M callers under 
 - A SCIM service-account extension exists in some IdPs (Okta `Application` resources, etc.) but is not mainstream and would add a parallel admin surface to the BA stock endpoints.
 - Doc 017's SCIM directory is for User/Group lookup only and explicitly excludes OAuth clients.
 
-### 5.7 Rejected Or Deferred Options
+### 5.7 D7 - Infrastructure (RS↔AS) M2M Clients Are First-Class And Distinct From Tenant M2M
+
+**Decision**: Model RS-to-AS calls (e.g. `content-api` calling `id`'s SCIM and `/oauth2/get-client`) as OAuth `client_credentials` clients with `oauthClient.referenceId = NULL`. Declare a small **system scope catalog** (`scim:read`, `oauth:clients:read`) as `oauthResourceScope` rows owned by `id` itself. Enforce two structural invariants in `clientPrivileges` and token issuance: a client with `referenceId IS NULL` cannot obtain a tenant-resource scope, and a client with `referenceId IS NOT NULL` cannot obtain a system scope.
+
+**Classification**: Standards-aligned use of OAuth roles plus a small repository-specific extension (the system scope catalog and the two invariants). The mechanism itself - `client_credentials` for inter-service auth - is RFC 6749 §4.4. The role distinction is RFC 6749 §1.1 ("the same party may act in multiple roles").
+
+**Reasoning**:
+
+- `content-api` already needs to call `id` for SCIM (doc 017) and the picker endpoint (§5.3). Without this decision, an operator would have to either reuse a tenant client (which would leak tenant authority into system calls) or invent a non-OAuth shared secret. Both are inappropriate workarounds under `AGENTS.md`.
+- BA's `oauthClient` already supports `referenceId = NULL`; nothing about its table needs to change.
+- The two invariants are the minimal extension needed to prevent confusion between the layers. They are documented here and implemented in `clientPrivileges` + the M2M branch of `customAccessTokenClaims`.
+- Local JWT verification via JWKS does **not** need an infra client. The infra client is required only for outbound authenticated calls from a resource server to `id`. Keeping that distinction explicit prevents over-provisioning.
+
+Non-decisions (intentionally left open):
+
+- Whether `content-api`'s infra credentials use `private_key_jwt` or `client_secret_basic` is an operational choice resolved during §7.7 implementation, not a doc 018 decision. Either is standards-conformant.
+- Whether the system scope catalog grows beyond `scim:read` and `oauth:clients:read` (e.g. to add `introspect`) depends on whether RFC 7662 introspection is adopted in a future release (already tracked under doc 013 D6 and §11 of this doc).
+
+### 5.8 Rejected Or Deferred Options
 
 **Rejected: keep `oauthClientOrganizationGrant` as-is and classify it.**
 
@@ -509,7 +582,9 @@ Phase 1 - id schema and wiring
   wire clientReference in oauth-provider.ts
   remove metadata.id_client_id / metadata.organization_id reads
   add /api/auth/oauth-client-resource-scope endpoints (CRUD scoped by org)
-  add oauth:clients:read M2M caller scope and audience for /oauth2/get-client
+  declare system scope catalog (scim:read, oauth:clients:read) as oauthResourceScope rows for id
+  enforce D7 invariants in clientPrivileges + customAccessTokenClaims M2M branch
+  seed the content-api infrastructure M2M client (referenceId = null)
 
 Phase 2 - id data migration
   backfill oauthClient.referenceId from oauthClientOrganizationGrant.organizationId
@@ -667,7 +742,42 @@ Tests:
 - `content-api` use-case tests updated to mock `OAuthClientDirectory` instead of `ContentPrincipalDirectory.validateServiceAccount...`.
 - Cross-repo smoke as in doc 017 §12 plus a `referenceId`-mismatch case.
 
-### 7.7 Cross-Doc Updates
+### 7.7 Provision Infrastructure M2M Clients
+
+Current problem:
+
+- `content-api` has no registered OAuth client identity in `id`. Outbound calls from `content-api` to `id` (SCIM per doc 017, picker per §7.4) require an authenticated `client_credentials` token, but there is no clean place today to declare the client, its scopes, or its secret material.
+- The existing `principal-validation` M2M caller token has been used as an ad-hoc system credential. It must be retired or repurposed as the `content-api` infra client (see also R18-G).
+
+Target behavior:
+
+- One `oauthClient` row per RS that needs to call `id`. For the current release that is exactly one: `content-api`.
+- The row has `referenceId = NULL`, `grant_types = ["client_credentials"]`, and is permitted (via `clientPrivileges`) to obtain only system scopes.
+- A system scope catalog declares each scope as an `oauthResourceScope` owned by `id`. Initial entries: `scim:read`, `oauth:clients:read`.
+- `clientPrivileges` and `customAccessTokenClaims` enforce D7's two structural invariants.
+
+Implementation tasks:
+
+- [ ] Declare a deployment-time seed (in `workers/core/src/auth/seed/*` or equivalent) that creates the `content-api` infra client if absent. The seed uses BA's stock `createOAuthClient` with `referenceId = null` and `grantTypes = ["client_credentials"]`.
+- [ ] Store `content-api`'s client secret (or `private_key_jwt` key material) in Wrangler secret bindings. Never commit secrets. Document the binding names in the relevant plugin README.
+- [ ] Add the two system scopes (`scim:read`, `oauth:clients:read`) as `oauthResourceScope` rows whose audience is `id` itself, not a downstream RS.
+- [ ] Extend `clientPrivileges` so:
+  - org admins cannot list, read, update, or delete clients with `referenceId IS NULL`;
+  - platform admins manage infra clients exclusively;
+  - tenant clients (`referenceId IS NOT NULL`) cannot resolve any system scope at token issuance.
+- [ ] Extend `customAccessTokenClaims`' M2M branch so a token request from a `referenceId IS NULL` client targeting a downstream RS audience fails with `invalid_scope`; conversely, a tenant client requesting a system scope fails the same way.
+- [ ] Provide an operator runbook entry (in the plugin README) covering: rotation, revocation, and adding a new RS as an infra client when a future RS appears.
+
+Tests:
+
+- `workers/core/tests/auth/infra-m2m-client.test.ts` (new):
+  - infra client (`referenceId = null`) successfully obtains `scim:read` and `oauth:clients:read` tokens audienced at `id`;
+  - infra client requesting a `content:read` scope at `aud = content-api` is rejected with `invalid_scope`;
+  - tenant client requesting `scim:read` is rejected with `invalid_scope`;
+  - org admin's listing of OAuth clients does not include `referenceId IS NULL` rows.
+- `pnpm lint` and `pnpm test`.
+
+### 7.8 Cross-Doc Updates
 
 Implementation tasks:
 
@@ -889,6 +999,34 @@ Tests:
 - Updated use-case tests in `content-api`.
 - Adapter test that asserts `client_secret` is never read.
 
+### R18-H. Provision The `content-api` Infrastructure M2M Client
+
+Scope:
+
+- [workers/core/src/auth/oauth-provider.ts](../workers/core/src/auth/oauth-provider.ts) (extend `clientPrivileges`, extend `customAccessTokenClaims` M2M branch)
+- New: a deployment-time seed under `workers/core/src/auth/seed/` (or equivalent) creating the infra client if absent
+- New: system scope catalog (`scim:read`, `oauth:clients:read`) as `oauthResourceScope` rows owned by `id`
+- New plugin README section documenting infra-client lifecycle, secret bindings, rotation
+
+Tasks:
+
+- [ ] Define and seed the `content-api` infra client (`referenceId = null`, `grant_types = ["client_credentials"]`).
+- [ ] Declare `scim:read` and `oauth:clients:read` as `oauthResourceScope` rows audienced at `id`.
+- [ ] Extend `clientPrivileges` so org admins cannot see `referenceId IS NULL` clients and platform admins exclusively manage them.
+- [ ] Extend the M2M branch of `customAccessTokenClaims` to enforce: infra clients cannot request tenant-resource scopes; tenant clients cannot request system scopes.
+- [ ] Store `content-api`'s client credentials in Wrangler secret bindings; document binding names in the plugin README.
+
+Acceptance criteria:
+
+- `content-api` calls `id`'s SCIM (doc 017) and `/oauth2/get-client` (§7.4) using a token minted from the infra client.
+- D7 invariants verified by unit tests (see §7.7).
+- Org admin UI listings exclude `referenceId IS NULL` rows.
+
+Tests:
+
+- `workers/core/tests/auth/infra-m2m-client.test.ts` as described in §7.7.
+- Integration: `content-api` SCIM adapter test (doc 017 §12) succeeds against the seeded infra client.
+
 ### R18-G. Delete Custom Plugin And Dead Conventions
 
 Scope:
@@ -928,12 +1066,14 @@ Tests:
 
 This document is complete when:
 
-- All seven decisions (D1-D6 plus §5.7 rejection) are accepted and reflected in code.
+- All eight decisions (D1-D7 plus §5.8 rejection) are accepted and reflected in code.
 - `oauthClient.referenceId` is the authoritative org-ownership field; `clientReference` is wired.
 - `oauthClientResourceScope` exists with unique `(clientId, resourceServerId)` and replaces `oauthClientOrganizationGrant`.
 - `customAccessTokenClaims` reads no `metadata.id_client_id` or `metadata.organization_id`.
 - `content-api` binding paths call no `id` synchronous validation endpoint for service accounts.
 - Picker UX uses BA's `/oauth2/get-client` via a scoped M2M caller.
+- A `content-api` infrastructure M2M client (`referenceId IS NULL`) is provisioned, and the system scope catalog (`scim:read`, `oauth:clients:read`) is declared as `oauthResourceScope` rows owned by `id`.
+- D7 invariants are enforced: infra clients cannot obtain tenant-resource scopes; tenant clients cannot obtain system scopes.
 - `oauthClientOrganizationGrant` table, `grants.ts`, and the service-account branch of `principal-validation` are deleted.
 - Docs 010, 013, 017, and content-api 007 reference this document for all M2M decisions.
 
@@ -942,18 +1082,25 @@ This document is complete when:
 ```text
 id
   Better Auth OAuth provider:
-    - oauthClient (referenceId = organization.id)
+    - oauthClient
+        Tenant M2M:        referenceId = organization.id
+        Infrastructure:    referenceId = NULL
     - /oauth2/register, /oauth2/create-client, /oauth2/get-client, ...
     - /oauth2/token with client_credentials grant
-    - clientReference + clientPrivileges enforce org ownership and admin RBAC
+    - clientReference + clientPrivileges enforce:
+        - tenant-client ownership by referenceId,
+        - infra-client management by platform admin only,
+        - D7 invariants (no cross-layer scope leakage)
 
-  id-specific extension (the only one):
+  id-specific extensions (the only ones):
     - oauthClientResourceScope (clientId, resourceServerId, allowedScopes, enabled)
-    - CRUD endpoints scoped by oauthClient.referenceId
+        CRUD endpoints scoped by oauthClient.referenceId
+    - System scope catalog as oauthResourceScope rows audienced at id:
+        scim:read, oauth:clients:read
 
   Identity events:
     SET + SSF + RISC/CAEP per docs 013-016, keyed off referenceId and
-    oauthClientResourceScope state changes
+    oauthClientResourceScope state changes (tenant clients only)
 
 content-api
   Local:
@@ -961,14 +1108,24 @@ content-api
     - bindings store opaque principal_id = client_id
     - scheduled reconciliation surfaces inert / mismatched bindings
 
-  Calls to id:
-    - GET /oauth2/get-client for picker (scope oauth:clients:read)
-    - POST /oauth2/token at runtime (standard OAuth)
+  Acts as RS for tenant tokens:
+    - validates JWTs locally via id's JWKS (no infra-client call needed)
 
-Service account
+  Acts as OAuth client when calling id:
+    - infrastructure M2M client (referenceId = NULL) in id
+    - GET /oauth2/get-client for picker (scope oauth:clients:read)
+    - SCIM Users/Groups reads (scope scim:read, per doc 017)
+    - POST /oauth2/token at runtime to mint the above caller tokens
+
+Tenant service account
   is just an OAuth client with grant_types including client_credentials,
   owned by exactly one organization via referenceId,
-  and constrained by oauthClientResourceScope per resource server.
+  and constrained by oauthClientResourceScope per downstream resource server.
+
+Infrastructure M2M client
+  is the same kind of OAuth client with referenceId = NULL,
+  permitted only to obtain system scopes audienced at id,
+  used for RS↔AS plumbing (SCIM reads, picker, future introspection).
 ```
 
-The custom M2M plugin disappears. What remains is one small projection table (`oauthClientResourceScope`) that BA does not natively model, plus BA's stock OAuth client surface used as designed.
+The custom M2M plugin disappears. What remains is one small projection table (`oauthClientResourceScope`) that BA does not natively model, the system scope catalog of `oauthResourceScope` rows for `id`-audienced calls, and BA's stock OAuth client surface used as designed for both tenant and infrastructure clients.
