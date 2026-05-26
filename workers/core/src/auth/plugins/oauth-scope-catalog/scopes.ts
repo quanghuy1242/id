@@ -14,6 +14,8 @@ export type OAuthRuntimeScopeRow = {
   readonly resourceServerId: string;
   readonly audience: string;
   readonly scope: string;
+  /** True when the owning resource server has `organizationId IS NULL` (id-owned system audience). */
+  readonly system: boolean;
 };
 
 export type OAuthScopeCatalogLoadResult = {
@@ -54,7 +56,8 @@ function parseCachedScopeRows(value: string | null): readonly OAuthRuntimeScopeR
       && typeof item === "object"
       && typeof (item as OAuthRuntimeScopeRow).resourceServerId === "string"
       && typeof (item as OAuthRuntimeScopeRow).audience === "string"
-      && typeof (item as OAuthRuntimeScopeRow).scope === "string")
+      && typeof (item as OAuthRuntimeScopeRow).scope === "string"
+      && typeof (item as OAuthRuntimeScopeRow).system === "boolean")
   ) {
     return null;
   }
@@ -83,19 +86,28 @@ function workspaceOnlyScopeSet(): ReadonlySet<string> {
   return new Set(authPluginConfig.workspaceOnlyScopes);
 }
 
+type RawRuntimeScopeRow = Omit<OAuthRuntimeScopeRow, "system"> & {
+  readonly organizationId: string | null;
+};
+
 async function loadEnabledScopeRows(db: CoreEnv["DB"]): Promise<readonly OAuthRuntimeScopeRow[]> {
   const result = await db
     .prepare(
-      `select s."resourceServerId", r."audience", s."scope"
+      `select s."resourceServerId", r."audience", s."scope", r."organizationId"
        from "${OAUTH_RESOURCE_SCOPE_MODEL}" s
        join "${RESOURCE_SERVER_MODEL}" r on r."id" = s."resourceServerId"
        where s."enabled" = ? and r."enabled" = ?
        order by r."audience" asc, s."scope" asc`,
     )
     .bind(1, 1)
-    .all<OAuthRuntimeScopeRow>();
+    .all<RawRuntimeScopeRow>();
 
-  return result.results ?? [];
+  return (result.results ?? []).map((row) => ({
+    resourceServerId: row.resourceServerId,
+    audience: row.audience,
+    scope: row.scope,
+    system: row.organizationId === null || row.organizationId === undefined,
+  }));
 }
 
 export async function loadOAuthScopesFromCache(

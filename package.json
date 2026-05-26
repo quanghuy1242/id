@@ -12,7 +12,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
-    "typecheck": "tsc -p packages/lib/tsconfig.json --noEmit && tsc -p packages/ui/tsconfig.json --noEmit && tsc -p workers/core/tsconfig.json --noEmit && tsc -p workers/ui/tsconfig.json --noEmit",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "check": "pnpm lint && pnpm check:dup && pnpm typecheck && pnpm test",

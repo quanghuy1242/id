@@ -29,6 +29,20 @@
       "when": 1779790274108,
       "tag": "0003_white_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1779793081938,
+      "tag": "0004_polite_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1779793125090,
+      "tag": "0005_funny_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { APIError } from "better-auth/api";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { authPluginConfig, OAUTH_CONTEXT_SELECTION_TTL_SECONDS, oauthTokenLifetimeConfig } from "./config";
-import { assertClientOrganizationGrant, assertClientResourceScope } from "./plugins/oauth-scope-catalog/grants";
+import { assertClientResourceScope, resolveOAuthClientReferenceId } from "./plugins/oauth-scope-catalog/grants";
 import {
   assertDirectShareScopes,
   assertRequestedResourceScopesAllowed,
@@ -53,6 +53,13 @@ export function authPathNeedsOAuthRuntimeCatalog(pathname: string): boolean {
     || authPath === "/oauth2/token"
     || authPath === "/oauth2/create-client"
     || authPath === "/oauth2/update-client";
+}
+
+function audienceIsSystem(catalog: OAuthRuntimeCatalog, resource: string): boolean | undefined {
+  for (const row of catalog.scopeRows) {
+    if (row.audience === resource) return row.system;
+  }
+  return undefined;
 }
 
 export function createOAuthProviderPlugin(
@@ -134,58 +141,70 @@ export function createOAuthProviderPlugin(
         return { aud: resource, org_id: referenceId, sub: user.id, team_ids: teamIds };
       }
 
-      const clientId = typeof metadata?.id_client_id === "string" ? metadata.id_client_id : undefined;
-      const organizationId = typeof metadata?.organization_id === "string" ? metadata.organization_id : undefined;
+      // M2M / client_credentials branch.
+      //
+      // Better Auth 1.6.11 does not pass the resolved oauth client (or its `client_id`
+      // and `referenceId` column) to `customAccessTokenClaims` for the
+      // `client_credentials` grant — only the row's `metadata` JSON is forwarded. Until
+      // BA exposes the client row directly, doc 018 §5.5 leaves a single one-field
+      // identity mirror in metadata (`metadata.id_client_id`) so we can resolve the row
+      // from the DB and read the authoritative `referenceId` column. The legacy
+      // `metadata.organization_id` mirror is no longer read.
       const productScopes = scopes.filter((scope) => !protocolScopeSet().has(scope));
+      const clientIdMirror = typeof metadata?.id_client_id === "string" ? metadata.id_client_id : undefined;
 
-      if (!clientId && productScopes.length > 0) {
+      if (productScopes.length === 0) {
+        // Pure protocol scopes (openid/profile/email/etc.) — no resource binding required.
+        return clientIdMirror ? { aud: resource, client_id: clientIdMirror } : { aud: resource };
+      }
+
+      if (!clientIdMirror) {
         throw new APIError("FORBIDDEN", {
-          message: "OAuth client metadata mirror is missing id_client_id",
+          message: "OAuth client identity mirror (metadata.id_client_id) is missing",
         });
       }
 
-      const clientOrganizationId = referenceId ?? organizationId;
-      if (clientId && clientOrganizationId && resource) {
-        try {
-          await assertClientResourceScope({
-            env,
-            clientId,
-            resource,
-            scopes: productScopes,
-            backgroundTaskRunner: runtime.backgroundTaskRunner,
-          });
-        } catch (error) {
-          if (!(error instanceof APIError) || error.message !== "OAuth client has no resource-scope grant") {
-            throw error;
-          }
-          await assertClientOrganizationGrant({
-            env,
-            clientId,
-            organizationId: clientOrganizationId,
-            resource,
-            scopes: productScopes,
-            backgroundTaskRunner: runtime.backgroundTaskRunner,
-          });
-        }
-        return { aud: resource, client_id: clientId, org_id: clientOrganizationId };
-      }
-      if (clientId && clientOrganizationId && !resource) {
-        return { aud: resource, client_id: clientId, org_id: clientOrganizationId };
-      }
-
-      if (productScopes.length > 0) {
-        if (!resource) {
-          throw new APIError("BAD_REQUEST", {
-            error: "invalid_scope",
-            error_description: "resource is required for client_credentials scopes",
-          });
-        }
-        throw new APIError("FORBIDDEN", {
-          message: "OAuth client metadata bridge is missing organization_id",
+      if (!resource) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_scope",
+          error_description: "resource is required for client_credentials scopes",
         });
       }
 
-      return clientId ? { aud: resource, client_id: clientId } : { aud: resource };
+      const clientReferenceId = await resolveOAuthClientReferenceId(env.DB, clientIdMirror);
+      const audienceSystem = audienceIsSystem(catalog, resource);
+      const clientIsInfra = clientReferenceId === null;
+
+      // D7 invariants: tenant client cannot obtain system scope; infra client cannot
+      // obtain tenant scope. Both rules are enforced again at runtime as defense in
+      // depth even though `oauthClientResourceScope` creation already structurally
+      // prevents cross-layer rows.
+      if (clientIsInfra && audienceSystem === false) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_scope",
+          error_description: "infrastructure client cannot obtain tenant-resource scopes",
+        });
+      }
+      if (!clientIsInfra && audienceSystem === true) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_scope",
+          error_description: "tenant client cannot obtain system scopes",
+        });
+      }
+
+      await assertClientResourceScope({
+        env,
+        clientId: clientIdMirror,
+        resource,
+        scopes: productScopes,
+        backgroundTaskRunner: runtime.backgroundTaskRunner,
+      });
+
+      const claims: Record<string, unknown> = { aud: resource, client_id: clientIdMirror };
+      if (!clientIsInfra) {
+        claims.org_id = clientReferenceId;
+      }
+      return claims;
     },
     customTokenResponseFields: ({ grantType }) => ({
       grant_type: grantType,

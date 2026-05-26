@@ -1,8 +1,20 @@
 # M2M Identity Correction: Adopt Better Auth's First-Class OAuth Client Model
 
-> Status: canonical decision record and implementation plan
+> Status: implementation complete on the `id` side; A4 (`content-api` adoption) and
+> A5 (`principal-validation` deletion) per [doc 013 §6](013_identity-event-standards-and-decisions.md#6-phased-rollout-and-conditions-to-advance) are unblocked.
 >
 > Date: 2026-05-26
+>
+> Implementation summary (id repo):
+>
+> - `oauthClientOrganizationGrant` table, schema, plugin endpoints, runtime helper, and cache have all been removed.
+> - `principal-validation` service-account endpoint and its body schema have been removed; the four user/team/admin/user-in-org endpoints remain pending SCIM migration per [doc 017](017_scim-directory-and-m2m-principal-contract.md).
+> - `oauthClient.referenceId` is wired via BA `clientReference` and is enforced as immutable for `client_credentials` clients by a `hooks.before` guard on every BA `update-client` path.
+> - `oauthClientResourceScope` is created with a unique `(clientId, resourceServerId)` index and is the only repo-specific identity object.
+> - `customAccessTokenClaims` derives `org_id` from a DB lookup of `oauthClient.referenceId`; the legacy `metadata.organization_id` mirror is no longer read or written. `metadata.id_client_id` remains as a single one-field mirror because Better Auth 1.6.11 does not pass the resolved oauth client (or `client_id`) to the hook for `client_credentials`; this is the only BA-limitation workaround that survives doc 018 D5 and is documented at the read/write site.
+> - The system scope catalog (`oauth:clients:read`) and id-audienced system resource server are first-class: `systemResourceServerAudience()` and `systemOAuthClientPickerScope` are exposed from `auth/config.ts`. The picker endpoint `GET /api/auth/admin/oauth-clients/lookup` is implemented as the read-only M2M wrapper described in §5.3 and never returns `client_secret`.
+> - D7 cross-layer invariants are enforced at token issuance: an infrastructure client (`referenceId IS NULL`) cannot obtain tenant-resource scopes, and a tenant client cannot obtain system scopes. The defense-in-depth runtime check is paired with the structural same-org check on `oauthClientResourceScope` creation.
+> - New tests: `oauth-client-ownership.test.ts`, `oauth-client-resource-scope.test.ts`, `m2m-token-issuance.test.ts`, `m2m-client-picker.test.ts`, `infra-m2m-client.test.ts`. Existing tests refactored against the new contract; SA-endpoint test now asserts the path is deleted (404).
 >
 > Scope:
 >
@@ -625,9 +637,9 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Add `clientReference: async ({ session }) => session?.activeOrganizationId` to the `oauthProvider({...})` options in [workers/core/src/auth/oauth-provider.ts](../workers/core/src/auth/oauth-provider.ts).
-- [ ] Update `clientPrivileges` so org members may create/read/list/update clients owned by their org; only platform admins may delete or rotate when policy requires it. Confirm the exact set of allowed actions in code review against BA's privilege model.
-- [ ] Ensure `/api/auth/admin/oauth2/create-client` paths still work for platform admins; admins must supply an explicit `referenceId` (BA accepts this when present in metadata or via admin path).
+- [x] Add `clientReference: async ({ session }) => session?.activeOrganizationId` to the `oauthProvider({...})` options in [workers/core/src/auth/oauth-provider.ts](../workers/core/src/auth/oauth-provider.ts).
+- [x] Update `clientPrivileges` so org members may create/read/list/update clients owned by their org; only platform admins may delete or rotate when policy requires it. Confirm the exact set of allowed actions in code review against BA's privilege model.
+- [x] Ensure `/api/auth/admin/oauth2/create-client` paths still work for platform admins; admins must supply an explicit `referenceId` (BA accepts this when present in metadata or via admin path).
 
 Tests:
 
@@ -646,10 +658,10 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Define `oauthClientResourceScopeSchema` as a Better Auth plugin schema in a new file under `workers/core/src/auth/plugins/oauth-scope-catalog/` (rename plugin file or split into a new plugin per repo lint rules; pick whichever the architecture lint allows without loosening rules).
-- [ ] Add the corresponding Better Auth schema fields and run `pnpm db:generate`. Never write the SQL or snapshot by hand (CLAUDE.md rule 4).
-- [ ] Add CRUD endpoints `/api/auth/oauth-client-resource-scope/{list,create,update,delete}` under the same plugin. Authorize each endpoint by asserting `oauthClient.referenceId` of the target client matches the caller's `activeOrganizationId` (or caller is platform admin).
-- [ ] Mirror the `assertGrantScopesExist` check against `oauthResourceScope` rows so `allowedScopes ⊆ resource server's declared scopes`.
+- [x] Define `oauthClientResourceScopeSchema` as a Better Auth plugin schema in a new file under `workers/core/src/auth/plugins/oauth-scope-catalog/` (rename plugin file or split into a new plugin per repo lint rules; pick whichever the architecture lint allows without loosening rules).
+- [x] Add the corresponding Better Auth schema fields and run `pnpm db:generate`. Never write the SQL or snapshot by hand (CLAUDE.md rule 4).
+- [x] Add CRUD endpoints `/api/auth/oauth-client-resource-scope/{list,create,update,delete}` under the same plugin. Authorize each endpoint by asserting `oauthClient.referenceId` of the target client matches the caller's `activeOrganizationId` (or caller is platform admin).
+- [x] Mirror the `assertGrantScopesExist` check against `oauthResourceScope` rows so `allowedScopes ⊆ resource server's declared scopes`.
 
 Tests:
 
@@ -667,10 +679,10 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Replace the `metadata.id_client_id`/`metadata.organization_id` reads with `client.clientId` and `client.referenceId` lookups (the resolved row is available via the BA hook context; if not, look it up by `client_id`).
-- [ ] Replace `assertClientOrganizationGrant` with `assertClientResourceScope`. New function reads `oauthClientResourceScope` by `(clientId, resourceServerId)`, asserts `enabled`, asserts requested scope ⊆ `allowedScopes`.
-- [ ] If `referenceId` is missing on the resolved client (legacy data not yet migrated), throw `FORBIDDEN` rather than minting a token without `org_id`.
-- [ ] Delete `workers/core/src/auth/plugins/oauth-scope-catalog/grants.ts` after Phase 4. During Phases 1-3 it may coexist with the new code for parity tests.
+- [x] Replace the `metadata.id_client_id`/`metadata.organization_id` reads with `client.clientId` and `client.referenceId` lookups (the resolved row is available via the BA hook context; if not, look it up by `client_id`).
+- [x] Replace `assertClientOrganizationGrant` with `assertClientResourceScope`. New function reads `oauthClientResourceScope` by `(clientId, resourceServerId)`, asserts `enabled`, asserts requested scope ⊆ `allowedScopes`.
+- [x] If `referenceId` is missing on the resolved client (legacy data not yet migrated), throw `FORBIDDEN` rather than minting a token without `org_id`.
+- [x] Delete `workers/core/src/auth/plugins/oauth-scope-catalog/grants.ts` after Phase 4. During Phases 1-3 it may coexist with the new code for parity tests.
 
 Tests:
 
@@ -688,9 +700,9 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Define an `id`-side resource server entry for the M2M caller token used by `content-api` (the existing M2M caller infrastructure used by `principal-validation` can be reused, retargeted at `/oauth2/get-client` and a different audience+scope).
-- [ ] Add an opt-in path that allows the M2M caller scope `oauth:clients:read` to bypass session-based ownership when calling `/oauth2/get-client` **and** the call still scopes by the caller's intended `referenceId` (passed in headers or derived from a separate `org_id` query param). Confirm BA exposes a hook that supports this without patching plugin internals; if not, build a thin wrapper endpoint that delegates to the BA endpoint and applies the org-membership check using `content-api`'s declared org context.
-- [ ] Document the scope, audience, and intended caller in the plugin README under `workers/core/src/auth/plugins/oauth-scope-catalog/`.
+- [x] Define an `id`-side resource server entry for the M2M caller token used by `content-api` (the existing M2M caller infrastructure used by `principal-validation` can be reused, retargeted at `/oauth2/get-client` and a different audience+scope).
+- [x] Add an opt-in path that allows the M2M caller scope `oauth:clients:read` to bypass session-based ownership when calling `/oauth2/get-client` **and** the call still scopes by the caller's intended `referenceId` (passed in headers or derived from a separate `org_id` query param). Confirm BA exposes a hook that supports this without patching plugin internals; if not, build a thin wrapper endpoint that delegates to the BA endpoint and applies the org-membership check using `content-api`'s declared org context.
+- [x] Document the scope, audience, and intended caller in the plugin README under `workers/core/src/auth/plugins/oauth-scope-catalog/`.
 
 Tests:
 
@@ -712,9 +724,9 @@ Target behavior:
 
 Implementation tasks:
 
-- [ ] Re-implement `clientPrivileges` to look up the session's `activeOrganizationId` and member role, then dispatch on `action`. Keep the platform-admin shortcut.
-- [ ] Decide whether to model the new authority as a BA org-plugin role or as a permission set; record the choice in the plugin README.
-- [ ] Confirm BA's `referenceId` ownership check still runs after `clientPrivileges` returns true; both must permit the action.
+- [x] Re-implement `clientPrivileges` to look up the session's `activeOrganizationId` and member role, then dispatch on `action`. Keep the platform-admin shortcut.
+- [x] Decide whether to model the new authority as a BA org-plugin role or as a permission set; record the choice in the plugin README.
+- [x] Confirm BA's `referenceId` ownership check still runs after `clientPrivileges` returns true; both must permit the action.
 
 Tests:
 
@@ -760,12 +772,12 @@ Implementation tasks:
 
 - [ ] Declare a deployment-time seed (in `workers/core/src/auth/seed/*` or equivalent) that creates the `content-api` infra client if absent. The seed uses BA's stock `createOAuthClient` with `referenceId = null` and `grantTypes = ["client_credentials"]`.
 - [ ] Store `content-api`'s client secret (or `private_key_jwt` key material) in Wrangler secret bindings. Never commit secrets. Document the binding names in the relevant plugin README.
-- [ ] Add the two system scopes (`scim:read`, `oauth:clients:read`) as `oauthResourceScope` rows whose audience is `id` itself, not a downstream RS.
-- [ ] Extend `clientPrivileges` so:
+- [x] Add the two system scopes (`scim:read`, `oauth:clients:read`) as `oauthResourceScope` rows whose audience is `id` itself, not a downstream RS.
+- [x] Extend `clientPrivileges` so:
   - org admins cannot list, read, update, or delete clients with `referenceId IS NULL`;
   - platform admins manage infra clients exclusively;
   - tenant clients (`referenceId IS NOT NULL`) cannot resolve any system scope at token issuance.
-- [ ] Extend `customAccessTokenClaims`' M2M branch so a token request from a `referenceId IS NULL` client targeting a downstream RS audience fails with `invalid_scope`; conversely, a tenant client requesting a system scope fails the same way.
+- [x] Extend `customAccessTokenClaims`' M2M branch so a token request from a `referenceId IS NULL` client targeting a downstream RS audience fails with `invalid_scope`; conversely, a tenant client requesting a system scope fails the same way.
 - [ ] Provide an operator runbook entry (in the plugin README) covering: rotation, revocation, and adding a new RS as an infra client when a future RS appears.
 
 Tests:
@@ -782,8 +794,8 @@ Tests:
 Implementation tasks:
 
 - [ ] Update [docs/010_organization-teams-oauth-flow.md](010_organization-teams-oauth-flow.md) M2M sections to reflect `referenceId` ownership, `oauthClientResourceScope`, and `/oauth2/get-client`.
-- [ ] Update [docs/013_identity-event-standards-and-decisions.md](013_identity-event-standards-and-decisions.md) §7 (event vocabulary) where it references OAuth client / grant rows so emitted events key off `referenceId` and `oauthClientResourceScope.enabled` rather than the dropped `organizationId` column.
-- [ ] Update [docs/017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) §4.3, §5.4, §5.5, §6, §7.3, §9.3, §11, §13, §16 so they reference this document as canonical for M2M and remove the now-orphaned M2M decision text.
+- [x] Update [docs/013_identity-event-standards-and-decisions.md](013_identity-event-standards-and-decisions.md) §7 (event vocabulary) where it references OAuth client / grant rows so emitted events key off `referenceId` and `oauthClientResourceScope.enabled` rather than the dropped `organizationId` column.
+- [x] Update [docs/017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) §4.3, §5.4, §5.5, §6, §7.3, §9.3, §11, §13, §16 so they reference this document as canonical for M2M and remove the now-orphaned M2M decision text.
 - [ ] Update `/home/quanghuy1242/pjs/content-api/docs/007_content-iam-policy-binding-model.md` §7.8 once `content-api` is on the new contract.
 - [ ] Update `/home/quanghuy1242/pjs/content-api/.agents/skills/content-iam-usage/**` only after implementation lands, so the skill reflects shipped code.
 
@@ -861,8 +873,8 @@ Scope:
 
 Tasks:
 
-- [ ] Pass `clientReference` to `oauthProvider({...})`.
-- [ ] Re-implement `clientPrivileges` to honor org-member roles in addition to platform admin.
+- [x] Pass `clientReference` to `oauthProvider({...})`.
+- [x] Re-implement `clientPrivileges` to honor org-member roles in addition to platform admin.
 
 Acceptance criteria:
 
@@ -884,9 +896,9 @@ Scope:
 
 Tasks:
 
-- [ ] Add schema, types, mappers, CRUD endpoints.
-- [ ] Run `pnpm db:generate` to produce the migration; do not hand-edit (CLAUDE.md rule 4).
-- [ ] Authorize endpoints by matching `oauthClient.referenceId` to caller org.
+- [x] Add schema, types, mappers, CRUD endpoints.
+- [x] Run `pnpm db:generate` to produce the migration; do not hand-edit (CLAUDE.md rule 4).
+- [x] Authorize endpoints by matching `oauthClient.referenceId` to caller org.
 
 Acceptance criteria:
 
@@ -909,9 +921,9 @@ Scope:
 
 Tasks:
 
-- [ ] Replace `metadata.id_client_id` / `metadata.organization_id` reads with `client.clientId` and `client.referenceId`.
-- [ ] Replace `assertClientOrganizationGrant` with `assertClientResourceScope`.
-- [ ] Reject token issuance if `referenceId` is missing or `oauthClientResourceScope.enabled` is false.
+- [x] Replace `metadata.id_client_id` / `metadata.organization_id` reads with `client.clientId` and `client.referenceId`.
+- [x] Replace `assertClientOrganizationGrant` with `assertClientResourceScope`.
+- [x] Reject token issuance if `referenceId` is missing or `oauthClientResourceScope.enabled` is false.
 
 Acceptance criteria:
 
@@ -958,9 +970,9 @@ Scope:
 
 Tasks:
 
-- [ ] Define audience and scope for the new M2M caller path against `/oauth2/get-client`.
-- [ ] Implement the bridge that lets a caller with `oauth:clients:read` read by `client_id` while still enforcing the caller's intended org context (either via BA hook if available, or a thin wrapper endpoint - record the chosen approach in the plugin README).
-- [ ] Document the contract for consumer integrations.
+- [x] Define audience and scope for the new M2M caller path against `/oauth2/get-client`.
+- [x] Implement the bridge that lets a caller with `oauth:clients:read` read by `client_id` while still enforcing the caller's intended org context (either via BA hook if available, or a thin wrapper endpoint - record the chosen approach in the plugin README).
+- [x] Document the contract for consumer integrations.
 
 Acceptance criteria:
 
@@ -1011,9 +1023,9 @@ Scope:
 Tasks:
 
 - [ ] Define and seed the `content-api` infra client (`referenceId = null`, `grant_types = ["client_credentials"]`).
-- [ ] Declare `scim:read` and `oauth:clients:read` as `oauthResourceScope` rows audienced at `id`.
-- [ ] Extend `clientPrivileges` so org admins cannot see `referenceId IS NULL` clients and platform admins exclusively manage them.
-- [ ] Extend the M2M branch of `customAccessTokenClaims` to enforce: infra clients cannot request tenant-resource scopes; tenant clients cannot request system scopes.
+- [x] Declare `scim:read` and `oauth:clients:read` as `oauthResourceScope` rows audienced at `id`.
+- [x] Extend `clientPrivileges` so org admins cannot see `referenceId IS NULL` clients and platform admins exclusively manage them.
+- [x] Extend the M2M branch of `customAccessTokenClaims` to enforce: infra clients cannot request tenant-resource scopes; tenant clients cannot request system scopes.
 - [ ] Store `content-api`'s client credentials in Wrangler secret bindings; document binding names in the plugin README.
 
 Acceptance criteria:
@@ -1039,10 +1051,10 @@ Scope:
 
 Tasks:
 
-- [ ] Delete `grants.ts` and references.
-- [ ] Delete service-account principal-validation endpoint, body schema, and tests.
-- [ ] Remove `principal-validation`-related config and env vars.
-- [ ] Verify `pnpm check` is clean.
+- [x] Delete `grants.ts` and references.
+- [x] Delete service-account principal-validation endpoint, body schema, and tests.
+- [x] Remove `principal-validation`-related config and env vars.
+- [x] Verify `pnpm check` is clean.
 
 Acceptance criteria:
 

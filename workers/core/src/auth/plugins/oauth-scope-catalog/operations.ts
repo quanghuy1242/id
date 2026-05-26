@@ -1,20 +1,17 @@
 import { APIError } from "better-auth/api";
 import {
+  OAUTH_CLIENT_MODEL,
   OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
-  OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,
   OAUTH_RESOURCE_SCOPE_MODEL,
   RESOURCE_SERVER_MODEL,
 } from "../../../shared/constants";
 import type { ResourceServerRow } from "../resource-server/schema";
 import type { AdapterContext, OAuthScopeCatalogPluginOptions } from "./types";
 import type {
-  CreateOAuthClientOrganizationGrantBody,
   CreateOAuthClientResourceScopeBody,
   CreateOAuthResourceScopeBody,
-  OAuthClientOrganizationGrantRow,
   OAuthClientResourceScopeRow,
   OAuthResourceScopeRow,
-  UpdateOAuthClientOrganizationGrantBody,
   UpdateOAuthClientResourceScopeBody,
   UpdateOAuthResourceScopeBody,
 } from "./schema";
@@ -47,21 +44,59 @@ export async function findResourceServerOrThrow(
   return resourceServer;
 }
 
-type OAuthClientRow = {
+export type OAuthClientRow = {
   readonly id: string;
   readonly clientId: string;
   readonly disabled?: boolean | null;
-  readonly grantTypes?: readonly string[] | null;
-  readonly metadata?: Record<string, unknown> | string | null;
+  readonly grantTypes?: readonly string[] | string | null;
   readonly referenceId?: string | null;
+  readonly metadata?: Record<string, unknown> | string | null;
 };
+
+function parseMetadata(value: OAuthClientRow["metadata"]): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return typeof parsed === "object" && parsed !== null ? { ...parsed as Record<string, unknown> } : {};
+    } catch {
+      return {};
+    }
+  }
+  return { ...value };
+}
+
+/**
+ * Better Auth 1.6.11 does not forward the resolved oauth client (or its `clientId`
+ * column) to `customAccessTokenClaims` for `client_credentials`, only `metadata`. Doc
+ * 018 §5.5 D5 allows this single one-field mirror as the BA-limitation workaround so
+ * the token-issuance hook can look up the client row by `clientId` and read the
+ * authoritative `referenceId` column. The legacy `metadata.organization_id` mirror is
+ * no longer written or read.
+ */
+export async function ensureOAuthClientIdentityMirror(
+  adapter: AdapterContext,
+  client: OAuthClientRow,
+): Promise<void> {
+  const metadata = parseMetadata(client.metadata);
+  if (metadata.id_client_id === client.clientId) return;
+  metadata.id_client_id = client.clientId;
+  // Strip the legacy organization_id mirror if present; org_id is now derived from
+  // the `referenceId` column at token-issuance time.
+  delete metadata.organization_id;
+  await adapter.update<OAuthClientRow>({
+    model: "oauthClient",
+    where: [{ field: "clientId", value: client.clientId }],
+    update: { metadata },
+  });
+}
 
 export async function findOAuthClientOrThrow(
   adapter: AdapterContext,
   clientId: string,
 ): Promise<OAuthClientRow> {
   const client = await adapter.findOne<OAuthClientRow>({
-    model: "oauthClient",
+    model: OAUTH_CLIENT_MODEL,
     where: [{ field: "clientId", value: clientId }],
   });
   if (!client) {
@@ -138,24 +173,6 @@ export async function assertGrantScopesExist(
   }
 }
 
-export async function assertUniqueClientOrganizationGrant(
-  adapter: AdapterContext,
-  body: Pick<CreateOAuthClientOrganizationGrantBody, "clientId" | "organizationId" | "resourceServerId">,
-  ignoreId?: string,
-): Promise<void> {
-  const rows = await adapter.findMany<OAuthClientOrganizationGrantRow>({
-    model: OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,
-    where: [
-      { field: "clientId", value: body.clientId },
-      { field: "organizationId", value: body.organizationId },
-      { field: "resourceServerId", value: body.resourceServerId },
-    ],
-  });
-  if (rows.some((row) => row.id !== ignoreId)) {
-    throw new APIError("BAD_REQUEST", { message: "OAuth client organization grant already exists" });
-  }
-}
-
 export async function assertUniqueClientResourceScope(
   adapter: AdapterContext,
   body: Pick<CreateOAuthClientResourceScopeBody, "clientId" | "resourceServerId">,
@@ -199,32 +216,6 @@ export function buildUpdateScopePayload(
   } as Partial<OAuthResourceScopeRow>;
 }
 
-export function buildCreateGrantPayload(
-  body: CreateOAuthClientOrganizationGrantBody,
-  actorId: string,
-): Omit<OAuthClientOrganizationGrantRow, "id"> {
-  const now = Date.now();
-  return {
-    ...body,
-    enabled: true,
-    createdBy: actorId,
-    updatedBy: actorId,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-export function buildUpdateGrantPayload(
-  fields: UpdateOAuthClientOrganizationGrantBody,
-  actorId: string,
-): Partial<OAuthClientOrganizationGrantRow> {
-  return {
-    ...fields,
-    updatedBy: actorId,
-    updatedAt: Date.now(),
-  } as Partial<OAuthClientOrganizationGrantRow>;
-}
-
 export function buildCreateClientResourceScopePayload(
   body: CreateOAuthClientResourceScopeBody,
   actorId: string,
@@ -249,33 +240,4 @@ export function buildUpdateClientResourceScopePayload(
     updatedBy: actorId,
     updatedAt: Date.now(),
   } as Partial<OAuthClientResourceScopeRow>;
-}
-
-function parseMetadata(value: OAuthClientRow["metadata"]): Record<string, unknown> {
-  if (!value) return {};
-  if (typeof value === "string") {
-    try {
-      const parsed: unknown = JSON.parse(value);
-      return typeof parsed === "object" && parsed !== null ? { ...parsed as Record<string, unknown> } : {};
-    } catch {
-      return {};
-    }
-  }
-  return { ...value };
-}
-
-export async function ensureOAuthClientMetadataBridge(
-  adapter: AdapterContext,
-  client: OAuthClientRow,
-  organizationId: string,
-): Promise<void> {
-  const metadata = parseMetadata(client.metadata);
-  if (metadata.id_client_id === client.clientId && metadata.organization_id === organizationId) return;
-  metadata.id_client_id = client.clientId;
-  metadata.organization_id = organizationId;
-  await adapter.update<OAuthClientRow>({
-    model: "oauthClient",
-    where: [{ field: "clientId", value: client.clientId }],
-    update: { metadata },
-  });
 }

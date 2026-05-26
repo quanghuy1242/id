@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `oauthClientResourceScope_client_resource_uidx` ON `oauthClientResourceScope` (`clientId`,`resourceServerId`);

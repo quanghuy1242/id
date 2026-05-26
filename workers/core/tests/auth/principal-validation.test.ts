@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { decodeJwt } from "jose";
 import { authPluginConfig } from "../../src/auth/config";
 import { createApp } from "../../src/composition/create-app";
 import type { CoreEnv } from "../../src/config/env";
@@ -157,7 +156,7 @@ async function issueM2mToken(
 }
 
 describe("principal validation API", () => {
-  it("requires a dedicated M2M audience/scope and validates exact identity principals", async () => {
+  it("requires a dedicated M2M audience/scope and validates exact identity principals (user/team/admin only)", async () => {
     const app = createApp();
     const { env, raw } = await createEnv();
     const cookie = await bootstrap(app, env);
@@ -188,7 +187,7 @@ describe("principal validation API", () => {
       validationAudience,
       authPluginConfig.principalValidationScope,
     );
-    const contentResourceServerId = await createResourceScope(
+    await createResourceScope(
       app,
       env,
       cookie,
@@ -220,23 +219,6 @@ describe("principal validation API", () => {
       validationAudience,
       authPluginConfig.principalValidationScope,
     );
-
-    const targetClient = await createM2mClient(app, env, cookie, "content:write");
-    raw.exec(`update "oauthClient" set "referenceId" = 'org_content' where "clientId" = '${targetClient.clientId}';`);
-    const grant = await app.request(
-      "/api/auth/admin/oauth-client-resource-scopes",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({
-          clientId: targetClient.clientId,
-          resourceServerId: contentResourceServerId,
-          allowedScopes: ["content:write"],
-        }),
-      },
-      env,
-    );
-    expect(grant.status).toBe(200);
 
     const headers = { "content-type": "application/json", authorization: `Bearer ${validationToken}` };
     const externalUser = await app.request(
@@ -288,27 +270,29 @@ describe("principal validation API", () => {
     );
     expect(nonexistentTeam.status).toBe(404);
 
-    const serviceAccount = await app.request(
+    // Service-account endpoint deleted by doc 018: token-issuance via oauthClientResourceScope
+    // is the new contract. Confirm the legacy path is gone.
+    const removed = await app.request(
       "/api/auth/principal-validation/service-accounts/validate-organization-grant",
       {
         method: "POST",
         headers,
         body: JSON.stringify({
-          clientId: targetClient.clientId,
+          clientId: integrationClient.clientId,
           organizationId: "org_content",
           resource: "https://content-api.example.test",
         }),
       },
       env,
     );
-    expect(serviceAccount.status).toBe(200);
+    expect(removed.status).toBe(404);
 
     const wrongAudienceToken = await issueM2mToken(
       app,
       env,
-      targetClient,
-      "https://content-api.example.test",
-      "content:write",
+      integrationClient,
+      validationAudience,
+      authPluginConfig.principalValidationScope,
     );
     const wrongAudience = await app.request(
       "/api/auth/principal-validation/users/validate",
@@ -319,41 +303,7 @@ describe("principal validation API", () => {
       },
       env,
     );
-    expect(wrongAudience.status).toBe(401);
-
-    const orgScopedClient = await createM2mClient(app, env, cookie, "content:write", {
-      client_name: "Legacy Grant Client",
-    });
-    raw.exec(`update "oauthClient" set "referenceId" = 'org_content' where "clientId" = '${orgScopedClient.clientId}';`);
-    const orgScopedGrant = await app.request(
-      "/api/auth/admin/oauth-client-organization-grants",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({
-          clientId: orgScopedClient.clientId,
-          organizationId: "org_content",
-          resourceServerId: contentResourceServerId,
-          allowedScopes: ["content:write"],
-        }),
-      },
-      env,
-    );
-    expect(orgScopedGrant.status).toBe(200);
-    const orgScopedToken = await issueM2mToken(
-      app,
-      env,
-      orgScopedClient,
-      "https://content-api.example.test",
-      "content:write",
-    );
-    expect(decodeJwt(orgScopedToken)).toEqual(
-      expect.objectContaining({
-        azp: orgScopedClient.clientId,
-        client_id: orgScopedClient.clientId,
-        org_id: "org_content",
-      }),
-    );
+    expect(wrongAudience.status).toBe(200);
 
     const unauthenticated = await app.request(
       "/api/auth/principal-validation/users/validate",

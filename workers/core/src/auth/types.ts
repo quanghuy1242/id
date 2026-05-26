@@ -30,6 +30,8 @@ export type OAuthRuntimeCatalog = {
     readonly resourceServerId: string;
     readonly audience: string;
     readonly scope: string;
+    /** True when the owning resource server has `organizationId IS NULL` (id-owned system audience). */
+    readonly system: boolean;
   }[];
 };
 

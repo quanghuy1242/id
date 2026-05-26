@@ -55,8 +55,6 @@ export type AuthPluginConfig = {
   readonly resourceAudienceCacheTtlSeconds: number;
   readonly oauthScopeCacheKey: string;
   readonly oauthScopeCacheTtlSeconds: number;
-  readonly oauthGrantCachePrefix: string;
-  readonly oauthGrantCacheTtlSeconds: number;
   readonly oauthClientResourceScopeCachePrefix: string;
   readonly oauthClientResourceScopeCacheTtlSeconds: number;
   readonly teamMembershipCachePrefix: string;
@@ -72,6 +70,10 @@ export type AuthPluginConfig = {
   readonly workspaceOnlyScopes: readonly string[];
   readonly maxTokenTeamIds: number;
   readonly principalValidationScope: string;
+  /** System resource-server slug used by id's own audiences (picker, SCIM, future system APIs). */
+  readonly systemResourceServerSlug: string;
+  /** OAuth scope that authorizes `/api/auth/admin/oauth-clients/lookup` for M2M callers. */
+  readonly systemOAuthClientPickerScope: string;
 };
 
 export const oauthTokenLifetimeConfig = {
@@ -103,8 +105,6 @@ export const authPluginConfig = {
   resourceAudienceCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthScopeCacheKey: "id-oauth-scopes:enabled",
   oauthScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
-  oauthGrantCachePrefix: "id-oauth-scopes:client-org-grants:",
-  oauthGrantCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthClientResourceScopeCachePrefix: "id-oauth-scopes:client-resource-scopes:",
   oauthClientResourceScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   teamMembershipCachePrefix: "id-teams:user:",
@@ -120,4 +120,15 @@ export const authPluginConfig = {
   workspaceOnlyScopes: ["content:share"],
   maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
   principalValidationScope: "identity:principals:validate",
+  systemResourceServerSlug: "id-system",
+  systemOAuthClientPickerScope: "oauth:clients:read",
 } as const satisfies AuthPluginConfig;
+
+/**
+ * Audience URL identifying id's own (`organizationId IS NULL`) system resource server.
+ * Used by the OAuth client picker (`/api/auth/admin/oauth-clients/lookup`) and any other
+ * id-audienced system endpoint (e.g. future SCIM reads called by RS-to-AS infra clients).
+ */
+export function systemResourceServerAudience(baseUrl: string): string {
+  return new URL("/system", baseUrl).toString();
+}

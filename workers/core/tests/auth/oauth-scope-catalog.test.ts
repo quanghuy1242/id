@@ -9,11 +9,11 @@ import {
   loadOAuthScopesFromCache,
 } from "../../src/auth/plugins/oauth-scope-catalog/scopes";
 import {
-  invalidateClientOrganizationGrants,
-  loadClientOrganizationGrants,
+  invalidateClientResourceScopes,
+  loadClientResourceScopes,
 } from "../../src/auth/plugins/oauth-scope-catalog/grants";
 import {
-  oauthClientOrganizationGrantBetterAuthFields,
+  oauthClientResourceScopeBetterAuthFields,
   oauthResourceScopeBetterAuthFields,
 } from "../../src/auth/plugins/oauth-scope-catalog/schema";
 import {
@@ -49,8 +49,11 @@ describe("OAuth scope catalog schema", () => {
     expect(oauthResourceScopeBetterAuthFields.enabled).toEqual(
       expect.objectContaining({ type: "boolean", required: true, defaultValue: true }),
     );
-    expect(oauthClientOrganizationGrantBetterAuthFields.allowedScopes).toEqual(
+    expect(oauthClientResourceScopeBetterAuthFields.allowedScopes).toEqual(
       expect.objectContaining({ type: "string[]", required: true }),
+    );
+    expect(oauthClientResourceScopeBetterAuthFields.clientId).toEqual(
+      expect.objectContaining({ type: "string", required: true, index: true }),
     );
   });
 });
@@ -63,7 +66,7 @@ describe("OAuth scope catalog cache", () => {
   it("loads enabled scopes from KV without hitting the store", async () => {
     const { kv, values } = createKv();
     values.set(authPluginConfig.oauthScopeCacheKey, {
-      value: JSON.stringify([{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read" }]),
+      value: JSON.stringify([{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read", system: false }]),
     });
 
     const result = await loadOAuthScopesFromCache(kv, async () => {
@@ -71,25 +74,27 @@ describe("OAuth scope catalog cache", () => {
     });
 
     expect(result).toEqual({
-      rows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read" }],
+      rows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read", system: false }],
       scopes: ["content:read"],
       source: "cache",
     });
   });
 
-  it("loads rows from the plugin-owned D1 query on KV miss", async () => {
+  it("loads rows from the plugin-owned D1 query on KV miss and marks id-owned audiences as system", async () => {
     const { kv } = createKv();
     const db = {
       prepare: (sql: string) => {
         expect(sql).toContain('from "oauthResourceScope"');
         expect(sql).toContain('join "resourceServer"');
+        expect(sql).toContain('"organizationId"');
         return {
           bind: (...values: number[]) => {
             expect(values).toEqual([1, 1]);
             return {
               all: async () => ({
                 results: [
-                  { resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" },
+                  { resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write", organizationId: "org_1" },
+                  { resourceServerId: "rs_system", audience: "https://id.example.test/system", scope: "oauth:clients:read", organizationId: null },
                 ],
               }),
             };
@@ -99,8 +104,11 @@ describe("OAuth scope catalog cache", () => {
     } as unknown as D1Database;
 
     await expect(loadOAuthResourceScopes({ DB: db, KV: kv })).resolves.toEqual({
-      rows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }],
-      scopes: ["content:write"],
+      rows: [
+        { resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write", system: false },
+        { resourceServerId: "rs_system", audience: "https://id.example.test/system", scope: "oauth:clients:read", system: true },
+      ],
+      scopes: ["content:write", "oauth:clients:read"],
       source: "store",
     });
   });
@@ -115,11 +123,11 @@ describe("OAuth scope catalog cache", () => {
   });
 });
 
-describe("OAuth client organization grant cache", () => {
-  it("keeps warm-isolate grant rows keyed by client ID", async () => {
+describe("OAuth client resource-scope cache", () => {
+  it("keeps warm-isolate resource-scope rows keyed by client ID", async () => {
     const { kv } = createKv();
-    await invalidateClientOrganizationGrants({ KV: kv }, "client_a");
-    await invalidateClientOrganizationGrants({ KV: kv }, "client_b");
+    await invalidateClientResourceScopes({ KV: kv }, "client_a");
+    await invalidateClientResourceScopes({ KV: kv }, "client_b");
     const reads: string[] = [];
     const db = {
       prepare: () => ({
@@ -128,9 +136,8 @@ describe("OAuth client organization grant cache", () => {
             reads.push(clientId);
             return {
               results: [{
-                id: `grant_${clientId}`,
+                id: `rs_scope_${clientId}`,
                 clientId,
-                organizationId: "org_1",
                 resourceServerId: "rs_1",
                 audience: "https://api.example.test",
                 allowedScopes: JSON.stringify(["content:write"]),
@@ -142,19 +149,19 @@ describe("OAuth client organization grant cache", () => {
       }),
     } as unknown as D1Database;
 
-    await expect(loadClientOrganizationGrants({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
+    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
       expect.objectContaining({ clientId: "client_a" }),
     ]);
-    await expect(loadClientOrganizationGrants({ DB: db, KV: kv }, "client_b")).resolves.toEqual([
+    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_b")).resolves.toEqual([
       expect.objectContaining({ clientId: "client_b" }),
     ]);
-    await expect(loadClientOrganizationGrants({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
+    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
       expect.objectContaining({ clientId: "client_a" }),
     ]);
     expect(reads).toEqual(["client_a", "client_b"]);
   });
 
-  it("refills grant KV cache in the background when waitUntil is available", async () => {
+  it("refills resource-scope KV cache in the background when waitUntil is available", async () => {
     const pendingWrite = new Promise<void>(() => undefined);
     const waited: Promise<unknown>[] = [];
     const kv = {
@@ -167,9 +174,8 @@ describe("OAuth client organization grant cache", () => {
         bind: (clientId: string) => ({
           all: async () => ({
             results: [{
-              id: `grant_${clientId}`,
+              id: `rs_scope_${clientId}`,
               clientId,
-              organizationId: "org_1",
               resourceServerId: "rs_1",
               audience: "https://api.example.test",
               allowedScopes: JSON.stringify(["content:write"]),
@@ -180,7 +186,7 @@ describe("OAuth client organization grant cache", () => {
       }),
     } as unknown as D1Database;
 
-    const result = await loadClientOrganizationGrants(
+    const result = await loadClientResourceScopes(
       { DB: db, KV: kv },
       "client_background",
       { waitUntil: (task) => waited.push(task) },
@@ -194,9 +200,9 @@ describe("OAuth client organization grant cache", () => {
 describe("OAuth scope issuance assertions", () => {
   const catalog = {
     scopeRows: [
-      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:read" },
-      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:share" },
-      { resourceServerId: "rs_other", audience: "https://other.example.test", scope: "content:read" },
+      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:read", system: false },
+      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:share", system: false },
+      { resourceServerId: "rs_other", audience: "https://other.example.test", scope: "content:read", system: false },
     ],
   };
 

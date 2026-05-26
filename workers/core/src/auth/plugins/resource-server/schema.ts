@@ -67,7 +67,7 @@ export type ResourceServerRow = Readonly<z.infer<typeof resourceServerSchema>>;
 /** Validated body for the create-resource-server endpoint. */
 export const createResourceServerBody = z
   .object({
-    organizationId: z.string().min(1),
+    organizationId: z.string().min(1).nullable().optional(),
     slug: resourceServerSchema.shape.slug,
     name: resourceServerSchema.shape.name,
     audience: resourceServerSchema.shape.audience,

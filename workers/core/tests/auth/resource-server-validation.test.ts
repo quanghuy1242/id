@@ -137,7 +137,7 @@ describe("resource server OpenAPI schemas", () => {
     const schema = createResourceServerOpenApiRequestBody.content["application/json"].schema;
     expect(schema).toEqual(
       expect.objectContaining({
-        required: ["organizationId", "slug", "name", "audience"],
+        required: ["slug", "name", "audience"],
       }),
     );
     expect(schema).toHaveProperty(["properties", "description", "type"], "string");

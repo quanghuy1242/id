@@ -9,10 +9,9 @@ import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idPrincipalValidation } from "./plugins/principal-validation";
-import {
-  invalidateClientOrganizationGrants,
-  invalidateClientResourceScopes,
-} from "./plugins/oauth-scope-catalog/grants";
+import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
+import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
+import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
 import {
@@ -67,6 +66,7 @@ export function getAuthOptions(
 ) {
   const emailSender = runtime.emailSender ?? createAuthEmailSender(env);
   const validationAudience = principalValidationAudience(env.BETTER_AUTH_URL);
+  const issuer = `${env.BETTER_AUTH_URL}${authPluginConfig.issuerPath}`;
 
   return {
     baseURL: env.BETTER_AUTH_URL,
@@ -121,6 +121,7 @@ export function getAuthOptions(
           gracePeriod: authPluginConfig.jwksGracePeriodSeconds,
         },
       }),
+      idOAuthM2MBridge(),
       createOAuthProviderPlugin(env, catalog, runtime, validationAudience, isPlatformAdmin),
       idResourceServer({
         invalidateAudienceCache: () => invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
@@ -131,7 +132,6 @@ export function getAuthOptions(
       }),
       idOAuthScopeCatalog({
         invalidateScopeCache: () => invalidateOAuthResourceScopes(env, runtime.backgroundTaskRunner),
-        invalidateGrantCache: (clientId) => invalidateClientOrganizationGrants(env, clientId, runtime.backgroundTaskRunner),
         invalidateClientResourceScopeCache: (clientId) =>
           invalidateClientResourceScopes(env, clientId, runtime.backgroundTaskRunner),
         authorize: async (organizationId, userId, role, adapter) =>
@@ -139,8 +139,9 @@ export function getAuthOptions(
             ? isPlatformAdmin(role)
             : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
+      idOAuthClientPicker({ issuer }),
       idPrincipalValidation({
-        issuer: `${env.BETTER_AUTH_URL}${authPluginConfig.issuerPath}`,
+        issuer,
         audience: validationAudience,
         scope: authPluginConfig.principalValidationScope,
       }),

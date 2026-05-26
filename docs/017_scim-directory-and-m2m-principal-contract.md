@@ -183,7 +183,7 @@ The plugin currently exposes boolean-style POST endpoints:
 | `POST /api/auth/principal-validation/users/validate-organization-member` | User exists and belongs to org | `GET /scim/v2/tenants/{orgId}/Users/{userId}` |
 | `POST /api/auth/principal-validation/teams/validate-organization-team` | Team exists inside org | `GET /scim/v2/tenants/{orgId}/Groups/{teamId}` |
 | `POST /api/auth/principal-validation/organization-administrators/validate` | User has Better Auth `owner` or `admin` role | virtual SCIM Group, e.g. `GET /scim/v2/tenants/{orgId}/Groups/org-admins` |
-| `POST /api/auth/principal-validation/service-accounts/validate-organization-grant` | OAuth client, resource server, and client/org/resource grant are enabled | no SCIM core replacement; see §6 |
+| ~~`POST /api/auth/principal-validation/service-accounts/validate-organization-grant`~~ (deleted by doc 018) | OAuth client, resource server, and client/org/resource grant are enabled | replaced by token-issuance enforcement at `/api/auth/oauth2/token` via `oauthClientResourceScope` (doc 018 §4.4); see §6 |
 
 The caller authentication shape is good: `assertPrincipalValidationCaller` verifies a bearer token against the issuer, audience, and required scope. The replacement SCIM endpoints should preserve that model with a dedicated SCIM audience and scope.
 

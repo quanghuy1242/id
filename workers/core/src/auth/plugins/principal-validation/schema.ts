@@ -21,14 +21,6 @@ export const validateTeamInOrganizationPrincipalBody = z
   })
   .strict();
 
-export const validateServiceAccountForOrganizationPrincipalBody = z
-  .object({
-    clientId: z.string().min(1).meta({ description: "OAuth client ID / service-account principal ID" }),
-    organizationId: z.string().min(1).meta({ description: "Organization ID the client must be eligible for" }),
-    resource: z.url().meta({ description: "Public OAuth resource audience of the target resource API" }),
-  })
-  .strict();
-
 export const validateOrganizationAdministratorPrincipalBody = z
   .object({
     userId: z.string().min(1).meta({ description: "id user ID to validate" }),

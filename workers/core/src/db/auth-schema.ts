@@ -355,35 +355,6 @@ export const oauthResourceScope = sqliteTable(
   ],
 );
 
-export const oauthClientOrganizationGrant = sqliteTable(
-  "oauthClientOrganizationGrant",
-  {
-    id: text("id").primaryKey(),
-    clientId: text("clientId").notNull(),
-    organizationId: text("organizationId")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    resourceServerId: text("resourceServerId")
-      .notNull()
-      .references(() => resourceServer.id, { onDelete: "cascade" }),
-    allowedScopes: text("allowedScopes", { mode: "json" }).notNull(),
-    enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
-    createdBy: text("createdBy"),
-    updatedBy: text("updatedBy"),
-    createdAt: integer("createdAt").notNull(),
-    updatedAt: integer("updatedAt").notNull(),
-  },
-  (table) => [
-    index("oauthClientOrganizationGrant_clientId_idx").on(table.clientId),
-    index("oauthClientOrganizationGrant_organizationId_idx").on(
-      table.organizationId,
-    ),
-    index("oauthClientOrganizationGrant_resourceServerId_idx").on(
-      table.resourceServerId,
-    ),
-  ],
-);
-
 export const oauthClientResourceScope = sqliteTable(
   "oauthClientResourceScope",
   {
@@ -402,6 +373,10 @@ export const oauthClientResourceScope = sqliteTable(
   (table) => [
     index("oauthClientResourceScope_clientId_idx").on(table.clientId),
     index("oauthClientResourceScope_resourceServerId_idx").on(
+      table.resourceServerId,
+    ),
+    uniqueIndex("oauthClientResourceScope_client_resource_uidx").on(
+      table.clientId,
       table.resourceServerId,
     ),
   ],
@@ -440,7 +415,6 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
   resourceServers: many(resourceServer),
-  oauthClientOrganizationGrants: many(oauthClientOrganizationGrant),
 }));
 
 export const teamRelations = relations(team, ({ one, many }) => ({
@@ -554,7 +528,6 @@ export const resourceServerRelations = relations(
       references: [organization.id],
     }),
     oauthResourceScopes: many(oauthResourceScope),
-    oauthClientOrganizationGrants: many(oauthClientOrganizationGrant),
     oauthClientResourceScopes: many(oauthClientResourceScope),
   }),
 );
@@ -564,20 +537,6 @@ export const oauthResourceScopeRelations = relations(
   ({ one }) => ({
     resourceServer: one(resourceServer, {
       fields: [oauthResourceScope.resourceServerId],
-      references: [resourceServer.id],
-    }),
-  }),
-);
-
-export const oauthClientOrganizationGrantRelations = relations(
-  oauthClientOrganizationGrant,
-  ({ one }) => ({
-    organization: one(organization, {
-      fields: [oauthClientOrganizationGrant.organizationId],
-      references: [organization.id],
-    }),
-    resourceServer: one(resourceServer, {
-      fields: [oauthClientOrganizationGrant.resourceServerId],
       references: [resourceServer.id],
     }),
   }),

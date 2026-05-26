@@ -31,6 +31,5 @@ export type OAuthScopeCatalogPluginOptions = {
     adapter: unknown,
   ) => Promise<boolean>;
   readonly invalidateScopeCache?: () => Promise<void>;
-  readonly invalidateGrantCache?: (clientId: string) => Promise<void>;
   readonly invalidateClientResourceScopeCache?: (clientId: string) => Promise<void>;
 };

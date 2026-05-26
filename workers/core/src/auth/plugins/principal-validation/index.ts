@@ -3,14 +3,12 @@ import type { BetterAuthPlugin } from "better-auth";
 import {
   assertPrincipalValidationCaller,
   validateOrganizationAdministrator,
-  validateServiceAccountForOrganization,
   validateTeamInOrganization,
   validateUser,
   validateUserInOrganization,
 } from "./operations";
 import {
   validateOrganizationAdministratorPrincipalBody,
-  validateServiceAccountForOrganizationPrincipalBody,
   validateTeamInOrganizationPrincipalBody,
   validateUserInOrganizationPrincipalBody,
   validateUserPrincipalBody,
@@ -59,17 +57,17 @@ const validateTeamInOrgMeta = principalValidationEndpointMeta({
   requestSchema: validateTeamInOrganizationPrincipalBody,
 });
 
-const validateServiceAccountMeta = principalValidationEndpointMeta({
-  description: "Validate that an OAuth client is eligible for organization-scoped M2M access to the given resource API",
-  requestSchema: validateServiceAccountForOrganizationPrincipalBody,
-});
-
 const validateOrgAdminMeta = principalValidationEndpointMeta({
   description: "Validate that a user is a current Better Auth organization owner/admin",
   requestSchema: validateOrganizationAdministratorPrincipalBody,
 });
 
-/** Better Auth plugin that owns authenticated exact-ID identity-principal validation. */
+/**
+ * Better Auth plugin that owns authenticated exact-ID identity-principal validation
+ * for users, organization users, teams, and organization administrators. Doc 017 will
+ * replace these endpoints with a read-only SCIM profile; service-account validation has
+ * been removed in favour of doc 018's `oauthClientResourceScope` token-issuance enforcement.
+ */
 export const idPrincipalValidation = (options: PrincipalValidationPluginOptions): BetterAuthPlugin => ({
   id: "id-principal-validation",
   endpoints: {
@@ -99,21 +97,6 @@ export const idPrincipalValidation = (options: PrincipalValidationPluginOptions)
       async (ctx) => {
         const adapter = await assertCaller(ctx, options);
         await validateTeamInOrganization(adapter, ctx.body.teamId, ctx.body.organizationId);
-        return ctx.json({ valid: true });
-      },
-    ),
-
-    validateServiceAccountForOrganizationPrincipal: createAuthEndpoint(
-      "/principal-validation/service-accounts/validate-organization-grant",
-      { method: "POST", body: validateServiceAccountForOrganizationPrincipalBody, metadata: validateServiceAccountMeta },
-      async (ctx) => {
-        const adapter = await assertCaller(ctx, options);
-        await validateServiceAccountForOrganization(
-          adapter,
-          ctx.body.clientId,
-          ctx.body.organizationId,
-          ctx.body.resource,
-        );
         return ctx.json({ valid: true });
       },
     ),
