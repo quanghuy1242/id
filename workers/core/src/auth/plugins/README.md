@@ -15,7 +15,7 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | `id-resource-server` | `resource-server/` | Admin CRUD for resource-server records and audience cache invalidation |
 | `id-oauth-scope-catalog` | `oauth-scope-catalog/` | Admin CRUD for resource-server-bound OAuth scopes, layer-matched M2M resource-scope rows, and runtime scope/grant preload |
 | `id-oauth-m2m-bridge` | `oauth-m2m-bridge/` | M2M OAuth client identity mirror and immutable client-reference boundary required by the BA token hook contract |
-| `id-oauth-client-picker` | `oauth-client-picker/` | Scoped system-M2M read-only client metadata lookup with tenant-context isolation |
+| `id-oauth-client-picker` | `oauth-client-picker/` | Scoped system-M2M client metadata and advisory OAuth resource-eligibility lookup with tenant-context isolation |
 | `id-principal-validation` | `principal-validation/` | Authenticated exact-ID principal validation for downstream durable policy writes |
 
 ## File structure

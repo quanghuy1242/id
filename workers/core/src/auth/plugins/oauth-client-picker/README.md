@@ -1,8 +1,9 @@
 # `id-oauth-client-picker` plugin
 
-Read-only M2M wrapper around `oauthClient` rows. Doc 018 §5.3 D3 keeps Better
-Auth's RFC 7592-shaped `/oauth2/get-client` as the canonical client metadata
-shape; this plugin exposes the same data over an M2M-token-authenticated path
+Read-only M2M wrapper around `oauthClient` rows and their id-owned OAuth
+resource eligibility. Doc 018 §5.3 D3 keeps Better Auth's RFC 7592-shaped
+`/oauth2/get-client` as the canonical client metadata shape; this plugin
+exposes the same data over an M2M-token-authenticated path
 (`GET /api/auth/admin/oauth-clients/lookup`) so `content-api` and other resource
 servers can read a client by `client_id` without a user session.
 
@@ -20,6 +21,20 @@ The picker requires both `?client_id=...` and `?org_id=...`. It returns RFC
 7591-shaped public fields only, and `client_secret` is never returned. A
 `referenceId` mismatch, including an attempt to inspect a system-layer client,
 returns `404` (doc 018 §9 cross-org leak prevention).
+
+When `?resource=<audience>` is supplied, the response also returns advisory
+`resource_access: { resource, status }`, where status is:
+
+- `enabled` when this tenant client has an enabled `oauthClientResourceScope`
+  row for an enabled resource server registered under `org_id`;
+- `disabled` when that id-owned attachment or resource-server registration is
+  disabled;
+- `missing` when there is no eligible attachment, or when the resource is
+  absent or outside the requested tenant layer.
+
+This is a repository-specific operational read for picker display and
+reconciliation. It reports only OAuth issuance eligibility owned by `id`; it
+does not approve a Content IAM binding, role, denial, or resource policy.
 
 ## Deployment
 

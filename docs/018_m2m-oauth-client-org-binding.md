@@ -14,9 +14,21 @@
 > - `oauthClient.referenceId` is wired via BA `clientReference` and is enforced as immutable for `client_credentials` clients by a `hooks.before` guard on every BA `update-client` path.
 > - `oauthClientResourceScope` and `oauthResourceScope` enforce their logical unique pairs through plugin-owned internal natural-key fields declared with Better Auth-supported field uniqueness; API responses omit those storage keys. These are the repo-specific OAuth catalog objects.
 > - `customAccessTokenClaims` derives `org_id` from a DB lookup of `oauthClient.referenceId`; legacy `metadata.organization_id` is stripped during bridge writes and is never token authority. `metadata.id_client_id` remains as a single one-field mirror because Better Auth 1.6.11 does not pass the resolved oauth client (or `client_id`) to the hook for `client_credentials`; this is the only BA-limitation workaround that survives doc 018 D5 and is documented at the read/write site.
-> - The system scope catalog (`oauth:clients:read`) and id-audienced system resource server are first-class: `systemResourceServerAudience()` and `systemOAuthClientPickerScope` are exposed from `auth/config.ts`. The picker endpoint `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...` is implemented as a read-only M2M wrapper and never returns `client_secret`.
+> - The system scope catalog (`oauth:clients:read`) and id-audienced system resource server are first-class: `systemResourceServerAudience()` and `systemOAuthClientPickerScope` are exposed from `auth/config.ts`. The picker/reconciliation endpoint `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=...` is implemented as a read-only M2M wrapper, reports only `id`-owned OAuth eligibility, and never returns `client_secret`.
 > - D7 cross-layer invariants are enforced structurally and at token issuance: an infrastructure client (`referenceId IS NULL`) binds only to a system resource server, and a tenant client binds only to one in its organization. Runtime checks reject corrupted cross-layer rows as defense in depth.
 > - New tests: `oauth-client-ownership.test.ts`, `oauth-client-resource-scope.test.ts`, `m2m-token-issuance.test.ts`, `m2m-client-picker.test.ts`, `infra-m2m-client.test.ts`. Existing tests refactored against the new contract; SA-endpoint test now asserts the path is deleted (404).
+>
+> **Known issues / deviations from plan (A2):**
+>
+> 1. **Ordinary members excluded from client management.** The original plan (§7.1, §7.5 of `e226f49`) intended any organization member — not just owners/admins — to `create`, `read`, `list`, and `update` OAuth clients in their org. The A2 implementation narrowed `canManageOrganizationOAuthClients` (`workers/core/src/auth/plugins/oauth-scope-catalog/authorization-context.ts:67`) to `role === "owner" || role === "admin"`, blocking ordinary members from all actions.
+>
+>    This is not a blocking defect: a member-created client would be inert — `oauthClientResourceScope` rows and `metadata.id_client_id` mirror writes both require owner/admin authority (`hasOrganizationAccess` in `policies/access.ts`), so the client could not mint tokens without admin provisioning. No production data exists. Fix is localized: add `isOrganizationMember()` to `authorization-context.ts` and dispatch `delete`/`rotate` through `canManageOrganizationOAuthClients` while routing `create`/`read`/`list`/`update` through `isOrganizationMember` in `oauth-provider.ts` `clientPrivileges`. Gates 2-4 (`hasOrganizationAccess`, `oauthClientResourceScope`, `metadata.id_client_id`) must not be loosened.
+>
+> 2. **Doc internal inconsistency.** §7.1 says "owners/admins may create/read/list/update" while §7.5 and §4.4 Flow A still say "org member". Both diverge from the code (`owner || admin`). The three sections should be aligned to the same policy when issue 1 is resolved.
+>
+> 3. **No ordinary-member test.** `oauth-client-ownership.test.ts` tests only a user with `role='owner'`. An ordinary-member test covering create, read, list, update, cross-org isolation, and delete/rotate rejection is required before issue 1 can be closed.
+>
+> Revisit when: a product requirement for non-admin members to provision service accounts appears, the picker/listing/binding-attach interaction is security-reviewed, and `content-api` binding flows have shipped.
 >
 > Scope:
 >
@@ -130,7 +142,7 @@ content-api (resource API)
   Content IAM:
     - bindings stored with principal = { type: "service_account", id: <client_id> }
     - local attach authority (no synchronous call to id at bind time)
-    - picker UX calls id /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=... through a scoped M2M caller token
+    - picker/reconciliation calls id /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=... through a scoped M2M caller token; id returns only its OAuth eligibility status, never Content IAM authority
 
 Runtime:
   service account -> id /api/auth/oauth2/token (client_credentials, resource)
@@ -304,45 +316,48 @@ What is **not** in this table:
   iss, exp, iat
   ```
 
-- the picker / display call against `id`'s RFC-7592-shaped M2M wrapper `/admin/oauth-clients/lookup?client_id=...&org_id=...` for non-secret metadata when an admin attaches the principal to a binding.
+- the picker / reconciliation call against `id`'s RFC-7592-shaped M2M wrapper `/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=...` for non-secret metadata plus advisory OAuth resource eligibility when a resource API displays or reconciles a binding.
 
-The wrapper is a repository-specific authenticated projection required because the stock BA management endpoint is session-oriented. It preserves the RFC 7591 public-field shape and tenant isolation; the runtime access token path remains standard OAuth.
+The wrapper is a repository-specific authenticated projection required because the stock BA management endpoint is session-oriented and does not model this repository's `oauthClientResourceScope`. It preserves the RFC 7591 public-field shape and tenant isolation, and optionally returns `resource_access.status = enabled | disabled | missing` for the stated audience. It does not authorize a resource-API binding; the runtime access token path remains standard OAuth.
 
 ### 4.4 End-To-End M2M Flows
 
 #### Flow A - Create A Service Account For An Organization
 
 ```text
-admin (member of org_1) --(content-ui or id-admin-ui)--> id
+organization owner/admin (or platform admin) --(id admin surface)--> id
   POST /api/auth/oauth2/create-client
     body: { client_name: "Editorial Automation",
             grant_types: ["client_credentials"],
-            token_endpoint_auth_method: "client_secret_basic",
-            redirect_uris: [] }
-    session has activeOrganizationId = org_1
+            token_endpoint_auth_method: "client_secret_post",
+            redirect_uris: ["https://app.example/callback"],
+            scope: "books:read books:write" }
+    tenant-admin session has activeOrganizationId = org_1
 
-BA:
-  - clientPrivileges allows action="create" for org member
-    (after RBAC is broadened from platform-admin-only to org-member-can-create)
-  - clientReference returns "org_1"
+id / Better Auth:
+  - clientPrivileges permits an org owner/admin in active org_1
+    (platform admin retains system administration authority)
+  - clientReference writes referenceId = "org_1"
   - row written:
       oauthClient { clientId, clientSecret, referenceId="org_1",
-                    grantTypes=["client_credentials"], scopes=null|chosen, ... }
-  - response includes client_secret exactly once
-```
+                    grantTypes=["client_credentials"], ... }
+  - response includes client_secret only on creation
 
-The admin then attaches resource-scope subsets:
-
-```text
-admin --(id-admin-ui or content-api admin)--> id
-  POST /api/auth/oauth-client-resource-scope
-    body: { client_id, resource_server_id, allowed_scopes: ["books:read", "books:write"] }
+organization owner/admin (or platform admin) --> id
+  POST /api/auth/admin/oauth-client-resource-scopes
+    body: { clientId: "client_xyz",
+            resourceServerId: "rs_content",
+            allowedScopes: ["books:read", "books:write"] }
 
 id:
-  - assertCallerOwnsClient: client.referenceId must match caller's activeOrganizationId
-    (or caller is platform admin)
-  - asserts allowed_scopes ⊆ oauthResourceScope rows for resource_server_id
-  - upserts oauthClientResourceScope row
+  - loads oauthClient and resourceServer
+  - requires client.referenceId == resourceServer.organizationId == "org_1"
+    (or matches the separate platform-managed system layer)
+  - asserts allowedScopes are declared, enabled oauthResourceScope rows for rs_content
+  - creates one oauthClientResourceScope(client_xyz, rs_content) row;
+    later enable/scope-subset changes use PATCH /api/auth/admin/oauth-client-resource-scopes/:id
+  - writes metadata.id_client_id only as the documented Better Auth hook bridge;
+    referenceId remains the sole organization authority
 ```
 
 #### Flow B - Service Account Obtains And Uses A Token
@@ -355,9 +370,10 @@ service-account holder --> id  POST /api/auth/oauth2/token
   resource=https://content-api.example
   scope=books:read books:write
 
-id (in customAccessTokenClaims when user is undefined):
-  - resolve client by client_id
-  - org_id = client.referenceId  (no metadata lookup)
+id (after Better Auth authenticates the client secret):
+  - Better Auth 1.6.11 supplies metadata.id_client_id to customAccessTokenClaims;
+    id uses that documented bridge to load oauthClient
+  - org_id = oauthClient.referenceId; metadata never supplies organization authority
   - resource_server = resolve by aud
   - assert oauthClientResourceScope(client_xyz, resource_server) exists and is enabled
   - assert requested scope ⊆ oauthClientResourceScope.allowed_scopes
@@ -384,14 +400,23 @@ admin --(content-ui)--> content-api  POST /policy-bindings
 content-api:
   1. ServiceAccountAttachmentPolicy.assertCanAttach(actor, ...)
        local-only check: admin has org.manage_bindings or service_account.attach for org_1
-  2. Picker UX (optional, not correctness-critical):
-       content-api -> id  GET /api/auth/admin/oauth-clients/lookup?client_id=client_xyz&org_id=org_1
+  2. Picker/reconciliation display (optional for the binding write):
+       content-api -> id
+         GET /api/auth/admin/oauth-clients/lookup
+             ?client_id=client_xyz&org_id=org_1&resource=https://content-api.example
        authorize with id M2M caller scope oauth:clients:read
-       returns RFC 7592-shaped fields; never secrets
-       reject save if client.referenceId !== org_1
+       id returns 404 if client.referenceId !== org_1; never returns secrets
+       if found, response contains:
+         resource_access = { resource: "https://content-api.example",
+                             status: "enabled" | "disabled" | "missing" }
+       this status reports id-owned OAuth token eligibility only;
+       it does not grant or deny a Content IAM binding
   3. Persist binding row with principal_id = client_xyz (opaque)
 
-No call to id at bind time other than the picker. Token-issuance is the only place id enforces (client, org, resource) eligibility.
+No call to id is required to authorize the binding write: content-api owns that
+policy. If it performs the lookup, the call is an advisory identity/OAuth
+eligibility read. Token issuance remains id's authoritative enforcement point
+for whether this client can use OAuth scopes at this audience.
 ```
 
 #### Flow D - Grant Disabled, Re-Enabled, Or Client Reassigned
@@ -405,9 +430,15 @@ Immediate:
 
 Long-term (content-api):
   reconciliation sweep:
-    GET id /api/auth/admin/oauth-clients/lookup?client_id=client_xyz&org_id=org_1 -> ok|404|disabled
-    cross-check client.referenceId against binding.org_id
-    surface mismatches/disabled bindings to operators; do not auto-delete
+    GET id /api/auth/admin/oauth-clients/lookup
+        ?client_id=client_xyz&org_id=org_1&resource=https://content-api.example
+    - 404: client absent or outside org_1 -> mark binding inert finding
+    - response.disabled = true: OAuth client disabled -> mark binding inert finding
+    - resource_access.status = "disabled" | "missing": token use is not
+      currently eligible at content-api -> mark binding inert finding
+    - resource_access.status = "enabled": id-side OAuth eligibility exists;
+      content-api still decides local binding policy and authorization
+    surface findings to operators; do not auto-delete
 
 Re-enable later:
   binding becomes live again on next successful token use.
@@ -425,7 +456,7 @@ OAuth `client` is a role in the standard, not a class of entity. The same `oauth
 **Layer 2 - Infrastructure M2M client (RS↔AS plumbing).** A resource server (or any other internal system) authenticating *as itself* to `id`. Used for:
 
 - `content-api` calling `id` SCIM endpoints (per doc 017) to resolve users, teams, and admins.
-- `content-api` calling `id`'s `/admin/oauth-clients/lookup` wrapper for picker UX (per §5.3 / §7.4).
+- `content-api` calling `id`'s `/admin/oauth-clients/lookup` wrapper for optional picker display and reconciliation of `id`-owned OAuth eligibility (per §5.3 / §7.4).
 - A future identity event consumer admin surface, RFC 7662 introspection callbacks, or any other RS-initiated call to `id`.
 
 Both layers use the same OAuth `client_credentials` grant, the same `oauthClient` row shape, and the same BA token endpoint. They differ only in metadata, ownership, and authorization rules:
@@ -462,7 +493,7 @@ Important note on when an infra client is *not* needed:
 System scope catalog (current release):
 
 ```text
-oauth:clients:read     -- A2 / §5.3 / §7.4: read non-secret client metadata for picker
+oauth:clients:read     -- A2 / §5.3 / §7.4: read non-secret client metadata and advisory OAuth eligibility for picker/reconciliation
 scim:read              -- A3 planned: SCIM Users/Groups read & filter
 ```
 
@@ -496,15 +527,16 @@ scim:read              -- A3 planned: SCIM Users/Groups read & filter
 
 ### 5.3 D3 - Expose RFC-7592-Shaped Client Metadata For Picker Use
 
-**Decision**: For picker UX and bind-time existence display, `content-api` calls `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...` through an `id` M2M caller token. This thin repository-specific wrapper returns only the stock public client metadata shape because Better Auth's stock management read is session-authenticated rather than system-M2M-authenticated.
+**Decision**: For optional picker display and scheduled reconciliation, `content-api` calls `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<content-api-audience>` through an `id` M2M caller token. Omitting `resource` remains valid for metadata-only consumers. This thin repository-specific wrapper returns the stock public client metadata shape plus advisory `resource_access.status = enabled | disabled | missing` when an audience is supplied, because Better Auth's stock management read is session-authenticated and does not expose this repository's `oauthClientResourceScope`.
 
-**Classification**: Repository-specific authentication bridge returning an RFC 7592-shaped public projection. Runtime service-account access continues to use standard OAuth `client_credentials`.
+**Classification**: Repository-specific operational read projection returning RFC 7592-shaped public metadata plus `id`-owned OAuth issuance eligibility. It is not OAuth authorization and does not replace resource-API authorization. Runtime service-account access continues to use standard OAuth `client_credentials`.
 
 **Reasoning**:
 
 - The wrapper returns RFC 7591 public client metadata fields and never returns client secrets.
 - It requires an explicit `org_id` and compares it with `oauthClient.referenceId`; mismatches return `404`, including attempts to read infrastructure clients.
-- The bridge exists only for system-M2M authentication of picker metadata, not as a replacement client-management API.
+- With `resource`, it reads only tenant-matched `resourceServer` and `oauthClientResourceScope` rows owned by `id`; absent, disabled, system-layer, or outside-tenant eligibility is reported without exposing unrelated registrations.
+- The bridge exists only for system-M2M retrieval of metadata and advisory OAuth eligibility, not as a replacement client-management API or as authorization to create, retain, or deny a `content-api` binding.
 
 The caller is authorized under dedicated system audience and scope `oauth:clients:read`.
 
@@ -597,7 +629,7 @@ Phase 1 - id schema and wiring
   add oauthClientResourceScope table
   wire clientReference in oauth-provider.ts
   remove metadata.organization_id authority; retain documented metadata.id_client_id BA hook bridge
-  add /api/auth/oauth-client-resource-scope endpoints (CRUD scoped by org)
+  add /api/auth/admin/oauth-client-resource-scopes endpoints (CRUD scoped by org)
   declare oauth:clients:read as an oauthResourceScope row for id; A3 later adds scim:read
   enforce D7 invariants on resource-scope writes + customAccessTokenClaims M2M branch
   seed the content-api infrastructure M2M client (referenceId = null)
@@ -609,7 +641,7 @@ Phase 2 - id clean-slate cutover
 
 Phase 3 - content-api adoption
   add ServiceAccountAttachmentPolicy
-  add OAuthClientDirectory adapter calling /admin/oauth-clients/lookup with org_id
+  add OAuthClientDirectory adapter calling /admin/oauth-clients/lookup with org_id and resource for advisory OAuth eligibility
   remove validateServiceAccountForOrganization call sites
   add scheduled inert-binding reconciliation
 
@@ -629,7 +661,7 @@ Rollback constraints:
 
 ### 7.1 Wire Up `clientReference` In `oauth-provider.ts`
 
-Current problem:
+Baseline problem corrected in A2:
 
 - [workers/core/src/auth/oauth-provider.ts](../workers/core/src/auth/oauth-provider.ts) passes no `clientReference`. BA falls back to `userId` ownership, which is wrong for org-owned service accounts.
 
@@ -645,12 +677,12 @@ Implementation tasks:
 
 Tests:
 
-- `workers/core/tests/auth/oauth-client-ownership.test.ts` (new): an org member can create, read, update, and list only clients of their own org; cannot see another org's clients.
+- `workers/core/tests/auth/oauth-client-ownership.test.ts` (new): an organization owner/admin can create, read, update, and list only clients of their own org; cannot see another org's clients.
 - `pnpm lint` and `pnpm test`.
 
 ### 7.2 Replace The Grant Table With `oauthClientResourceScope`
 
-Current problem:
+Baseline problem corrected in A2:
 
 - `oauthClientOrganizationGrant` carries `organizationId` (duplicating `referenceId`) and is many-to-many.
 
@@ -671,7 +703,7 @@ Tests:
 
 ### 7.3 Migrate Token-Issuance Enforcement
 
-Current problem:
+Baseline problem corrected in A2:
 
 - The baseline implementation read `metadata.organization_id` and called `assertClientOrganizationGrant`; organization authority must instead come from `oauthClient.referenceId` and `oauthClientResourceScope`.
 
@@ -692,34 +724,35 @@ Tests:
 
 ### 7.4 Expose BA Client Read For Picker UX
 
-Current problem:
+Baseline problem corrected in A2:
 
 - `content-api` has no clean way to read non-secret client metadata from `id`. The `principal-validation` service-account endpoint conflates existence, eligibility, and ownership in a non-standard shape.
 
 Target behavior:
 
-- `content-api` calls `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...` with an `id` M2M token whose audience is the id-system resource server and whose scope is `oauth:clients:read`. The wrapper enforces tenant isolation by `referenceId`.
+- For picker display or reconciliation, `content-api` calls `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<content-api-audience>` with an `id` M2M token whose audience is the id-system resource server and whose scope is `oauth:clients:read`. The wrapper enforces tenant isolation by `referenceId` and returns advisory `id`-owned OAuth resource eligibility; it does not authorize a Content IAM binding.
 
 Implementation tasks:
 
 - [x] Define an `id`-side resource server entry for the M2M caller token used by `content-api`.
-- [x] Implement a thin wrapper endpoint requiring `org_id`, returning public metadata only, and returning `404` when `oauthClient.referenceId` does not match.
+- [x] Implement a thin wrapper endpoint requiring `org_id`, returning public metadata with optional `resource_access` when `resource` is supplied, and returning `404` when `oauthClient.referenceId` does not match.
+- [x] Resolve `resource_access` only against a resource server owned by the requested tenant; report other-tenant and system-layer registrations as `missing`.
 - [x] Document the scope, audience, and intended caller in `workers/core/src/auth/plugins/oauth-client-picker/README.md`.
 
 Tests:
 
-- `workers/core/tests/auth/m2m-client-picker.test.ts` (new): an M2M caller with `oauth:clients:read` can read non-secret client metadata; never receives `client_secret`; cannot read clients owned by a different org context.
+- `workers/core/tests/auth/m2m-client-picker.test.ts` (new): an M2M caller with `oauth:clients:read` can read non-secret client metadata and enabled/disabled/missing resource eligibility; never receives `client_secret`; cannot read clients or expose resource registrations owned by a different org context.
 
 ### 7.5 Apply `clientPrivileges` And RBAC
 
-Current problem:
+Baseline problem corrected in A2:
 
 - `clientPrivileges` currently only allows the platform-admin role for all actions ([workers/core/src/auth/oauth-provider.ts:100-104](../workers/core/src/auth/oauth-provider.ts#L100-L104)). Org admins cannot create service accounts for their own org.
 
 Target behavior:
 
 - `clientPrivileges` permits:
-  - `create`, `read`, `list`, `update`: org member with `org.manage_oauth_clients` (or whatever local authority is appropriate per the BA org plugin's role model).
+  - `create`, `read`, `list`, `update`: organization owner/admin in the active organization.
   - `rotate`: org admin only.
   - `delete`: org admin only.
   - Platform admin: all actions.
@@ -742,14 +775,14 @@ Current problem:
 
 Target behavior:
 
-- Local `ServiceAccountAttachmentPolicy` enforces attach authority; `OAuthClientDirectory` calls `id`'s `/admin/oauth-clients/lookup` wrapper for picker UX; binding writes do not call `id` synchronously.
+- Local `ServiceAccountAttachmentPolicy` enforces attach authority; `OAuthClientDirectory` calls `id`'s `/admin/oauth-clients/lookup` wrapper with `resource` for optional display and scheduled reconciliation of OAuth eligibility; binding writes do not call `id` synchronously.
 
 Implementation tasks:
 
 - [ ] Add `src/domain/iam/service-account-attachment-policy.ts` in `content-api` with `assertCanAttach({ actor, clientId, orgId, resource })` checking local authority.
-- [ ] Add `src/infrastructure/identity/oauth-client-directory.ts` calling `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...` with the SCIM/M2M caller token.
+- [ ] Add `src/infrastructure/identity/oauth-client-directory.ts` calling `GET /api/auth/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<content-api-audience>` with the SCIM/M2M caller token for optional display/reconciliation.
 - [ ] Remove `validateServiceAccountForOrganization` calls from `CreatePolicyBindingUseCase`, `CreatePolicyDenialUseCase`, and any other use case currently using it.
-- [ ] Add reconciliation in `content-api`: a scheduled job iterating service-account bindings, calling `/admin/oauth-clients/lookup`, recording missing/disabled/mismatched client findings.
+- [ ] Add reconciliation in `content-api`: a scheduled job iterating service-account bindings, calling `/admin/oauth-clients/lookup` with its audience as `resource`, recording missing/disabled/mismatched client or OAuth-eligibility findings without changing local binding policy.
 
 Tests:
 
@@ -812,7 +845,7 @@ Rollout sequence:
 
 3. **Deploy `id` A2** with `clientReference`, layer-matched resource-scope writes, `oauth:clients:read`, the system-M2M picker wrapper, and token issuance based on `referenceId` plus the documented `metadata.id_client_id` Better Auth bridge.
 
-4. **Deploy A3/A4 consumers together with their required system scopes and credentials**. `content-api` must use `/admin/oauth-clients/lookup?client_id=...&org_id=...` and no longer call the removed service-account branch.
+4. **Deploy A3/A4 consumers together with their required system scopes and credentials**. For picker/reconciliation reads, `content-api` must use `/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<content-api-audience>` and no longer call the removed service-account branch. Its local binding policy remains authoritative for binding writes.
 
 5. **A5 remains later work**: remove the remaining user/team/admin principal-validation surface only after A4 is complete and the deprecation window in doc 017 §10 has elapsed.
 
@@ -833,6 +866,8 @@ Env and config changes:
 | Admin creates an OAuth client outside of an organization context | Allowed only via the platform-admin path; row stores `referenceId` only when explicitly provided. Without `referenceId`, the client cannot mint M2M tokens with `org_id`. |
 | `/admin/oauth-clients/lookup` called without `org_id` | Return `400`; the M2M caller must always state the tenant lookup context. |
 | `/admin/oauth-clients/lookup` called for a client outside `org_id` | Return `404` rather than leak the existence of the client. |
+| `/admin/oauth-clients/lookup` called with `resource` for an absent, system-layer, or another tenant's resource server | Return metadata with `resource_access.status = "missing"` rather than expose registrations outside the stated tenant context. |
+| `/admin/oauth-clients/lookup` called with `resource` whose tenant resource-scope attachment or resource server is disabled | Return metadata with `resource_access.status = "disabled"`; `content-api` may surface an inert finding but remains owner of its binding policy. |
 | `content-api` reconciliation sees client deleted at `id` | Mark binding inert; surface to operator; do not auto-delete. Matches doc 017 §11 inert-binding policy. |
 | `oauthClient.referenceId` becomes orphaned because the organization is deleted | Cascade per BA's existing org-plugin cascade for `member`/`team`; this doc does not modify cascade behavior. Existing tokens valid until exp; reconciliation flags affected bindings. |
 | `oauthClientResourceScope` row for a deleted resource server | Detected at token issuance (resource server resolution fails first). Periodic cleanup deletes orphaned rows. |
@@ -944,14 +979,16 @@ Tests:
 
 Scope:
 
-- [workers/core/src/auth/oauth-provider.ts](../workers/core/src/auth/oauth-provider.ts)
-- `workers/core/src/auth/plugins/oauth-scope-catalog/README.md` (or new plugin README)
+- [workers/core/src/auth/plugins/oauth-client-picker/index.ts](../workers/core/src/auth/plugins/oauth-client-picker/index.ts)
+- [workers/core/src/auth/plugins/oauth-client-picker/operations.ts](../workers/core/src/auth/plugins/oauth-client-picker/operations.ts)
+- [workers/core/src/auth/plugins/oauth-client-picker/README.md](../workers/core/src/auth/plugins/oauth-client-picker/README.md)
 - `workers/core/tests/auth/m2m-client-picker.test.ts`
 
 Tasks:
 
 - [x] Define audience and scope for the new M2M caller path against `/admin/oauth-clients/lookup`.
 - [x] Implement the bridge that lets a caller with `oauth:clients:read` read by `client_id` while still enforcing the caller's intended org context (either via BA hook if available, or a thin wrapper endpoint - record the chosen approach in the plugin README).
+- [x] Support optional `resource` and report only tenant-isolated `id`-owned OAuth eligibility as `resource_access.status`, without authorizing resource-client bindings.
 - [x] Document the contract for consumer integrations.
 
 Acceptance criteria:
@@ -960,6 +997,7 @@ Acceptance criteria:
 - Caller never receives `client_secret`.
 - Calls missing the required `org_id` context return `400`.
 - Cross-org reads return `404`.
+- A `resource` query reports `enabled`, `disabled`, or `missing` from `id`'s tenant-isolated OAuth tables; another tenant's or system-layer registration is not exposed.
 
 Tests:
 
@@ -978,13 +1016,14 @@ Scope:
 Tasks:
 
 - [ ] Add `ServiceAccountAttachmentPolicy`.
-- [ ] Add `OAuthClientDirectory` calling `id`'s `/admin/oauth-clients/lookup?client_id=...&org_id=...`.
+- [ ] Add `OAuthClientDirectory` calling `id`'s `/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<content-api-audience>` for optional display and reconciliation.
 - [ ] Remove `validateServiceAccountForOrganization` calls from use cases.
-- [ ] Add scheduled reconciliation surfacing inert / `referenceId`-mismatched bindings.
+- [ ] Add scheduled reconciliation surfacing inert / `referenceId`-mismatched / OAuth-ineligible bindings, while retaining `content-api` authority over binding policy.
 
 Acceptance criteria:
 
 - No use case calls `principal-validation` service-account endpoint.
+- `OAuthClientDirectory` treats `resource_access` only as picker/reconciliation input; `ServiceAccountAttachmentPolicy` remains the authority for binding writes.
 - Reconciliation report visible to operators.
 
 Tests:
@@ -1012,7 +1051,7 @@ Tasks:
 
 Acceptance criteria:
 
-- `content-api` calls `id`'s `/admin/oauth-clients/lookup` (§7.4), and later A3 SCIM endpoints, using a token minted from the infra client.
+- `content-api` calls `id`'s `/admin/oauth-clients/lookup` with its `resource` audience for optional display/reconciliation (§7.4), and later A3 SCIM endpoints, using a token minted from the infra client.
 - D7 invariants verified by unit tests (see §7.7).
 - Org admin UI listings exclude `referenceId IS NULL` rows.
 
@@ -1063,7 +1102,7 @@ This document is complete when:
 - `oauthClientResourceScope` exists with unique `(clientId, resourceServerId)` and replaces `oauthClientOrganizationGrant`.
 - `customAccessTokenClaims` derives organization authority only from `referenceId`; its documented `metadata.id_client_id` bridge exists only because the Better Auth 1.6.11 hook does not expose `client_id`.
 - `content-api` binding paths call no `id` synchronous validation endpoint for service accounts.
-- Picker UX uses `/admin/oauth-clients/lookup?client_id=...&org_id=...` via a scoped system-M2M caller.
+- Picker/reconciliation uses `/admin/oauth-clients/lookup?client_id=...&org_id=...&resource=<audience>` via a scoped system-M2M caller for advisory `id` OAuth eligibility only; `content-api` owns binding authority.
 - A `content-api` infrastructure M2M client (`referenceId IS NULL`) is provisioned, and the system scope catalog is declared as `oauthResourceScope` rows owned by `id` as its consuming APIs land (`oauth:clients:read` in A2 and `scim:read` in A3).
 - D7 invariants are enforced: infra clients cannot obtain tenant-resource scopes; tenant clients cannot obtain system scopes.
 - `oauthClientOrganizationGrant` and the service-account branch of `principal-validation` are deleted; `grants.ts` implements only `oauthClientResourceScope`.
@@ -1099,14 +1138,16 @@ content-api
   Local:
     - ServiceAccountAttachmentPolicy (admin authority to attach)
     - bindings store opaque principal_id = client_id
-    - scheduled reconciliation surfaces inert / mismatched bindings
+    - scheduled reconciliation uses advisory OAuth eligibility and surfaces inert /
+      mismatched bindings without delegating Content IAM authority to id
 
   Acts as RS for tenant tokens:
     - validates JWTs locally via id's JWKS (no infra-client call needed)
 
   Acts as OAuth client when calling id:
     - infrastructure M2M client (referenceId = NULL) in id
-    - GET /admin/oauth-clients/lookup?client_id=...&org_id=... for picker (scope oauth:clients:read)
+    - GET /admin/oauth-clients/lookup?client_id=...&org_id=...&resource=...
+        for picker/reconciliation (scope oauth:clients:read; advisory OAuth eligibility only)
     - SCIM Users/Groups reads (scope scim:read, per doc 017)
     - POST /oauth2/token at runtime to mint the above caller tokens
 
@@ -1122,3 +1163,83 @@ Infrastructure M2M client
 ```
 
 The legacy organization-grant and service-account-validation surfaces disappear. What remains is one small projection table (`oauthClientResourceScope`) that BA does not natively model, the system scope catalog of `oauthResourceScope` rows for `id`-audienced calls, BA's stock OAuth client surface, and the narrowly documented `metadata.id_client_id` bridge required at Better Auth 1.6.11 token-hook time.
+
+## 14. Appendix: Opus prompting to correct limitation
+
+````
+You are reviewing the A2 M2M correction in `/home/quanghuy1242/pjs/auth`, commits `f5cd7ad`, `b21324e`, `2dde3be`. I found 3 issues. You do NOT need to fix them — they are deferred known issues. You need to understand and document them.
+
+## CONTEXT
+
+The original plan (`e226f49`, doc 018 §7.1 & §7.5) specified this policy for OAuth client management:
+
+| Action | Who |
+|---|---|
+| create, read, list, update | ANY org member |
+| delete, rotate | org owner/admin only |
+| all actions | platform admin |
+
+The A2 implementation narrowed this to `owner || admin` for ALL actions and partially rewrote the doc to match the broken code instead of flagging the regression.
+
+## WHAT WENT WRONG — THE 3 ISSUES
+
+### Issue 1: Ordinary members blocked from client management
+
+- **Where**: `workers/core/src/auth/plugins/oauth-scope-catalog/authorization-context.ts:67`
+- **Current**: `canManageOrganizationOAuthClients()` returns true only for `role === "owner" || role === "admin"`
+- **Planned**: Any org member (membership row exists) for create/read/list/update
+- **Why not blocking**: A member-created client is inert — `oauthClientResourceScope` rows (required for token issuance) and the `metadata.id_client_id` mirror write are both gated by `hasOrganizationAccess()` in `policies/access.ts`, which requires owner/admin. No prod data. The four-gate security chain holds even with gate 1 opened.
+- **Fix locations** (when revisited):
+  1. `authorization-context.ts` — add `isOrganizationMember()` (check member row exists, don't check role)
+  2. `oauth-provider.ts:113-122` `clientPrivileges` — dispatch `delete`/`rotate` → `canManageOrganizationOAuthClients`, everything else → `isOrganizationMember()`
+  3. Gates 2-4 must NOT be loosened when gate 1 opens
+
+### Issue 2: Doc internal inconsistency
+
+- **Where**: doc 018 §7.1 says "owners/admins may create/read/list/update" while §7.5 and §4.4 Flow A still say "org member"
+- **Root cause**: §7.1 was rewritten in `b21324e` to match the narrowed code; §7.5 and §4.4 were missed in the rewrite
+- **None of them match the code** right now (`owner || admin`)
+- **Fix**: Align all three to the same policy when Issue 1 is resolved
+
+### Issue 3: No ordinary-member test
+
+- **Where**: `workers/core/tests/auth/oauth-client-ownership.test.ts` (~line 45-88)
+- **Current**: Only tests a user with `role='owner'`
+- **Needed**: A test with ordinary membership (no role or `role='member'`) covering: create → 200, read → 200, list → 200, update → 200, delete → 403, cross-org read → 403/404
+- **Existing fixtures**: `m2m-helpers.ts` has `createTestEnv()` and `bootstrapAdmin()` — use same pattern, insert `member` row with no role or `role='member'`
+
+## THE FOUR-GATE SECURITY CHAIN (for your understanding)
+
+```
+Gate 1: clientPrivileges (oauth-provider.ts)     ← this is where the narrowing lives
+        → canManageOrganizationOAuthClients()    ← owner||admin (should be member for CRUD)
+
+Gate 2: authorize() in idResourceServer +        ← policies/access.ts: hasOrganizationAccess()
+        idOAuthScopeCatalog plugins              ← owner||admin ONLY. Correct, no change.
+
+Gate 3: oauthClientResourceScope rows            ← checked in customAccessTokenClaims
+        (clientId, resourceServerId, scopes)     ← token issuance fails without a row
+
+Gate 4: metadata.id_client_id mirror             ← written ONLY by ensureOAuthClientIdentityMirror()
+                                                  at Gate 2 time (admin-only)
+```
+
+## VERIFICATION (for when this is revisited, not now)
+
+- `pnpm lint` must be clean
+- `pnpm vitest run workers/core/tests/auth/oauth-client-ownership.test.ts`
+- `pnpm test` full suite
+
+## WHAT NOT TO CHANGE
+
+- `customAccessTokenClaims` — M2M token issuance is correct
+- D7 invariants — infra vs tenant layer enforcement is correct
+- `policies/access.ts` — `hasOrganizationAccess` stays owner||admin
+- `oauth-provider.ts` lines 123-172 — M2M token issuance branch is untouched
+- The picker endpoint, infra client model, resource-scope CRUD — all correct
+- Any plugin other than the oauth-scope-catalog authorization context
+
+## THE META-RULE
+
+The policy narrowing happened because an LLM defaulted to "admin-only RBAC" as the safe answer and rewrote the doc to match. Do NOT do that. When you see a doc that says one thing and code that says another, flag it — don't silently reconcile them in either direction without explicit acceptance.
+````
