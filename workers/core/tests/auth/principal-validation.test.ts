@@ -180,7 +180,7 @@ describe("principal validation API", () => {
       `insert into "team" ("id", "name", "organizationId", "createdAt", "updatedAt") values ('team_other', 'Other', 'org_other', 1700000000000, 1700000000000);`,
     );
 
-    await createResourceScope(
+    const validationResourceServerId = await createResourceScope(
       app,
       env,
       cookie,
@@ -198,6 +198,21 @@ describe("principal validation API", () => {
     );
 
     const integrationClient = await createM2mClient(app, env, cookie, authPluginConfig.principalValidationScope);
+    raw.exec(`update "oauthClient" set "referenceId" = 'org_content' where "clientId" = '${integrationClient.clientId}';`);
+    const validationGrant = await app.request(
+      "/api/auth/admin/oauth-client-resource-scopes",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          clientId: integrationClient.clientId,
+          resourceServerId: validationResourceServerId,
+          allowedScopes: [authPluginConfig.principalValidationScope],
+        }),
+      },
+      env,
+    );
+    expect(validationGrant.status).toBe(200);
     const validationToken = await issueM2mToken(
       app,
       env,
@@ -207,14 +222,14 @@ describe("principal validation API", () => {
     );
 
     const targetClient = await createM2mClient(app, env, cookie, "content:write");
+    raw.exec(`update "oauthClient" set "referenceId" = 'org_content' where "clientId" = '${targetClient.clientId}';`);
     const grant = await app.request(
-      "/api/auth/admin/oauth-client-organization-grants",
+      "/api/auth/admin/oauth-client-resource-scopes",
       {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
         body: JSON.stringify({
           clientId: targetClient.clientId,
-          organizationId: "org_content",
           resourceServerId: contentResourceServerId,
           allowedScopes: ["content:write"],
         }),
@@ -307,11 +322,9 @@ describe("principal validation API", () => {
     expect(wrongAudience.status).toBe(401);
 
     const orgScopedClient = await createM2mClient(app, env, cookie, "content:write", {
-      metadata: { organization_id: "org_content" },
+      client_name: "Legacy Grant Client",
     });
-    raw.exec(
-      `update "oauthClient" set "metadata" = '{"id_client_id":"${orgScopedClient.clientId}","organization_id":"org_content"}' where "clientId" = '${orgScopedClient.clientId}';`,
-    );
+    raw.exec(`update "oauthClient" set "referenceId" = 'org_content' where "clientId" = '${orgScopedClient.clientId}';`);
     const orgScopedGrant = await app.request(
       "/api/auth/admin/oauth-client-organization-grants",
       {

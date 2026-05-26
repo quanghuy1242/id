@@ -113,6 +113,40 @@ export const organization = sqliteTable(
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );
 
+export const team = sqliteTable(
+  "team",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$onUpdate(
+      () => /* @__PURE__ */ new Date(),
+    ),
+  },
+  (table) => [index("team_organizationId_idx").on(table.organizationId)],
+);
+
+export const teamMember = sqliteTable(
+  "teamMember",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("teamId")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    index("teamMember_teamId_idx").on(table.teamId),
+    index("teamMember_userId_idx").on(table.userId),
+  ],
+);
+
 export const member = sqliteTable(
   "member",
   {
@@ -141,12 +175,12 @@ export const invitation = sqliteTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     role: text("role"),
+    teamId: text("teamId"),
     status: text("status").default("pending").notNull(),
     expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),
-    teamId: text("teamId"),
     inviterId: text("inviterId")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -277,53 +311,27 @@ export const oauthConsent = sqliteTable(
   ],
 );
 
-export const resourceServer = sqliteTable("resourceServer", {
-  id: text("id").primaryKey(),
-  organizationId: text("organizationId")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  slug: text("slug").notNull(),
-  name: text("name").notNull(),
-  audience: text("audience").notNull().unique(),
-  description: text("description"),
-  enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
-  createdBy: text("createdBy"),
-  updatedBy: text("updatedBy"),
-  disabledAt: integer("disabledAt"),
-  disabledBy: text("disabledBy"),
-  createdAt: integer("createdAt").notNull(),
-  updatedAt: integer("updatedAt").notNull(),
-});
-
-export const team = sqliteTable(
-  "team",
+export const resourceServer = sqliteTable(
+  "resourceServer",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organizationId").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    slug: text("slug").notNull(),
     name: text("name").notNull(),
-    organizationId: text("organizationId")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }),
-  },
-  (table) => [index("team_organizationId_idx").on(table.organizationId)],
-);
-
-export const teamMember = sqliteTable(
-  "teamMember",
-  {
-    id: text("id").primaryKey(),
-    teamId: text("teamId")
-      .notNull()
-      .references(() => team.id, { onDelete: "cascade" }),
-    userId: text("userId")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }),
+    audience: text("audience").notNull().unique(),
+    description: text("description"),
+    enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
+    createdBy: text("createdBy"),
+    updatedBy: text("updatedBy"),
+    disabledAt: integer("disabledAt"),
+    disabledBy: text("disabledBy"),
+    createdAt: integer("createdAt").notNull(),
+    updatedAt: integer("updatedAt").notNull(),
   },
   (table) => [
-    index("teamMember_teamId_idx").on(table.teamId),
-    index("teamMember_userId_idx").on(table.userId),
+    index("resourceServer_organizationId_idx").on(table.organizationId),
   ],
 );
 
@@ -344,7 +352,6 @@ export const oauthResourceScope = sqliteTable(
   },
   (table) => [
     index("oauthResourceScope_resourceServerId_idx").on(table.resourceServerId),
-    uniqueIndex("oauthResourceScope_resourceServerId_scope_uidx").on(table.resourceServerId, table.scope),
   ],
 );
 
@@ -368,9 +375,33 @@ export const oauthClientOrganizationGrant = sqliteTable(
   },
   (table) => [
     index("oauthClientOrganizationGrant_clientId_idx").on(table.clientId),
-    uniqueIndex("oauthClientOrganizationGrant_client_org_resource_uidx").on(
-      table.clientId,
+    index("oauthClientOrganizationGrant_organizationId_idx").on(
       table.organizationId,
+    ),
+    index("oauthClientOrganizationGrant_resourceServerId_idx").on(
+      table.resourceServerId,
+    ),
+  ],
+);
+
+export const oauthClientResourceScope = sqliteTable(
+  "oauthClientResourceScope",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("clientId").notNull(),
+    resourceServerId: text("resourceServerId")
+      .notNull()
+      .references(() => resourceServer.id, { onDelete: "cascade" }),
+    allowedScopes: text("allowedScopes", { mode: "json" }).notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
+    createdBy: text("createdBy"),
+    updatedBy: text("updatedBy"),
+    createdAt: integer("createdAt").notNull(),
+    updatedAt: integer("updatedAt").notNull(),
+  },
+  (table) => [
+    index("oauthClientResourceScope_clientId_idx").on(table.clientId),
+    index("oauthClientResourceScope_resourceServerId_idx").on(
       table.resourceServerId,
     ),
   ],
@@ -379,13 +410,13 @@ export const oauthClientOrganizationGrant = sqliteTable(
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  teamMembers: many(teamMember),
   members: many(member),
   invitations: many(invitation),
   oauthClients: many(oauthClient),
   oauthRefreshTokens: many(oauthRefreshToken),
   oauthAccessTokens: many(oauthAccessToken),
   oauthConsents: many(oauthConsent),
-  teamMembers: many(teamMember),
 }));
 
 export const sessionRelations = relations(session, ({ one, many }) => ({
@@ -405,11 +436,30 @@ export const accountRelations = relations(account, ({ one }) => ({
 }));
 
 export const organizationRelations = relations(organization, ({ many }) => ({
+  teams: many(team),
   members: many(member),
   invitations: many(invitation),
   resourceServers: many(resourceServer),
-  teams: many(team),
   oauthClientOrganizationGrants: many(oauthClientOrganizationGrant),
+}));
+
+export const teamRelations = relations(team, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [team.organizationId],
+    references: [organization.id],
+  }),
+  teamMembers: many(teamMember),
+}));
+
+export const teamMemberRelations = relations(teamMember, ({ one }) => ({
+  team: one(team, {
+    fields: [teamMember.teamId],
+    references: [team.id],
+  }),
+  user: one(user, {
+    fields: [teamMember.userId],
+    references: [user.id],
+  }),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -430,25 +480,6 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
   user: one(user, {
     fields: [invitation.inviterId],
-    references: [user.id],
-  }),
-}));
-
-export const teamRelations = relations(team, ({ one, many }) => ({
-  organization: one(organization, {
-    fields: [team.organizationId],
-    references: [organization.id],
-  }),
-  members: many(teamMember),
-}));
-
-export const teamMemberRelations = relations(teamMember, ({ one }) => ({
-  team: one(team, {
-    fields: [teamMember.teamId],
-    references: [team.id],
-  }),
-  user: one(user, {
-    fields: [teamMember.userId],
     references: [user.id],
   }),
 }));
@@ -515,27 +546,49 @@ export const oauthConsentRelations = relations(oauthConsent, ({ one }) => ({
   }),
 }));
 
-export const resourceServerRelations = relations(resourceServer, ({ one }) => ({
-  organization: one(organization, {
-    fields: [resourceServer.organizationId],
-    references: [organization.id],
+export const resourceServerRelations = relations(
+  resourceServer,
+  ({ one, many }) => ({
+    organization: one(organization, {
+      fields: [resourceServer.organizationId],
+      references: [organization.id],
+    }),
+    oauthResourceScopes: many(oauthResourceScope),
+    oauthClientOrganizationGrants: many(oauthClientOrganizationGrant),
+    oauthClientResourceScopes: many(oauthClientResourceScope),
   }),
-}));
+);
 
-export const oauthResourceScopeRelations = relations(oauthResourceScope, ({ one }) => ({
-  resourceServer: one(resourceServer, {
-    fields: [oauthResourceScope.resourceServerId],
-    references: [resourceServer.id],
+export const oauthResourceScopeRelations = relations(
+  oauthResourceScope,
+  ({ one }) => ({
+    resourceServer: one(resourceServer, {
+      fields: [oauthResourceScope.resourceServerId],
+      references: [resourceServer.id],
+    }),
   }),
-}));
+);
 
-export const oauthClientOrganizationGrantRelations = relations(oauthClientOrganizationGrant, ({ one }) => ({
-  organization: one(organization, {
-    fields: [oauthClientOrganizationGrant.organizationId],
-    references: [organization.id],
+export const oauthClientOrganizationGrantRelations = relations(
+  oauthClientOrganizationGrant,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [oauthClientOrganizationGrant.organizationId],
+      references: [organization.id],
+    }),
+    resourceServer: one(resourceServer, {
+      fields: [oauthClientOrganizationGrant.resourceServerId],
+      references: [resourceServer.id],
+    }),
   }),
-  resourceServer: one(resourceServer, {
-    fields: [oauthClientOrganizationGrant.resourceServerId],
-    references: [resourceServer.id],
+);
+
+export const oauthClientResourceScopeRelations = relations(
+  oauthClientResourceScope,
+  ({ one }) => ({
+    resourceServer: one(resourceServer, {
+      fields: [oauthClientResourceScope.resourceServerId],
+      references: [resourceServer.id],
+    }),
   }),
-}));
+);

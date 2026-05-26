@@ -70,7 +70,7 @@ const validateOrgAdminMeta = principalValidationEndpointMeta({
 });
 
 /** Better Auth plugin that owns authenticated exact-ID identity-principal validation. */
-export const idPrincipalValidation = (options: PrincipalValidationPluginOptions = {}): BetterAuthPlugin => ({
+export const idPrincipalValidation = (options: PrincipalValidationPluginOptions): BetterAuthPlugin => ({
   id: "id-principal-validation",
   endpoints: {
     validateUserPrincipal: createAuthEndpoint(

@@ -9,7 +9,10 @@ import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idPrincipalValidation } from "./plugins/principal-validation";
-import { invalidateClientOrganizationGrants } from "./plugins/oauth-scope-catalog/grants";
+import {
+  invalidateClientOrganizationGrants,
+  invalidateClientResourceScopes,
+} from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
 import {
@@ -122,13 +125,19 @@ export function getAuthOptions(
       idResourceServer({
         invalidateAudienceCache: () => invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
         authorize: async (organizationId, userId, role, adapter) =>
-          isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+          organizationId === null || organizationId === undefined
+            ? isPlatformAdmin(role)
+            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
       idOAuthScopeCatalog({
         invalidateScopeCache: () => invalidateOAuthResourceScopes(env, runtime.backgroundTaskRunner),
         invalidateGrantCache: (clientId) => invalidateClientOrganizationGrants(env, clientId, runtime.backgroundTaskRunner),
+        invalidateClientResourceScopeCache: (clientId) =>
+          invalidateClientResourceScopes(env, clientId, runtime.backgroundTaskRunner),
         authorize: async (organizationId, userId, role, adapter) =>
-          isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+          organizationId === null || organizationId === undefined
+            ? isPlatformAdmin(role)
+            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
       idPrincipalValidation({
         issuer: `${env.BETTER_AUTH_URL}${authPluginConfig.issuerPath}`,

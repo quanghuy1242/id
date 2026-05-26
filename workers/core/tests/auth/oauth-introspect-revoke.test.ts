@@ -1,15 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
-import * as authSchema from "../../src/db/auth-schema";
+import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 
-type RawSqlite = { readonly exec: (sql: string) => void };
 type TestAuth = ReturnType<typeof betterAuth>;
+type TestDatabase = {
+  readonly db: D1Database;
+  readonly raw: RawSqlite;
+};
 
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
@@ -20,8 +20,14 @@ function createKv(): BetterAuthKvStorage {
   };
 }
 
-async function createAuth(raw: RawSqlite, opts?: { validAudiences?: readonly string[]; scopes?: readonly string[]; scopeRows?: readonly { resourceServerId: string; audience: string; scope: string }[] }) {
-  const db = drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema });
+async function createAuth(
+  db: D1Database,
+  opts?: {
+    readonly validAudiences?: readonly string[];
+    readonly scopes?: readonly string[];
+    readonly scopeRows?: readonly { readonly resourceServerId: string; readonly audience: string; readonly scope: string }[];
+  },
+) {
   return betterAuth(
     getAuthOptions(
       { BETTER_AUTH_SECRET: "test-secret", BETTER_AUTH_URL: "https://id.example.test", DB: db, KV: createKv() },
@@ -30,22 +36,24 @@ async function createAuth(raw: RawSqlite, opts?: { validAudiences?: readonly str
   );
 }
 
-async function createMemoryDatabase(): Promise<RawSqlite> {
-  const { default: Database } = await import("better-sqlite3") as { readonly default: new (path: string) => RawSqlite };
-  const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
-  return raw;
+async function createMemoryDatabase(): Promise<TestDatabase> {
+  const { db, raw } = await createMemoryD1();
+  raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`);
+  return { db, raw };
 }
 
-async function signInSuperadmin(auth: TestAuth): Promise<string> {
-  await auth.api.createUser({
+async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<string> {
+  const created = await auth.api.createUser({
     body: { name: "Admin", email: "admin@example.test", password: "password123", role: "admin", data: { emailVerified: true } },
   });
   const r = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: "admin@example.test", password: "password123" }),
   }));
+  raw.exec(
+    `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_admin', 'org_1', '${created.user.id}', 'owner', 1700000000000);`,
+  );
+  raw.exec(`update "session" set "activeOrganizationId" = 'org_1' where "userId" = '${created.user.id}';`);
   return r.headers.get("set-cookie") ?? "";
 }
 
@@ -58,15 +66,52 @@ function codeChallenge(verifier: string): string { return createHash("sha256").u
 
 async function createM2MClient(auth: TestAuth, cookie: string) {
   const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/create-client", {
-    method: "POST", headers: { "content-type": "application/json", cookie },
+    method: "POST", headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
     body: JSON.stringify({ client_name: "M2M Client", redirect_uris: ["https://app.example.test/callback"], token_endpoint_auth_method: "client_secret_post", grant_types: ["client_credentials"], response_types: ["code"], scope: "content:write" }),
   }));
   return r.json<{ readonly client_id: string; readonly client_secret: string }>();
 }
 
+async function grantTenantClientAccess(
+  auth: TestAuth,
+  raw: RawSqlite,
+  cookie: string,
+  clientId: string,
+  scope: string,
+): Promise<void> {
+  const resource = await auth.handler(new Request("https://id.example.test/api/auth/admin/resource-servers", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+    body: JSON.stringify({
+      organizationId: "org_1",
+      slug: scope.replaceAll(":", "-"),
+      name: scope,
+      audience: "https://api.example.test",
+    }),
+  }));
+  expect(resource.status).toBe(200);
+  const resourceServer = await resource.json<{ readonly id: string }>();
+
+  const declaredScope = await auth.handler(new Request("https://id.example.test/api/auth/admin/oauth-scopes", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+    body: JSON.stringify({ resourceServerId: resourceServer.id, scope }),
+  }));
+  expect(declaredScope.status).toBe(200);
+
+  raw.exec(`update "oauthClient" set "referenceId" = 'org_1' where "clientId" = '${clientId}';`);
+
+  const clientResourceScope = await auth.handler(new Request("https://id.example.test/api/auth/admin/oauth-client-resource-scopes", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+    body: JSON.stringify({ clientId, resourceServerId: resourceServer.id, allowedScopes: [scope] }),
+  }));
+  expect(clientResourceScope.status).toBe(200);
+}
+
 async function createConfidentialCodeClient(auth: TestAuth, cookie: string) {
   const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/create-client", {
-    method: "POST", headers: { "content-type": "application/json", cookie },
+    method: "POST", headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
     body: JSON.stringify({
       client_name: "Web Client", redirect_uris: ["https://app.example.test/callback"],
       token_endpoint_auth_method: "client_secret_post", grant_types: ["authorization_code", "refresh_token"],
@@ -133,21 +178,13 @@ async function issueM2MToken(auth: TestAuth, clientId: string, clientSecret: str
   return r.json<{ readonly access_token: string }>();
 }
 
-async function issueOpaqueM2MToken(auth: TestAuth, clientId: string, clientSecret: string) {
-  const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/token", {
-    method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret, scope: "content:write" }),
-  }));
-  expect(r.status).toBe(200);
-  return r.json<{ readonly access_token: string }>();
-}
-
 describe("OAuth introspection", () => {
   it("returns active: true for a valid M2M token", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createM2MClient(auth, cookie);
+    await grantTenantClientAccess(auth, raw, cookie, client.client_id, "content:write");
     const token = await issueM2MToken(auth, client.client_id, client.client_secret);
 
     const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/introspect", {
@@ -159,9 +196,9 @@ describe("OAuth introspection", () => {
   });
 
   it("returns active: false for an unknown token", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createM2MClient(auth, cookie);
 
     const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/introspect", {
@@ -172,8 +209,8 @@ describe("OAuth introspection", () => {
   });
 
   it("requires client authentication for introspection", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw);
+    const { db } = await createMemoryDatabase();
+    const auth = await createAuth(db);
     const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/introspect", {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token: "any" }),
@@ -184,11 +221,12 @@ describe("OAuth introspection", () => {
 
 describe("OAuth revocation", () => {
   it("revokes a token successfully", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createM2MClient(auth, cookie);
-    const token = await issueOpaqueM2MToken(auth, client.client_id, client.client_secret);
+    await grantTenantClientAccess(auth, raw, cookie, client.client_id, "content:write");
+    const token = await issueM2MToken(auth, client.client_id, client.client_secret);
 
     const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/revoke", {
       method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", authorization: basicAuth(client.client_id, client.client_secret) },
@@ -198,9 +236,9 @@ describe("OAuth revocation", () => {
   });
 
   it("returns active: false after a revocation roundtrip", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createConfidentialCodeClient(auth, cookie);
     const refreshToken = await issueRefreshToken(auth, client.client_id, client.client_secret);
 
@@ -226,9 +264,9 @@ describe("OAuth revocation", () => {
   });
 
   it("returns 200 for nonexistent token (RFC 7009 idempotency)", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createM2MClient(auth, cookie);
 
     const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/revoke", {
@@ -239,10 +277,11 @@ describe("OAuth revocation", () => {
   });
 
   it("revoked token JWT signature remains valid (revocation is store-side, not cryptographic)", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
-    const cookie = await signInSuperadmin(auth);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, { validAudiences: ["https://api.example.test"], scopes: ["content:write"], scopeRows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write" }] });
+    const cookie = await signInSuperadmin(auth, raw);
     const client = await createM2MClient(auth, cookie);
+    await grantTenantClientAccess(auth, raw, cookie, client.client_id, "content:write");
     const token = await issueM2MToken(auth, client.client_id, client.client_secret);
 
     await auth.handler(new Request("https://id.example.test/api/auth/oauth2/revoke", {

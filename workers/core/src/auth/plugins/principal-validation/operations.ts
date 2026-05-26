@@ -1,12 +1,15 @@
 import { APIError } from "better-auth/api";
 import { decodeProtectedHeader, importJWK, jwtVerify } from "jose";
-import { authPluginConfig } from "../../config";
 import {
+  OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
   OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,
   RESOURCE_SERVER_MODEL,
 } from "../../../shared/constants";
 import type { ResourceServerRow } from "../resource-server/schema";
-import type { OAuthClientOrganizationGrantRow } from "../oauth-scope-catalog/schema";
+import type {
+  OAuthClientOrganizationGrantRow,
+  OAuthClientResourceScopeRow,
+} from "../oauth-scope-catalog/schema";
 import type { PrincipalValidationAdapter } from "./types";
 
 type JwksRow = {
@@ -34,6 +37,7 @@ type TeamRow = {
 type OAuthClientRow = {
   readonly clientId: string;
   readonly disabled?: boolean | null;
+  readonly referenceId?: string | null;
 };
 
 function bearerToken(headers: Headers): string {
@@ -52,8 +56,8 @@ export async function assertPrincipalValidationCaller(params: {
   readonly adapter: PrincipalValidationAdapter;
   readonly headers: Headers;
   readonly issuer: string;
-  readonly audience?: string;
-  readonly scope?: string;
+  readonly audience: string;
+  readonly scope: string;
 }): Promise<void> {
   const token = bearerToken(params.headers);
   const header = decodeProtectedHeader(token);
@@ -71,13 +75,13 @@ export async function assertPrincipalValidationCaller(params: {
   try {
     ({ payload } = await jwtVerify(token, cryptoKey, {
       issuer: params.issuer,
-      audience: params.audience ?? authPluginConfig.principalValidationAudience,
+      audience: params.audience,
     }));
   } catch {
     throw new APIError("UNAUTHORIZED");
   }
 
-  if (!tokenHasScope(payload.scope, params.scope ?? authPluginConfig.principalValidationScope)) {
+  if (!tokenHasScope(payload.scope, params.scope)) {
     throw new APIError("FORBIDDEN");
   }
 }
@@ -139,6 +143,17 @@ export async function validateServiceAccountForOrganization(
     where: [{ field: "audience", value: resource }],
   });
   if (!resourceServer || !resourceServer.enabled) throw new APIError("NOT_FOUND");
+
+  if ((client as OAuthClientRow & { readonly referenceId?: string | null }).referenceId === organizationId) {
+    const resourceScope = await adapter.findOne<OAuthClientResourceScopeRow>({
+      model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+      where: [
+        { field: "clientId", value: clientId },
+        { field: "resourceServerId", value: resourceServer.id },
+      ],
+    });
+    if (resourceScope?.enabled) return;
+  }
 
   const grant = await adapter.findOne<OAuthClientOrganizationGrantRow>({
     model: OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,

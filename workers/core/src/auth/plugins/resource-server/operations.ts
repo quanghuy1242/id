@@ -22,7 +22,7 @@ export type AuthorizeFn = NonNullable<ResourceServerPluginOptions["authorize"]>;
  */
 export async function assertResourceServerAccess(
   authorize: AuthorizeFn | undefined,
-  organizationId: string,
+  organizationId: string | null | undefined,
   userId: string,
   role: string | null | undefined,
   adapter: unknown,
@@ -57,10 +57,25 @@ export async function canAccessResourceServer(
  */
 export async function assertUniqueSlug(
   adapter: AdapterContext,
-  organizationId: string,
+  organizationId: string | null | undefined,
   slug: string,
   ignoreId?: string,
 ): Promise<void> {
+  if (!organizationId) {
+    const rows = await adapter.findMany<ResourceServerRow>({
+      model: RESOURCE_SERVER_MODEL,
+      where: [
+        { field: "organizationId", value: null },
+        { field: "slug", value: slug },
+      ],
+    });
+
+    if (rows.some((row) => row.id !== ignoreId)) {
+      throw new APIError("BAD_REQUEST", { message: "System resource server slug already exists" });
+    }
+    return;
+  }
+
   const rows = await adapter.findMany<ResourceServerRow>({
     model: RESOURCE_SERVER_MODEL,
     where: [

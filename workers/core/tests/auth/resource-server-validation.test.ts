@@ -107,7 +107,12 @@ describe("updateResourceServerBody", () => {
 describe("resourceServerBetterAuthFields", () => {
   it("matches the Better Auth table field contract", () => {
     expect(resourceServerBetterAuthFields).toEqual({
-      organizationId: { type: "string", required: true, references: { model: "organization", field: "id" } },
+      organizationId: {
+        type: "string",
+        required: false,
+        index: true,
+        references: { model: "organization", field: "id" },
+      },
       slug: { type: "string", required: true },
       name: { type: "string", required: true },
       audience: { type: "string", required: true, unique: true },

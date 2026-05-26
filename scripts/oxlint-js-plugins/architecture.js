@@ -898,7 +898,7 @@ function walkUpPastContainers(node) {
 
 function isAllowedConstLocation(filename) {
   return /\/src\/(shared|domain|infrastructure)\//.test(filename) ||
-    /\/workers\/core\/src\/auth\/config\.ts$/.test(filename) ||
+    filename.endsWith("/workers/core/src/auth/config.ts") ||
     filename.includes("/packages/lib/src/");
 }
 

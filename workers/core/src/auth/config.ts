@@ -57,6 +57,8 @@ export type AuthPluginConfig = {
   readonly oauthScopeCacheTtlSeconds: number;
   readonly oauthGrantCachePrefix: string;
   readonly oauthGrantCacheTtlSeconds: number;
+  readonly oauthClientResourceScopeCachePrefix: string;
+  readonly oauthClientResourceScopeCacheTtlSeconds: number;
   readonly teamMembershipCachePrefix: string;
   readonly emailVerificationStoragePrefix: string;
   readonly passwordResetStoragePrefix: string;
@@ -69,7 +71,6 @@ export type AuthPluginConfig = {
   readonly directShareReferenceId: string;
   readonly workspaceOnlyScopes: readonly string[];
   readonly maxTokenTeamIds: number;
-  readonly principalValidationAudience: string;
   readonly principalValidationScope: string;
 };
 
@@ -104,6 +105,8 @@ export const authPluginConfig = {
   oauthScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthGrantCachePrefix: "id-oauth-scopes:client-org-grants:",
   oauthGrantCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
+  oauthClientResourceScopeCachePrefix: "id-oauth-scopes:client-resource-scopes:",
+  oauthClientResourceScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   teamMembershipCachePrefix: "id-teams:user:",
   emailVerificationStoragePrefix: "id-email:verification:",
   passwordResetStoragePrefix: "id-email:password-reset:",
@@ -116,6 +119,5 @@ export const authPluginConfig = {
   directShareReferenceId: "urn:id:oauth-context:direct-share",
   workspaceOnlyScopes: ["content:share"],
   maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
-  principalValidationAudience: "https://id.quanghuy.dev/principal-validation",
   principalValidationScope: "identity:principals:validate",
 } as const satisfies AuthPluginConfig;

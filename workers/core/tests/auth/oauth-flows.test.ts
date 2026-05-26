@@ -1,15 +1,13 @@
-import { readFileSync } from "node:fs";
 import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
 import { describe, expect, it } from "vitest";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
-import * as authSchema from "../../src/db/auth-schema";
+import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 
-type RawSqlite = {
-  readonly exec: (sql: string) => void;
+type TestDatabase = {
+  readonly db: D1Database;
+  readonly raw: RawSqlite;
 };
 
 type TestAuth = ReturnType<typeof betterAuth>;
@@ -27,13 +25,7 @@ function createKv(): BetterAuthKvStorage {
   };
 }
 
-async function createAuth(raw: RawSqlite, validAudiences: readonly string[] = []) {
-  const db = drizzleAdapter(drizzle(raw), {
-    provider: "sqlite",
-    camelCase: true,
-    schema: authSchema,
-  });
-
+async function createAuth(db: D1Database, validAudiences: readonly string[] = []) {
   return betterAuth(
     getAuthOptions(
       {
@@ -58,8 +50,8 @@ async function createAuth(raw: RawSqlite, validAudiences: readonly string[] = []
   );
 }
 
-async function signInSuperadmin(auth: TestAuth, _raw: RawSqlite): Promise<string> {
-  await auth.api.createUser({
+async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<{ readonly cookie: string; readonly userId: string }> {
+  const created = await auth.api.createUser({
     body: {
       name: "Root Admin",
       email: "root@example.test",
@@ -80,33 +72,59 @@ async function signInSuperadmin(auth: TestAuth, _raw: RawSqlite): Promise<string
     }),
   );
 
+  raw.exec(
+    `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_root', 'org_1', '${created.user.id}', 'owner', 1700000000000);`,
+  );
+
   const cookie = response.headers.get("set-cookie");
   expect(cookie).toEqual(expect.any(String));
-  return cookie ?? "";
+  raw.exec(`update "session" set "activeOrganizationId" = 'org_1' where "userId" = '${created.user.id}';`);
+  return { cookie: cookie ?? "", userId: created.user.id };
 }
 
-async function createMemoryDatabase(): Promise<RawSqlite> {
-  const sqliteModuleName = "better-sqlite3";
-  const { default: Database } = (await import(sqliteModuleName)) as {
-    readonly default: new (path: string) => RawSqlite;
-  };
-  const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
+async function createMemoryDatabase(): Promise<TestDatabase> {
+  const { db, raw } = await createMemoryD1();
   raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`);
-  return raw;
+  return { db, raw };
 }
 
 describe("OAuth Provider flows", () => {
   it("creates a confidential client through the admin endpoint and issues a resource-bound M2M JWT", async () => {
-    const raw = await createMemoryDatabase();
-    const auth = await createAuth(raw, ["https://api.example.test"]);
-    const cookie = await signInSuperadmin(auth, raw);
+    const { db, raw } = await createMemoryDatabase();
+    const auth = await createAuth(db, ["https://api.example.test"]);
+    const { cookie } = await signInSuperadmin(auth, raw);
+
+    const resourceResponse = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/resource-servers", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        body: JSON.stringify({
+          organizationId: "org_1",
+          slug: "content-api",
+          name: "Content API",
+          audience: "https://api.example.test",
+        }),
+      }),
+    );
+    expect(resourceResponse.status).toBe(200);
+    const resourceServer = (await resourceResponse.json()) as { readonly id: string };
+
+    const scopeResponse = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/oauth-scopes", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        body: JSON.stringify({
+          resourceServerId: resourceServer.id,
+          scope: "content:write",
+        }),
+      }),
+    );
+    expect(scopeResponse.status).toBe(200);
 
     const clientResponse = await auth.handler(
       new Request("https://id.example.test/api/auth/oauth2/create-client", {
         method: "POST",
-        headers: { "content-type": "application/json", cookie },
+        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
         body: JSON.stringify({
           client_name: "Worker API",
           redirect_uris: ["https://app.example.test/callback"],
@@ -123,6 +141,20 @@ describe("OAuth Provider flows", () => {
       readonly client_id: string;
       readonly client_secret: string;
     };
+    raw.exec(`update "oauthClient" set "referenceId" = 'org_1' where "clientId" = '${client.client_id}';`);
+
+    const clientResourceScopeResponse = await auth.handler(
+      new Request("https://id.example.test/api/auth/admin/oauth-client-resource-scopes", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        body: JSON.stringify({
+          clientId: client.client_id,
+          resourceServerId: resourceServer.id,
+          allowedScopes: ["content:write"],
+        }),
+      }),
+    );
+    expect(clientResourceScopeResponse.status).toBe(200);
 
     const tokenResponse = await auth.handler(
       new Request("https://id.example.test/api/auth/oauth2/token", {
@@ -165,7 +197,7 @@ describe("OAuth Provider flows", () => {
     expect(payload.scope).toBe("content:write");
     expect(payload.sub).toBeUndefined();
     expect(payload.azp).toBe(client.client_id);
-    expect(payload.client_id).toBeUndefined();
-    expect(payload.org_id).toBeUndefined();
+    expect(payload.client_id).toBe(client.client_id);
+    expect(payload.org_id).toBe("org_1");
   });
 });

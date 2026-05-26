@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 type RawStatement = {
   readonly all: (...bindings: unknown[]) => unknown[];
@@ -10,6 +10,15 @@ export type RawSqlite = {
   readonly exec: (sql: string) => void;
   readonly prepare: (sql: string) => RawStatement;
 };
+
+export function applyAuthMigrations(raw: RawSqlite): void {
+  const migrations = readdirSync("migrations")
+    .filter((file) => /^\d+_.*\.sql$/u.test(file))
+    .sort();
+  for (const migration of migrations) {
+    raw.exec(readFileSync(`migrations/${migration}`, "utf8"));
+  }
+}
 
 class TestD1PreparedStatement implements D1PreparedStatement {
   private readonly bindings: readonly unknown[];
@@ -53,16 +62,36 @@ class TestD1PreparedStatement implements D1PreparedStatement {
   }
 
   async all<T = unknown>(): Promise<D1Result<T>> {
+    const statement = this.sqlite.prepare(this.sql);
+    try {
+      return {
+        success: true,
+        results: statement.all(...this.bindings) as T[],
+        meta: {
+          duration: 0,
+          size_after: 0,
+          rows_read: 0,
+          rows_written: 0,
+          changed_db: false,
+          changes: 0,
+        },
+      };
+    } catch (error) {
+      if (!(error instanceof TypeError) || !error.message.includes("does not return data")) {
+        throw error;
+      }
+    }
+    const result = statement.run(...this.bindings);
     return {
       success: true,
-      results: this.sqlite.prepare(this.sql).all(...this.bindings) as T[],
+      results: [] as T[],
       meta: {
         duration: 0,
         size_after: 0,
         rows_read: 0,
-        rows_written: 0,
-        changed_db: false,
-        changes: 0,
+        rows_written: result.changes,
+        changed_db: result.changes > 0,
+        changes: result.changes,
       },
     };
   }
@@ -78,8 +107,7 @@ export async function createMemoryD1(): Promise<{ readonly db: D1Database; reado
     readonly default: new (path: string) => RawSqlite;
   };
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
+  applyAuthMigrations(raw);
 
   const db: D1Database = {
     prepare(query) {

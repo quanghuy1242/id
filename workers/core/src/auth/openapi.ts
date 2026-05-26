@@ -4,11 +4,12 @@ export interface BetterAuthFieldDef {
   type: "string" | "number" | "boolean" | "date" | "string[]";
   required?: boolean;
   unique?: boolean;
+  index?: boolean;
   defaultValue?: string | number | boolean | Date | (() => string | number | boolean | Date);
   references?: { model: string; field: string };
 }
 
-type BetterAuthMeta = Partial<Pick<BetterAuthFieldDef, "unique" | "references">>;
+type BetterAuthMeta = Partial<Pick<BetterAuthFieldDef, "index" | "unique" | "references">>;
 
 function analyzeZodField(schema: z.ZodTypeAny): {
   type: BetterAuthFieldDef["type"];

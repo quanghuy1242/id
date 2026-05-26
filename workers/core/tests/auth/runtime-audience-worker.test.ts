@@ -2,7 +2,7 @@ import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/composition/create-app";
 import type { CoreEnv } from "../../src/config/env";
-import { createMemoryD1 } from "./d1-test-helper";
+import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 
 function createKv(): KVNamespace {
   const values = new Map<string, string>();
@@ -17,14 +17,17 @@ function createKv(): KVNamespace {
   } as KVNamespace;
 }
 
-async function createEnv(): Promise<CoreEnv> {
-  const { db } = await createMemoryD1();
+async function createEnv(): Promise<{ readonly env: CoreEnv; readonly raw: RawSqlite }> {
+  const { db, raw } = await createMemoryD1();
   return {
-    BETTER_AUTH_SECRET: "test-secret",
-    BETTER_AUTH_URL: "https://id.example.test",
-    ID_BOOTSTRAP_TOKEN: "bootstrap-token",
-    DB: db,
-    KV: createKv(),
+    raw,
+    env: {
+      BETTER_AUTH_SECRET: "test-secret",
+      BETTER_AUTH_URL: "https://id.example.test",
+      ID_BOOTSTRAP_TOKEN: "bootstrap-token",
+      DB: db,
+      KV: createKv(),
+    },
   };
 }
 
@@ -61,7 +64,7 @@ async function bootstrap(app: ReturnType<typeof createApp>, env: CoreEnv): Promi
 describe("runtime resource audience integration", () => {
   it("loads resource-server audiences through createApp and rejects disabled audiences", async () => {
     const app = createApp();
-    const env = await createEnv();
+    const { env, raw } = await createEnv();
     const cookie = await bootstrap(app, env);
 
     const organization = await app.request(
@@ -128,6 +131,22 @@ describe("runtime resource audience integration", () => {
       readonly client_id: string;
       readonly client_secret: string;
     };
+    raw.exec(`update "oauthClient" set "referenceId" = '${org.id}' where "clientId" = '${oauthClient.client_id}';`);
+
+    const clientResourceScope = await app.request(
+      "/api/auth/admin/oauth-client-resource-scopes",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          clientId: oauthClient.client_id,
+          resourceServerId: resourceServer.id,
+          allowedScopes: ["content:read"],
+        }),
+      },
+      env,
+    );
+    expect(clientResourceScope.status).toBe(200);
 
     const token = await app.request(
       "/api/auth/oauth2/token",

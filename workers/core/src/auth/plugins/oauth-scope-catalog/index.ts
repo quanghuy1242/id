@@ -2,35 +2,49 @@ import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api
 import type { BetterAuthPlugin } from "better-auth";
 import {
   OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,
+  OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
   OAUTH_RESOURCE_SCOPE_MODEL,
 } from "../../../shared/constants";
 import {
   assertCatalogAccess,
   assertGrantScopesExist,
+  assertClientOwnerAccess,
   assertUniqueClientOrganizationGrant,
+  assertUniqueClientResourceScope,
   assertUniqueResourceScope,
+  buildCreateClientResourceScopePayload,
   buildCreateGrantPayload,
   buildCreateScopePayload,
+  buildUpdateClientResourceScopePayload,
   buildUpdateGrantPayload,
   buildUpdateScopePayload,
+  ensureOAuthClientMetadataBridge,
+  findOAuthClientOrThrow,
   findResourceServerOrThrow,
 } from "./operations";
 import type { AdapterContext, OAuthScopeCatalogPluginOptions } from "./types";
 import {
   createOAuthClientOrganizationGrantBody,
-  createOAuthClientOrganizationGrantOpenApiRequestBody,
+  createOAuthClientResourceScopeBody,
+  createClientResourceScopeMetadata,
+  createGrantMetadata,
   createOAuthResourceScopeBody,
-  createOAuthResourceScopeOpenApiRequestBody,
+  createScopeMetadata,
+  deleteClientResourceScopeMetadata,
+  listClientResourceScopeMetadata,
+  listGrantMetadata,
+  listScopeMetadata,
   oauthClientOrganizationGrantBetterAuthFields,
-  oauthClientOrganizationGrantOpenApiSchema,
+  oauthClientResourceScopeBetterAuthFields,
   oauthResourceScopeBetterAuthFields,
-  oauthResourceScopeOpenApiSchema,
-  oauthScopeCatalogEndpointMeta,
   updateOAuthClientOrganizationGrantBody,
-  updateOAuthClientOrganizationGrantOpenApiRequestBody,
+  updateOAuthClientResourceScopeBody,
+  updateClientResourceScopeMetadata,
+  updateGrantMetadata,
   updateOAuthResourceScopeBody,
-  updateOAuthResourceScopeOpenApiRequestBody,
+  updateScopeMetadata,
   type OAuthClientOrganizationGrantRow,
+  type OAuthClientResourceScopeRow,
   type OAuthResourceScopeRow,
 } from "./schema";
 
@@ -40,49 +54,7 @@ function adapterContext(adapter: unknown): AdapterContext {
   return adapter as AdapterContext;
 }
 
-const createScopeMetadata = oauthScopeCatalogEndpointMeta({
-  description: "Create an OAuth scope bound to a resource server",
-  requestBody: createOAuthResourceScopeOpenApiRequestBody,
-  responseSchema: oauthResourceScopeOpenApiSchema,
-  responseDescription: "OAuth resource scope created successfully",
-});
-
-const listScopeMetadata = oauthScopeCatalogEndpointMeta({
-  description: "List all OAuth resource scopes visible to the requester",
-  responseSchema: oauthResourceScopeOpenApiSchema,
-  responseDescription: "List of visible OAuth resource scopes",
-});
-
-const updateScopeMetadata = oauthScopeCatalogEndpointMeta({
-  description: "Update an OAuth resource scope by ID",
-  hasIdParam: true,
-  requestBody: updateOAuthResourceScopeOpenApiRequestBody,
-  responseSchema: oauthResourceScopeOpenApiSchema,
-  responseDescription: "OAuth resource scope updated successfully",
-});
-
-const createGrantMetadata = oauthScopeCatalogEndpointMeta({
-  description: "Create an org-scoped M2M client organization grant",
-  requestBody: createOAuthClientOrganizationGrantOpenApiRequestBody,
-  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
-  responseDescription: "OAuth client organization grant created successfully",
-});
-
-const listGrantMetadata = oauthScopeCatalogEndpointMeta({
-  description: "List all OAuth client organization grants visible to the requester",
-  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
-  responseDescription: "List of visible OAuth client organization grants",
-});
-
-const updateGrantMetadata = oauthScopeCatalogEndpointMeta({
-  description: "Update an OAuth client organization grant by ID",
-  hasIdParam: true,
-  requestBody: updateOAuthClientOrganizationGrantOpenApiRequestBody,
-  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
-  responseDescription: "OAuth client organization grant updated successfully",
-});
-
-/** Better Auth plugin that owns resource-server-bound OAuth scopes and M2M org grants. */
+/** Better Auth plugin that owns resource-server-bound OAuth scopes and M2M scope subsets. */
 export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-oauth-scope-catalog",
   schema: {
@@ -91,6 +63,9 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
     },
     oauthClientOrganizationGrant: {
       fields: oauthClientOrganizationGrantBetterAuthFields,
+    },
+    oauthClientResourceScope: {
+      fields: oauthClientResourceScopeBetterAuthFields,
     },
   },
   endpoints: {
@@ -194,6 +169,131 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
       },
     ),
 
+    createOAuthClientResourceScope: createAuthEndpoint(
+      "/admin/oauth-client-resource-scopes",
+      {
+        method: "POST",
+        use: [sessionMiddleware],
+        body: createOAuthClientResourceScopeBody,
+        metadata: createClientResourceScopeMetadata,
+      },
+      async (ctx) => {
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
+
+        const resourceServer = await findResourceServerOrThrow(
+          adapterContext(ctx.context.adapter),
+          ctx.body.resourceServerId,
+        );
+        await assertGrantScopesExist(adapterContext(ctx.context.adapter), ctx.body.resourceServerId, ctx.body.allowedScopes);
+        const client = await assertClientOwnerAccess(options, ctx, ctx.body.clientId);
+        const ownerOrganizationId = client.referenceId;
+        if (!ownerOrganizationId) {
+          throw new APIError("FORBIDDEN", { message: "Only organization-owned OAuth clients can use this endpoint" });
+        }
+        if (ownerOrganizationId !== resourceServer.organizationId) {
+          throw new APIError("BAD_REQUEST", { message: "OAuth client and resource server must belong to the same organization" });
+        }
+        await assertUniqueClientResourceScope(adapterContext(ctx.context.adapter), ctx.body);
+        await ensureOAuthClientMetadataBridge(adapterContext(ctx.context.adapter), client, ownerOrganizationId);
+
+        const row = await ctx.context.adapter.create<OAuthClientResourceScopeRow>({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          data: buildCreateClientResourceScopePayload(ctx.body, session.user.id),
+        });
+        await options.invalidateClientResourceScopeCache?.(ctx.body.clientId);
+        return ctx.json(row);
+      },
+    ),
+
+    listOAuthClientResourceScopes: createAuthEndpoint(
+      "/admin/oauth-client-resource-scopes",
+      {
+        method: "GET",
+        use: [sessionMiddleware],
+        metadata: listClientResourceScopeMetadata,
+      },
+      async (ctx) => {
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
+
+        const rows = await ctx.context.adapter.findMany<OAuthClientResourceScopeRow>({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          sortBy: { field: "createdAt", direction: "desc" },
+        });
+        const access = await Promise.all(rows.map(async (row) => {
+          try {
+            await assertClientOwnerAccess(options, ctx, row.clientId);
+            return { row, visible: true };
+          } catch (error) {
+            if (!(error instanceof APIError)) throw error;
+            return { row, visible: false };
+          }
+        }));
+        const visible = access.filter((entry) => entry.visible).map((entry) => entry.row);
+        return ctx.json({ oauthClientResourceScopes: visible });
+      },
+    ),
+
+    updateOAuthClientResourceScope: createAuthEndpoint(
+      "/admin/oauth-client-resource-scopes/:id",
+      {
+        method: "PATCH",
+        use: [sessionMiddleware],
+        body: updateOAuthClientResourceScopeBody,
+        metadata: updateClientResourceScopeMetadata,
+      },
+      async (ctx) => {
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
+
+        const existing = await ctx.context.adapter.findOne<OAuthClientResourceScopeRow>({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+        });
+        if (!existing) throw new APIError("NOT_FOUND");
+        await assertClientOwnerAccess(options, ctx, existing.clientId);
+        if (ctx.body.allowedScopes) {
+          await assertGrantScopesExist(adapterContext(ctx.context.adapter), existing.resourceServerId, ctx.body.allowedScopes);
+        }
+
+        const row = await ctx.context.adapter.update<OAuthClientResourceScopeRow>({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+          update: buildUpdateClientResourceScopePayload(ctx.body, session.user.id),
+        });
+        await options.invalidateClientResourceScopeCache?.(existing.clientId);
+        return ctx.json(row);
+      },
+    ),
+
+    deleteOAuthClientResourceScope: createAuthEndpoint(
+      "/admin/oauth-client-resource-scopes/:id",
+      {
+        method: "DELETE",
+        use: [sessionMiddleware],
+        metadata: deleteClientResourceScopeMetadata,
+      },
+      async (ctx) => {
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
+
+        const existing = await ctx.context.adapter.findOne<OAuthClientResourceScopeRow>({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+        });
+        if (!existing) throw new APIError("NOT_FOUND");
+        await assertClientOwnerAccess(options, ctx, existing.clientId);
+
+        await ctx.context.adapter.delete({
+          model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+        });
+        await options.invalidateClientResourceScopeCache?.(existing.clientId);
+        return ctx.json({ deleted: true });
+      },
+    ),
+
     createOAuthClientOrganizationGrant: createAuthEndpoint(
       "/admin/oauth-client-organization-grants",
       { method: "POST", use: [sessionMiddleware], body: createOAuthClientOrganizationGrantBody, metadata: createGrantMetadata },
@@ -212,8 +312,13 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           session.user.role,
           ctx.context.adapter,
         );
+        const client = await findOAuthClientOrThrow(adapterContext(ctx.context.adapter), ctx.body.clientId);
+        if (client.referenceId && client.referenceId !== ctx.body.organizationId) {
+          throw new APIError("BAD_REQUEST", { message: "Legacy grant organization must match oauthClient.referenceId" });
+        }
         await assertGrantScopesExist(adapterContext(ctx.context.adapter), ctx.body.resourceServerId, ctx.body.allowedScopes);
         await assertUniqueClientOrganizationGrant(adapterContext(ctx.context.adapter), ctx.body);
+        await ensureOAuthClientMetadataBridge(adapterContext(ctx.context.adapter), client, ctx.body.organizationId);
 
         const row = await ctx.context.adapter.create<OAuthClientOrganizationGrantRow>({
           model: OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL,
@@ -289,6 +394,5 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         return ctx.json(row);
       },
     ),
-
   },
 });

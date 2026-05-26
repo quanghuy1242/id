@@ -1,6 +1,7 @@
+import { APIError } from "better-auth/api";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { authPluginConfig, OAUTH_CONTEXT_SELECTION_TTL_SECONDS, oauthTokenLifetimeConfig } from "./config";
-import { assertClientOrganizationGrant } from "./plugins/oauth-scope-catalog/grants";
+import { assertClientOrganizationGrant, assertClientResourceScope } from "./plugins/oauth-scope-catalog/grants";
 import {
   assertDirectShareScopes,
   assertRequestedResourceScopesAllowed,
@@ -99,10 +100,17 @@ export function createOAuthProviderPlugin(
         throw new Error("OAuth authorization context was not selected");
       },
     },
-    clientPrivileges: async ({ user, action }) => {
+    clientReference: async ({ session }) =>
+      typeof session?.activeOrganizationId === "string" ? session.activeOrganizationId : undefined,
+    clientPrivileges: async ({ user, session, action }) => {
       if (!user) return false;
-      if (action === "read" || action === "list") return canManageOAuthClients(roleValue(user.role));
-      return canManageOAuthClients(roleValue(user.role));
+      if (canManageOAuthClients(roleValue(user.role))) return true;
+      const activeOrganizationId =
+        typeof session?.activeOrganizationId === "string" ? session.activeOrganizationId : undefined;
+      if (!activeOrganizationId) return false;
+      const hasOrgAccess = await canManageOrganizationOAuthClients(env.DB as AdminDbAdapter, user.id, activeOrganizationId);
+      if (!hasOrgAccess) return false;
+      return action === "create" || action === "read" || action === "list" || action === "update";
     },
     customAccessTokenClaims: async ({ resource, referenceId, scopes, user, metadata }) => {
       assertRequestedResourceScopesAllowed({ catalog, scopes, resource });
@@ -128,22 +136,87 @@ export function createOAuthProviderPlugin(
 
       const clientId = typeof metadata?.id_client_id === "string" ? metadata.id_client_id : undefined;
       const organizationId = typeof metadata?.organization_id === "string" ? metadata.organization_id : undefined;
-      if (clientId && organizationId && resource) {
-        await assertClientOrganizationGrant({
-          env,
-          clientId,
-          organizationId,
-          resource,
-          scopes: scopes.filter((scope) => !protocolScopeSet().has(scope)),
-          backgroundTaskRunner: runtime.backgroundTaskRunner,
+      const productScopes = scopes.filter((scope) => !protocolScopeSet().has(scope));
+
+      if (!clientId && productScopes.length > 0) {
+        throw new APIError("FORBIDDEN", {
+          message: "OAuth client metadata mirror is missing id_client_id",
         });
-        return { aud: resource, client_id: clientId, org_id: organizationId };
       }
 
-      return { aud: resource };
+      const clientOrganizationId = referenceId ?? organizationId;
+      if (clientId && clientOrganizationId && resource) {
+        try {
+          await assertClientResourceScope({
+            env,
+            clientId,
+            resource,
+            scopes: productScopes,
+            backgroundTaskRunner: runtime.backgroundTaskRunner,
+          });
+        } catch (error) {
+          if (!(error instanceof APIError) || error.message !== "OAuth client has no resource-scope grant") {
+            throw error;
+          }
+          await assertClientOrganizationGrant({
+            env,
+            clientId,
+            organizationId: clientOrganizationId,
+            resource,
+            scopes: productScopes,
+            backgroundTaskRunner: runtime.backgroundTaskRunner,
+          });
+        }
+        return { aud: resource, client_id: clientId, org_id: clientOrganizationId };
+      }
+      if (clientId && clientOrganizationId && !resource) {
+        return { aud: resource, client_id: clientId, org_id: clientOrganizationId };
+      }
+
+      if (productScopes.length > 0) {
+        if (!resource) {
+          throw new APIError("BAD_REQUEST", {
+            error: "invalid_scope",
+            error_description: "resource is required for client_credentials scopes",
+          });
+        }
+        throw new APIError("FORBIDDEN", {
+          message: "OAuth client metadata bridge is missing organization_id",
+        });
+      }
+
+      return clientId ? { aud: resource, client_id: clientId } : { aud: resource };
     },
     customTokenResponseFields: ({ grantType }) => ({
       grant_type: grantType,
     }),
   });
+}
+
+type AdminDbAdapter = {
+  readonly findMany: (params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown }>;
+  }) => Promise<Array<Record<string, unknown>>>;
+};
+
+async function canManageOrganizationOAuthClients(
+  adapter: AdminDbAdapter,
+  userId: string,
+  organizationId: string,
+): Promise<boolean> {
+  const memberships = await adapter.findMany({
+    model: "member",
+    where: [
+      { field: "userId", value: userId },
+      { field: "organizationId", value: organizationId },
+    ],
+  });
+
+  return memberships.some(
+    (m) =>
+      (m.userId === userId || m.user_id === userId)
+      && (m.organizationId === organizationId || m.organization_id === organizationId)
+      && (m.role === "owner" || m.role === "admin"),
+  );
 }

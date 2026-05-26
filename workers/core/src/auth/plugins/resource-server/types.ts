@@ -25,7 +25,7 @@ export type ResourceServerPluginOptions = {
    * operation.
    */
   readonly authorize?: (
-    organizationId: string,
+    organizationId: string | null | undefined,
     userId: string,
     role: string | null | undefined,
     adapter: unknown,

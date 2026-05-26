@@ -4,6 +4,9 @@ export const RESOURCE_SERVER_MODEL = "resourceServer" as const;
 /** BA model name for the OAuth resource-scope catalog plugin table. */
 export const OAUTH_RESOURCE_SCOPE_MODEL = "oauthResourceScope" as const;
 
+/** BA model name for per-client OAuth resource-scope rows. */
+export const OAUTH_CLIENT_RESOURCE_SCOPE_MODEL = "oauthClientResourceScope" as const;
+
 /** BA model name for org-scoped OAuth client grant plugin table. */
 export const OAUTH_CLIENT_ORGANIZATION_GRANT_MODEL = "oauthClientOrganizationGrant" as const;
 

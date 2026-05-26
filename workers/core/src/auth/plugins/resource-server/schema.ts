@@ -21,9 +21,9 @@ export const resourceServerSchema = z.object({
     description: "Unique identifier of the resource server",
     example: "rs_123456",
   }),
-  organizationId: z.string().min(1).meta({
-    description: "The organization ID that owns this resource server",
-    betterAuth: { references: { model: "organization", field: "id" } },
+  organizationId: z.string().min(1).nullable().optional().meta({
+    description: "The organization ID that owns this resource server; null for the id-owned system audience",
+    betterAuth: { index: true, references: { model: "organization", field: "id" } },
   }),
   slug: z.string().min(1).meta({
     description: "URL-friendly unique slug for the resource server inside the organization",
@@ -67,7 +67,7 @@ export type ResourceServerRow = Readonly<z.infer<typeof resourceServerSchema>>;
 /** Validated body for the create-resource-server endpoint. */
 export const createResourceServerBody = z
   .object({
-    organizationId: resourceServerSchema.shape.organizationId,
+    organizationId: z.string().min(1),
     slug: resourceServerSchema.shape.slug,
     name: resourceServerSchema.shape.name,
     audience: resourceServerSchema.shape.audience,

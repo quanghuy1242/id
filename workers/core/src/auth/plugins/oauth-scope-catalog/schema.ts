@@ -8,48 +8,68 @@ import {
 
 const oauthScopePattern = /^[a-z][a-z0-9:_-]*$/u;
 
+const actorAuditFields = {
+  createdBy: z.string().optional().meta({ description: "User ID of the creator" }),
+  updatedBy: z.string().optional().meta({ description: "User ID of the last updater" }),
+  createdAt: z.number().meta({ description: "Timestamp (ms) of creation" }),
+  updatedAt: z.number().meta({ description: "Timestamp (ms) of last update" }),
+};
+
+const oauthClientIdField = z.string().min(1).meta({
+  description: "OAuth client ID / service-account principal ID",
+  betterAuth: { index: true },
+});
+
+const allowedScopesField = z.array(z.string().min(1).regex(oauthScopePattern)).meta({
+  description: "Resource-server-bound OAuth scopes this client may request",
+});
+
+function resourceServerReferenceField(description: string) {
+  return z.string().min(1).meta({
+    description,
+    betterAuth: { index: true, references: { model: "resourceServer", field: "id" } },
+  });
+}
+
 /** Canonical Zod schema for a resource-server-bound OAuth scope row. */
 export const oauthResourceScopeSchema = z.object({
   id: z.string().meta({ description: "Unique identifier of the OAuth resource scope" }),
-  resourceServerId: z.string().min(1).meta({
-    description: "Resource-server row that owns this OAuth scope",
-    betterAuth: { references: { model: "resourceServer", field: "id" } },
-  }),
+  resourceServerId: resourceServerReferenceField("Resource-server row that owns this OAuth scope"),
   scope: z.string().min(1).regex(oauthScopePattern).meta({
     description: "OAuth scope string owned by the resource server",
   }),
   description: z.string().optional().meta({ description: "Optional admin-facing description" }),
   enabled: z.boolean().default(true).meta({ description: "Whether this scope can be issued" }),
-  createdBy: z.string().optional().meta({ description: "User ID of the creator" }),
-  updatedBy: z.string().optional().meta({ description: "User ID of the last updater" }),
-  createdAt: z.number().meta({ description: "Timestamp (ms) of creation" }),
-  updatedAt: z.number().meta({ description: "Timestamp (ms) of last update" }),
+  ...actorAuditFields,
 }).meta({ id: "OAuthResourceScope" });
 
 /** Canonical Zod schema for an org-scoped M2M client grant row. */
 export const oauthClientOrganizationGrantSchema = z.object({
   id: z.string().meta({ description: "Unique identifier of the OAuth client organization grant" }),
-  clientId: z.string().min(1).meta({ description: "OAuth client ID / service-account principal ID" }),
+  clientId: oauthClientIdField,
   organizationId: z.string().min(1).meta({
     description: "Organization for which the client can receive org-scoped M2M tokens",
-    betterAuth: { references: { model: "organization", field: "id" } },
+    betterAuth: { index: true, references: { model: "organization", field: "id" } },
   }),
-  resourceServerId: z.string().min(1).meta({
-    description: "Resource server for which this client grant applies",
-    betterAuth: { references: { model: "resourceServer", field: "id" } },
-  }),
-  allowedScopes: z.array(z.string().min(1).regex(oauthScopePattern)).meta({
-    description: "Resource-server-bound OAuth scopes this client may request",
-  }),
+  resourceServerId: resourceServerReferenceField("Resource server for which this client grant applies"),
+  allowedScopes: allowedScopesField,
   enabled: z.boolean().default(true).meta({ description: "Whether this grant can be used" }),
-  createdBy: z.string().optional().meta({ description: "User ID of the creator" }),
-  updatedBy: z.string().optional().meta({ description: "User ID of the last updater" }),
-  createdAt: z.number().meta({ description: "Timestamp (ms) of creation" }),
-  updatedAt: z.number().meta({ description: "Timestamp (ms) of last update" }),
+  ...actorAuditFields,
 }).meta({ id: "OAuthClientOrganizationGrant" });
+
+/** Canonical Zod schema for a per-client resource-scope subset row. */
+export const oauthClientResourceScopeSchema = z.object({
+  id: z.string().meta({ description: "Unique identifier of the OAuth client resource-scope row" }),
+  clientId: oauthClientIdField,
+  resourceServerId: resourceServerReferenceField("Resource server for which this client's scope subset applies"),
+  allowedScopes: allowedScopesField,
+  enabled: z.boolean().default(true).meta({ description: "Whether this resource-scope row can be used" }),
+  ...actorAuditFields,
+}).meta({ id: "OAuthClientResourceScope" });
 
 export type OAuthResourceScopeRow = Readonly<z.infer<typeof oauthResourceScopeSchema>>;
 export type OAuthClientOrganizationGrantRow = Readonly<z.infer<typeof oauthClientOrganizationGrantSchema>>;
+export type OAuthClientResourceScopeRow = Readonly<z.infer<typeof oauthClientResourceScopeSchema>>;
 
 export const createOAuthResourceScopeBody = z
   .object({
@@ -83,18 +103,37 @@ export const updateOAuthClientOrganizationGrantBody = z
   })
   .strict();
 
+export const createOAuthClientResourceScopeBody = z
+  .object({
+    clientId: oauthClientResourceScopeSchema.shape.clientId,
+    resourceServerId: oauthClientResourceScopeSchema.shape.resourceServerId,
+    allowedScopes: oauthClientResourceScopeSchema.shape.allowedScopes,
+  })
+  .strict();
+
+export const updateOAuthClientResourceScopeBody = z
+  .object({
+    allowedScopes: oauthClientResourceScopeSchema.shape.allowedScopes.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 export type CreateOAuthResourceScopeBody = z.infer<typeof createOAuthResourceScopeBody>;
 export type UpdateOAuthResourceScopeBody = z.infer<typeof updateOAuthResourceScopeBody>;
 export type CreateOAuthClientOrganizationGrantBody = z.infer<typeof createOAuthClientOrganizationGrantBody>;
 export type UpdateOAuthClientOrganizationGrantBody = z.infer<typeof updateOAuthClientOrganizationGrantBody>;
+export type CreateOAuthClientResourceScopeBody = z.infer<typeof createOAuthClientResourceScopeBody>;
+export type UpdateOAuthClientResourceScopeBody = z.infer<typeof updateOAuthClientResourceScopeBody>;
 
 export const oauthResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthResourceScopeSchema);
 export const oauthClientOrganizationGrantBetterAuthFields = mapZodToBetterAuthFields(
   oauthClientOrganizationGrantSchema,
 );
+export const oauthClientResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthClientResourceScopeSchema);
 
 export const oauthResourceScopeOpenApiSchema = zodSchemaToOpenApi(oauthResourceScopeSchema);
 export const oauthClientOrganizationGrantOpenApiSchema = zodSchemaToOpenApi(oauthClientOrganizationGrantSchema);
+export const oauthClientResourceScopeOpenApiSchema = zodSchemaToOpenApi(oauthClientResourceScopeSchema);
 export const createOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(createOAuthResourceScopeBody);
 export const updateOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(updateOAuthResourceScopeBody);
 export const createOAuthClientOrganizationGrantOpenApiRequestBody = openApiJsonRequestBody(
@@ -102,6 +141,12 @@ export const createOAuthClientOrganizationGrantOpenApiRequestBody = openApiJsonR
 );
 export const updateOAuthClientOrganizationGrantOpenApiRequestBody = openApiJsonRequestBody(
   updateOAuthClientOrganizationGrantBody,
+);
+export const createOAuthClientResourceScopeOpenApiRequestBody = openApiJsonRequestBody(
+  createOAuthClientResourceScopeBody,
+);
+export const updateOAuthClientResourceScopeOpenApiRequestBody = openApiJsonRequestBody(
+  updateOAuthClientResourceScopeBody,
 );
 
 export type EndpointMetaOptions = {
@@ -133,3 +178,73 @@ export function oauthScopeCatalogEndpointMeta(options: EndpointMetaOptions) {
     },
   };
 }
+
+export const createScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Create an OAuth scope bound to a resource server",
+  requestBody: createOAuthResourceScopeOpenApiRequestBody,
+  responseSchema: oauthResourceScopeOpenApiSchema,
+  responseDescription: "OAuth resource scope created successfully",
+});
+
+export const listScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "List all OAuth resource scopes visible to the requester",
+  responseSchema: oauthResourceScopeOpenApiSchema,
+  responseDescription: "List of visible OAuth resource scopes",
+});
+
+export const updateScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Update an OAuth resource scope by ID",
+  hasIdParam: true,
+  requestBody: updateOAuthResourceScopeOpenApiRequestBody,
+  responseSchema: oauthResourceScopeOpenApiSchema,
+  responseDescription: "OAuth resource scope updated successfully",
+});
+
+export const createGrantMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Create a legacy org-scoped OAuth client organization grant",
+  requestBody: createOAuthClientOrganizationGrantOpenApiRequestBody,
+  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
+  responseDescription: "OAuth client organization grant created successfully",
+});
+
+export const listGrantMetadata = oauthScopeCatalogEndpointMeta({
+  description: "List all legacy OAuth client organization grants visible to the requester",
+  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
+  responseDescription: "List of visible OAuth client organization grants",
+});
+
+export const updateGrantMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Update a legacy OAuth client organization grant by ID",
+  hasIdParam: true,
+  requestBody: updateOAuthClientOrganizationGrantOpenApiRequestBody,
+  responseSchema: oauthClientOrganizationGrantOpenApiSchema,
+  responseDescription: "OAuth client organization grant updated successfully",
+});
+
+export const createClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Create a per-client OAuth resource-scope subset row",
+  requestBody: createOAuthClientResourceScopeOpenApiRequestBody,
+  responseSchema: oauthClientResourceScopeOpenApiSchema,
+  responseDescription: "OAuth client resource-scope row created successfully",
+});
+
+export const listClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "List all per-client OAuth resource-scope rows visible to the requester",
+  responseSchema: oauthClientResourceScopeOpenApiSchema,
+  responseDescription: "List of visible OAuth client resource-scope rows",
+});
+
+export const updateClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Update a per-client OAuth resource-scope row by ID",
+  hasIdParam: true,
+  requestBody: updateOAuthClientResourceScopeOpenApiRequestBody,
+  responseSchema: oauthClientResourceScopeOpenApiSchema,
+  responseDescription: "OAuth client resource-scope row updated successfully",
+});
+
+export const deleteClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
+  description: "Delete a per-client OAuth resource-scope row by ID",
+  hasIdParam: true,
+  responseSchema: oauthClientResourceScopeOpenApiSchema,
+  responseDescription: "OAuth client resource-scope row deleted successfully",
+});
