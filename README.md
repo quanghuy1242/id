@@ -4,7 +4,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 
 This repo implements the first-batch documented scope:
 
-- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), principal-validation API, admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`)
+- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), temporary principal-validation API, admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`). The standards-first target for user/team/admin synchronous lookup is read-only SCIM v2 per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md).
 - `ui-id` Worker — admin UI scaffold under `/admin/*`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
@@ -21,10 +21,11 @@ This implementation follows the planning and architecture documents:
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
 - [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, Sender email, API-only operation, incident runbooks
 - [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
-- [docs/013_identity-event-standards-and-decisions.md](docs/013_identity-event-standards-and-decisions.md) — standards landscape (SET/SSE/RISC/CAEP) and decision record for the identity event channel
+- [docs/013_identity-event-standards-and-decisions.md](docs/013_identity-event-standards-and-decisions.md) — standards landscape (SET/SSF/RISC/CAEP) and decision record for the identity event channel
 - [docs/014_identity-event-producer-id.md](docs/014_identity-event-producer-id.md) — producer-side implementation plan (`idIdentityEvents` plugin, transactional outbox, SET delivery)
 - [docs/015_identity-event-consumer-content-api-audit.md](docs/015_identity-event-consumer-content-api-audit.md) — consumer-side audit-mode plan for `content-api` (receipts, orphan-binding findings)
 - [docs/016_identity-event-consumer-content-api-fence-enforcement.md](docs/016_identity-event-consumer-content-api-fence-enforcement.md) — consumer-side fence enforcement plan (conditional, Phase 3)
+- [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md) — proposal to replace custom user/team/admin principal-validation with read-only SCIM v2 and to resolve service-account/M2M binding semantics explicitly
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
@@ -35,6 +36,7 @@ Intentionally deferred to later batches:
 - ReBAC (Zanzibar graph authorization)
 - ABAC / Lua policy engine
 - webhook delivery
+- read-only SCIM v2 directory replacement for the temporary principal-validation API
 - custom onboarding flows and registration contexts
 - pipeline/hook scripting engine
 

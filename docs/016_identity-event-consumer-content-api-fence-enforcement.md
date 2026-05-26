@@ -24,6 +24,7 @@
 > Related docs:
 >
 > - [015_identity-event-consumer-content-api-audit.md](015_identity-event-consumer-content-api-audit.md)
+> - [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) - synchronous SCIM directory and M2M principal contract proposal
 
 ## Table Of Contents
 

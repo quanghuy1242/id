@@ -28,6 +28,7 @@
 > Related docs:
 >
 > - [016_identity-event-consumer-content-api-fence-enforcement.md](016_identity-event-consumer-content-api-fence-enforcement.md) — Phase 3 enforcement, conditional
+> - [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) - synchronous SCIM directory and M2M principal contract proposal
 
 ## Table Of Contents
 
@@ -72,7 +73,7 @@ Outcomes for Phase 1:
 - `content-api` exposes a SET receiver endpoint that verifies signatures using `id`'s JWKS, deduplicates by `jti`, and dispatches RISC events to handlers.
 - Each Phase 1 RISC event produces a structured **reconciliation finding** (an audit record) without modifying any policy binding or denial row.
 - Operators can list pending findings, mark them resolved, and see which bindings reference identity principals that `id` has reported disabled, purged, or otherwise changed.
-- The existing two-channel contract (JWT claims + write-time `principal-validation`) is preserved unchanged. This adds a third channel as additive audit, not as a substitute.
+- The existing two-channel contract (JWT claims + current write-time `principal-validation`) is preserved unchanged for this audit phase. This adds a third channel as additive audit, not as a substitute. [017](017_scim-directory-and-m2m-principal-contract.md) separately proposes replacing user/team/admin principal-validation with read-only SCIM.
 
 Non-goals for this doc:
 
@@ -120,7 +121,7 @@ The receiver is on the same Worker that already serves `content-api`'s public ro
 The `content-iam-usage` skill at `/home/quanghuy1242/pjs/content-api/.agents/skills/content-iam-usage/` documents two channels and only two:
 
 1. **Request JWT** — verified by [src/application/auth/authenticate-bearer-token.usecase.ts](../../content-api/src/application/auth/authenticate-bearer-token.usecase.ts). Issuer, audience, JWKS, scopes, projection of `sub`, `org_id`, `team_ids`, `azp`, `client_id` into `Actor`.
-2. **Synchronous principal validation** — [src/infrastructure/identity/id-content-principal-directory.ts](../../content-api/src/infrastructure/identity/id-content-principal-directory.ts) calls `id`'s `/api/auth/principal-validation/**` endpoints during durable IAM writes.
+2. **Synchronous principal validation** — [src/infrastructure/identity/id-content-principal-directory.ts](../../content-api/src/infrastructure/identity/id-content-principal-directory.ts) currently calls `id`'s `/api/auth/principal-validation/**` endpoints during durable IAM writes. [017](017_scim-directory-and-m2m-principal-contract.md) proposes replacing the user/team/admin subset with read-only SCIM.
 
 The skill explicitly states there is no webhook and that the 15-minute token lifetime is the acceptable staleness window. Phase 1 adds a third channel that does not alter either contract.
 
@@ -145,7 +146,7 @@ The receiver lives at `POST /webhooks/id-events`. It accepts SETs from one or mo
 | Behavior | Today | Phase 1 audit |
 |---|---|---|
 | JWT verification, claim projection | unchanged | unchanged |
-| Write-time `principal-validation` calls on IAM writes | unchanged | unchanged |
+| Write-time `principal-validation` calls on IAM writes | unchanged | unchanged in this audit phase; target replacement tracked in doc 017 |
 | `ContentPolicy.can()` decision path | unchanged | unchanged |
 | Policy binding creation / deletion | manual via IAM workflows | unchanged — no auto-modify |
 | `Actor.iat` field | not present | not present (added in doc 016 only) |

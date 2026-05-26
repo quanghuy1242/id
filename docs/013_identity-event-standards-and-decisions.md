@@ -16,7 +16,7 @@
 > - `docs/005_oauth2-oidc-integration-guide.md`
 > - `docs/006_resource-server-jwt-guide.md`
 > - `docs/010_organization-teams-oauth-flow.md`
-> - `docs/012_random_thoughts.md` — earlier draft superseded by docs 013-016 (its custom event vocabulary is rejected; its staging and standards-boundary discipline are retained)
+> - `docs/012_random_thoughts.md` — earlier draft superseded by docs 013-017 (its custom event vocabulary is rejected; its staging and standards-boundary discipline are retained)
 >
 > Standards references:
 >
@@ -34,6 +34,7 @@
 > - [014_identity-event-producer-id.md](014_identity-event-producer-id.md)
 > - [015_identity-event-consumer-content-api-audit.md](015_identity-event-consumer-content-api-audit.md)
 > - [016_identity-event-consumer-content-api-fence-enforcement.md](016_identity-event-consumer-content-api-fence-enforcement.md)
+> - [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) - proposal correcting the synchronous directory lookup contract and M2M binding options
 
 ## Table Of Contents
 
@@ -57,7 +58,7 @@
   - [5.5 D5 — Fence Enforcement Is Gated On Audit Insufficiency](#55-d5--fence-enforcement-is-gated-on-audit-insufficiency)
   - [5.6 D6 — RFC 7662 Introspection Is Deferred](#56-d6--rfc-7662-introspection-is-deferred)
   - [5.7 D7 — OIDC Back-Channel Logout Is Out Of Scope](#57-d7--oidc-back-channel-logout-is-out-of-scope)
-  - [5.8 D8 — SCIM Is Not Adopted](#58-d8--scim-is-not-adopted)
+  - [5.8 D8 — SCIM Read/Query Is Separate From Full Provisioning](#58-d8--scim-readquery-is-separate-from-full-provisioning)
 - [6. Phased Rollout And Conditions To Advance](#6-phased-rollout-and-conditions-to-advance)
 - [7. Event Vocabulary Mapping](#7-event-vocabulary-mapping)
 - [8. What This Document Does Not Cover](#8-what-this-document-does-not-cover)
@@ -75,13 +76,13 @@ Outcomes:
 - A recorded decision on the M2M access-token lifetime (10,800s today) versus alternatives.
 - A recorded decision on whether to adopt CAEP and consumer-side fences, and the conditions under which each is unlocked.
 - An explicit mapping from `docs/012_random_thoughts.md`'s invented event names to RISC / CAEP equivalents where their semantics fit, with explicitly-classified repository extensions where they do not.
-- An explicit, justified scope-out of RFC 7662 introspection (deferred), OIDC Back-Channel Logout (different problem), and SCIM (not adopted).
+- An explicit, justified scope-out of RFC 7662 introspection (deferred) and OIDC Back-Channel Logout (different problem), plus a corrected distinction between SCIM read/query (the target synchronous directory contract) and full SCIM provisioning (not adopted for this event-channel phase).
 
 This document is forever-relevant. Implementation docs 014-016 may evolve; the decisions in §5 should be referenced and amended in place when they change, not duplicated elsewhere.
 
 ## 2. System Summary
 
-`id` issues short-lived JWT access tokens (user 900s, M2M 10,800s) carrying identity facts (`sub`, `org_id`, `team_ids`, `azp`, `client_id`, OAuth scopes). Resource APIs such as `content-api` verify those JWTs locally against the issuer's JWKS and own their product authorization. For durable references (policy bindings naming a `user_id`, `team_id`, or `service_account` principal), `content-api` calls back to `id` synchronously at write time via the `principal-validation` plugin endpoints.
+`id` issues short-lived JWT access tokens (user 900s, M2M 10,800s) carrying identity facts (`sub`, `org_id`, `team_ids`, `azp`, `client_id`, OAuth scopes). Resource APIs such as `content-api` verify those JWTs locally against the issuer's JWKS and own their product authorization. For durable references (policy bindings naming a `user_id`, `team_id`, or `service_account` principal), `content-api` currently calls back to `id` synchronously at write time via the `principal-validation` plugin endpoints. That plugin is a temporary compatibility surface; [017](017_scim-directory-and-m2m-principal-contract.md) records the proposal to replace user/team/admin lookup with read-only SCIM and to resolve service-account binding separately.
 
 Two staleness windows exist:
 
@@ -121,7 +122,7 @@ The `idPrincipalValidation` plugin already provides exact, synchronous lookups f
 - `validateServiceAccountForOrganization` requires an enabled OAuth client, enabled resource audience, and enabled client/org/resource grant.
 - `validateOrganizationAdministrator` requires current Better Auth owner/admin role.
 
-These are documented in [workers/core/src/auth/plugins/principal-validation/README.md](workers/core/src/auth/plugins/principal-validation/README.md). `content-api` calls them on durable IAM writes via [src/infrastructure/identity/id-content-principal-directory.ts](../../content-api/src/infrastructure/identity/id-content-principal-directory.ts). This is *pull-shaped* synchronous validation, and it remains the correct mechanism for write-time correctness — events do not replace it.
+These are documented in [workers/core/src/auth/plugins/principal-validation/README.md](workers/core/src/auth/plugins/principal-validation/README.md). `content-api` calls them on durable IAM writes via [src/infrastructure/identity/id-content-principal-directory.ts](../../content-api/src/infrastructure/identity/id-content-principal-directory.ts). This is the current *pull-shaped* synchronous validation implementation. Events do not replace write-time lookup, but [017](017_scim-directory-and-m2m-principal-contract.md) corrects the target contract: user/team/admin lookup should move to read-only SCIM, while service-account binding semantics need a separate OAuth/M2M decision.
 
 ### 3.3 Existing OAuth Standards Surface
 
@@ -202,7 +203,7 @@ CAEP is the standards answer to "I want to keep longer-lived tokens *and* be abl
 | **RFC 7009 — Token Revocation** | Lets a client revoke its own access/refresh token server-side. | Server-side state only. Self-contained JWTs still verify locally at resource servers until expiry. Not a downstream-API notification mechanism. |
 | **RFC 7662 — Token Introspection** | Lets a resource server query the AS for "is this token active *right now*." | Per-request synchronous call. Used as a route-by-route opt-in for high-risk endpoints. Complementary to events; not push. |
 | **OIDC Back-Channel Logout 1.0** | Tells a relying party that the OP session ended, so the RP can end its browser session. | Targets browser RPs and session cookies. Resource APIs do not maintain user sessions. Different problem. |
-| **RFC 7644 — SCIM 2.0 Protocol** | Provisioning/deprovisioning + group management between IdP and downstream service. | Heavy. Designed for enterprise workforce sync. Better Auth does not ship SCIM. Most of what SCIM solves is already covered by write-time `principal-validation`. |
+| **RFC 7644 — SCIM 2.0 Protocol** | Synchronous HTTP protocol for creating, modifying, retrieving, querying, and discovering identity resources such as Users and Groups. | Not an identity-event channel and does not replace SET/SSF/RISC/CAEP. Read-only SCIM is the standards-shaped replacement for custom user/team/admin lookup; full provisioning remains out of scope for this event-channel phase. See [017](017_scim-directory-and-m2m-principal-contract.md). |
 
 These specs are referenced for two reasons: (a) so future engineers do not misread the event channel as their substitute, and (b) so the implementation docs can correctly say "for problem X, use this standard; not the event channel."
 
@@ -219,13 +220,13 @@ These specs are referenced for two reasons: (a) so future engineers do not misre
 | OpenID SSF (Shared Signals Framework) | Established interoperability standard | **Adopt** as event transport. |
 | OpenID RISC | Established interoperability standard | **Adopt** as account-lifecycle vocabulary. |
 | OpenID CAEP | Established interoperability standard | **Conditional adopt** for sub-expiry revocation (D4). |
-| RFC 7644 SCIM 2.0 | Established interoperability standard | Reject for this codebase — disproportionate (D8). |
+| RFC 7644 SCIM 2.0 | Established interoperability standard | Adopt as the target synchronous read/query directory contract for users, org users, teams/groups, and org-admin group lookup; do not adopt full provisioning in this event-channel phase (D8, doc 017). |
 | Better Auth `organizationHooks` (member/team add/remove) | Better Auth-supported capability | Use as event capture point inside producer. |
 | Better Auth user disable/delete hooks | Better Auth-supported capability | Use as event capture point inside producer. |
 | Plugin endpoint append-events in `oauth-scope-catalog` / `resource-server` | Better Auth-supported capability + repository-specific extension | Use as event capture point for OAuth grant/client disable events. |
 | Transactional outbox row in same DB transaction as identity mutation | Repository-specific extension | Use as the producer's atomicity mechanism. Standard industry pattern. |
 | Custom relationship/client events (from `docs/012_random_thoughts.md`) | Mixed: user-disable overlaps RISC; membership change is not CAEP `token-claims-change` without an identified token; disabling an OAuth client is not CAEP `credential-change` unless a credential is actually revoked | **Reject** the user event in favor of RISC; define reviewed repo-specific URIs for member removal, client disable, team delete, and OAuth client-organization grant disable. |
-| Scheduled pull reconciliation sweep from `content-api` to `principal-validation` | Repository-specific extension | Acceptable; deferred in favor of push (per user preference). May be added later as a redundant safety net. |
+| Scheduled pull reconciliation sweep from `content-api` to `id` | Repository-specific operational pattern using the chosen synchronous lookup contract | Acceptable as a redundant safety net when implemented against read-only SCIM for user/team/admin lookup. Do not add new `principal-validation` dependency. |
 | `iat`-based denial fence on consumer | Repository-specific enforcement derived from accepted security events | Adopt only when audit is insufficient (D5). |
 | Public user-managed webhook marketplace (the old `auther` model) | Repository-specific extension | **Reject** for first release. Operator-provisioned subscriptions only. |
 | Per-request live validation on every API call from `content-api` to `id` | Inappropriate workaround | Reject — defeats self-contained JWTs. |
@@ -340,19 +341,21 @@ Operationally: introspection is the right tool when one route needs the freshest
 - Conflating logout propagation with identity events would push `id` toward emitting `signout` events as if they were authorization events. They are not — they govern browser session cookies, not API authority.
 - The applicable Better Auth and `next-blog` browser flows are documented in [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) and use RP-initiated logout, which is sufficient for the current product surface.
 
-### 5.8 D8 — SCIM Is Not Adopted
+### 5.8 D8 — SCIM Read/Query Is Separate From Full Provisioning
 
-**Decision**: SCIM 2.0 (RFC 7644) is not implemented in `id` for first release. The combination of write-time `principal-validation` (synchronous) + Phase 1 RISC notification (asynchronous) covers the principal-lifecycle synchronization need without the cost of a full SCIM server.
+**Decision**: SCIM 2.0 read/query is the standards-shaped synchronous directory contract for user, organization-user, team/group, and organization-admin lookup. Full SCIM provisioning is not implemented in `id` for this event-channel phase. The current `principal-validation` plugin remains a temporary compatibility surface until [017](017_scim-directory-and-m2m-principal-contract.md)'s read-only SCIM replacement and M2M binding decision are implemented.
 
 **Reasoning**:
 
-- SCIM is the standard answer to "enterprise IdP provisions users to many downstream apps." Better Auth does not ship a SCIM server, and the current architecture has one resource API consumer (`content-api`) with a small number of durable principal references.
-- Write-time `principal-validation` already gives `content-api` exact, synchronous knowledge that a principal exists before persisting a binding. That is the read-side of SCIM's value.
-- Asynchronous lifecycle change notifications (RISC) cover the push side, with a smaller surface than `SCIM ProvisioningEvents` and without requiring `/Users`, `/Groups`, `/Bulk`, or full schema discovery.
+- SCIM is not only provisioning. RFC 7644 also covers retrieval, query, and discovery of Users and Groups. That is the correct standards category for synchronous principal directory lookup.
+- SET/SSF/RISC/CAEP solves the asynchronous lifecycle/security-signal problem. It does not replace SCIM read/query, and SCIM does not replace the event channel.
+- Full SCIM provisioning (`POST`, `PUT`, `PATCH`, `DELETE`, `/Bulk`, external create/update ownership) remains out of scope until a separate product requirement exists.
+- OAuth service accounts and client/org/resource grants are not SCIM core Users or Groups. Their runtime path stays OAuth client credentials + resource indicators + JWT/JWKS or introspection; their bind/attach management semantics are evaluated in doc 017.
 
 **Conditions to revisit**:
 
-- A future enterprise customer or compliance regime explicitly requires SCIM provisioning. At that point, evaluate adding SCIM as a complement, not a replacement, for the event channel.
+- Implement doc 017's read-only SCIM proposal when replacing custom user/team/admin write-time lookup.
+- Add full SCIM provisioning only when an enterprise customer, compliance regime, or product requirement explicitly requires external user/group create/update/delete.
 
 ## 6. Phased Rollout And Conditions To Advance
 
@@ -419,7 +422,8 @@ This section enumerates only failure modes whose handling is a **decision** (and
 | A token issued before a Phase 2 membership-removal extension event is presented after the event commits | In Phase 3 only: the consumer derives a local fence cutoff from SET `toe` and denies via `iat <= fence.tokens_issued_before`. `tokens_issued_before` is local enforcement state, not a CAEP-defined claim. In Phase 1-2: accepted, because no fence exists yet. |
 | Producer wants to publish a non-RISC, non-CAEP event | Must be classified as repo extension per §4.3, must use the repo-namespaced URI scheme `https://id.<host>/secevent/event-type/<name>`, and must justify why no standard URI fits. Organization-member-removed, team-member-removed, client-disabled, team-deleted, and client-grant-disabled are the five cases approved in Phase 2. |
 | Subscriber asks for an event type the producer does not emit (e.g. profile change) | SSF stream config rejects on registration. Adding the event type is a future decision recorded here. |
-| Subscriber asks the producer to act as a SCIM server | Reject. D8 stands until the conditions to revisit are met. |
+| Subscriber asks the producer for synchronous User/Group directory lookup | Read-only SCIM is the target contract per D8 and doc 017. Do not add new custom principal-validation endpoints. |
+| Subscriber asks the producer for full SCIM provisioning | Reject until a separate product requirement exists. D8 only adopts read/query for the current replacement path. |
 | A new resource API beyond `content-api` requests a subscription | Allowed under the operator-provisioned model. The producer is generic across subscribers; doc 015's consumer-specific behaviors do not apply to other subscribers. |
 
 ## 10. Definition Of Done
@@ -428,8 +432,8 @@ This doc is the decision record. It is "done" when:
 
 - All eight decisions (D1-D8) are recorded with reasoning and explicit conditions for revision.
 - The vocabulary mapping (§7) covers every event named in `docs/012_random_thoughts.md` §7.1, with each row resolved to a standard URI or a justified repo-specific URI.
-- [README.md](../README.md) references docs 013-016 in its Contracts section.
-- [docs/003_future-implementation.md](docs/003_future-implementation.md) references docs 013-016 with a one-paragraph reading-order summary and the diagrammed phase relationship.
+- [README.md](../README.md) references docs 013-017 in its Contracts section.
+- [docs/003_future-implementation.md](docs/003_future-implementation.md) references docs 013-017 with a one-paragraph reading-order summary and the diagrammed phase relationship.
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) records D1 (M2M 10,800s stale-authority window) explicitly so resource API authors do not assume immediate revocation. *(Out of scope for this doc; tracked here as a follow-up.)*
 
 The first three are completed in the same change set as this doc. The last is a follow-up cross-doc update.
@@ -441,10 +445,11 @@ id (producer)                                            content-api (consumer)
 ─────────────                                            ───────────────────
 Phase 0 (today)                                          Phase 0 (today)
   RFC 7009 revoke                                          JWT verify
-  RFC 7662 introspect (unused on hot paths)                Synchronous principal-validation on writes
+  RFC 7662 introspect (unused on hot paths)                Temporary principal-validation on writes
   900s user tokens                                         Two-channel contract documented
   10,800s M2M tokens
-  Synchronous principal-validation
+  Temporary principal-validation
+  Target: read-only SCIM per doc 017
   organizationHooks fire but emit nothing
 
 Phase 1 (D3)                                             Phase 1 (D3)

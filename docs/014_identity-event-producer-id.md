@@ -26,6 +26,7 @@
 >
 > - [015_identity-event-consumer-content-api-audit.md](015_identity-event-consumer-content-api-audit.md)
 > - [016_identity-event-consumer-content-api-fence-enforcement.md](016_identity-event-consumer-content-api-fence-enforcement.md)
+> - [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) - synchronous SCIM directory and M2M principal contract proposal
 
 ## Table Of Contents
 
@@ -125,7 +126,7 @@ Better Auth plugins in this repo follow the convention documented in [workers/co
 
 - `idResourceServer` ([workers/core/src/auth/plugins/resource-server/](workers/core/src/auth/plugins/resource-server/)) — `resourceServer` table, audience cache, admin endpoints.
 - `idOAuthScopeCatalog` ([workers/core/src/auth/plugins/oauth-scope-catalog/](workers/core/src/auth/plugins/oauth-scope-catalog/)) — `oauthResourceScope` and `oauthClientOrganizationGrant` tables.
-- `idPrincipalValidation` ([workers/core/src/auth/plugins/principal-validation/](workers/core/src/auth/plugins/principal-validation/)) — read-only validation endpoints.
+- `idPrincipalValidation` ([workers/core/src/auth/plugins/principal-validation/](workers/core/src/auth/plugins/principal-validation/)) — temporary read-only validation endpoints; [017](017_scim-directory-and-m2m-principal-contract.md) proposes replacing user/team/admin lookup with read-only SCIM.
 
 Each plugin owns: `schema.ts`, `types.ts`, `index.ts` (Better Auth plugin export with `createAuthEndpoint` admin routes), `operations.ts` (CRUD via the Better Auth adapter), and may have a runtime companion (e.g. `audiences.ts`, `scopes.ts`) that preloads data before BA construction. The new plugin follows this layout.
 
@@ -717,7 +718,7 @@ Target behavior:
 
 - `POST /api/auth/ssf/streams/:id/verify` enqueues a synthetic event with type URI `https://schemas.openid.net/secevent/ssf/event-type/verification` (the SSF verification event URI), `state` set to a random nonce, and waits for the subscriber to acknowledge via 2xx within the standard delivery flow.
 
-The verification event URI is the canonical SSF identifier; do not substitute any SCIM `urn:ietf:params:SCIM:event:*` URI here — those belong to RFC 7644 / SCIM Events and are out of scope per [013 D8](013_identity-event-standards-and-decisions.md#58-d8--scim-is-not-adopted).
+The verification event URI is the canonical SSF identifier; do not substitute any SCIM `urn:ietf:params:SCIM:event:*` URI here. SCIM read/query is tracked separately in [017](017_scim-directory-and-m2m-principal-contract.md), and full SCIM provisioning/events remain out of scope per [013 D8](013_identity-event-standards-and-decisions.md#58-d8--scim-readquery-is-separate-from-full-provisioning).
 
 Implementation tasks:
 
