@@ -49,11 +49,17 @@ describe("OAuth scope catalog schema", () => {
     expect(oauthResourceScopeBetterAuthFields.enabled).toEqual(
       expect.objectContaining({ type: "boolean", required: true, defaultValue: true }),
     );
+    expect(oauthResourceScopeBetterAuthFields.resourceScopeKey).toEqual(
+      expect.objectContaining({ type: "string", required: true, unique: true }),
+    );
     expect(oauthClientResourceScopeBetterAuthFields.allowedScopes).toEqual(
       expect.objectContaining({ type: "string[]", required: true }),
     );
     expect(oauthClientResourceScopeBetterAuthFields.clientId).toEqual(
       expect.objectContaining({ type: "string", required: true, index: true }),
+    );
+    expect(oauthClientResourceScopeBetterAuthFields.clientResourceKey).toEqual(
+      expect.objectContaining({ type: "string", required: true, unique: true }),
     );
   });
 });

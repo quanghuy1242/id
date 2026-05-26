@@ -38,6 +38,10 @@ export const oauthResourceScopeSchema = z.object({
   scope: z.string().min(1).regex(oauthScopePattern).meta({
     description: "OAuth scope string owned by the resource server",
   }),
+  resourceScopeKey: z.string().min(1).meta({
+    description: "Internal uniqueness key for resourceServerId and scope",
+    betterAuth: { unique: true },
+  }),
   description: z.string().optional().meta({ description: "Optional admin-facing description" }),
   enabled: z.boolean().default(true).meta({ description: "Whether this scope can be issued" }),
   ...actorAuditFields,
@@ -48,6 +52,10 @@ export const oauthClientResourceScopeSchema = z.object({
   id: z.string().meta({ description: "Unique identifier of the OAuth client resource-scope row" }),
   clientId: oauthClientIdField,
   resourceServerId: resourceServerReferenceField("Resource server for which this client's scope subset applies"),
+  clientResourceKey: z.string().min(1).meta({
+    description: "Internal uniqueness key for clientId and resourceServerId",
+    betterAuth: { unique: true },
+  }),
   allowedScopes: allowedScopesField,
   enabled: z.boolean().default(true).meta({ description: "Whether this resource-scope row can be used" }),
   ...actorAuditFields,
@@ -95,8 +103,23 @@ export type UpdateOAuthClientResourceScopeBody = z.infer<typeof updateOAuthClien
 export const oauthResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthResourceScopeSchema);
 export const oauthClientResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthClientResourceScopeSchema);
 
-export const oauthResourceScopeOpenApiSchema = zodSchemaToOpenApi(oauthResourceScopeSchema);
-export const oauthClientResourceScopeOpenApiSchema = zodSchemaToOpenApi(oauthClientResourceScopeSchema);
+const publicOAuthResourceScopeSchema = oauthResourceScopeSchema.omit({ resourceScopeKey: true });
+const publicOAuthClientResourceScopeSchema = oauthClientResourceScopeSchema.omit({ clientResourceKey: true });
+
+/** Removes the plugin-internal uniqueness key from an OAuth scope response. */
+export function presentOAuthResourceScope(row: OAuthResourceScopeRow) {
+  const { resourceScopeKey: _resourceScopeKey, ...response } = row;
+  return response;
+}
+
+/** Removes the plugin-internal uniqueness key from a client resource-scope response. */
+export function presentOAuthClientResourceScope(row: OAuthClientResourceScopeRow) {
+  const { clientResourceKey: _clientResourceKey, ...response } = row;
+  return response;
+}
+
+export const oauthResourceScopeOpenApiSchema = zodSchemaToOpenApi(publicOAuthResourceScopeSchema);
+export const oauthClientResourceScopeOpenApiSchema = zodSchemaToOpenApi(publicOAuthClientResourceScopeSchema);
 export const createOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(createOAuthResourceScopeBody);
 export const updateOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(updateOAuthResourceScopeBody);
 export const createOAuthClientResourceScopeOpenApiRequestBody = openApiJsonRequestBody(

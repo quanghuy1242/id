@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
+import {
+  clientResourceKey,
+  resourceScopeKey,
+} from "../../src/auth/plugins/oauth-scope-catalog/operations";
 import {
   attachClientResourceScope,
   bootstrapAdmin,
@@ -7,6 +12,8 @@ import {
   createResourceServer,
   createTestEnv,
 } from "./m2m-helpers";
+
+const SYSTEM_AUDIENCE = systemResourceServerAudience("https://id.example.test");
 
 async function withOrg(test: Awaited<ReturnType<typeof createTestEnv>>, id: string, slug: string): Promise<void> {
   test.raw.exec(
@@ -59,7 +66,75 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     expect([400, 403]).toContain(attach.status);
   });
 
-  it("rejects duplicate (clientId, resourceServerId) on second create (unique constraint)", async () => {
+  it("enforces unique scope names per resource server in the database", async () => {
+    const test = await createTestEnv();
+    const cookie = await bootstrapAdmin(test);
+    await withOrg(test, "org_default", "org-default");
+    const resourceServerId = await createResourceServer(test, cookie, {
+      organizationId: "org_default",
+      slug: "content",
+      name: "Content",
+      audience: "https://content.example.test",
+    });
+    const createResponse = await test.app.request(
+      "/api/auth/admin/oauth-scopes",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ resourceServerId, scope: "content:read" }),
+      },
+      test.env,
+    );
+    expect(createResponse.status).toBe(200);
+    expect(await createResponse.json()).not.toHaveProperty("resourceScopeKey");
+    const duplicateKey = resourceScopeKey(resourceServerId, "content:read").replaceAll("'", "''");
+
+    expect(() => test.raw.exec(
+      `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_duplicate', '${resourceServerId}', 'content:read', '${duplicateKey}', 1, 1700000000000, 1700000000000);`,
+    )).toThrow(/UNIQUE constraint failed/u);
+  });
+
+  it("updates the persisted natural key when a catalog scope is renamed", async () => {
+    const test = await createTestEnv();
+    const cookie = await bootstrapAdmin(test);
+    await withOrg(test, "org_default", "org-default");
+    const resourceServerId = await createResourceServer(test, cookie, {
+      organizationId: "org_default",
+      slug: "content",
+      name: "Content",
+      audience: "https://content.example.test",
+    });
+    const createResponse = await test.app.request(
+      "/api/auth/admin/oauth-scopes",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ resourceServerId, scope: "content:read" }),
+      },
+      test.env,
+    );
+    expect(createResponse.status).toBe(200);
+    const created = (await createResponse.json()) as { readonly id: string };
+
+    const updateResponse = await test.app.request(
+      `/api/auth/admin/oauth-scopes/${created.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ scope: "content:write" }),
+      },
+      test.env,
+    );
+    expect(updateResponse.status).toBe(200);
+    expect(await updateResponse.json()).not.toHaveProperty("resourceScopeKey");
+
+    const renamedKey = resourceScopeKey(resourceServerId, "content:write").replaceAll("'", "''");
+    expect(() => test.raw.exec(
+      `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_renamed_duplicate', '${resourceServerId}', 'content:write', '${renamedKey}', 1, 1700000000000, 1700000000000);`,
+    )).toThrow(/UNIQUE constraint failed/u);
+  });
+
+  it("rejects duplicate (clientId, resourceServerId) on second create", async () => {
     const test = await createTestEnv();
     const cookie = await bootstrapAdmin(test);
     await withOrg(test, "org_default", "org-default");
@@ -78,15 +153,28 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       allowedScopes: ["content:read"],
     });
     expect(first.status).toBe(200);
+    const listResponse = await test.app.request(
+      "/api/auth/admin/oauth-client-resource-scopes",
+      { method: "GET", headers: { cookie } },
+      test.env,
+    );
+    expect(listResponse.status).toBe(200);
+    const listBody = (await listResponse.json()) as { readonly oauthClientResourceScopes: readonly Record<string, unknown>[] };
+    expect(listBody.oauthClientResourceScopes[0]).not.toHaveProperty("clientResourceKey");
     const dup = await attachClientResourceScope(test, cookie, {
       clientId: client.clientId,
       resourceServerId,
       allowedScopes: ["content:read"],
     });
     expect(dup.status).toBe(400);
+
+    const duplicateKey = clientResourceKey(client.clientId, resourceServerId).replaceAll("'", "''");
+    expect(() => test.raw.exec(
+      `insert into "oauthClientResourceScope" ("id", "clientId", "resourceServerId", "clientResourceKey", "allowedScopes", "enabled", "createdAt", "updatedAt") values ('crs_duplicate', '${client.clientId}', '${resourceServerId}', '${duplicateKey}', '["content:read"]', 1, 1700000000000, 1700000000000);`,
+    )).toThrow(/UNIQUE constraint failed/u);
   });
 
-  it("rejects attaching scope to a client whose referenceId is null (only org-owned clients can use this endpoint)", async () => {
+  it("rejects attaching an infrastructure client to a tenant resource server", async () => {
     const test = await createTestEnv();
     const cookie = await bootstrapAdmin(test);
     await withOrg(test, "org_default", "org-default");
@@ -104,6 +192,61 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       resourceServerId,
       allowedScopes: ["content:read"],
     });
-    expect(attach.status).toBe(403);
+    expect(attach.status).toBe(400);
+  });
+
+  it("allows a platform admin to attach an infrastructure client to the system resource server", async () => {
+    const test = await createTestEnv();
+    const cookie = await bootstrapAdmin(test);
+    const resourceServerId = await createResourceServer(test, cookie, {
+      organizationId: null,
+      slug: authPluginConfig.systemResourceServerSlug,
+      name: "id system",
+      audience: SYSTEM_AUDIENCE,
+    });
+    await createOAuthScope(test, cookie, {
+      resourceServerId,
+      scope: authPluginConfig.systemOAuthClientPickerScope,
+    });
+    const infra = await createM2MClient(test, cookie, {
+      name: "Infra",
+      scope: authPluginConfig.systemOAuthClientPickerScope,
+      referenceId: null,
+    });
+
+    const attach = await attachClientResourceScope(test, cookie, {
+      clientId: infra.clientId,
+      resourceServerId,
+      allowedScopes: [authPluginConfig.systemOAuthClientPickerScope],
+    });
+    expect(attach.status).toBe(200);
+  });
+
+  it("rejects attaching a tenant client to the system resource server", async () => {
+    const test = await createTestEnv();
+    const cookie = await bootstrapAdmin(test);
+    await withOrg(test, "org_default", "org-default");
+    const resourceServerId = await createResourceServer(test, cookie, {
+      organizationId: null,
+      slug: authPluginConfig.systemResourceServerSlug,
+      name: "id system",
+      audience: SYSTEM_AUDIENCE,
+    });
+    await createOAuthScope(test, cookie, {
+      resourceServerId,
+      scope: authPluginConfig.systemOAuthClientPickerScope,
+    });
+    const tenant = await createM2MClient(test, cookie, {
+      name: "Tenant",
+      scope: authPluginConfig.systemOAuthClientPickerScope,
+      referenceId: "org_default",
+    });
+
+    const attach = await attachClientResourceScope(test, cookie, {
+      clientId: tenant.clientId,
+      resourceServerId,
+      allowedScopes: [authPluginConfig.systemOAuthClientPickerScope],
+    });
+    expect(attach.status).toBe(400);
   });
 });

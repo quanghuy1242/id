@@ -9,6 +9,7 @@ import {
 import {
   assertTeamIdsWithinTokenLimit,
   assertUserBelongsToOrganization,
+  canManageOrganizationOAuthClients,
   loadUserTeamIdsForOrganization,
 } from "./plugins/oauth-scope-catalog/authorization-context";
 import type { AuthOptionsEnv, AuthRuntimeOptions, OAuthRuntimeCatalog } from "./types";
@@ -115,7 +116,7 @@ export function createOAuthProviderPlugin(
       const activeOrganizationId =
         typeof session?.activeOrganizationId === "string" ? session.activeOrganizationId : undefined;
       if (!activeOrganizationId) return false;
-      const hasOrgAccess = await canManageOrganizationOAuthClients(env.DB as AdminDbAdapter, user.id, activeOrganizationId);
+      const hasOrgAccess = await canManageOrganizationOAuthClients(env, user.id, activeOrganizationId);
       if (!hasOrgAccess) return false;
       return action === "create" || action === "read" || action === "list" || action === "update";
     },
@@ -141,15 +142,7 @@ export function createOAuthProviderPlugin(
         return { aud: resource, org_id: referenceId, sub: user.id, team_ids: teamIds };
       }
 
-      // M2M / client_credentials branch.
-      //
-      // Better Auth 1.6.11 does not pass the resolved oauth client (or its `client_id`
-      // and `referenceId` column) to `customAccessTokenClaims` for the
-      // `client_credentials` grant — only the row's `metadata` JSON is forwarded. Until
-      // BA exposes the client row directly, doc 018 §5.5 leaves a single one-field
-      // identity mirror in metadata (`metadata.id_client_id`) so we can resolve the row
-      // from the DB and read the authoritative `referenceId` column. The legacy
-      // `metadata.organization_id` mirror is no longer read.
+      // BA 1.6.11 exposes metadata, not the M2M client row; doc 018 §5.5 documents this bridge.
       const productScopes = scopes.filter((scope) => !protocolScopeSet().has(scope));
       const clientIdMirror = typeof metadata?.id_client_id === "string" ? metadata.id_client_id : undefined;
 
@@ -175,10 +168,7 @@ export function createOAuthProviderPlugin(
       const audienceSystem = audienceIsSystem(catalog, resource);
       const clientIsInfra = clientReferenceId === null;
 
-      // D7 invariants: tenant client cannot obtain system scope; infra client cannot
-      // obtain tenant scope. Both rules are enforced again at runtime as defense in
-      // depth even though `oauthClientResourceScope` creation already structurally
-      // prevents cross-layer rows.
+      // Recheck D7 at issuance in case persisted data bypassed the structural write guard.
       if (clientIsInfra && audienceSystem === false) {
         throw new APIError("BAD_REQUEST", {
           error: "invalid_scope",
@@ -210,32 +200,4 @@ export function createOAuthProviderPlugin(
       grant_type: grantType,
     }),
   });
-}
-
-type AdminDbAdapter = {
-  readonly findMany: (params: {
-    model: string;
-    where?: Array<{ field: string; value: unknown }>;
-  }) => Promise<Array<Record<string, unknown>>>;
-};
-
-async function canManageOrganizationOAuthClients(
-  adapter: AdminDbAdapter,
-  userId: string,
-  organizationId: string,
-): Promise<boolean> {
-  const memberships = await adapter.findMany({
-    model: "member",
-    where: [
-      { field: "userId", value: userId },
-      { field: "organizationId", value: organizationId },
-    ],
-  });
-
-  return memberships.some(
-    (m) =>
-      (m.userId === userId || m.user_id === userId)
-      && (m.organizationId === organizationId || m.organization_id === organizationId)
-      && (m.role === "owner" || m.role === "admin"),
-  );
 }

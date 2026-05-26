@@ -16,9 +16,10 @@ The caller must present a Bearer token that:
 - carries `scope` including `oauth:clients:read`
   (`authPluginConfig.systemOAuthClientPickerScope`).
 
-The picker returns RFC 7591-shaped public fields only. `client_secret` is never
-returned. When the caller passes `?org_id=...`, a `referenceId` mismatch returns
-`404` (doc 018 §9 cross-org leak prevention).
+The picker requires both `?client_id=...` and `?org_id=...`. It returns RFC
+7591-shaped public fields only, and `client_secret` is never returned. A
+`referenceId` mismatch, including an attempt to inspect a system-layer client,
+returns `404` (doc 018 §9 cross-org leak prevention).
 
 ## Deployment
 

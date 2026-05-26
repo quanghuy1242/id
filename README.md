@@ -62,7 +62,7 @@ Versions are pinned in `package.json`. Verified package metadata on May 19, 2026
 - `src/infrastructure/persistence/crud-adapter.ts` owns shared CRUD row access and cursor pagination.
 - `src/infrastructure/repositories/mappers/**` owns DB row ↔ domain entity conversion.
 - Better Auth-owned tables are never defined in `workers/core/src/infrastructure/db/schema.ts` and never written directly outside BA APIs.
-- Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path.
+- Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path. Plugin-owned natural-key invariants are represented by supported unique fields in those schemas, so generated schema output is never post-processed.
 - Raw D1 access is forbidden outside `workers/core/src/infrastructure/persistence/`. Even there, it is only allowed when the Better Auth adapter is genuinely unavailable. Canonical auth-boundary exceptions are plugin-owned runtime companions that preload audiences, OAuth scopes/grants, or token team facts before the Better Auth OAuth Provider can be constructed. Plugin CRUD still uses the Better Auth adapter.
 - Custom Better Auth plugin conventions are documented in [.agents/skills/id-auth-plugin/SKILL.md](.agents/skills/id-auth-plugin/SKILL.md).
 - Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
@@ -149,7 +149,7 @@ Public `POST /api/auth/sign-up/email` is disabled. Admins create users through B
 
 ## Migrations
 
-Better Auth schema is generated via CLI. Plugin-owned custom tables are included in the same migration generation step. Generated SQL migrations live under `migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
+Better Auth schema is generated via CLI. Plugin-owned custom tables and their supported field-level indexes are included in the same migration generation step before Drizzle generates migration output; do not hand-edit generated schema, SQL, or snapshots. Generated SQL migrations live under `migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.
 
 Generate BA schema (built-in + plugin tables) — this writes the Drizzle schema file:
 

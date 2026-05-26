@@ -1,12 +1,6 @@
 import { APIError } from "better-auth/api";
-import { decodeProtectedHeader, importJWK, jwtVerify } from "jose";
+import { verifyScopedBearerToken } from "../../verify-scoped-bearer";
 import type { PrincipalValidationAdapter } from "./types";
-
-type JwksRow = {
-  readonly id: string;
-  readonly publicKey: string;
-  readonly alg?: string | null;
-};
 
 type UserRow = {
   readonly id: string;
@@ -24,18 +18,6 @@ type TeamRow = {
   readonly organizationId: string;
 };
 
-function bearerToken(headers: Headers): string {
-  const authorization = headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) {
-    throw new APIError("UNAUTHORIZED");
-  }
-  return authorization.slice("Bearer ".length);
-}
-
-function tokenHasScope(scopeClaim: unknown, requiredScope: string): boolean {
-  return typeof scopeClaim === "string" && scopeClaim.split(" ").includes(requiredScope);
-}
-
 export async function assertPrincipalValidationCaller(params: {
   readonly adapter: PrincipalValidationAdapter;
   readonly headers: Headers;
@@ -43,31 +25,7 @@ export async function assertPrincipalValidationCaller(params: {
   readonly audience: string;
   readonly scope: string;
 }): Promise<void> {
-  const token = bearerToken(params.headers);
-  const header = decodeProtectedHeader(token);
-  if (!header.kid) throw new APIError("UNAUTHORIZED");
-
-  const keys = await params.adapter.findMany<JwksRow>({ model: "jwks" });
-  const key = keys.find((row) => row.id === header.kid);
-  if (!key) throw new APIError("UNAUTHORIZED");
-
-  const cryptoKey = await importJWK(
-    JSON.parse(key.publicKey) as JsonWebKey,
-    key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA"),
-  );
-  let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
-  try {
-    ({ payload } = await jwtVerify(token, cryptoKey, {
-      issuer: params.issuer,
-      audience: params.audience,
-    }));
-  } catch {
-    throw new APIError("UNAUTHORIZED");
-  }
-
-  if (!tokenHasScope(payload.scope, params.scope)) {
-    throw new APIError("FORBIDDEN");
-  }
+  await verifyScopedBearerToken(params);
 }
 
 export async function validateUser(adapter: PrincipalValidationAdapter, userId: string): Promise<void> {

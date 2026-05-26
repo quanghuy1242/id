@@ -7,7 +7,7 @@ import {
 import {
   assertCatalogAccess,
   assertGrantScopesExist,
-  assertClientOwnerAccess,
+  assertClientResourceScopeAccess,
   assertUniqueClientResourceScope,
   assertUniqueResourceScope,
   buildCreateClientResourceScopePayload,
@@ -28,6 +28,8 @@ import {
   listScopeMetadata,
   oauthClientResourceScopeBetterAuthFields,
   oauthResourceScopeBetterAuthFields,
+  presentOAuthClientResourceScope,
+  presentOAuthResourceScope,
   updateOAuthClientResourceScopeBody,
   updateClientResourceScopeMetadata,
   updateOAuthResourceScopeBody,
@@ -79,7 +81,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           data: buildCreateScopePayload(ctx.body, session.user.id),
         });
         await options.invalidateScopeCache?.();
-        return ctx.json(row);
+        return ctx.json(presentOAuthResourceScope(row));
       },
     ),
 
@@ -110,7 +112,9 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
             return { row, visible: false };
           }
         }));
-        const visible = access.filter((entry) => entry.visible).map((entry) => entry.row);
+        const visible = access
+          .filter((entry) => entry.visible)
+          .map((entry) => presentOAuthResourceScope(entry.row));
         return ctx.json({ oauthScopes: visible });
       },
     ),
@@ -147,10 +151,11 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         const row = await ctx.context.adapter.update<OAuthResourceScopeRow>({
           model: OAUTH_RESOURCE_SCOPE_MODEL,
           where: [{ field: "id", value: ctx.params?.id }],
-          update: buildUpdateScopePayload(ctx.body, session.user.id),
+          update: buildUpdateScopePayload(ctx.body, existing.resourceServerId, session.user.id),
         });
+        if (!row) throw new APIError("NOT_FOUND");
         await options.invalidateScopeCache?.();
-        return ctx.json(row);
+        return ctx.json(presentOAuthResourceScope(row));
       },
     ),
 
@@ -171,13 +176,11 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           ctx.body.resourceServerId,
         );
         await assertGrantScopesExist(adapterContext(ctx.context.adapter), ctx.body.resourceServerId, ctx.body.allowedScopes);
-        const client = await assertClientOwnerAccess(options, ctx, ctx.body.clientId);
-        const ownerOrganizationId = client.referenceId;
-        if (!ownerOrganizationId) {
-          throw new APIError("FORBIDDEN", { message: "Only organization-owned OAuth clients can use this endpoint" });
-        }
-        if (resourceServer.organizationId !== null && resourceServer.organizationId !== ownerOrganizationId) {
-          throw new APIError("BAD_REQUEST", { message: "OAuth client and resource server must belong to the same organization" });
+        const client = await assertClientResourceScopeAccess(options, ctx, ctx.body.clientId);
+        if (resourceServer.organizationId !== (client.referenceId ?? null)) {
+          throw new APIError("BAD_REQUEST", {
+            message: "OAuth client and resource server must belong to the same authorization layer",
+          });
         }
         await assertUniqueClientResourceScope(adapterContext(ctx.context.adapter), ctx.body);
         await ensureOAuthClientIdentityMirror(adapterContext(ctx.context.adapter), client);
@@ -187,7 +190,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           data: buildCreateClientResourceScopePayload(ctx.body, session.user.id),
         });
         await options.invalidateClientResourceScopeCache?.(ctx.body.clientId);
-        return ctx.json(row);
+        return ctx.json(presentOAuthClientResourceScope(row));
       },
     ),
 
@@ -208,14 +211,16 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         });
         const access = await Promise.all(rows.map(async (row) => {
           try {
-            await assertClientOwnerAccess(options, ctx, row.clientId);
+            await assertClientResourceScopeAccess(options, ctx, row.clientId);
             return { row, visible: true };
           } catch (error) {
             if (!(error instanceof APIError)) throw error;
             return { row, visible: false };
           }
         }));
-        const visible = access.filter((entry) => entry.visible).map((entry) => entry.row);
+        const visible = access
+          .filter((entry) => entry.visible)
+          .map((entry) => presentOAuthClientResourceScope(entry.row));
         return ctx.json({ oauthClientResourceScopes: visible });
       },
     ),
@@ -237,7 +242,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
-        await assertClientOwnerAccess(options, ctx, existing.clientId);
+        await assertClientResourceScopeAccess(options, ctx, existing.clientId);
         if (ctx.body.allowedScopes) {
           await assertGrantScopesExist(adapterContext(ctx.context.adapter), existing.resourceServerId, ctx.body.allowedScopes);
         }
@@ -247,8 +252,9 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           where: [{ field: "id", value: ctx.params?.id }],
           update: buildUpdateClientResourceScopePayload(ctx.body, session.user.id),
         });
+        if (!row) throw new APIError("NOT_FOUND");
         await options.invalidateClientResourceScopeCache?.(existing.clientId);
-        return ctx.json(row);
+        return ctx.json(presentOAuthClientResourceScope(row));
       },
     ),
 
@@ -268,7 +274,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
-        await assertClientOwnerAccess(options, ctx, existing.clientId);
+        await assertClientResourceScopeAccess(options, ctx, existing.clientId);
 
         await ctx.context.adapter.delete({
           model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,

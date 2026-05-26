@@ -16,7 +16,7 @@ await Promise.all(
   projects.map(
     (p) =>
       new Promise((resolve) => {
-        const child = execFile(tsc, ["-p", p, "--noEmit"], { cwd: root }, (error, stdout, stderr) => {
+        execFile(tsc, ["-p", p, "--noEmit"], { cwd: root }, (error, stdout, stderr) => {
           if (stdout) process.stdout.write(stdout);
           if (stderr) process.stderr.write(stderr);
           if (error) failed = true;

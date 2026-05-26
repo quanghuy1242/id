@@ -71,8 +71,8 @@ function parseMetadata(value: OAuthClientRow["metadata"]): Record<string, unknow
  * column) to `customAccessTokenClaims` for `client_credentials`, only `metadata`. Doc
  * 018 §5.5 D5 allows this single one-field mirror as the BA-limitation workaround so
  * the token-issuance hook can look up the client row by `clientId` and read the
- * authoritative `referenceId` column. The legacy `metadata.organization_id` mirror is
- * no longer written or read.
+ * authoritative `referenceId` column. A legacy `metadata.organization_id` mirror is
+ * stripped if encountered and is never used as authority.
  */
 export async function ensureOAuthClientIdentityMirror(
   adapter: AdapterContext,
@@ -111,7 +111,13 @@ function userRole(user: Record<string, unknown>): string | null | undefined {
     : undefined;
 }
 
-export async function assertClientOwnerAccess(
+/**
+ * Authorizes management of a client resource-scope row against the client's
+ * ownership layer. Tenant clients use their organization; infrastructure
+ * clients use the system layer and are therefore restricted to platform admins
+ * by the injected authorization policy.
+ */
+export async function assertClientResourceScopeAccess(
   options: OAuthScopeCatalogPluginOptions,
   ctx: {
     readonly context: {
@@ -126,12 +132,9 @@ export async function assertClientOwnerAccess(
   const session = ctx.context.session;
   if (!session) throw new APIError("UNAUTHORIZED");
   const client = await findOAuthClientOrThrow(ctx.context.adapter as AdapterContext, clientId);
-  if (!client.referenceId) {
-    throw new APIError("FORBIDDEN", { message: "Only organization-owned OAuth clients can use this endpoint" });
-  }
   await assertCatalogAccess(
     options.authorize,
-    client.referenceId,
+    client.referenceId ?? null,
     session.user.id,
     userRole(session.user),
     ctx.context.adapter,
@@ -190,6 +193,27 @@ export async function assertUniqueClientResourceScope(
   }
 }
 
+/**
+ * Builds the persisted natural-key value for one resource-server scope.
+ *
+ * Better Auth plugin schemas support single-field unique storage constraints,
+ * so this explicit plugin-owned field enforces the logical
+ * `(resourceServerId, scope)` pair without modifying generated schema output.
+ */
+export function resourceScopeKey(resourceServerId: string, scope: string): string {
+  return JSON.stringify([resourceServerId, scope]);
+}
+
+/**
+ * Builds the persisted natural-key value for one client/resource attachment.
+ *
+ * The value gives the plugin schema a supported unique field that represents
+ * the logical `(clientId, resourceServerId)` pair.
+ */
+export function clientResourceKey(clientId: string, resourceServerId: string): string {
+  return JSON.stringify([clientId, resourceServerId]);
+}
+
 export function buildCreateScopePayload(
   body: CreateOAuthResourceScopeBody,
   actorId: string,
@@ -197,6 +221,7 @@ export function buildCreateScopePayload(
   const now = Date.now();
   return {
     ...body,
+    resourceScopeKey: resourceScopeKey(body.resourceServerId, body.scope),
     enabled: true,
     createdBy: actorId,
     updatedBy: actorId,
@@ -207,10 +232,12 @@ export function buildCreateScopePayload(
 
 export function buildUpdateScopePayload(
   fields: UpdateOAuthResourceScopeBody,
+  resourceServerId: string,
   actorId: string,
 ): Partial<OAuthResourceScopeRow> {
   return {
     ...fields,
+    ...(fields.scope === undefined ? {} : { resourceScopeKey: resourceScopeKey(resourceServerId, fields.scope) }),
     updatedBy: actorId,
     updatedAt: Date.now(),
   } as Partial<OAuthResourceScopeRow>;
@@ -223,6 +250,7 @@ export function buildCreateClientResourceScopePayload(
   const now = Date.now();
   return {
     ...body,
+    clientResourceKey: clientResourceKey(body.clientId, body.resourceServerId),
     enabled: true,
     createdBy: actorId,
     updatedBy: actorId,

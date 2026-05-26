@@ -70,7 +70,7 @@ export type AuthPluginConfig = {
   readonly workspaceOnlyScopes: readonly string[];
   readonly maxTokenTeamIds: number;
   readonly principalValidationScope: string;
-  /** System resource-server slug used by id's own audiences (picker, SCIM, future system APIs). */
+  /** Slug for id-owned system resource-server audiences. */
   readonly systemResourceServerSlug: string;
   /** OAuth scope that authorizes `/api/auth/admin/oauth-clients/lookup` for M2M callers. */
   readonly systemOAuthClientPickerScope: string;

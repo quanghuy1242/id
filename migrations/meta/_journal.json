@@ -43,6 +43,13 @@
       "when": 1779793125090,
       "tag": "0005_funny_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1779798528148,
+      "tag": "0006_kind_demogoblin",
+      "breakpoints": true
     }
   ]
 }

@@ -343,6 +343,7 @@ export const oauthResourceScope = sqliteTable(
       .notNull()
       .references(() => resourceServer.id, { onDelete: "cascade" }),
     scope: text("scope").notNull(),
+    resourceScopeKey: text("resourceScopeKey").notNull().unique(),
     description: text("description"),
     enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
     createdBy: text("createdBy"),
@@ -363,6 +364,7 @@ export const oauthClientResourceScope = sqliteTable(
     resourceServerId: text("resourceServerId")
       .notNull()
       .references(() => resourceServer.id, { onDelete: "cascade" }),
+    clientResourceKey: text("clientResourceKey").notNull().unique(),
     allowedScopes: text("allowedScopes", { mode: "json" }).notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
     createdBy: text("createdBy"),
@@ -373,10 +375,6 @@ export const oauthClientResourceScope = sqliteTable(
   (table) => [
     index("oauthClientResourceScope_clientId_idx").on(table.clientId),
     index("oauthClientResourceScope_resourceServerId_idx").on(
-      table.resourceServerId,
-    ),
-    uniqueIndex("oauthClientResourceScope_client_resource_uidx").on(
-      table.clientId,
       table.resourceServerId,
     ),
   ],

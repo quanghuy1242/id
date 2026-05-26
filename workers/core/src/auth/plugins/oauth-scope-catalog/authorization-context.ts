@@ -11,6 +11,10 @@ type MembershipRow = {
   readonly id: string;
 };
 
+type MembershipRoleRow = {
+  readonly role?: string | null;
+};
+
 type TeamIdRow = {
   readonly teamId: string;
 };
@@ -32,6 +36,35 @@ function isD1Database(value: unknown): value is D1Database {
 
 function isAdapterLike(value: unknown): value is AdapterLike {
   return typeof value === "object" && value !== null && "findOne" in value && "findMany" in value;
+}
+
+/**
+ * Resolves OAuth client management permission for the active organization in
+ * both Worker runtime (D1) and Better Auth schema-generation/test adapter
+ * contexts.
+ */
+export async function canManageOrganizationOAuthClients(
+  env: Pick<AuthorizationContextEnv, "DB">,
+  userId: string,
+  organizationId: string,
+): Promise<boolean> {
+  let roles: readonly MembershipRoleRow[] = [];
+  if (isD1Database(env.DB)) {
+    const member = await env.DB
+      .prepare(`select "role" from "member" where "userId" = ? and "organizationId" = ? limit 1`)
+      .bind(userId, organizationId)
+      .first<MembershipRoleRow>();
+    roles = member ? [member] : [];
+  } else if (isAdapterLike(env.DB)) {
+    roles = await env.DB.findMany<MembershipRoleRow>({
+      model: "member",
+      where: [
+        { field: "userId", value: userId },
+        { field: "organizationId", value: organizationId },
+      ],
+    });
+  }
+  return roles.some((membership) => membership.role === "owner" || membership.role === "admin");
 }
 
 export async function assertUserBelongsToOrganization(

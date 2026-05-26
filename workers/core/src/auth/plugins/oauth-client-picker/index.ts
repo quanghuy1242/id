@@ -1,17 +1,11 @@
 import { APIError, createAuthEndpoint } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
-import { decodeProtectedHeader, importJWK, jwtVerify, type JWTPayload } from "jose";
 import { OAUTH_CLIENT_MODEL } from "../../../shared/constants";
 import { authPluginConfig, systemResourceServerAudience } from "../../config";
+import { verifyScopedBearerToken } from "../../verify-scoped-bearer";
 import type { OAuthClientPickerPluginOptions } from "./types";
 
 export type { OAuthClientPickerPluginOptions } from "./types";
-
-type JwksRow = {
-  readonly id: string;
-  readonly publicKey: string;
-  readonly alg?: string | null;
-};
 
 type OAuthClientRow = {
   readonly id: string;
@@ -35,50 +29,6 @@ type PickerAdapter = {
   }) => Promise<T | null>;
   readonly findMany: <T>(query: { model: string }) => Promise<T[]>;
 };
-
-function tokenFromHeaders(headers: Headers): string {
-  const authorization = headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) throw new APIError("UNAUTHORIZED");
-  return authorization.slice("Bearer ".length);
-}
-
-function tokenHasScope(scopeClaim: unknown, requiredScope: string): boolean {
-  return typeof scopeClaim === "string" && scopeClaim.split(" ").includes(requiredScope);
-}
-
-async function verifyPickerCaller(params: {
-  readonly adapter: PickerAdapter;
-  readonly headers: Headers;
-  readonly issuer: string;
-  readonly audience: string;
-  readonly scope: string;
-}): Promise<JWTPayload> {
-  const token = tokenFromHeaders(params.headers);
-  const header = decodeProtectedHeader(token);
-  if (!header.kid) throw new APIError("UNAUTHORIZED");
-
-  const keys = await params.adapter.findMany<JwksRow>({ model: "jwks" });
-  const key = keys.find((row) => row.id === header.kid);
-  if (!key) throw new APIError("UNAUTHORIZED");
-
-  const cryptoKey = await importJWK(
-    JSON.parse(key.publicKey) as JsonWebKey,
-    key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA"),
-  );
-  let payload: JWTPayload;
-  try {
-    ({ payload } = await jwtVerify(token, cryptoKey, {
-      issuer: params.issuer,
-      audience: params.audience,
-    }));
-  } catch {
-    throw new APIError("UNAUTHORIZED");
-  }
-  if (!tokenHasScope(payload.scope, params.scope)) {
-    throw new APIError("FORBIDDEN");
-  }
-  return payload;
-}
 
 function parseList(value: OAuthClientRow["grantTypes"]): readonly string[] {
   if (!value) return [];
@@ -117,8 +67,9 @@ function publicClientFields(row: OAuthClientRow): Record<string, unknown> {
  * Doc 018 §5.3 keeps BA's RFC 7592-shaped `/oauth2/get-client` as the canonical
  * shape; this wrapper exposes the same data over an M2M-token-authenticated path
  * (caller proves `aud = id-system audience` + `scope = oauth:clients:read`) and
- * applies tenant isolation by `client.referenceId` so a content-api admin cannot
- * read clients owned by another organization.
+ * requires the requested tenant context and applies isolation by
+ * `client.referenceId` so a content-api admin cannot read clients owned by
+ * another organization.
  *
  * The picker never returns `client_secret`. Cross-org reads return `404`.
  */
@@ -131,10 +82,10 @@ export const idOAuthClientPicker = (options: OAuthClientPickerPluginOptions = {}
       async (ctx) => {
         const headers = ctx.request?.headers;
         if (!headers) throw new APIError("UNAUTHORIZED");
-        const adapter = ctx.context.adapter as unknown as PickerAdapter;
+        const adapter = ctx.context.adapter as PickerAdapter;
 
         const audience = options.audience ?? systemResourceServerAudience(ctx.context.baseURL);
-        await verifyPickerCaller({
+        await verifyScopedBearerToken({
           adapter,
           headers,
           issuer: options.issuer ?? ctx.context.baseURL,
@@ -151,13 +102,19 @@ export const idOAuthClientPicker = (options: OAuthClientPickerPluginOptions = {}
             error_description: "client_id query parameter is required",
           });
         }
+        if (!orgId) {
+          throw new APIError("BAD_REQUEST", {
+            error: "invalid_request",
+            error_description: "org_id query parameter is required",
+          });
+        }
 
         const row = await adapter.findOne<OAuthClientRow>({
           model: OAUTH_CLIENT_MODEL,
           where: [{ field: "clientId", value: clientId }],
         });
         if (!row) throw new APIError("NOT_FOUND");
-        if (orgId && row.referenceId !== orgId) {
+        if (row.referenceId !== orgId) {
           // Doc 018 §9: return 404 rather than leaking the existence of the client.
           throw new APIError("NOT_FOUND");
         }

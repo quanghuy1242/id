@@ -13,7 +13,9 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | Plugin | Path | Purpose |
 |---|---|---|
 | `id-resource-server` | `resource-server/` | Admin CRUD for resource-server records and audience cache invalidation |
-| `id-oauth-scope-catalog` | `oauth-scope-catalog/` | Admin CRUD for resource-server-bound OAuth scopes, M2M org grants, and runtime scope/grant preload |
+| `id-oauth-scope-catalog` | `oauth-scope-catalog/` | Admin CRUD for resource-server-bound OAuth scopes, layer-matched M2M resource-scope rows, and runtime scope/grant preload |
+| `id-oauth-m2m-bridge` | `oauth-m2m-bridge/` | M2M OAuth client identity mirror and immutable client-reference boundary required by the BA token hook contract |
+| `id-oauth-client-picker` | `oauth-client-picker/` | Scoped system-M2M read-only client metadata lookup with tenant-context isolation |
 | `id-principal-validation` | `principal-validation/` | Authenticated exact-ID principal validation for downstream durable policy writes |
 
 ## File structure
@@ -41,6 +43,7 @@ plugins/<name>/
 - Model names must include JSDoc per architecture lint (`constants-jsdoc`).
 - Custom plugin modules may use JSDoc at architectural boundaries. Keep comments focused on ownership and invariants rather than narrating each assignment.
 - Use Zod for runtime data boundaries: plugin rows, request bodies, response bodies, OpenAPI fragments, and env/config values. Use TypeScript-only types for internal callback options and adapter capability surfaces that are never parsed from untrusted input.
+- Natural-key uniqueness for plugin rows must be represented through supported plugin schema fields. For compound logical keys, persist a deterministic internal key with `unique: true`, compute it only in the owning endpoint operations, and omit it from public responses.
 
 ## Writing a new plugin
 

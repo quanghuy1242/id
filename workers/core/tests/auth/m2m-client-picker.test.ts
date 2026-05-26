@@ -24,27 +24,18 @@ async function seedInfraInfrastructure() {
   });
   await createOAuthScope(test, cookie, { resourceServerId: systemRsId, scope: authPluginConfig.systemOAuthClientPickerScope });
 
-  // Provision the content-api infrastructure M2M client (referenceId = NULL) and
-  // attach the picker scope. We must temporarily flip referenceId to allow the
-  // admin-only attach endpoint, then return to NULL. Use SQL helpers directly to
-  // model "platform-admin provisioning at deploy time".
+  // Provision the content-api infrastructure M2M client on the system layer.
   const infra = await createM2MClient(test, cookie, {
     name: "content-api infra",
     scope: authPluginConfig.systemOAuthClientPickerScope,
-    referenceId: "org_seed_pivot",
+    referenceId: null,
   });
-  test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_seed_pivot', 'Pivot', 'pivot', 1700000000000);`);
-  test.raw.exec(`update "resourceServer" set "organizationId" = 'org_seed_pivot' where "id" = '${systemRsId}';`);
   const attach = await attachClientResourceScope(test, cookie, {
     clientId: infra.clientId,
     resourceServerId: systemRsId,
     allowedScopes: [authPluginConfig.systemOAuthClientPickerScope],
   });
   expect(attach.status).toBe(200);
-  // Restore the system shape: the resource server returns to organizationId = NULL,
-  // and the infra client's referenceId returns to NULL.
-  test.raw.exec(`update "resourceServer" set "organizationId" = NULL where "id" = '${systemRsId}';`);
-  test.raw.exec(`update "oauthClient" set "referenceId" = NULL where "clientId" = '${infra.clientId}';`);
   return { test, cookie, systemRsId, infra };
 }
 
@@ -97,6 +88,20 @@ describe("OAuth client picker endpoint", () => {
       test.env,
     );
     expect(lookup.status).toBe(404);
+  });
+
+  it("requires an organization context for every client lookup", async () => {
+    const { test, cookie, infra } = await seedInfraInfrastructure();
+    test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_tenant', 'Tenant', 'tenant', 1700000000000);`);
+    const tenant = await createM2MClient(test, cookie, { name: "Tenant SA", scope: "openid", referenceId: "org_tenant" });
+    const token = await issueInfraToken(test, infra);
+
+    const lookup = await test.app.request(
+      `/api/auth/admin/oauth-clients/lookup?client_id=${tenant.clientId}`,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
+    expect(lookup.status).toBe(400);
   });
 
   it("rejects callers without the oauth:clients:read scope", async () => {
