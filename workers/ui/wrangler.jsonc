@@ -3,6 +3,7 @@
   "main": "vinext/server/app-router-entry",
   "compatibility_date": "2026-05-19",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "assets": {
     "directory": "dist/client",

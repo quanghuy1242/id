@@ -46,15 +46,17 @@ export async function verifyScopedBearerToken(params: {
   const key = keys.find((row) => row.id === header.kid);
   if (!key) throw new APIError("UNAUTHORIZED");
 
+  const alg = key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA");
   const cryptoKey = await importJWK(
     JSON.parse(key.publicKey) as JsonWebKey,
-    key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA"),
+    alg,
   );
   let payload: JWTPayload;
   try {
     ({ payload } = await jwtVerify(token, cryptoKey, {
       issuer: params.issuer,
       audience: params.audience,
+      algorithms: [alg],
     }));
   } catch {
     throw new APIError("UNAUTHORIZED");

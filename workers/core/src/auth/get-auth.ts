@@ -80,11 +80,14 @@ export function getAuthOptions(
         domain: env.BETTER_AUTH_COOKIE_DOMAIN,
       },
       ipAddress: {
-        ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
+        ipAddressHeaders: ["cf-connecting-ip"],
       },
     },
     rateLimit: {
-      // Edge rules own throttling; BA counters would add per-request storage I/O.
+      // BA rate counters add per-request storage I/O. Route-level throttling
+      // is handled at the edge via Cloudflare WAF rules. workers_dev: false
+      // (per SEC-003) closes the workers.dev bypass, which is the primary
+      // vector for unauthenticated rate-limit evasion.
       enabled: false,
     },
     emailVerification: {

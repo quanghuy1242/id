@@ -32,38 +32,31 @@ describe("useOauthRequestDescription", () => {
     expect(result.current).toBe("An application is requesting access.");
   });
 
-  it("uses client_name when available", () => {
-    const { result } = renderHook(() =>
-      useOauthRequestDescription("client_name=TestApp&scope=openid")
-    );
-    expect(result.current).toContain("TestApp");
-  });
-
-  it("falls back to client_id when client_name is not available", () => {
+  it("uses client_id in description", () => {
     const { result } = renderHook(() =>
       useOauthRequestDescription("client_id=abc123&scope=openid")
     );
-    expect(result.current).toContain("abc123");
+    expect(result.current).toBe("Client abc123 is requesting access. Scopes: openid");
+  });
+
+  it("falls back to default when client_id is not available", () => {
+    const { result } = renderHook(() =>
+      useOauthRequestDescription("scope=openid")
+    );
+    expect(result.current).toBe("Client this application is requesting access. Scopes: openid");
   });
 
   it("includes scopes when present", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("client_name=TestApp&scope=openid profile email")
+      useOauthRequestDescription("client_id=abc123&scope=openid profile email")
     );
     expect(result.current).toContain("Scopes: openid profile email");
   });
 
   it("does not include scopes when empty", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("client_name=TestApp")
+      useOauthRequestDescription("client_id=abc123")
     );
     expect(result.current).not.toContain("Scopes:");
-  });
-
-  it("uses fallback name when neither client_name nor client_id is present", () => {
-    const { result } = renderHook(() =>
-      useOauthRequestDescription("scope=openid")
-    );
-    expect(result.current).toContain("this application");
   });
 });

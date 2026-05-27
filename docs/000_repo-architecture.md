@@ -1340,6 +1340,7 @@ Acceptance:
 | Package leak | `packages/lib` imports runtime frameworks | package isolation lint. |
 | Bundle leak | React/Vinext enters core | `core-no-ui-deps` plus bundle smoke. |
 | Secret leakage | `.dev.vars` committed | `.dev.vars.example` only and secret scan if available. |
+| Cross-subdomain session cookie | Session cookie scoped to `.quanghuy.dev` shares the session with every sibling subdomain | The `id` session cookie is deliberately scoped to `.quanghuy.dev` for cross-subdomain SSO. Any sibling subdomain under `quanghuy.dev` is a session-trusted surface — a takeover of such a subdomain is a session-stealing primitive. Enumerate CNAMEs quarterly. The cookie is `HttpOnly`, `Secure`, and `SameSite=Lax` (BA defaults). Do not narrow the domain without a replacement cross-subdomain auth model. |
 
 ## 15. Test And Verification Plan
 

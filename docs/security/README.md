@@ -65,6 +65,7 @@ Update the `Status` column in `security-register.md` only — the snapshot is an
 # YYYYMMDD_NNNN — Security Audit: <topic>
 
 > Date: YYYY-MM-DD
+> Last Commit: <full 40-char hash>
 > Register baseline: SEC-NNN (highest ID before this run)
 > Scope: <components or surfaces audited>
 > Excluded: <what was not audited and why>

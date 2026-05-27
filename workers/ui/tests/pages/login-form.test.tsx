@@ -66,28 +66,18 @@ describe("LoginForm", () => {
     });
   });
 
-  it("shows password length error for short password", async () => {
-    render(<LoginForm />);
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "short" } });
-    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
-    await waitFor(() => {
-      expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
-    });
-  });
-
   it("submits the form with valid credentials", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/dashboard" });
+    mockPostAuthApi.mockResolvedValue({});
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
       expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
         email: "test@example.com",
-        password: "password123",
+        password: "password12345",
         oauth_query: "",
       });
     });
@@ -98,7 +88,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
@@ -111,7 +101,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
@@ -124,7 +114,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
@@ -139,7 +129,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
@@ -155,13 +145,13 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
       expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
         email: "test@example.com",
-        password: "password123",
+        password: "password12345",
         oauth_query: "client_id=test&scope=openid",
       });
     });

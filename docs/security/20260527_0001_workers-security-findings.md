@@ -1,6 +1,7 @@
 # 20260527_0001 — Security Audit: workers/core + workers/ui
 
 > Date: 2026-05-27
+> Last Commit: `040d5df5fbf0ac0ca5fbeece095d9fb619c32f48`
 > Register baseline: — (first audit; establishes SEC-001–018)
 > Scope: `workers/core`, `workers/ui`, `packages/lib`
 > Excluded: tests, packages outside `lib`, migrations, edge-side WAF rules

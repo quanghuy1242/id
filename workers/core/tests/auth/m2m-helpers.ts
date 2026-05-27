@@ -30,7 +30,7 @@ export async function createTestEnv(): Promise<TestEnv> {
     env: {
       BETTER_AUTH_SECRET: "test-secret",
       BETTER_AUTH_URL: "https://id.example.test",
-      ID_BOOTSTRAP_TOKEN: "bootstrap-token",
+      ID_BOOTSTRAP_TOKEN: "test-bootstrap-token-v1",
       DB: db,
       KV: createTestKv(),
     },
@@ -42,7 +42,7 @@ export async function bootstrapAdmin(test: TestEnv): Promise<string> {
     "/api/bootstrap/admin",
     {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer bootstrap-token" },
+      headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
       body: JSON.stringify({
         email: "root@example.test",
         password: "password12345",

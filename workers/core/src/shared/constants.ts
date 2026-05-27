@@ -19,6 +19,18 @@ export const OAUTH_SCOPE_CATALOG_MEMORY_CACHE_TTL_MS = 60_000;
 /** Minimum one-time bootstrap password length for the initial admin user. */
 export const MIN_BOOTSTRAP_PASSWORD_LENGTH = 12;
 
+/** Minimum one-time bootstrap token length enforced at handler entry (SEC-009). */
+export const MIN_BOOTSTRAP_TOKEN_LENGTH = 20;
+
+/** Maximum bootstrap attempts per IP within the rate limit window (SEC-002). */
+export const BOOTSTRAP_RATE_LIMIT_MAX_ATTEMPTS = 5;
+
+/** Bootstrap rate limit window in seconds (SEC-002). */
+export const BOOTSTRAP_RATE_LIMIT_TTL_SECONDS = 60;
+
+/** Bootstrap KV lock TTL in seconds for race-window prevention (SEC-007). */
+export const BOOTSTRAP_LOCK_TTL_SECONDS = 30;
+
 /** OAuth grant type constant for machine-to-machine (client_credentials) clients. */
 export const OAUTH_CLIENT_GRANT_TYPE_M2M = "client_credentials" as const;
 

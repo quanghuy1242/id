@@ -4,7 +4,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 
 This repo implements the first-batch documented scope:
 
-- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), temporary principal-validation API (compatibility surface until content-api adopts SCIM), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
+- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
 - `ui-id` Worker — admin UI scaffold under `/admin/*`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
@@ -38,6 +38,10 @@ Intentionally deferred to later batches:
 - webhook delivery
 - custom onboarding flows and registration contexts
 - pipeline/hook scripting engine
+
+## Security
+
+Last security check date: **2026-05-27**. See [docs/security/](docs/security/) for the living findings register and audit snapshots.
 
 ## Stack
 

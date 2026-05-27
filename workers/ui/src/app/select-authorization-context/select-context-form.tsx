@@ -12,12 +12,21 @@ type Organization = {
   name: string;
 };
 
+const organizationSchema = { parse: (data: unknown): readonly Organization[] => {
+  if (!Array.isArray(data)) return [];
+  return data.filter(
+    (item): item is Organization =>
+      typeof item === "object" && item !== null &&
+      typeof (item as Record<string, unknown>).id === "string" && ((item as Record<string, unknown>).id as string).length > 0 &&
+      typeof (item as Record<string, unknown>).name === "string" && ((item as Record<string, unknown>).name as string).length > 0,
+  );
+} };
+
 async function fetchOrganizations(): Promise<readonly Organization[]> {
   try {
     const res = await fetch("/api/auth/organization/list", { headers: { accept: "application/json" } });
     const data: unknown = await res.json();
-    if (!Array.isArray(data)) return [];
-    return data as Organization[];
+    return organizationSchema.parse(data);
   } catch {
     return [];
   }

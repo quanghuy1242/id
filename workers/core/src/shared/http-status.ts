@@ -9,3 +9,12 @@ export const HTTP_UNAUTHORIZED = 401;
 
 /** Returned when an authenticated actor lacks permission for an admin action. */
 export const HTTP_FORBIDDEN = 403;
+
+/** Returned when a resource is not found. */
+export const HTTP_NOT_FOUND = 404;
+
+/** Returned when the caller has exceeded a rate limit. */
+export const HTTP_TOO_MANY_REQUESTS = 429;
+
+/** Returned when service is temporarily unavailable or misconfigured. */
+export const HTTP_SERVICE_UNAVAILABLE = 503;

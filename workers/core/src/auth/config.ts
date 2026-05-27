@@ -14,7 +14,7 @@ export const OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS = 86_400;
 export const JWKS_ROTATION_INTERVAL_SECONDS = 86_400;
 
 /** JWKS retired-key grace period, in seconds. */
-export const JWKS_GRACE_PERIOD_SECONDS = 2_592_000;
+export const JWKS_GRACE_PERIOD_SECONDS = 1_209_600;
 
 /** Maximum team IDs allowed in an issued access-token claim. */
 export const MAX_TOKEN_TEAM_IDS = 128;

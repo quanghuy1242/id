@@ -15,7 +15,7 @@ function parseClientInfo(oauthQuery: string): ClientInfo {
   if (!oauthQuery) return { name: "an application", scopes: [] };
   const search = new URLSearchParams(oauthQuery);
   return {
-    name: search.get("client_name") ?? search.get("client_id") ?? "an application",
+    name: `Client ${search.get("client_id") ?? "unknown"}`,
     scopes: (search.get("scope") ?? "").split(" ").filter(Boolean),
   };
 }

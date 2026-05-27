@@ -97,6 +97,18 @@
     },
     {
       "tool": "aislop",
+      "file": "workers/core/src/auth/adapters/secondary-storage.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment documents KV getAndDelete non-atomic limitation per SEC-008 audit finding."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/get-auth.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment documents rate-limit strategy per SEC-003: workers_dev: false is the primary defense; WAF rules handle route throttling."
+    },
+    {
+      "tool": "aislop",
       "file": "workers/core/src/auth/plugins/scim-directory/resources.ts",
       "rule": "ai-slop/narrative-comment",
       "reason": "JSDoc at architectural boundary documenting the privacy rule for userName mapping."

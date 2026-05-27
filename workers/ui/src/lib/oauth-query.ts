@@ -19,8 +19,8 @@ export function useOauthRequestDescription(oauthQuery: string): string {
     }
 
     const search = new URLSearchParams(oauthQuery);
-    const name = search.get("client_name") ?? search.get("client_id") ?? "this application";
+    const clientId = search.get("client_id") ?? "this application";
     const scope = search.get("scope") ?? "";
-    return `${name} is requesting access.${scope ? ` Scopes: ${scope}` : ""}`;
+    return `Client ${clientId} is requesting access.${scope ? ` Scopes: ${scope}` : ""}`;
   }, [oauthQuery]);
 }

@@ -21,7 +21,7 @@ async function createEnv(): Promise<CoreEnv> {
   return {
     BETTER_AUTH_SECRET: "test-secret",
     BETTER_AUTH_URL: "https://id.example.test",
-    ID_BOOTSTRAP_TOKEN: "bootstrap-token",
+    ID_BOOTSTRAP_TOKEN: "test-bootstrap-token-v1",
     DB: db,
     KV: createKv(),
   };

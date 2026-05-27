@@ -19,8 +19,8 @@ vi.mock("@/lib/oauth-query", () => ({
   useOauthRequestDescription: (q: string) => {
     if (!q) return "An application is requesting access.";
     const search = new URLSearchParams(q);
-    const name = search.get("client_name") ?? search.get("client_id") ?? "an application";
-    return `${name} is requesting permission to access your account.`;
+    const clientId = search.get("client_id") ?? "this application";
+    return `Client ${clientId} is requesting access.`;
   },
 }));
 
@@ -46,15 +46,15 @@ describe("ConsentForm", () => {
     expect(screen.getByText(/an application/i, { exact: false })).toBeInTheDocument();
   });
 
-  it("shows client name from oauth query", () => {
-    mockOauthQuery = "client_name=TestApp&scope=openid profile";
+  it("shows client id from oauth query", () => {
+    mockOauthQuery = "client_id=test-app&scope=openid profile";
 
     render(<ConsentForm />);
-    expect(screen.getByText(/testapp/i, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/Client test-app/i)).toBeInTheDocument();
   });
 
   it("shows scopes as badges when present", () => {
-    mockOauthQuery = "client_name=TestApp&scope=openid profile email";
+    mockOauthQuery = "client_id=test-app&scope=openid profile email";
 
     render(<ConsentForm />);
     expect(screen.getByText(/openid/i)).toBeInTheDocument();

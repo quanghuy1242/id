@@ -21,8 +21,15 @@ function validateEmail(value: string): string | undefined {
 
 function validatePassword(value: string): string | undefined {
   if (!value) return "Password is required";
-  if (value.length < 8) return "Password must be at least 8 characters";
   return undefined;
+}
+
+function isSameOrigin(url: string): boolean {
+  try {
+    return new URL(url, window.location.origin).origin === window.location.origin;
+  } catch {
+    return false;
+  }
 }
 
 export function LoginForm() {
@@ -57,11 +64,15 @@ export function LoginForm() {
       });
 
       if (body.redirect) {
-        router.push((body.url || body.redirectURL || "/") as string);
+        const url = (body.url || body.redirectURL || "/") as string;
+        if (isSameOrigin(url)) { router.push(url); return; }
+        setError("Unexpected redirect target");
         return;
       }
       if (body.url) {
-        router.push(body.url as string);
+        const url = body.url as string;
+        if (isSameOrigin(url)) { router.push(url); return; }
+        setError("Unexpected redirect target");
         return;
       }
       setError((body.message || body.error || "Sign in failed") as string);
