@@ -74,6 +74,8 @@ export type AuthPluginConfig = {
   readonly systemResourceServerSlug: string;
   /** OAuth scope that authorizes `/api/auth/admin/oauth-clients/lookup` for M2M callers. */
   readonly systemOAuthClientPickerScope: string;
+  /** OAuth scope that authorizes SCIM directory read endpoints. */
+  readonly scimDirectoryScope: string;
 };
 
 export const oauthTokenLifetimeConfig = {
@@ -122,7 +124,17 @@ export const authPluginConfig = {
   principalValidationScope: "identity:principals:validate",
   systemResourceServerSlug: "id-system",
   systemOAuthClientPickerScope: "oauth:clients:read",
+  scimDirectoryScope: "identity:directory:read",
 } as const satisfies AuthPluginConfig;
+
+/**
+ * Audience URL for the SCIM directory resource server.
+ * M2M callers must present a token with this audience and `identity:directory:read` scope
+ * to access SCIM read endpoints.
+ */
+export function scimDirectoryAudience(baseUrl: string): string {
+  return new URL("/scim", baseUrl).toString();
+}
 
 /**
  * Audience URL identifying id's own (`organizationId IS NULL`) system resource server.

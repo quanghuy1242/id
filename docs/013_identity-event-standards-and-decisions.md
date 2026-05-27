@@ -389,7 +389,7 @@ These tracks are related but not serialized:
 |---|---|---|---|
 | A1 | Correct doc language: SCIM read/query is the target synchronous directory contract; OAuth client credentials remains the M2M runtime contract; custom `principal-validation` is temporary only | Recorded in docs; no code dependency | doc 017 |
 | A2 | Adopt BA `referenceId`, `oauthClientResourceScope`, picker auth, and infra M2M clients | Must land before service-account principal-validation deletion and before `content-api` M2M adoption is complete | doc 018 |
-| A3 | Add read-only SCIM routes in `id` for users, org users, groups, and virtual org-admin groups | Can start after A1; does not depend on event-channel work | doc 017 |
+| A3 ✓ | Add read-only SCIM routes in `id` for users, org users, groups, and virtual org-admin groups | **Implemented 2026-05-27** — `id-scim-directory` plugin shipped; `pnpm check` green; 396 tests pass. | doc 017 |
 | A4 | Migrate `content-api` user/team/admin checks to SCIM and service-account attach flows to doc 018's OAuth-client contract | Requires A2 for the M2M side and A3 for the SCIM side | docs 017 + 018 |
 | A5 | Deprecate, facade, then remove `principal-validation` | Only after A4 is complete and the deprecation window has elapsed | docs 017 + 018 |
 | B1 | SSF stream-config endpoints; SET envelope; RISC event vocabulary; transactional outbox; HMAC + JWS signing; retry + DLQ; audit receiver, verification, idempotency, and findings | Default first release for the event channel | docs 014 + 015 |

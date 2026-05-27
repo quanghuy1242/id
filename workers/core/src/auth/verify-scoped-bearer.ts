@@ -34,7 +34,12 @@ export async function verifyScopedBearerToken(params: {
   readonly scope: string;
 }): Promise<JWTPayload> {
   const token = bearerToken(params.headers);
-  const header = decodeProtectedHeader(token);
+  let header: Awaited<ReturnType<typeof decodeProtectedHeader>>;
+  try {
+    header = decodeProtectedHeader(token);
+  } catch {
+    throw new APIError("UNAUTHORIZED");
+  }
   if (!header.kid) throw new APIError("UNAUTHORIZED");
 
   const keys = await params.adapter.findMany<JwksRow>({ model: "jwks" });

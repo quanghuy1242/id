@@ -21,3 +21,40 @@ export const MIN_BOOTSTRAP_PASSWORD_LENGTH = 12;
 
 /** OAuth grant type constant for machine-to-machine (client_credentials) clients. */
 export const OAUTH_CLIENT_GRANT_TYPE_M2M = "client_credentials" as const;
+
+/** SCIM core User schema URN (RFC 7643 §4.1). */
+export const SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User" as const;
+/** SCIM core Group schema URN (RFC 7643 §4.2). */
+export const SCIM_GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group" as const;
+/** SCIM ListResponse message schema URN (RFC 7644 §3.9). */
+export const SCIM_LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse" as const;
+/** SCIM Error message schema URN (RFC 7644 §3.12). */
+export const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error" as const;
+/** SCIM ServiceProviderConfig schema URN (RFC 7643 §5). */
+export const SCIM_SERVICE_PROVIDER_CONFIG_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig" as const;
+/** SCIM Schema schema URN (RFC 7643 §7). */
+export const SCIM_SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema" as const;
+/** SCIM ResourceType schema URN (RFC 7644 §6). */
+export const SCIM_RESOURCE_TYPE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ResourceType" as const;
+
+/**
+ * Repository-specific SCIM extension schema URI for tenant (organization) membership.
+ * Returned alongside the core User schema on tenant-path User responses.
+ * Classified as a repository-specific URL convention (not a SCIM-native construct).
+ */
+export const SCIM_TENANT_MEMBERSHIP_SCHEMA = "https://id/scim/schemas/tenant-membership" as const;
+
+/** Virtual SCIM Group ID representing the owner/admin members of an organization. No DB row backing. */
+export const SCIM_ORG_ADMINS_GROUP_ID = "org-admins" as const;
+
+/** Maximum number of resources the SCIM filter endpoint returns in one response. */
+export const SCIM_MAX_FILTER_RESULTS = 100;
+
+/** HTTP 200 OK status code for SCIM responses. */
+export const SCIM_HTTP_OK = 200;
+/** HTTP 400 Bad Request status code for SCIM error responses. */
+export const SCIM_HTTP_BAD_REQUEST = 400;
+/** HTTP 404 Not Found status code for SCIM error responses. */
+export const SCIM_HTTP_NOT_FOUND = 404;
+/** HTTP 405 Method Not Allowed status code for SCIM read-only enforcement. */
+export const SCIM_HTTP_METHOD_NOT_ALLOWED = 405;

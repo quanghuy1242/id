@@ -82,6 +82,36 @@
       "tool": "fallow",
       "files": "workers/core/src/auth/plugins/oauth-scope-catalog/index.ts|workers/core/src/auth/plugins/resource-server/index.ts",
       "reason": "Better Auth plugin endpoint handlers intentionally share explicit validate-authorize-mutate-invalidate structure across plugin-owned CRUD surfaces."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/scim-directory/index.ts",
+      "rule": "complexity/file-too-large",
+      "reason": "SCIM directory plugin centralizes all endpoint registrations for the SCIM v2 read-only surface; splitting routes would fragment the plugin contract."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/scim-directory/index.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment links userName eq filter handler to findUser for future coupling awareness when userName is upgraded to email."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/scim-directory/resources.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "JSDoc at architectural boundary documenting the privacy rule for userName mapping."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/scim-directory/schema.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "JSDoc at architectural boundary documenting OpenAPI content-type limitation for SCIM+JSON."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/scim-directory/schema.ts",
+      "rule": "ai-slop/todo-stub",
+      "reason": "TODO comment at architectural boundary tracking Better Auth content-type support for SCIM OpenAPI docs."
     }
   ]
 }

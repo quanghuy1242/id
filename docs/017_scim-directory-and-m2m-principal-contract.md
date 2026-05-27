@@ -1,8 +1,21 @@
 # SCIM Directory And M2M Principal Contract Proposal
 
-> Status: proposal and brainstorming decision record
+> Status: A3 (`id` read-only SCIM plugin) implemented — 2026-05-27. A4 (`content-api` SCIM adapter) and A5 (principal-validation deprecation) remain pending.
 >
 > Date: 2026-05-26
+>
+> Implementation summary (A3 — id repo):
+>
+> - Plugin: `workers/core/src/auth/plugins/scim-directory/`
+> - SCIM schema URNs, HTTP status codes, and org-admins sentinel moved to `workers/core/src/shared/constants.ts`.
+> - `scimDirectoryAudience(baseUrl)` and `scimDirectoryScope` added to `workers/core/src/auth/config.ts`.
+> - All SCREAMING_SNAKE_CASE constants satisfy the architecture `constants-placement` and `constants-jsdoc` lint rules.
+> - `verifyScopedBearerToken` in `verify-scoped-bearer.ts` hardened to catch jose `decodeProtectedHeader` errors and convert them to `UNAUTHORIZED` (previously caused 500).
+> - Endpoints: discovery (no auth), global `/Users/:id` + `/Users?filter=`, tenant `/tenants/:orgId/Users/:userId`, tenant `/tenants/:orgId/Groups/:groupId`, tenant `/tenants/:orgId/Groups?filter=`. Unsupported mutation methods return 405.
+> - `schema.ts` is the canonical source for SCIM response Zod schemas, derived TypeScript types, and OpenAPI endpoint metadata fragments. `types.ts` is reserved for internal composition types only (`ScimAdapter`, `ScimDirectoryPluginOptions`, `ScimFilterClause`, `ParsedScimFilter`).
+> - All SCIM endpoints carry `metadata` with OpenAPI tags, descriptions, path params, and `application/json` response schemas (Better Auth's OpenAPI type system does not support `application/scim+json` as a content-type key; the actual wire response uses `application/scim+json`).
+> - All 405 mutation endpoints use `disableBody: true` so Better Auth skips body parsing and content-type validation, which allows standard SCIM clients sending `Content-Type: application/scim+json` with a request body to receive 405 instead of 415.
+> - 396 tests pass; `pnpm check` and `pnpm advise` are clean.
 >
 > Scope:
 >
@@ -883,11 +896,11 @@ Scope:
 
 Tasks:
 
-- [ ] Implement read-only SCIM routes.
-- [ ] Enforce SCIM caller M2M audience and scope.
-- [ ] Map Better Auth User, Member, and Team rows to SCIM resources.
-- [ ] Implement approved filter subset.
-- [ ] Test route contracts and errors.
+- [x] Implement read-only SCIM routes.
+- [x] Enforce SCIM caller M2M audience and scope.
+- [x] Map Better Auth User, Member, and Team rows to SCIM resources.
+- [x] Implement approved filter subset.
+- [x] Test route contracts and errors.
 
 Acceptance criteria:
 

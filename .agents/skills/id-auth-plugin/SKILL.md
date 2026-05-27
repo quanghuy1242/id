@@ -24,10 +24,49 @@ For the current concrete template, also read `workers/core/src/auth/plugins/reso
 - Keep plugin-owned pre-auth runtime companions inside the plugin directory when Better Auth needs data before endpoint context exists, such as the resource-server audience KV cache and D1 fallback.
 - Inject authorization callbacks from `workers/core/src/auth/get-auth.ts`; never import `auth/policies/access.ts` directly inside a plugin.
 
+## Better Auth Endpoint Metadata
+
+When writing `createAuthEndpoint` options, follow these rules:
+
+### `metadata.openapi.responses` type constraint
+
+Better Auth's underlying `better-call` package hardcodes the allowed response content-type keys to `"application/json"`, `"text/plain"`, and `"text/html"` (see `better-call` `EndpointBaseOptions.metadata.openapi.responses`). You **cannot** use any other content-type key — the TypeScript compiler will reject it.
+
+If your plugin returns a non-standard content type on the wire:
+
+1. Use `"application/json"` as the OpenAPI metadata content-type key — it is the closest available match.
+2. Leave a `TODO` comment at the metadata helper noting the limitation, the relevant standard, and that the actual wire response already sends the correct content type.
+3. Never weaken the type or cast to `any` to force an unsupported key through.
+
+Type the `responses` value as `Record<string, { description: string; content?: { "application/json"?: { schema: Record<string, unknown> } } }>` to satisfy the `better-call` type.
+
+### `disableBody: true` for mutation-rejection endpoints
+
+When an endpoint always rejects a method (e.g. returning 405 for POST/PUT/PATCH/DELETE on a read-only resource), add `disableBody: true` to the endpoint options. Without it, Better Auth's global `allowedMediaTypes` check will reject requests whose `Content-Type` does not match the configured allowed list — returning 415 instead of the intended protocol-level error. With `disableBody: true`, body parsing is skipped entirely, so the handler receives the request and returns the correct error status.
+
+### `metadata.openapi.tags`
+
+Tag every endpoint with a plugin-specific tag. Group all endpoints in the same plugin under the same tag.
+
+### Endpoint metadata helper pattern
+
+Model the metadata builder on `resourceServerEndpointMeta`, `oauthScopeCatalogEndpointMeta`, or `scimEndpointMeta` from the corresponding plugin's `schema.ts`. The helper should:
+
+- Accept `description`, optional path params (with `name`, `in`, `required`, `schema`, `description`), optional `requestBody`, optional `responseSchema` from `zodSchemaToOpenApi`, and optional `responseDescription`.
+- Return `{ openapi: { tags, description, parameters?, requestBody?, responses } }`.
+
+## Zod Schemas and Derived Types
+
+- `schema.ts` owns canonical Zod schemas for all API/response shapes the plugin produces. Other plugin files import types from `schema.ts`, not from `types.ts`.
+- `types.ts` is reserved for runtime composition hooks (adapter interfaces, filter types, plugin callback options) — not data shapes that can be expressed as Zod schemas.
+- Use `zodSchemaToOpenApi` from `../../openapi` to derive OpenAPI fragments from Zod schemas. Do not hand-write OpenAPI JSON Schema objects when a Zod schema exists.
+- Use `.meta({ id: "SchemaName" })` on Zod schemas so `z.toJSONSchema` includes the schema id.
+
 ## Validation
 
 - Unit-test schema derivation and operation helpers without Better Auth context.
 - Unit-test plugin runtime companions such as audience cache hit/miss/invalidation behavior without a Better Auth context.
 - Integration-test endpoint handlers through `auth.handler()` using `betterAuth(getAuthOptions(...))`.
+- For endpoints that reject mutations, send the protocol's standard content type and a body in the test request — this verifies `disableBody: true` is present and the 415 bypass works correctly. Do not strip the content-type header from tests to sidestep a BA validation error.
 - Run `pnpm check` after code changes.
 - Run `pnpm advise` after substantial plugin refactors and handle new findings according to repo guidance.

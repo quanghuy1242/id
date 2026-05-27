@@ -4,12 +4,13 @@ import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
 import { hashPassword, verifyPassword } from "./adapters/password";
-import { authPluginConfig } from "./config";
+import { authPluginConfig, scimDirectoryAudience } from "./config";
 import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idPrincipalValidation } from "./plugins/principal-validation";
 import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
+import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
@@ -66,6 +67,7 @@ export function getAuthOptions(
 ) {
   const emailSender = runtime.emailSender ?? createAuthEmailSender(env);
   const validationAudience = principalValidationAudience(env.BETTER_AUTH_URL);
+  const scimAudience = scimDirectoryAudience(env.BETTER_AUTH_URL);
   const issuer = `${env.BETTER_AUTH_URL}${authPluginConfig.issuerPath}`;
 
   return {
@@ -144,6 +146,10 @@ export function getAuthOptions(
         issuer,
         audience: validationAudience,
         scope: authPluginConfig.principalValidationScope,
+      }),
+      idScimDirectory({
+        issuer,
+        audience: scimAudience,
       }),
       openAPI(),
     ],

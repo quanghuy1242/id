@@ -16,7 +16,8 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | `id-oauth-scope-catalog` | `oauth-scope-catalog/` | Admin CRUD for resource-server-bound OAuth scopes, layer-matched M2M resource-scope rows, and runtime scope/grant preload |
 | `id-oauth-m2m-bridge` | `oauth-m2m-bridge/` | M2M OAuth client identity mirror and immutable client-reference boundary required by the BA token hook contract |
 | `id-oauth-client-picker` | `oauth-client-picker/` | Scoped system-M2M client metadata and advisory OAuth resource-eligibility lookup with tenant-context isolation |
-| `id-principal-validation` | `principal-validation/` | Authenticated exact-ID principal validation for downstream durable policy writes |
+| `id-principal-validation` | `principal-validation/` | Authenticated exact-ID principal validation for downstream durable policy writes (temporary compatibility surface — see doc 017) |
+| `id-scim-directory` | `scim-directory/` | Read-only SCIM v2 directory (RFC 7644) for users, org users, teams/groups, and virtual org-admin group — doc 017 A3 |
 
 ## File structure
 
