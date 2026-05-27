@@ -9,7 +9,7 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS",
-    "run_worker_first": ["/login", "/consent", "/select-authorization-context", "/admin/*"]
+    "run_worker_first": ["/login", "/consent", "/select-authorization-context", "/admin", "/admin/*"]
   },
   "routes": [
     // Login and consent pages (OAuth browser flows)
@@ -17,6 +17,7 @@
     { "pattern": "id.quanghuy.dev/consent", "zone_name": "quanghuy.dev" },
     { "pattern": "id.quanghuy.dev/select-authorization-context", "zone_name": "quanghuy.dev" },
     // UI administration pages (management forms)
+    { "pattern": "id.quanghuy.dev/admin", "zone_name": "quanghuy.dev" },
     { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" },
     // Client-side assets (JS, CSS) referenced by UI pages
     { "pattern": "id.quanghuy.dev/assets/*", "zone_name": "quanghuy.dev" }
