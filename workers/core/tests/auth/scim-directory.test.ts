@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authPluginConfig, scimDirectoryAudience } from "../../src/auth/config";
+import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
 import {
   attachClientResourceScope,
   bootstrapAdmin,
@@ -68,7 +68,7 @@ async function seedScimInfrastructure() {
   const test = await createTestEnv();
   const cookie = await bootstrapAdmin(test);
 
-  const SCIM_AUDIENCE = scimDirectoryAudience("https://id.example.test");
+  const SCIM_AUDIENCE = systemResourceServerAudience("https://id.example.test");
 
   // Create a resource server + scope for SCIM audience.
   const scimRsId = await createResourceServer(test, cookie, {

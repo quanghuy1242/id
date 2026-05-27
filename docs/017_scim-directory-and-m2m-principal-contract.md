@@ -1,6 +1,6 @@
 # SCIM Directory And M2M Principal Contract Proposal
 
-> Status: A3 (`id` read-only SCIM plugin) and A5 (principal-validation removal) implemented — 2026-05-27. A4 (`content-api` SCIM adapter) remains pending.
+> Status: Track A complete — 2026-05-27. A3 (SCIM plugin), A4 (content-api SCIM adapter), A5 (principal-validation removal) all implemented.
 >
 > Date: 2026-05-26
 >

@@ -148,8 +148,13 @@ const scimErrorMetadata = scimEndpointMeta({
  * as defined by doc 017 §4.2 and §7.1. Full SCIM provisioning is not supported;
  * mutation methods return 405.
  *
- * Authentication: M2M bearer token with `aud = scimDirectoryAudience(baseUrl)` and
+ * Authentication: M2M bearer token with
+ * `aud = systemResourceServerAudience(baseUrl)` (i.e. `{idBaseUrl}/system`) and
  * `scope = identity:directory:read` (authPluginConfig.scimDirectoryScope).
+ *
+ * The audience is deliberately `/system`, shared with the OAuth client picker plugin,
+ * so a single M2M token serves both SCIM reads and OAuth client lookups
+ * (see doc 020 §2). The original per-doc-017 `/scim` audience is no longer used.
  */
 export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuthPlugin => ({
   id: "id-scim-directory",

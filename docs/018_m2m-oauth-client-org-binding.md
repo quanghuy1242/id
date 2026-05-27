@@ -1,8 +1,6 @@
 # M2M Identity Correction: Adopt Better Auth's First-Class OAuth Client Model
 
-> Status: A2 `id`-side M2M correction code is implemented for a clean-slate rollout; infrastructure credential provisioning remains a deployment task.
-> A4 still requires A3 plus `content-api` adoption, and A5 remains gated on A4
-> completion and its deprecation window per [doc 013 §6](013_identity-event-standards-and-decisions.md#6-phased-rollout-and-conditions-to-advance).
+> Status: Track A complete — 2026-05-27. A2 (M2M correction), A3 (SCIM plugin), A4 (content-api SCIM adapter), A5 (principal-validation removal) all implemented.
 >
 > Date: 2026-05-26
 >

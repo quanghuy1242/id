@@ -16,14 +16,15 @@ The plugin is registered in `get-auth.ts`. A SCIM M2M client must be provisioned
 before resource servers can call the endpoints:
 
 1. Create a resource server with
-   `audience = scimDirectoryAudience(BETTER_AUTH_URL)` (e.g. `https://id.example/scim`).
+   `audience = systemResourceServerAudience(BETTER_AUTH_URL)` (e.g. `https://id.example/system`).
+   This is shared with the OAuth client picker — one M2M token serves both (doc 020 §2).
 2. Declare `identity:directory:read` on it via `POST /api/auth/admin/oauth-scopes`.
 3. Create an infrastructure M2M client (`referenceId IS NULL`,
    `grant_types = ["client_credentials"]`).
 4. Attach an `oauthClientResourceScope` row linking the infra client to the SCIM
    resource server, with `allowedScopes = ["identity:directory:read"]`.
 5. Store the infra client's `client_secret` in consumer secret bindings and issue
-   tokens with `aud = scimDirectoryAudience(...)` + `scope = identity:directory:read`.
+    tokens with `aud = systemResourceServerAudience(...)` + `scope = identity:directory:read`.
 
 ## Usage
 
@@ -36,7 +37,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=client_credentials
 &client_id=<infra-client-id>
 &client_secret=<infra-client-secret>
-&resource=https://id.example/scim
+&resource=https://id.example/system
 &scope=identity:directory:read
 ```
 
@@ -135,7 +136,7 @@ POST /api/auth/scim/v2/Bulk                         — 405 (bulk not supported)
 ```
 
 All resource endpoints (non-discovery) require a M2M bearer token with
-`aud = scimDirectoryAudience(baseUrl)` and `scope = identity:directory:read`.
+`aud = systemResourceServerAudience(baseUrl)` and `scope = identity:directory:read`.
 
 ## Banned users
 
