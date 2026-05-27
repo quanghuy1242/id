@@ -387,10 +387,10 @@ These tracks are related but not serialized:
 
 | Track / phase | Scope | Conditions to advance | Execution docs |
 |---|---|---|---|
-| A1 | Correct doc language: SCIM read/query is the target synchronous directory contract; OAuth client credentials remains the M2M runtime contract; custom `principal-validation` is temporary only | Recorded in docs; no code dependency | doc 017 |
-| A2 | Adopt BA `referenceId`, `oauthClientResourceScope`, picker auth, and infra M2M clients | Must land before service-account principal-validation deletion and before `content-api` M2M adoption is complete | doc 018 |
+| A1 ✓ | Correct doc language: SCIM read/query is the target synchronous directory contract; OAuth client credentials remains the M2M runtime contract; custom `principal-validation` is temporary only | Recorded in docs; no code dependency | doc 017 |
+| A2 ✓ | Adopt BA `referenceId`, `oauthClientResourceScope`, picker auth, and infra M2M clients | **Implemented 2026-05-26** — doc 018 | doc 018 |
 | A3 ✓ | Add read-only SCIM routes in `id` for users, org users, groups, and virtual org-admin groups | **Implemented 2026-05-27** — `id-scim-directory` plugin shipped; `pnpm check` green; 396 tests pass. | doc 017 |
-| A4 | Migrate `content-api` user/team/admin checks to SCIM and service-account attach flows to doc 018's OAuth-client contract | Requires A2 for the M2M side and A3 for the SCIM side | docs 017 + 018 |
+| A4 | Migrate `content-api` user/team/admin checks to SCIM and service-account attach flows to doc 018's OAuth-client contract | Requires A2 for the M2M side and A3 for the SCIM side. **Note**: ordinary members cannot create OAuth clients yet (doc 018 known issue #1 — `canManageOrganizationOAuthClients` restricted to `owner\|\|admin`). If content-api needs member-created service accounts, fix that first. | docs 017 + 018 |
 | A5 ✓ | Deprecate, facade, then remove `principal-validation` | **Implemented 2026-05-27** — `id-principal-validation` plugin, test file, and runtime wiring removed from `id`. The `content-api` migration (A4) is gated separately. | docs 017 + 018 |
 | B1 | SSF stream-config endpoints; SET envelope; RISC event vocabulary; transactional outbox; HMAC + JWS signing; retry + DLQ; audit receiver, verification, idempotency, and findings | Default first release for the event channel | docs 014 + 015 |
 | B2 | Add CAEP and approved repository-specific event types reusing the same outbox + delivery; consumer remains audit-only | Only when D4 conditions are met | doc 014 §8 + doc 015 §8 |
