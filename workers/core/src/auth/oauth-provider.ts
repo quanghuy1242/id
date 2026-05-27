@@ -37,10 +37,6 @@ function roleValue(role: unknown): string | null | undefined {
   return typeof role === "string" || role === null || role === undefined ? role : undefined;
 }
 
-export function principalValidationAudience(baseUrl: string): string {
-  return new URL("/principal-validation", baseUrl).toString();
-}
-
 /**
  * OAuth Provider validates dynamic audiences and scopes when constructed.
  * Only routes that need those checks should pay the runtime catalog preload.
@@ -67,7 +63,6 @@ export function createOAuthProviderPlugin(
   env: AuthOptionsEnv,
   catalog: OAuthRuntimeCatalog,
   runtime: AuthRuntimeOptions,
-  validationAudience: string,
   canManageOAuthClients: (role: string | null | undefined) => boolean,
 ) {
   return oauthProvider({
@@ -84,7 +79,7 @@ export function createOAuthProviderPlugin(
       ...catalog.scopes,
     ],
     grantTypes: [...authPluginConfig.oauthGrantTypes],
-    validAudiences: [...catalog.validAudiences, validationAudience],
+    validAudiences: [...catalog.validAudiences],
     postLogin: {
       page: "/select-authorization-context",
       shouldRedirect: async ({ headers, scopes, session }) => {

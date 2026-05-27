@@ -69,7 +69,6 @@ export type AuthPluginConfig = {
   readonly directShareReferenceId: string;
   readonly workspaceOnlyScopes: readonly string[];
   readonly maxTokenTeamIds: number;
-  readonly principalValidationScope: string;
   /** Slug for id-owned system resource-server audiences. */
   readonly systemResourceServerSlug: string;
   /** OAuth scope that authorizes `/api/auth/admin/oauth-clients/lookup` for M2M callers. */
@@ -121,7 +120,6 @@ export const authPluginConfig = {
   directShareReferenceId: "urn:id:oauth-context:direct-share",
   workspaceOnlyScopes: ["content:share"],
   maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
-  principalValidationScope: "identity:principals:validate",
   systemResourceServerSlug: "id-system",
   systemOAuthClientPickerScope: "oauth:clients:read",
   scimDirectoryScope: "identity:directory:read",

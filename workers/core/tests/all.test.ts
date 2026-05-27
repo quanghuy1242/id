@@ -20,7 +20,6 @@ await import("./auth/oauth-scope-catalog.test");
 await import("./auth/organization-invite-session.test");
 await import("./auth/organization-teams.test");
 await import("./auth/password.test");
-await import("./auth/principal-validation.test");
 await import("./auth/scim-directory.test");
 await import("./auth/resource-server-operations.test");
 await import("./auth/resource-server-plugin.test");

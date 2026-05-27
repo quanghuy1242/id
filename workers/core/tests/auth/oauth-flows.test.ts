@@ -36,14 +36,9 @@ async function createAuth(db: D1Database, validAudiences: readonly string[] = []
       },
       {
         validAudiences,
-        scopes: ["content:write", "identity:principals:validate"],
+        scopes: ["content:write"],
         scopeRows: [
           { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
-          {
-            resourceServerId: "rs_identity",
-            audience: "https://id.example.test/principal-validation",
-            scope: "identity:principals:validate",
-          },
         ],
       },
     ),

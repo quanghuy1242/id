@@ -1,5 +1,10 @@
 # `id-oauth-client-picker` plugin
 
+> **Purpose**: Lets resource servers look up OAuth client metadata without a user
+> session. `content-api` uses this to show which service accounts are available
+> when an admin creates a policy binding — without the admin needing to hold any
+> client secrets.
+
 Read-only M2M wrapper around `oauthClient` rows and their id-owned OAuth
 resource eligibility. Doc 018 §5.3 D3 keeps Better Auth's RFC 7592-shaped
 `/oauth2/get-client` as the canonical client metadata shape; this plugin
@@ -35,6 +40,29 @@ When `?resource=<audience>` is supplied, the response also returns advisory
 This is a repository-specific operational read for picker display and
 reconciliation. It reports only OAuth issuance eligibility owned by `id`; it
 does not approve a Content IAM binding, role, denial, or resource policy.
+
+## Usage
+
+```http
+GET /api/auth/admin/oauth-clients/lookup?client_id=c_abc123&org_id=org_content
+Authorization: Bearer <system-M2M-token>
+```
+
+Response (200):
+
+```json
+{
+  "client_id": "c_abc123",
+  "client_name": "content-api writer",
+  "grant_types": ["client_credentials"],
+  "token_endpoint_auth_method": "client_secret_post",
+  "reference_id": "org_content",
+  "resource_access": { "resource": "https://api.example.test", "status": "enabled" }
+}
+```
+
+Returns 404 when `client_id` does not exist, `referenceId` does not match
+`org_id`, or the client has no eligible attachment.
 
 ## Deployment
 

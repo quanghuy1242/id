@@ -1,9 +1,65 @@
-# OAuth Scope Catalog Plugin
+# `id-oauth-scope-catalog` Plugin
 
-`id-oauth-scope-catalog` owns resource-server-bound OAuth scope rows, layer-matched M2M client resource-scope rows, and runtime scope/grant preload helpers. Tenant clients may bind only to a resource server in their `referenceId` organization; infrastructure clients (`referenceId IS NULL`) may bind only to system resource servers and are platform-admin managed.
+> **Purpose**: Lets admins define which OAuth scopes exist and which M2M clients
+> are allowed to request them. Without a scope catalog, token issuance cannot
+> validate that a client is authorized for the product scopes it asks for.
 
-The plugin stays inside the Better Auth boundary. CRUD endpoints use the Better Auth adapter. Runtime companions use narrowly approved pre-auth lookups only where OAuth Provider needs catalog data before plugin endpoint context exists.
+OAuth scope catalog plugin for Better Auth. Owns resource-server-bound OAuth scope rows,
+layer-matched M2M client resource-scope rows (`oauthClientResourceScope`), and runtime
+scope/grant preload helpers.
 
-The data model requires unique `(resourceServerId, scope)` and `(clientId, resourceServerId)` pairs. The plugin persists deterministic `resourceScopeKey` and `clientResourceKey` values for those natural keys and declares each as a supported Better Auth `unique: true` field. Endpoint responses omit the internal keys; direct writes outside the plugin contract are not permitted.
+## Setup
 
-It does not model product roles, permissions, concrete resource grants, hierarchy, inheritance, Content IAM policy decisions, or principal-validation endpoints. The authenticated exact-ID validation API lives in `../principal-validation/`.
+Registered in `get-auth.ts`. No separate provisioning is required — once a resource server
+exists, admin users define scopes on it and attach M2M clients to those scopes.
+
+## Usage
+
+All endpoints require an authenticated admin session (cookie).
+
+### Scopes
+
+```
+POST   /api/auth/admin/oauth-scopes          — create a scope on a resource server
+GET    /api/auth/admin/oauth-scopes          — list scopes
+PUT    /api/auth/admin/oauth-scopes/:id      — update a scope
+DELETE /api/auth/admin/oauth-scopes/:id      — delete a scope
+```
+
+Create body:
+
+```json
+{ "resourceServerId": "rs_123", "scope": "content:write" }
+```
+
+The `(resourceServerId, scope)` pair is unique. Scope changes invalidate the runtime
+scope cache.
+
+### Client resource scopes (doc 018 D2)
+
+```
+POST   /api/auth/admin/oauth-client-resource-scopes          — attach client to resource
+GET    /api/auth/admin/oauth-client-resource-scopes           — list client-scope rows
+PUT    /api/auth/admin/oauth-client-resource-scopes/:id      — update allowed scopes
+DELETE /api/auth/admin/oauth-client-resource-scopes/:id      — disconnect client from resource
+```
+
+Create body:
+
+```json
+{
+  "clientId": "client_456",
+  "resourceServerId": "rs_123",
+  "allowedScopes": ["content:write", "content:read"]
+}
+```
+
+The `(clientId, resourceServerId)` pair is unique. A client with no enabled
+`oauthClientResourceScope` row cannot obtain tokens with product scopes
+(D2 token-issuance enforcement).
+
+## Rules
+
+Tenant clients (`referenceId IS NOT NULL`) may only bind to resource servers in their
+`referenceId` organization. Infrastructure clients (`referenceId IS NULL`) may only bind
+to system resource servers (`organizationId IS NULL`) — doc 018 D7.

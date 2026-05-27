@@ -24,6 +24,81 @@ For the current concrete template, also read `workers/core/src/auth/plugins/reso
 - Keep plugin-owned pre-auth runtime companions inside the plugin directory when Better Auth needs data before endpoint context exists, such as the resource-server audience KV cache and D1 fallback.
 - Inject authorization callbacks from `workers/core/src/auth/get-auth.ts`; never import `auth/policies/access.ts` directly inside a plugin.
 
+## Plugin READMEs
+
+When writing or updating a plugin's `README.md`, follow this structure so the
+document is useful to both consumers and contributors.
+
+### 1. Purpose block (mandatory, first)
+
+Start with a one-sentence `> **Purpose**:` blockquote that answers three
+questions for someone who has never seen the codebase:
+
+- What problem does this plugin solve?
+- Who calls it (admin user? M2M client? which downstream system)?
+- Why does the caller need it — what breaks without it?
+
+Keep it at the consumer level. Use concrete examples and system names
+(`content-api`, `id`). Avoid framework jargon (Better Auth, Drizzle, BA adapter).
+
+Good:
+
+```markdown
+> **Purpose**: Lets resource servers look up OAuth client metadata without a
+> user session. `content-api` uses this to show which service accounts are
+> available when an admin creates a policy binding — without the admin
+> needing to hold any client secrets.
+```
+
+Bad:
+
+```markdown
+# OAuth Client Picker Plugin
+Read-only M2M wrapper around oauthClient rows. Doc 018 D3.
+```
+
+If the plugin is transparent to callers, say so:
+
+```markdown
+> **Purpose**: Prevents service-account clients from being moved between
+> organizations. Enforced transparently — no consumer action needed.
+```
+
+### 2. Setup (if applicable)
+
+If the plugin needs provisioning before it is usable (M2M client, resource
+server, scope, oauthClientResourceScope row), describe the steps in numbered
+order. A new operator should be able to follow them without reading source.
+
+Model this on `oauth-client-picker/README.md` Deployment section.
+
+If the plugin has no setup (registered in `get-auth.ts` and immediately
+available after admin sign-in), say so briefly.
+
+### 3. Usage (if callable)
+
+For every distinct consumer action, show a concrete HTTP request and the
+response. Include headers (`Authorization`, `Content-Type`, `Accept` where
+meaningful). Show real URL paths with real parameter values (`org_content`,
+`user_123`), not placeholders.
+
+Model this on `scim-directory/README.md` Usage section.
+
+### 4. Routes (reference table)
+
+After usage examples, list every route in a compact table or code block for
+quick scanning. For read-only plugins, also list the mutation-method routes
+and their expected status codes.
+
+### 5. Technical detail
+
+After the consumer-facing sections, add implementation notes: file
+responsibilities, important internal invariants, cache invalidation behavior,
+and architectural rationale. This section is for contributors, not consumers.
+
+If the plugin is transparent and has no endpoints, the technical detail can
+be a single paragraph describing the hook or behavior.
+
 ## Better Auth Endpoint Metadata
 
 When writing `createAuthEndpoint` options, follow these rules:

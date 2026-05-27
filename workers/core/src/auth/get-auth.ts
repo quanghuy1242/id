@@ -8,7 +8,6 @@ import { authPluginConfig, scimDirectoryAudience } from "./config";
 import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
-import { idPrincipalValidation } from "./plugins/principal-validation";
 import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
@@ -19,7 +18,6 @@ import {
   authPathNeedsOAuthRuntimeCatalog,
   createOAuthProviderPlugin,
   emptyOAuthRuntimeCatalog,
-  principalValidationAudience,
 } from "./oauth-provider";
 import type { AuthOptionsEnv, AuthRuntimeOptions, OAuthRuntimeCatalog } from "./types";
 import type { CoreEnv } from "../config/env";
@@ -66,7 +64,6 @@ export function getAuthOptions(
   runtime: AuthRuntimeOptions = {},
 ) {
   const emailSender = runtime.emailSender ?? createAuthEmailSender(env);
-  const validationAudience = principalValidationAudience(env.BETTER_AUTH_URL);
   const scimAudience = scimDirectoryAudience(env.BETTER_AUTH_URL);
   const issuer = `${env.BETTER_AUTH_URL}${authPluginConfig.issuerPath}`;
 
@@ -124,7 +121,7 @@ export function getAuthOptions(
         },
       }),
       idOAuthM2MBridge(),
-      createOAuthProviderPlugin(env, catalog, runtime, validationAudience, isPlatformAdmin),
+      createOAuthProviderPlugin(env, catalog, runtime, isPlatformAdmin),
       idResourceServer({
         invalidateAudienceCache: () => invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
         authorize: async (organizationId, userId, role, adapter) =>
@@ -142,11 +139,6 @@ export function getAuthOptions(
             : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
       idOAuthClientPicker({ issuer }),
-      idPrincipalValidation({
-        issuer,
-        audience: validationAudience,
-        scope: authPluginConfig.principalValidationScope,
-      }),
       idScimDirectory({
         issuer,
         audience: scimAudience,
