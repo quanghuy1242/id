@@ -16,7 +16,7 @@ describe("Button", () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole("button", { name: /primary/i });
     expect(button).toHaveClass("btn-primary");
-    expect(button).toHaveClass("btn-sm");
+    expect(button).not.toHaveClass("btn-sm");
   });
 
   it("applies secondary variant class", () => {
@@ -31,16 +31,17 @@ describe("Button", () => {
     expect(button).toHaveClass("btn-error");
   });
 
-  it("applies sm size by default", () => {
-    render(<Button>Small</Button>);
-    const button = screen.getByRole("button", { name: /small/i });
-    expect(button).toHaveClass("btn-sm");
+  it("uses medium size by default", () => {
+    render(<Button>Medium</Button>);
+    const button = screen.getByRole("button", { name: /medium/i });
+    expect(button).not.toHaveClass("btn-sm");
+    expect(button).not.toHaveClass("btn-md");
   });
 
-  it("applies md size when specified", () => {
-    render(<Button size="md">Medium</Button>);
-    const button = screen.getByRole("button", { name: /medium/i });
-    expect(button).toHaveClass("btn-md");
+  it("applies sm size when specified", () => {
+    render(<Button size="sm">Small</Button>);
+    const button = screen.getByRole("button", { name: /small/i });
+    expect(button).toHaveClass("btn-sm");
   });
 
   it("passes through name and value attributes", () => {
@@ -82,7 +83,7 @@ describe("LinkButton", () => {
     render(<LinkButton href="/test">Primary Link</LinkButton>);
     const link = screen.getByRole("link", { name: /primary link/i });
     expect(link).toHaveClass("btn-primary");
-    expect(link).toHaveClass("btn-sm");
+    expect(link).not.toHaveClass("btn-sm");
   });
 
   it("applies secondary variant when specified", () => {
@@ -97,9 +98,9 @@ describe("LinkButton", () => {
     expect(link).toHaveClass("btn-error");
   });
 
-  it("applies md size when specified", () => {
-    render(<LinkButton href="/test" size="md">Medium Link</LinkButton>);
-    const link = screen.getByRole("link", { name: /medium link/i });
-    expect(link).toHaveClass("btn-md");
+  it("applies sm size when specified", () => {
+    render(<LinkButton href="/test" size="sm">Small Link</LinkButton>);
+    const link = screen.getByRole("link", { name: /small link/i });
+    expect(link).toHaveClass("btn-sm");
   });
 });

@@ -2,6 +2,7 @@ node_modules
 dist
 coverage
 .wrangler
+.ladle/build
 .dev.vars
 .DS_Store
 *.tsbuildinfo

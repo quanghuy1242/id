@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-import { Alert, Button, HiddenInput, Stack, TextInput } from "@id/ui";
+import { Alert, Button, HiddenInput, Inline, Stack, TextInput } from "@id/ui";
 import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
@@ -105,9 +105,11 @@ export function LoginForm() {
             required
             error={fieldErrors.password}
           />
-          <Button type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </Button>
+          <Inline justify="end">
+            <Button type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </Inline>
         </Stack>
       </form>
     </Stack>

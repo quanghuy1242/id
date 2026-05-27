@@ -5,20 +5,20 @@ import { describe, expect, it } from "vitest";
 import AdminPage from "@/app/admin/page";
 
 describe("AdminPage", () => {
-  it("renders dashboard heading", () => {
+  it("renders dashboard content without an in-page title row", () => {
     render(<AdminPage />);
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Dashboard");
+    expect(screen.queryByRole("heading", { level: 2, name: /dashboard/i })).toBeNull();
   });
 
-  it("renders in dashboard layout", () => {
+  it("renders scaffold content without shell chrome", () => {
     render(<AdminPage />);
-    expect(document.querySelector("header")).toBeInTheDocument();
+    expect(document.querySelector("header")).toBeNull();
     expect(screen.getByText(/scaffold/i)).toBeInTheDocument();
   });
 
-  it("renders a page header", () => {
+  it("does not render a page header", () => {
     render(<AdminPage />);
-    expect(document.querySelector("header")).toBeInTheDocument();
+    expect(document.querySelector("header")).toBeNull();
   });
 
   it("renders a page body", () => {

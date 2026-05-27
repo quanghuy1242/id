@@ -17,7 +17,7 @@ type ButtonProps = {
 
 export function Button({
   variant = "primary",
-  size = "sm",
+  size = "md",
   type = "button",
   name,
   value,
@@ -32,7 +32,7 @@ export function Button({
   }[variant];
   const sizeClass = {
     sm: "btn-sm",
-    md: "btn-md",
+    md: "",
   }[size];
 
   return (
@@ -42,7 +42,7 @@ export function Button({
       value={value}
       disabled={disabled}
       onClick={onClick}
-      className={`btn ${sizeClass} ${variantClass}`}
+      className={`btn ${sizeClass} ${variantClass}`.trim()}
     >
       {children}
     </button>
@@ -56,7 +56,7 @@ type LinkButtonProps = {
   readonly children: ReactNode;
 };
 
-export function LinkButton({ href, variant = "primary", size = "sm", children }: LinkButtonProps) {
+export function LinkButton({ href, variant = "primary", size = "md", children }: LinkButtonProps) {
   const variantClass = {
     primary: "btn-primary",
     secondary: "btn-neutral",
@@ -64,11 +64,11 @@ export function LinkButton({ href, variant = "primary", size = "sm", children }:
   }[variant];
   const sizeClass = {
     sm: "btn-sm",
-    md: "btn-md",
+    md: "",
   }[size];
 
   return (
-    <a href={href} className={`btn ${sizeClass} ${variantClass}`}>
+    <a href={href} className={`btn ${sizeClass} ${variantClass}`.trim()}>
       {children}
     </a>
   );

@@ -3,6 +3,7 @@ type TextInputProps = {
   readonly label: string;
   readonly name: string;
   readonly type?: "email" | "password" | "text";
+  readonly size?: "sm" | "md";
   readonly autoComplete?: string;
   readonly required?: boolean;
   readonly defaultValue?: string;
@@ -13,15 +14,18 @@ export function TextInput({
   label,
   name,
   type = "text",
+  size = "md",
   autoComplete,
   required,
   defaultValue,
   error,
 }: TextInputProps) {
+  const sizeClass = size === "sm" ? "input-sm" : "";
+
   return (
     <label htmlFor={name} className="form-control w-full">
       <div className="label">
-        <span className="label-text font-medium text-base-content/80">{label}</span>
+        <span className="label-text text-base font-medium text-base-content">{label}</span>
       </div>
       <input
         id={name}
@@ -32,7 +36,7 @@ export function TextInput({
         defaultValue={defaultValue}
         aria-label={label}
         aria-invalid={error ? true : undefined}
-        className={`input input-bordered input-sm w-full bg-base-100 text-base-content focus:input-primary${error ? " input-error" : ""}`}
+        className={`input input-bordered ${sizeClass} w-full bg-base-100 text-base-content focus:input-primary${error ? " input-error" : ""}`.trim()}
       />
       {error && (
         <div className="label">
@@ -63,13 +67,16 @@ type RadioGroupProps = {
   readonly name: string;
   readonly options: readonly RadioOption[];
   readonly value: string;
+  readonly size?: "sm" | "md";
   readonly onChange: (value: string) => void;
 };
 
-export function RadioGroup({ title, name, options, value, onChange }: RadioGroupProps) {
+export function RadioGroup({ title, name, options, value, size = "md", onChange }: RadioGroupProps) {
+  const radioSizeClass = size === "sm" ? "radio-sm" : "";
+
   return (
     <fieldset className="fieldset">
-      <legend className="fieldset-legend text-base-content/80">{title}</legend>
+      <legend className="fieldset-legend text-base font-medium text-base-content">{title}</legend>
       {options.map((option) => (
         <label key={option.value} className="label cursor-pointer justify-start gap-3 py-0.5">
           <input
@@ -77,11 +84,11 @@ export function RadioGroup({ title, name, options, value, onChange }: RadioGroup
             name={name}
             value={option.value}
             aria-label={option.label}
-            className="radio radio-xs radio-primary"
+            className={`radio ${radioSizeClass} radio-primary`.trim()}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
           />
-          <span className="label-text">{option.label}</span>
+          <span className="label-text text-base text-base-content">{option.label}</span>
         </label>
       ))}
     </fieldset>

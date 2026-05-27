@@ -9,7 +9,8 @@ describe("Badge", () => {
     render(<Badge>Default</Badge>);
     const badge = screen.getByText(/default/i);
     expect(badge.tagName.toLowerCase()).toBe("span");
-    expect(badge).toHaveClass("badge", "badge-sm", "badge-outline", "badge-neutral");
+    expect(badge).toHaveClass("badge", "badge-outline", "badge-neutral");
+    expect(badge).not.toHaveClass("badge-sm");
   });
 
   it("renders primary tone", () => {
@@ -56,5 +57,10 @@ describe("Badge", () => {
     render(<Badge />);
     const badge = document.querySelector(".badge");
     expect(badge).toBeDefined();
+  });
+
+  it("renders small size when specified", () => {
+    render(<Badge size="sm">Small</Badge>);
+    expect(screen.getByText(/small/i)).toHaveClass("badge-sm");
   });
 });

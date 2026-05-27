@@ -2,9 +2,11 @@
 import type { ReactNode } from "react";
 
 type BadgeTone = "neutral" | "primary" | "secondary" | "accent" | "success" | "warning" | "error" | "info";
+type BadgeSize = "sm" | "md";
 
 type BadgeProps = {
   readonly tone?: BadgeTone;
+  readonly size?: BadgeSize;
   readonly children: ReactNode;
 };
 
@@ -19,6 +21,11 @@ const badgeClass: Record<BadgeTone, string> = {
   info: "badge-info",
 };
 
-export function Badge({ tone = "neutral", children }: BadgeProps) {
-  return <span className={`badge badge-sm badge-outline ${badgeClass[tone]}`}>{children}</span>;
+const sizeClass: Record<BadgeSize, string> = {
+  sm: "badge-sm",
+  md: "",
+};
+
+export function Badge({ tone = "neutral", size = "md", children }: BadgeProps) {
+  return <span className={`badge ${sizeClass[size]} badge-outline ${badgeClass[tone]}`.trim()}>{children}</span>;
 }

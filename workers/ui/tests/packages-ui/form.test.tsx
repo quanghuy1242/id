@@ -63,6 +63,18 @@ describe("TextInput", () => {
     const input = screen.getByRole("textbox", { name: /email/i });
     expect(input).toHaveClass("input-error");
   });
+
+  it("uses default input size instead of input-sm", () => {
+    render(<TextInput label="Email" name="email" />);
+    const input = screen.getByRole("textbox", { name: /email/i });
+    expect(input).not.toHaveClass("input-sm");
+  });
+
+  it("applies input-sm when small size is specified", () => {
+    render(<TextInput label="Email" name="email" size="sm" />);
+    const input = screen.getByRole("textbox", { name: /email/i });
+    expect(input).toHaveClass("input-sm");
+  });
 });
 
 describe("HiddenInput", () => {
@@ -135,5 +147,32 @@ describe("RadioGroup", () => {
     );
     screen.getByLabelText(/option 2/i).click();
     expect(onChange).toHaveBeenCalledWith("option2");
+  });
+
+  it("uses default radio size instead of radio-xs", () => {
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        value="option1"
+        onChange={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(/option 1/i)).not.toHaveClass("radio-xs");
+  });
+
+  it("applies radio-sm when small size is specified", () => {
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        value="option1"
+        size="sm"
+        onChange={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(/option 1/i)).toHaveClass("radio-sm");
   });
 });

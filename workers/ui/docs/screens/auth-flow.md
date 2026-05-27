@@ -24,7 +24,7 @@ form component; the page itself is a server component.
 | _____________________________________________________ |
 | [! password required message]                         |
 |                                                       |
-| [             Sign in / Signing in...             ]   |
+|                                     [ Sign in ]      |
 +-------------------------------------------------------+
 ```
 
@@ -37,7 +37,7 @@ Components:
       HiddenInput(name=OAUTH_QUERY_PARAM, value=useOauthQuery())
       TextInput(label="Email", name="email", type="email", autoComplete="username", required, error?)
       TextInput(label="Password", name="password", type="password", autoComplete="current-password", required, error?)
-      Button(type="submit", variant="primary", disabled=loading) "Sign in" | "Signing in..."
+      Inline(justify="end") > Button(type="submit", variant="primary", disabled=loading) "Sign in" | "Signing in..."
 
 Data: POST /api/auth/sign-in/email
         body: { email, password, [OAUTH_QUERY_PARAM]: oauthQuery }

@@ -1,47 +1,45 @@
 # Admin Shell
 
 Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileDock) is rendered once by
-`workers/ui/src/app/admin/layout.tsx`. Individual page files render only `PageHeader` + `PageBody`.
+`workers/ui/src/app/admin/layout.tsx`. Route location/title is shown in the topbar breadcrumb. Individual page files render body content and any route-specific action rows.
 
 ---
 
 ## Shell — Desktop (lg+)
 
 ```
-+-- Topbar (navbar, h-14, bg-base-100, border-b, shrink-0) ------+
-| id admin                                          [actor-name]  |
-+-- Sidebar (w-64, lg:flex, overflow-y-auto) -+-- MainContent ---+
-| Dashboard                                    |                  |
-|                                              |  PageHeader      |
-| Identity                                     |  +------------+  |
-|   Users                                      |  | Title      |  |
-|   Organizations                              |  | [Actions]  |  |
-|                                              |  +------------+  |
-| OAuth                                        |  PageBody        |
-|   Applications                               |  (scrolls)       |
-|   Resource APIs                              |                  |
-|   Scope Catalog                              |                  |
-|   M2M Bindings                               |                  |
-|   Sessions & Tokens                          |                  |
-|                                              |                  |
-| Security                                     |                  |
-|   JWKS                                       |                  |
-|   Consents                                   |                  |
-|                                              |                  |
-| System                                       |                  |
-|   Service Accounts                           |                  |
-|   Issuer Metadata                            |                  |
-|   SCIM Status                                |                  |
-|   Health                                     |                  |
-|   Settings                                   |                  |
++-- Topbar (navbar bg-base-100 shadow-sm border-b px-4 sm:px-6) --+
+| [btn btn-ghost text-xl] id admin / Admin / Dashboard [input][avatar] |
++-- Sidebar (aside bg-base-100 border-r p-4) -+-- MainContent -----+
+| +-- menu bg-base-200 rounded-box --------+ |                    |
+| | Dashboard                              | |  PageHeader        |
+| | Identity                               | |  +------------+   |
+| |   Users                                | |  | Title      |   |
+| |   Organizations                        | |  | [Actions]  |   |
+| | OAuth                                  | |  +------------+   |
+| |   Applications                         | |  PageBody         |
+| |   Resource APIs                        | |  (scrolls)        |
+| |   Scope Catalog                        | |                   |
+| |   M2M Bindings                         | |                   |
+| |   Sessions & Tokens                    | |                   |
+| | Security                               | |                   |
+| |   JWKS                                 | |                   |
+| |   Consents                             | |                   |
+| | System                                 | |                   |
+| |   Service Accounts                     | |                   |
+| |   Issuer Metadata                      | |                   |
+| |   SCIM Status                          | |                   |
+| |   Health                               | |                   |
+| |   Settings                             | |                   |
+| +----------------------------------------+ |                   |
 +---------------------------------------------+------------------+
 ```
 
 ## Shell — Mobile (< lg)
 
 ```
-+-- Topbar (h-14, bg-base-100, border-b) ------------------------+
-| id admin                                          [actor-name]  |
++-- Topbar (navbar bg-base-100 shadow-sm border-b) ---------------+
+| [btn btn-ghost text-xl] id admin / Admin / Dashboard [input][avatar] |
 +----------------------------------------------------------------+
 | MainContent (full width, no sidebar visible)                   |
 |                                                                |
@@ -51,31 +49,32 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 |  +----------------------------------------------------------+  |
 |  PageBody (scrolls inside MainContent)                         |
 |                                                                |
-+-- MobileDock (dock, dock-sm, fixed bottom, lg:hidden) ---------+
-|  [Dash]   [Identity]   [OAuth]   [Security]   [System]        |
++-- MobileDock (dock dock-sm bg-base-100 border-t) --------------+
+|  [• Dash] [• Identity] [• OAuth] [• Security] [• System]      |
 +----------------------------------------------------------------+
 ```
 
 Components:
   AppShell > Topbar + SidebarLayout + MobileDock
-  Topbar: AdminTopbar (non-client; DaisyUI navbar-start/navbar-end layout)
+  Topbar: AdminTopbar (`usePathname()`-driven breadcrumb in `navbar-start`; DaisyUI navbar with `btn btn-ghost text-xl normal-case` brand button, `breadcrumbs text-sm`, `input input-bordered input-sm w-24 md:w-auto` search field, and `dropdown dropdown-end` avatar menu in `navbar-end`)
   SidebarLayout > Sidebar + MainContent
-  Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile)
-  MainContent: children slot — each page renders PageHeader + PageBody here
-  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden)
+  Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile) rendered as one `ul.menu.bg-base-200.rounded-box`; top-level items are direct `li > a`, grouped sections use `li > h2.menu-title + ul > li > a`
+  MainContent: children slot — each page renders content body here; route title lives in the topbar breadcrumb
+  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden) with `dock-label` text under a compact glyph
 
 Active state rules:
-  Sidebar items: className="active" + aria-current="page" when pathname.startsWith(item.href)
+  Sidebar items: active item uses the same menu row shape as all other items, with only text emphasis + aria-current
                  Dashboard uses exact match (pathname === "/admin")
   Dock items:    className="dock-active" + aria-current="page" when pathname.startsWith(section.primaryHref)
                  Dashboard uses exact match
 
 Actor info:
-  Topbar right slot — placeholder "Admin" until auth middleware is wired.
-  Replace with actor name + role badge once session is available in layout.
+  Topbar avatar dropdown is a placeholder shell control until auth/session wiring exists.
+  Replace initials + menu targets with real actor data once session is available in layout.
 
 Notes:
   Sidebar and MobileDock are implemented in workers/ui/src/app/admin/_components/admin-nav.tsx.
   AdminTopbar is also in admin-nav.tsx (server-safe; no hooks).
   No mobile drawer — MobileDock provides top-level section navigation.
   Shell scrolling model: AppShell is h-screen overflow-hidden; MainContent scrolls independently.
+  DaisyUI structure is authoritative: sidebar follows the documented `ul.menu > li > h2.menu-title + ul > li > a` pattern, and the topbar brand follows the navbar title/button pattern from the DaisyUI navbar examples.

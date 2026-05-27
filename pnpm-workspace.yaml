@@ -3,16 +3,20 @@ packages:
   - "packages/*"
   - "workers/*"
 allowBuilds:
+  '@swc/core': true
   aislop: true
   better-sqlite3: true
   esbuild: true
   fallow: true
+  msw: true
   sharp: true
   workerd: true
 minimumReleaseAge: 0
 onlyBuiltDependencies:
+  - '@swc/core'
   - aislop
   - esbuild
   - fallow
+  - msw
   - sharp
   - workerd

@@ -1,37 +1,71 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavTitle, Text, TopbarEnd, TopbarStart } from "@id/ui";
+import {
+  DockLink,
+  NavLink,
+  NavMenu,
+  NavSection,
+  TopbarAvatarMenu,
+  TopbarBreadcrumb,
+  TopbarBrandLink,
+  TopbarEnd,
+  TopbarSearchField,
+  TopbarStart,
+} from "@id/ui";
 import { MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
   return exact ? pathname === href : pathname.startsWith(href);
 }
 
+function getCurrentPageLabel(pathname: string): string {
+  const activeEntry = SIDEBAR_NAV.find((entry) => entry.type === "item" && isActive(pathname, entry.href, entry.exact));
+  return activeEntry?.label ?? "Dashboard";
+}
+
 export function AdminSidebarNav() {
   const pathname = usePathname();
+  const groups: Array<{ title: string | null; items: Array<{ label: string; href: string; exact?: boolean }> }> = [];
+  const topLevelItems: Array<{ label: string; href: string; exact?: boolean }> = [];
+
+  for (const entry of SIDEBAR_NAV) {
+    if (entry.type === "section") {
+      groups.push({ title: entry.label, items: [] });
+      continue;
+    }
+
+    if (groups.length === 0) {
+      topLevelItems.push(entry);
+      continue;
+    }
+
+    groups[groups.length - 1].items.push(entry);
+  }
 
   return (
-    <ul>
-      {SIDEBAR_NAV.map((entry, i) => {
-        if (entry.type === "section") {
-          return <NavTitle key={`section-${i}`}>{entry.label}</NavTitle>;
-        }
+    <NavMenu label="Admin sidebar navigation">
+      {topLevelItems.map((entry) => {
         const active = isActive(pathname, entry.href, entry.exact);
         return (
-          <li key={entry.href}>
-            <Link
-              href={entry.href}
-              aria-current={active ? "page" : undefined}
-              className={active ? "active" : ""}
-            >
-              {entry.label}
-            </Link>
-          </li>
+          <NavLink key={entry.href} href={entry.href} active={active} current={active ? "page" : undefined}>
+            {entry.label}
+          </NavLink>
         );
       })}
-    </ul>
+      {groups.map((group, groupIndex) => (
+        <NavSection key={group.title ?? `root-${groupIndex}`} title={group.title ?? undefined}>
+          {group.items.map((entry) => {
+            const active = isActive(pathname, entry.href, entry.exact);
+            return (
+              <NavLink key={entry.href} href={entry.href} active={active} current={active ? "page" : undefined}>
+                {entry.label}
+              </NavLink>
+            );
+          })}
+        </NavSection>
+      ))}
+    </NavMenu>
   );
 }
 
@@ -43,14 +77,13 @@ export function AdminMobileNav() {
       {MOBILE_NAV.map((item) => {
         const active = isActive(pathname, item.href, item.exact);
         return (
-          <Link
+          <DockLink
             key={item.href}
             href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={active ? "dock-active" : ""}
-          >
-            {item.label}
-          </Link>
+            current={active ? "page" : undefined}
+            active={active}
+            label={item.label}
+          />
         );
       })}
     </>
@@ -58,13 +91,25 @@ export function AdminMobileNav() {
 }
 
 export function AdminTopbar() {
+  const pathname = usePathname();
+  const currentPageLabel = getCurrentPageLabel(pathname);
+
   return (
     <>
       <TopbarStart>
-        <Text variant="h3" as="span">id admin</Text>
+        <TopbarBrandLink href="/admin">id admin</TopbarBrandLink>
+        <TopbarBreadcrumb items={["Admin", currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
-        <Text variant="caption" as="span">Admin</Text>
+        <TopbarSearchField placeholder="Search" />
+        <TopbarAvatarMenu
+          initials="AD"
+          items={[
+            { label: "Profile", href: "/admin/profile", badge: "New" },
+            { label: "Settings", href: "/admin/settings" },
+            { label: "Logout", href: "/logout" },
+          ]}
+        />
       </TopbarEnd>
     </>
   );

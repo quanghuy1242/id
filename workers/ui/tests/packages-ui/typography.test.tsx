@@ -10,6 +10,7 @@ describe("Text", () => {
     const element = screen.getByText(/body text/i);
     expect(element).toBeInTheDocument();
     expect(element.tagName.toLowerCase()).toBe("p");
+    expect(element).toHaveClass("text-base");
   });
 
   it("renders h1 variant as h1 element", () => {
@@ -37,7 +38,7 @@ describe("Text", () => {
     render(<Text variant="caption">Caption</Text>);
     const element = screen.getByText(/caption/i);
     expect(element.tagName.toLowerCase()).toBe("p");
-    expect(element).toHaveClass("text-xs");
+    expect(element).toHaveClass("text-sm");
   });
 
   it("overrides element type with as prop", () => {

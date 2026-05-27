@@ -156,6 +156,11 @@ describe("Stack", () => {
     const { container } = render(<Stack gap="lg">LG</Stack>);
     expect(container.firstChild).toHaveClass("gap-6");
   });
+
+  it("applies start alignment when specified", () => {
+    const { container } = render(<Stack align="start">Aligned</Stack>);
+    expect(container.firstChild).toHaveClass("items-start");
+  });
 });
 
 describe("Grid", () => {
@@ -265,10 +270,10 @@ describe("Topbar", () => {
 });
 
 describe("Sidebar", () => {
-  it("renders as a nav menu", () => {
+  it("renders as a sidebar container", () => {
     render(<Sidebar>Side</Sidebar>);
-    const nav = screen.getByText(/side/i).closest("nav");
-    expect(nav).toHaveClass("menu", "menu-sm", "w-64", "bg-base-100");
+    const aside = screen.getByText(/side/i).closest("aside");
+    expect(aside).toHaveClass("w-72", "bg-base-100", "border-r", "p-4", "overflow-y-auto");
   });
 });
 

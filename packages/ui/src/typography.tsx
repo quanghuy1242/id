@@ -13,8 +13,8 @@ const textClasses: Record<TextVariant, string> = {
   h1: "text-2xl font-bold leading-tight text-base-content m-0",
   h2: "text-xl font-semibold leading-tight text-base-content m-0",
   h3: "text-lg font-semibold leading-tight text-base-content m-0",
-  body: "text-sm font-normal leading-relaxed text-base-content/90 m-0",
-  caption: "text-xs font-normal text-base-content/60 m-0",
+  body: "text-base font-normal leading-relaxed text-base-content m-0",
+  caption: "text-sm font-normal text-base-content/70 m-0",
 };
 
 const defaultElement: Record<TextVariant, ElementType> = {

@@ -1,7 +1,3 @@
-// Link-based navigation tabs for URL-routed admin detail pages.
-// Each tab is a full page navigation link, not an in-page panel switch.
-// Active state is determined by the caller passing currentPath (usePathname() in Next.js).
-
 type TabNavItem = {
   readonly href: string;
   readonly label: string;

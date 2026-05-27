@@ -120,6 +120,7 @@ pnpm db:migrate:local
 ```bash
 pnpm dev:core                    # core-id Worker
 pnpm dev:ui                      # ui-id Worker (Vinext dev)
+pnpm dev:ladle                   # Ladle component workshop for @id/ui
 ```
 
 In production, route specificity sends `/admin/*` and `/assets/*` to `ui-id` and `/api/auth/*` plus metadata routes to `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
@@ -205,6 +206,7 @@ There is intentionally no separate `check:ui`; UI composition is enforced by `pn
 Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `workers/ui/tests/all.test.ts`) to avoid repeated environment/import setup. Add new test files to the matching barrel instead of widening the project `include` patterns.
 `pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks stay under `/admin/*`, including `/admin/health`, because production only routes `/admin/*` to `ui-id`.
 `pnpm deploy:ui:dry-run` mirrors the Cloudflare deploy path: it builds from `workers/ui`, lets Vinext/@cloudflare/vite-plugin generate `workers/ui/dist/server/wrangler.json`, then runs Wrangler deploy with `--dry-run`.
+`pnpm dev:ladle` serves the shared `@id/ui` component stories from `.ladle/` and `stories/` without booting the full UI worker. `pnpm build:ladle` generates a static Ladle build under `.ladle/build`.
 
 ## Deployment
 
