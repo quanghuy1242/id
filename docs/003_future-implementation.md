@@ -842,32 +842,34 @@ When the UI work starts, it should call `id` API endpoints for generic teams, OA
 
 ## 10. Identity Events, SCIM Directory, And M2M Principal Contracts (Docs 013-018)
 
-The identity event channel, synchronous principal lookup contract, and M2M / OAuth-client contract are designed across six sibling documents. Docs 013-016 cover asynchronous lifecycle/security events. Doc 017 corrects the synchronous user/team/admin directory lookup side and defers all service-account decisions to doc 018. Doc 018 is the canonical M2M correction: it adopts Better Auth's first-class oauth-provider primitives and bounds the only remaining repo-specific extension.
+The identity event channel, synchronous principal lookup contract, and M2M / OAuth-client contract are designed across six sibling documents. **Track A (synchronous directory correct) is complete** — docs 017 and 018 are implemented, principal-validation is deleted, content-api ships a SCIM + OAuth picker adapter. **Track B (asynchronous push channel via 014/015/016) is deferred** — no implementation has started; it may be deferred indefinitely until a recorded operational requirement for stale-binding cleanup exists.
 
 ### 10.1 The Six Docs
 
 | Doc | Role | Scope | Phases |
 |---|---|---|---|
 | [013_identity-event-standards-and-decisions.md](013_identity-event-standards-and-decisions.md) | Standards landscape + decision record | Forever-reference. Standards mapping (SET / SSF / RISC / CAEP / RFC 7662 / OIDC BCL / SCIM), classification per `a.md` taxonomy, M2M TTL and other decisions D1-D8. No implementation. | All phases (decisions) |
-| [014_identity-event-producer-id.md](014_identity-event-producer-id.md) | Producer-side implementation plan | `id` only. New `idIdentityEvents` Better Auth plugin. Transactional outbox. SET envelope (RFC 8417). SSF stream-config endpoints. Cloudflare Queues delivery with retry/DLQ. | Phase 1 (RISC) + Phase 2 (CAEP) |
-| [015_identity-event-consumer-content-api-audit.md](015_identity-event-consumer-content-api-audit.md) | Consumer-side audit-mode plan | `content-api` only. SET receiver, JWS verification, idempotency on `jti`, reconciliation findings table, operator read API. **No** change to `ContentPolicy.can()`. | Phase 1 + Phase 2 (audit only) |
-| [016_identity-event-consumer-content-api-fence-enforcement.md](016_identity-event-consumer-content-api-fence-enforcement.md) | Consumer-side fence enforcement plan, conditional | `content-api` only. `iat`-based fence table, denial in token-principal expansion, operator override endpoints, delivery-bound revocation SLA. | Phase 3 (gated on D5 trigger) |
-| [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) | Synchronous SCIM directory contract | `id` and `content-api`. Replaces custom user/team/admin principal-validation with read-only SCIM v2. Defers every service-account decision to doc 018. | Proposal; prerequisite for replacing user/team/admin principal-validation |
-| [018_m2m-oauth-client-org-binding.md](018_m2m-oauth-client-org-binding.md) | **Canonical** M2M / OAuth-client contract | `id` and `content-api`. Adopts BA's `clientReference`, `clientPrivileges`, RFC 7591/7592-shaped endpoints, and native `client_credentials`. Replaces `oauthClientOrganizationGrant` with `oauthClientResourceScope`. Removes `metadata.id_client_id` / `metadata.organization_id`. | Canonical decision; prerequisite for replacing service-account principal-validation |
+| [014_identity-event-producer-id.md](014_identity-event-producer-id.md) | Producer-side implementation plan | `id` only. New `idIdentityEvents` Better Auth plugin. Transactional outbox. SET envelope (RFC 8417). SSF stream-config endpoints. Cloudflare Queues delivery with retry/DLQ. | **Deferred** (Track B not started) |
+| [015_identity-event-consumer-content-api-audit.md](015_identity-event-consumer-content-api-audit.md) | Consumer-side audit-mode plan | `content-api` only. SET receiver, JWS verification, idempotency on `jti`, reconciliation findings table, operator read API. **No** change to `ContentPolicy.can()`. | **Deferred** (Track B not started) |
+| [016_identity-event-consumer-content-api-fence-enforcement.md](016_identity-event-consumer-content-api-fence-enforcement.md) | Consumer-side fence enforcement plan, conditional | `content-api` only. `iat`-based fence table, denial in token-principal expansion, operator override endpoints, delivery-bound revocation SLA. | **Deferred** (gated on 015 + D5 trigger) |
+| [017_scim-directory-and-m2m-principal-contract.md](017_scim-directory-and-m2m-principal-contract.md) | Synchronous SCIM directory contract | `id` and `content-api`. Replaces custom user/team/admin principal-validation with read-only SCIM v2. | **Implemented** (2026-05-27 — Track A4) |
+| [018_m2m-oauth-client-org-binding.md](018_m2m-oauth-client-org-binding.md) | **Canonical** M2M / OAuth-client contract | `id` and `content-api`. Adopts BA's `clientReference`, `clientPrivileges`, RFC 7591/7592-shaped endpoints, and native `client_credentials`. Replaces `oauthClientOrganizationGrant` with `oauthClientResourceScope`. | **Implemented** (2026-05-26 — Track A2) |
 
 ### 10.2 Reading Order
 
 For someone new to the design:
 
-1. **Read [013](013_identity-event-standards-and-decisions.md) first**. It defines the standards landscape, the decisions, and the phased event-channel plan. Without it, the other docs lack the "why."
-2. **Read [014](014_identity-event-producer-id.md) and [015](015_identity-event-consumer-content-api-audit.md) in parallel**. They define Phase 1 (and Phase 2 as additive extension sections). Each is independently implementable: 014 is producer-only in `id`, 015 is consumer-only in `content-api`.
-3. **Read [016](016_identity-event-consumer-content-api-fence-enforcement.md) last, and only when needed**. It is conditional on the trigger conditions in its §2. Reviewing it earlier is fine for context, but its implementation should not begin until 015 is shipped and the recorded requirement exists.
-4. **Read [017](017_scim-directory-and-m2m-principal-contract.md) before touching principal-validation, SCIM, or the user/team/admin side of identity lookup.** It is the SCIM directory replacement plan.
-5. **Read [018](018_m2m-oauth-client-org-binding.md) before touching OAuth clients, `oauthClientOrganizationGrant`, `client_credentials` token issuance, or service-account binding workflows in `content-api`.** It is canonical for M2M.
+1. **Read [013](013_identity-event-standards-and-decisions.md) first**. It defines the standards landscape, the decisions, and the phased plan. Without it, the other docs lack the "why."
+2. **Track A (017 + 018) is implemented** — synchronous SCIM directory + OAuth client picker are live in both `id` and `content-api`. No further action needed.
+3. **Track B (014 + 015 + 016) is deferred** — the asynchronous push channel (SET/SSF/RISC events) has not been implemented. No consumer exists yet. These docs can be reviewed for context but are not required for current operations. Implementation may begin only when a recorded operational requirement for stale-binding cleanup exists.
 
 For someone reviewing a change set against this plan: event-channel changes reference doc 013 by decision ID (D1-D8) then 014/015/016 §N for execution. Synchronous user/team/admin directory changes reference doc 017. Anything touching OAuth clients, service accounts, the grant table, or M2M token issuance references doc 018 by decision ID (018 D1-D6).
 
-### 10.3 Phase And Producer/Consumer Relationship
+### 10.3 Current Status
+
+**Track A (synchronous): complete.** SCIM directory + OAuth picker replacing principal-validation is shipped in both `id` (A3, A5) and `content-api` (A4). Docs 017 + 018 are implemented. No further synchronous work.
+
+**Track B (asynchronous push channel): deferred.** None of 014/015/016 have been implemented. The following phase diagram is retained as the planned design if and when Track B is started:
 
 ```text
                   Phase 1                Phase 2                Phase 3
