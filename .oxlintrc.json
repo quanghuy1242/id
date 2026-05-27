@@ -148,7 +148,9 @@
     "migrations",
     ".architecture-rule-workspace",
     "**/tests/fixtures/**",
-    "scripts/**"
+    "scripts/**",
+    "workers/ui/.next/**",
+    "workers/ui/next-env.d.ts"
   ],
   "env": {
     "es2022": true,

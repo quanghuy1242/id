@@ -5,15 +5,15 @@ import { describe, expect, it } from "vitest";
 import AdminPage from "@/app/admin/page";
 
 describe("AdminPage", () => {
-  it("renders id admin heading", () => {
+  it("renders dashboard heading", () => {
     render(<AdminPage />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("id admin");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Dashboard");
   });
 
   it("renders in dashboard layout", () => {
     render(<AdminPage />);
-    const main = document.querySelector("main");
-    expect(main).toHaveClass("flex", "flex-col");
+    expect(document.querySelector("header")).toBeInTheDocument();
+    expect(screen.getByText(/scaffold/i)).toBeInTheDocument();
   });
 
   it("renders a page header", () => {

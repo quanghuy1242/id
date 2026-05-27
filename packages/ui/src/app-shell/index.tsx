@@ -1,3 +1,11 @@
+// Layout primitives (Page, Container, PageSection, PageHeader, PageBody, Stack, Grid, Columns, Spacer)
+// are pure CSS flex/grid utilities — no backing DaisyUI component.
+//
+// DaisyUI 5 — components used by shell elements:
+//   Topbar  → Navbar:  https://daisyui.com/components/navbar/
+//   Sidebar → Menu:    https://daisyui.com/components/menu/
+//   Dock    → Dock:    https://daisyui.com/components/dock/
+//   Panel   → Card:    https://daisyui.com/components/card/
 import type { ReactNode } from "react";
 
 type Gap = "xs" | "sm" | "md" | "lg";
@@ -161,15 +169,35 @@ export function Spacer({ size = "md" }: SpacerProps) {
 }
 
 export function AppShell({ children }: SurfaceProps) {
-  return <div className="min-h-screen bg-base-200 text-base-content">{children}</div>;
+  return <div className="h-screen overflow-hidden flex flex-col bg-base-200 text-base-content">{children}</div>;
 }
 
 export function Topbar({ children }: SurfaceProps) {
-  return <header className="navbar min-h-14 bg-base-100 border-b border-base-300 px-4">{children}</header>;
+  return <header className="navbar min-h-14 shrink-0 bg-base-100 border-b border-base-300 px-4">{children}</header>;
+}
+
+export function TopbarStart({ children }: SurfaceProps) {
+  return <div className="navbar-start">{children}</div>;
+}
+
+export function TopbarEnd({ children }: SurfaceProps) {
+  return <div className="navbar-end">{children}</div>;
 }
 
 export function Sidebar({ children }: SurfaceProps) {
-  return <nav className="menu menu-sm w-64 bg-base-100 border-r border-base-300 p-3">{children}</nav>;
+  return <nav className="hidden lg:flex flex-col menu menu-sm w-64 shrink-0 bg-base-100 border-r border-base-300 p-3 overflow-y-auto">{children}</nav>;
+}
+
+export function NavTitle({ children }: SurfaceProps) {
+  return <li className="menu-title">{children}</li>;
+}
+
+export function SidebarLayout({ children }: SurfaceProps) {
+  return <div className="flex flex-1 min-h-0 overflow-hidden">{children}</div>;
+}
+
+export function MainContent({ children }: SurfaceProps) {
+  return <main className="flex flex-col flex-1 min-h-0 overflow-y-auto">{children}</main>;
 }
 
 type MobileDockProps = SurfaceProps & {

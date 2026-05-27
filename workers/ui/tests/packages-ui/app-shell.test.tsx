@@ -235,7 +235,10 @@ describe("AppShell", () => {
   it("renders with base styling", () => {
     const { container } = render(<AppShell>Shell</AppShell>);
     expect(container.firstChild).toHaveClass(
-      "min-h-screen",
+      "h-screen",
+      "overflow-hidden",
+      "flex",
+      "flex-col",
       "bg-base-200",
       "text-base-content"
     );

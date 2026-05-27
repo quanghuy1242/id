@@ -1,3 +1,4 @@
+// DaisyUI 5: https://daisyui.com/components/input/
 type TextInputProps = {
   readonly label: string;
   readonly name: string;
@@ -18,8 +19,10 @@ export function TextInput({
   error,
 }: TextInputProps) {
   return (
-    <label htmlFor={name} className="form-control w-full gap-1">
-      <span className="label-text font-medium text-base-content/80">{label}</span>
+    <label htmlFor={name} className="form-control w-full">
+      <div className="label">
+        <span className="label-text font-medium text-base-content/80">{label}</span>
+      </div>
       <input
         id={name}
         name={name}
@@ -31,11 +34,16 @@ export function TextInput({
         aria-invalid={error ? true : undefined}
         className={`input input-bordered input-sm w-full bg-base-100 text-base-content focus:input-primary${error ? " input-error" : ""}`}
       />
-      {error && <span className="validator-hint text-error">{error}</span>}
+      {error && (
+        <div className="label">
+          <span className="label-text-alt text-error">{error}</span>
+        </div>
+      )}
     </label>
   );
 }
 
+// DaisyUI 5 Radio: https://daisyui.com/components/radio/
 type HiddenInputProps = {
   readonly name: string;
   readonly value: string;

@@ -1,16 +1,16 @@
-import { Page, PageBody, PageHeader, Panel, Stack, Text } from "@id/ui";
+import { PageBody, PageHeader, Panel, Stack, Text } from "@id/ui";
 
 export default function AdminPage() {
   return (
-    <Page layout="dashboard">
+    <>
       <PageHeader>
-        <Text variant="h1">id admin</Text>
+        <Text variant="h2">Dashboard</Text>
       </PageHeader>
       <PageBody>
         <Stack>
           <Panel>Scaffold. Full admin UI deferred to later batch.</Panel>
         </Stack>
       </PageBody>
-    </Page>
+    </>
   );
 }

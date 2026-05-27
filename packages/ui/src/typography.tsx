@@ -1,3 +1,4 @@
+// Pure Tailwind type scale — no DaisyUI component. Token values from globals.css via text-base-content.
 import type { ElementType, ReactNode } from "react";
 
 type TextVariant = "h1" | "h2" | "h3" | "body" | "caption";

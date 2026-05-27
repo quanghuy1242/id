@@ -1,3 +1,4 @@
+// Pure CSS flex row — no DaisyUI component. Token spacing via gap-* mapped from design tokens.
 import type { ReactNode } from "react";
 
 type Gap = "xs" | "sm" | "md" | "lg";

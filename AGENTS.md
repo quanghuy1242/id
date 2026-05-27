@@ -76,6 +76,21 @@ When new findings appear, handle them autonomously:
 
 `pnpm@11.1.3` via corepack.
 
+## Admin UI
+
+Load the `id-admin-ui` skill when working on any of the following:
+
+- Any file under `workers/ui/src/app/admin/**`
+- Any component in `packages/ui/src/**`
+- Any screen spec in `workers/ui/docs/screens/`
+- Any question about what components exist, what token values are, or what the screen spec format is
+
+The skill contains the full component registry, token reference, screen spec format, and hard rules. Do not implement admin UI pages without it.
+
+**Hard gate:** A new `/admin` route file must not be created before a corresponding spec entry exists in `workers/ui/docs/screens/<section>.md`. Draft the spec, get approval, then implement. The spec must contain at minimum the ASCII sketch, the `Components:` block, and the `Data:` line.
+
+Design system architecture rationale lives in `docs/022_admin-ui-system.md`.
+
 ## Rules
 
 1. Always keep README.md up to date when public commands, topology, or setup changes. (hard gate — do not skip)

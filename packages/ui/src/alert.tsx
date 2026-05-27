@@ -1,3 +1,4 @@
+// DaisyUI 5: https://daisyui.com/components/alert/
 import type { ReactNode } from "react";
 
 type AlertTone = "error" | "success" | "warning" | "info";

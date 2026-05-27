@@ -1,3 +1,4 @@
+// DaisyUI 5: https://daisyui.com/components/badge/
 import type { ReactNode } from "react";
 
 type BadgeTone = "neutral" | "primary" | "secondary" | "accent" | "success" | "warning" | "error" | "info";

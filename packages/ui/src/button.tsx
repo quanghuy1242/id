@@ -1,3 +1,4 @@
+// DaisyUI 5: https://daisyui.com/components/button/
 import type { ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "danger";
