@@ -1,4 +1,4 @@
-import type { User } from "../_actions/users";
+import type { Session, User } from "../_actions/users";
 
 export const mockUsers: User[] = [
   {
@@ -65,5 +65,44 @@ export const mockUsers: User[] = [
     banExpires: null,
     createdAt: "2024-05-20T00:00:00.000Z",
     updatedAt: "2024-05-20T00:00:00.000Z",
+  },
+];
+
+export const mockSessions: Session[] = [
+  {
+    id: "sess_001",
+    token: "tok_abc123",
+    userId: "user_001",
+    ipAddress: "192.168.1.1",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0",
+    activeOrganizationId: "org_001",
+    activeTeamId: null,
+    impersonatedBy: null,
+    createdAt: "2026-05-01T10:00:00.000Z",
+    expiresAt: "2027-01-01T10:00:00.000Z",
+  },
+  {
+    id: "sess_002",
+    token: "tok_def456",
+    userId: "user_001",
+    ipAddress: "10.0.0.5",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/121.0",
+    activeOrganizationId: null,
+    activeTeamId: null,
+    impersonatedBy: "admin_001",
+    createdAt: "2026-05-05T14:30:00.000Z",
+    expiresAt: "2027-01-05T14:30:00.000Z",
+  },
+  {
+    id: "sess_003",
+    token: "tok_ghi789",
+    userId: "user_001",
+    ipAddress: "192.168.1.2",
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1",
+    activeOrganizationId: null,
+    activeTeamId: null,
+    impersonatedBy: null,
+    createdAt: "2024-10-15T08:00:00.000Z",
+    expiresAt: "2024-11-15T08:00:00.000Z",
   },
 ];

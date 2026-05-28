@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Checkbox, Form, HiddenInput, RadioGroup, TextInput } from "@id/ui";
+import { Checkbox, Form, HiddenInput, RadioGroup, Textarea, TextInput } from "@id/ui";
 
 describe("Form", () => {
   it("renders a form element", () => {
@@ -292,5 +292,52 @@ describe("Checkbox", () => {
     const input = screen.getByLabelText(/parent/i) as HTMLInputElement;
     expect(input).toBeChecked();
     expect(input.indeterminate).toBe(true);
+  });
+});
+
+describe("Textarea", () => {
+  it("renders a labeled textarea", () => {
+    render(<Textarea label="Notes" name="notes" />);
+    expect(screen.getByText(/notes/i)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /notes/i })).toBeInTheDocument();
+  });
+
+  it("sets defaultValue", () => {
+    render(<Textarea label="Notes" name="notes" defaultValue='{"key":"value"}' />);
+    expect(screen.getByRole("textbox", { name: /notes/i })).toHaveValue('{"key":"value"}');
+  });
+
+  it("sets required attribute", () => {
+    render(<Textarea label="Notes" name="notes" required />);
+    expect(screen.getByRole("textbox", { name: /notes/i })).toBeRequired();
+  });
+
+  it("shows error message when error prop is provided", () => {
+    render(<Textarea label="Notes" name="notes" error="Must be valid JSON" />);
+    expect(screen.getByText(/must be valid json/i)).toBeInTheDocument();
+  });
+
+  it("applies textarea-error class when error is present", () => {
+    render(<Textarea label="Notes" name="notes" error="Invalid" />);
+    const textarea = screen.getByRole("textbox", { name: /notes/i });
+    expect(textarea).toHaveClass("textarea-error");
+  });
+
+  it("applies font-mono class for code-friendly display", () => {
+    render(<Textarea label="Notes" name="notes" />);
+    const textarea = screen.getByRole("textbox", { name: /notes/i });
+    expect(textarea).toHaveClass("font-mono");
+  });
+
+  it("calls onChange when value changes", () => {
+    const onChange = vi.fn<(value: string) => void>();
+    render(<Textarea label="Notes" name="notes" onChange={onChange} />);
+    fireEvent.change(screen.getByRole("textbox", { name: /notes/i }), { target: { value: "hello" } });
+    expect(onChange).toHaveBeenCalled();
+  });
+
+  it("renders placeholder when provided", () => {
+    render(<Textarea label="Notes" name="notes" placeholder="Enter JSON..." />);
+    expect(screen.getByPlaceholderText("Enter JSON...")).toBeInTheDocument();
   });
 });

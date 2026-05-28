@@ -7,6 +7,7 @@ import {
   Form as AriaForm,
   Input,
   Label,
+  TextArea,
   TextField,
 } from "react-aria-components";
 import { useRadioGroup, useRadio, useCheckbox } from "react-aria";
@@ -271,5 +272,53 @@ export function Checkbox({
         </span>
       ) : null}
     </div>
+  );
+}
+
+// DaisyUI 5 Textarea: https://daisyui.com/components/textarea/
+type TextareaProps = {
+  readonly label: string;
+  readonly name: string;
+  readonly required?: boolean;
+  readonly defaultValue?: string;
+  readonly error?: string;
+  readonly rows?: number;
+  readonly placeholder?: string;
+  readonly onChange?: (value: string) => void;
+};
+
+export function Textarea({
+  label,
+  name,
+  required,
+  defaultValue,
+  error,
+  rows = 4,
+  placeholder,
+  onChange,
+}: TextareaProps) {
+  return (
+    <TextField
+      name={name}
+      isRequired={required}
+      defaultValue={defaultValue}
+      isInvalid={error ? true : undefined}
+      onChange={onChange}
+      className="form-control w-full"
+    >
+      <Label className="label">
+        <span className="label-text text-base font-medium text-base-content">{label}</span>
+      </Label>
+      <TextArea
+        name={name}
+        aria-label={label}
+        rows={rows}
+        placeholder={placeholder}
+        className={`textarea textarea-bordered w-full bg-base-100 text-base-content font-mono focus:textarea-primary${error ? " textarea-error" : ""}`.trim()}
+      />
+      <div className="label">
+        <FieldError className="label-text-alt text-error">{error}</FieldError>
+      </div>
+    </TextField>
   );
 }

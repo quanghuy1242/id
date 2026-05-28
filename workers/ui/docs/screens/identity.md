@@ -1,26 +1,33 @@
 # Identity Screens
 
-## Component gaps
+## Component registry (all implemented)
 
-These `@id/ui` components are referenced in this spec but do **not** exist yet.
-They must be built before the corresponding screens can be implemented.
-
-| Component | Used on | Notes |
-|---|---|---|
-| `Avatar` / `AvatarPlaceholder` | User detail (profile panel) | Renders `<img>` if `user.image` set, else circle with initials. DaisyUI `avatar` + `avatar-placeholder` classes. Used only on the user detail page; acceptable to skip for initial implementation (show text-only profile) or inline as a one-off in the route file until needed elsewhere. |
-
-**Everything else exists** in `packages/ui/src/` with the exact props described in this spec:
+All components exist in `packages/ui/src/` with the exact props described in this spec:
 `AppShell`, `Topbar`, `TopbarStart`, `TopbarEnd`, `TopbarBrandLink`, `TopbarSearchField`, `TopbarBreadcrumb`, `TopbarAvatarMenu`,
 `Sidebar`, `SidebarLayout`, `MainContent`, `MobileDock`,
 `PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,
 `NavMenu`, `NavSection`, `NavLink`, `DockLink`, `NavTitle`,
-`Text`, `Heading`, `Button`, `LinkButton`,
-`TextInput` (label/name/type/required/defaultValue/error/onChange — no `placeholder` prop; no `type="number"`, use text+validation),
-`RadioGroup` (title/name/options/value/onChange — fully controlled, no `default`),
+`Text`, `Heading`,
+`Button` (variant/size/iconName/iconPosition/ariaLabel/circle/disabled/onClick — `children` optional for icon-only buttons),
+`LinkButton` (href/variant/size/children),
+`TextInput` (label/name/type/required/defaultValue/error/onChange — no `placeholder`, no `type="number"`),
+`Textarea` (label/name/required/defaultValue/error/rows/placeholder/onChange — monospace font-mono, used for JSON/multiline fields),
+`RadioGroup` (title/name/options/value/onChange — fully controlled),
+`Avatar` (initials/image/alt/size),
 `Alert` (tone); `Badge` (tone/size/children); `Skeleton` (rows/height); `EmptyState` (message/cta/onCta);
 `ErrorAlert` (message/onRetry); `SearchInput` (value/onChange/placeholder/grow/size); `FilterDropdown` (label/options/value/onChange/size);
-`Tabs` (route-tab items with href); `ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/children);
+`Tabs` (ariaLabel/selectedKey/items/onSelectionChange — route-tab items with href);
+`ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/error/children);
 `DataTable` (columns/rows/getRowKey/onRowClick/sortBy/sortDirection/onSort/pagination={total/limit/offset/onChange}).
+
+**Icon names registered in nav-icons.tsx:** Activity, AppWindow, Bot, Building2, ChevronDown, ChevronRight,
+FileCheck2, Fingerprint, Globe, HeartPulse, KeyRound, LayoutDashboard, Link2, Pencil, Plus, Server, Settings, Tags, Trash2, Users.
+Add new icons to `iconMap` in `packages/ui/src/nav-icons.tsx` before using them.
+
+**Icon-only buttons:** Pass `iconName` + `ariaLabel` with no `children`. The button auto-applies `btn-circle`. Example:
+```tsx
+<Button size="sm" variant="secondary" iconName="Pencil" ariaLabel="Rename team" onClick={...} />
+```
 
 ---
 
@@ -29,6 +36,20 @@ Covers all routes under `/admin/identity`. Actor-scoping rules:
 - Org admin (`member.role = "owner" | "admin"`) — no access to `/admin/identity/users`; directed to their own org detail only.
 
 Box-drawing key: ┌─┐ top edge · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no
+
+**Ladle story pattern for org sub-pages (Members / Teams / Invitations):**
+Each story renders both `OrganizationDetailContent` (provides header + tabs) AND the sub-content component together,
+matching the route file structure. This ensures the tab context is visible in every story state.
+```tsx
+export const OrgMembers_Populated: Story = () => (
+  <AdminShell activePath="/admin/identity/organizations/org_001/members">
+    <PageBody>
+      <OrganizationDetailContent orgId="org_001" actions={detailActions} />
+      <OrganizationMembersContent orgId="org_001" actions={membersActions} />
+    </PageBody>
+  </AdminShell>
+);
+```
 
 ---
 
@@ -430,11 +451,11 @@ Platform admin only. Org admins redirected to their own org detail.
 Components:
   AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
   MainContent > PageBody > Stack(gap="md")
-    PageHeader: Inline(justify="between")
+    Panel > Inline(justify="between")
       Text(variant="h1", "Organizations")
       Inline(gap="sm")
         SearchInput(placeholder="Search organizations…", value=search, onChange)
-        LinkButton(href="#", variant="primary", "+ Create")  — opens create modal
+        Button(variant="primary", iconName="Plus", onClick=openCreateModal, "Create")
 
     Panel(padding="none") > DataTable(
       columns=[name(sortable), slug, createdAt(sortable)],
@@ -448,10 +469,11 @@ Components:
 
   Create modal: ConfirmDialog(title="Create Organization", confirmLabel="Create", onConfirm)
     TextInput(label="Name", name="name", required)
-    TextInput(label="Slug", name="slug", required)  — validate: check-slug on blur
+    TextInput(label="Slug", name="slug", required)
     TextInput(label="Logo URL", name="logo")
-    TextInput(label="Metadata", name="metadata")
-      — NOTE: raw JSON string. Validate parseable on blur; show inline error via TextInput error prop.
+    Textarea(label="Metadata (JSON)", name="metadata", placeholder='{"plan":"enterprise"}', error=metadataError)
+      — Validate parseable on change; show inline error via Textarea error prop.
+      — Use Textarea (not TextInput) for all JSON/multiline fields.
     On confirm: POST /api/auth/organization/create { name, slug, logo?, metadata? }
     On success: navigate to /admin/identity/organizations/${id}
 
@@ -529,7 +551,8 @@ Components:
       Button(variant="danger", onClick=openDeleteModal, "Delete")
 
     Tabs(
-      selectedKey="overview",
+      ariaLabel="Organization detail tabs",
+      selectedKey=activeTab,   — "overview" | "members" | "teams" | "invitations"; default "overview"
       items=[
         {id:"overview", href:`/admin/identity/organizations/${orgId}`, label:"Overview"},
         {id:"members", href:`/admin/identity/organizations/${orgId}/members`, label:"Members"},
@@ -537,6 +560,9 @@ Components:
         {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"}
       ]
     )
+    — NOTE: sub-page route files (members/teams/invitations) pass activeTab="members"|"teams"|"invitations"
+      to OrganizationDetailContent so the correct tab is highlighted.
+      Sub-pages also wrap both OrganizationDetailContent + sub-content in Stack(gap="md") for spacing.
 
     Panel
       Grid(columns="two")
@@ -549,7 +575,8 @@ Components:
     TextInput(label="Name", name="name", defaultValue=org.name)
     TextInput(label="Slug", name="slug", defaultValue=org.slug)
     TextInput(label="Logo URL", name="logo", defaultValue=org.logo||"")
-    TextInput(label="Metadata", name="metadata", defaultValue=org.metadata||"")
+    Textarea(label="Metadata (JSON)", name="metadata", defaultValue=org.metadata||"", placeholder='{"plan":"enterprise"}', error=editMetaError)
+      — Validate parseable on change. Use Textarea for JSON fields.
     On confirm: POST /api/auth/organization/update { data: { name, slug, logo, metadata } }
 
   Delete modal: ConfirmDialog(title="Delete Organization", confirmLabel="Delete Org", variant="danger",
@@ -564,7 +591,9 @@ Data: GET /api/auth/organization/get-full-organization → Organization (with me
 
 Notes:
   - Slug validation on blur in edit modal (same as create, skip if unchanged).
-  - Metadata displayed as monospace pre/code block; edit as raw JSON string.
+  - Metadata displayed as a `<pre>` block with `JSON.stringify(JSON.parse(...), null, 2)` formatting for readability.
+    Use CSS vars `var(--color-base-200)` for background and `var(--radius-box)` for border-radius.
+  - Metadata edited as raw JSON string via `Textarea` component (monospace, multiline).
 
 ---
 
@@ -636,9 +665,9 @@ Components:
     rows=filteredMembers, getRowKey=(m)=>m.id
   )
   Per-row: Inline(gap="sm")
-    Button(size="sm", onClick=openRoleModal, "Chg Role")
-    Button(variant="danger", size="sm", onClick=openRemoveModal, "Remove")
-      — disabled if member.role==="owner" AND owners.length===1 (tooltip: "Cannot remove the last owner")
+    Button(size="sm", variant="secondary", iconName="Pencil", ariaLabel="Change role", onClick=openRoleModal)
+    Button(variant="danger", size="sm", iconName="Trash2", ariaLabel="Remove member", onClick=openRemoveModal)
+      — disabled if member.role==="owner" AND owners.length===1 (last owner guard)
 
   Loading: Skeleton(rows=5)
   Empty: EmptyState(message="No members")
@@ -756,9 +785,9 @@ Components:
     rows=teams, getRowKey=(t)=>t.id
   )
   Per-row actions: Inline(gap="xs")
-    Button(size="sm", onClick=selectTeam, "▶")           — expand/collapse member panel
-    Button(size="sm", onClick=openRenameModal, "Ren")    — Rename
-    Button(variant="danger", size="sm", onClick=openDeleteModal, "✕")  — Delete
+    Button(size="sm", variant="secondary", iconName="ChevronRight"/"ChevronDown", ariaLabel="Expand"/"Collapse", onClick=selectTeam)
+    Button(size="sm", variant="secondary", iconName="Pencil", ariaLabel="Rename team", onClick=openRenameModal)
+    Button(variant="danger", size="sm", iconName="Trash2", ariaLabel="Delete team", onClick=openDeleteModal)
 
   — Expanded member panel (visible when a team row is selected):
     Panel(tone="muted")

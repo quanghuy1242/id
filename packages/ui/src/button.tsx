@@ -17,7 +17,8 @@ type ButtonProps = {
   readonly value?: string;
   readonly disabled?: boolean;
   readonly circle?: boolean;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
+  readonly ariaLabel?: string;
   readonly onClick?: () => void;
   readonly iconName?: string;
   readonly iconPosition?: "left" | "right";
@@ -32,6 +33,7 @@ export function Button({
   disabled,
   circle,
   children,
+  ariaLabel,
   onClick,
   iconName,
   iconPosition = "left",
@@ -48,6 +50,8 @@ export function Button({
   }[size];
 
   const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
+  const isIconOnly = !children && iconName;
+  const shapeClass = circle || isIconOnly ? " btn-circle" : "";
 
   return (
     <AriaButton
@@ -56,7 +60,8 @@ export function Button({
       value={value}
       isDisabled={disabled}
       onPress={onClick}
-      className={`btn ${sizeClass} ${variantClass}${circle ? " btn-circle" : ""}`.trim()}
+      aria-label={ariaLabel}
+      className={`btn ${sizeClass} ${variantClass}${shapeClass}`.trim()}
     >
       {iconPosition === "left" && icon}
       {children}
