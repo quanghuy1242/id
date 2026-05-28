@@ -168,8 +168,13 @@ export function AdminMobileRouteTabs() {
 }
 
 async function handleLogout() {
-  await signOut();
-  window.location.href = "/admin/login";
+  try {
+    await signOut();
+  } catch {
+    // sign-out network error — navigate anyway so the middleware
+    // redirects unauthenticated requests to /login
+  }
+  window.location.href = "/login";
 }
 
 export function AdminTopbar() {

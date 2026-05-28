@@ -203,5 +203,8 @@ export async function getCurrentSession(): Promise<CurrentSession> {
 }
 
 export async function signOut(): Promise<void> {
-  await fetch("/api/auth/sign-out", { method: "POST" });
+  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Sign-out failed with status ${res.status}`);
+  }
 }
