@@ -221,6 +221,10 @@ export function MainContent({ children }: SurfaceProps) {
   return <main className="flex flex-col flex-1 min-h-0 overflow-y-auto">{children}</main>;
 }
 
+export function MobileRouteTabs({ children }: SurfaceProps) {
+  return <div className="lg:hidden border-b border-base-300 bg-base-100 px-6">{children}</div>;
+}
+
 type MobileDockProps = SurfaceProps & {
   readonly ariaLabel?: string;
 };

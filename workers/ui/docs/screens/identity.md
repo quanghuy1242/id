@@ -19,7 +19,7 @@ They must be built before the corresponding screens can be implemented.
 `RadioGroup` (title/name/options/value/onChange — fully controlled, no `default`),
 `Alert` (tone); `Badge` (tone/size/children); `Skeleton` (rows/height); `EmptyState` (message/cta/onCta);
 `ErrorAlert` (message/onRetry); `SearchInput` (value/onChange/placeholder/grow/size); `FilterDropdown` (label/options/value/onChange/size);
-`TabNav` (items); `ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/children);
+`Tabs` (route-tab items with href); `ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/children);
 `DataTable` (columns/rows/getRowKey/onRowClick/sortBy/sortDirection/onSort/pagination={total/limit/offset/onChange}).
 
 ---
@@ -156,7 +156,7 @@ Badge mappings:
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ id admin   ▸ Admin ▸ Users ▸ John Doe          [Impersonate] │
 ├──────────────────┬───────────────────────────────────────────────┤
-│ ▸ Dashboard      │ ┌─ TabNav ──────────────────────────────────┐ │
+│ ▸ Dashboard      │ ┌─ Tabs ────────────────────────────────────┐ │
 │                  │ │  ▸ Overview          Sessions              │ │
 │ ▸ Identity       │ └───────────────────────────────────────────┘ │
 │   · Users        │                                               │
@@ -221,10 +221,13 @@ Components:
       — If not impersonating:
         Button(variant="secondary", onClick=openImpersonateModal, "Impersonate")
 
-    TabNav(items=[
-      {href: `/admin/identity/users/${userId}`, label:"Overview", active:true},
-      {href: `/admin/identity/users/${userId}/sessions`, label:"Sessions"}
-    ])
+    Tabs(
+      selectedKey="overview",
+      items=[
+        {id:"overview", href:`/admin/identity/users/${userId}`, label:"Overview"},
+        {id:"sessions", href:`/admin/identity/users/${userId}/sessions`, label:"Sessions"}
+      ]
+    )
 
     — If banned: Alert(tone="warning") showing "This user is banned. Reason: {banReason}. Expires: {banExpires}."
     — If loading: Skeleton(rows=4, height="md")
@@ -314,13 +317,13 @@ Notes:
 
 ## /admin/identity/users/:userId/sessions
 
-Inherits parent shell + PageHeader + TabNav. Sessions tab active.
+Inherits parent shell + PageHeader + Tabs. Sessions tab active.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ ...   ▸ ... ▸ John Doe                        [Impersonate]  │
 ├──────────────────┬───────────────────────────────────────────────┤
-│   (sidebar)      │ ┌─ TabNav ──────────────────────────────────┐ │
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
 │                  │ │   Overview          ▸ Sessions             │ │
 │                  │ └───────────────────────────────────────────┘ │
 │                  │                                               │
@@ -473,7 +476,7 @@ Behavior:
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ ...  ▸ ... ▸ Acme Corp         #acme       ⚠ [Delete Org]   │
 ├──────────────────┬───────────────────────────────────────────────┤
-│   (sidebar)      │ ┌─ TabNav ──────────────────────────────────┐ │
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
 │                  │ │  ▸ Overview  Members  Teams  Invitations  │ │
 │                  │ └───────────────────────────────────────────┘ │
 │                  │                                               │
@@ -525,12 +528,15 @@ Components:
         Badge(tone="neutral", children=`#${org.slug}`)
       Button(variant="danger", onClick=openDeleteModal, "Delete")
 
-    TabNav(items=[
-      {href:`/admin/identity/organizations/${orgId}`, label:"Overview", active:true},
-      {href:`/admin/identity/organizations/${orgId}/members`, label:"Members"},
-      {href:`/admin/identity/organizations/${orgId}/teams`, label:"Teams"},
-      {href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"}
-    ])
+    Tabs(
+      selectedKey="overview",
+      items=[
+        {id:"overview", href:`/admin/identity/organizations/${orgId}`, label:"Overview"},
+        {id:"members", href:`/admin/identity/organizations/${orgId}/members`, label:"Members"},
+        {id:"teams", href:`/admin/identity/organizations/${orgId}/teams`, label:"Teams"},
+        {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"}
+      ]
+    )
 
     Panel
       Grid(columns="two")
@@ -564,13 +570,13 @@ Notes:
 
 ## /admin/identity/organizations/:orgId/members
 
-Inherits parent shell + PageHeader + TabNav. Members tab active.
+Inherits parent shell + PageHeader + Tabs. Members tab active.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ ...  ▸ ... ▸ Acme Corp         #acme       ⚠ [Delete Org]   │
 ├──────────────────┬───────────────────────────────────────────────┤
-│   (sidebar)      │ ┌─ TabNav ──────────────────────────────────┐ │
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
 │ │                  │ │   Overview  ▸ Members  Teams  Invitations │ │
 │ │                  │ └───────────────────────────────────────────┘ │
 │ │                  │                                               │
@@ -680,13 +686,13 @@ Notes:
 
 ## /admin/identity/organizations/:orgId/teams
 
-Inherits parent shell + PageHeader + TabNav. Teams tab active.
+Inherits parent shell + PageHeader + Tabs. Teams tab active.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ ...  ▸ ... ▸ Acme Corp         #acme       ⚠ [Delete Org]   │
 ├──────────────────┬───────────────────────────────────────────────┤
-│   (sidebar)      │ ┌─ TabNav ──────────────────────────────────┐ │
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
 │ │                  │ │   Overview  Members  ▸ Teams  Invitations │ │
 │ │                  │ └───────────────────────────────────────────┘ │
 │ │                  │                                               │
@@ -810,13 +816,13 @@ Behavior:
 
 ## /admin/identity/organizations/:orgId/invitations
 
-Inherits parent shell + PageHeader + TabNav. Invitations tab active.
+Inherits parent shell + PageHeader + Tabs. Invitations tab active.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ ◈ ...  ▸ ... ▸ Acme Corp         #acme       ⚠ [Delete Org]   │
 ├──────────────────┬───────────────────────────────────────────────┤
-│   (sidebar)      │ ┌─ TabNav ──────────────────────────────────┐ │
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
 │ │                  │ │  Overview  Members  Teams  ▸ Invitations │ │
 │ │                  │ └───────────────────────────────────────────┘ │
 │ │                  │                                               │

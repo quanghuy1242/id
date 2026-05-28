@@ -75,7 +75,7 @@ packages/ui/src/
   └── Form: TextInput, HiddenInput, RadioGroup
   └── Feedback: Alert, Badge, Skeleton, EmptyState, ErrorAlert
   └── Data: DataTable
-  └── Navigation: TabNav
+  └── Navigation: Tabs
   └── Overlays: ConfirmDialog
   └── Inputs: SearchInput, FilterDropdown
   └── Interactive leaves: react-aria-components (Dialog, Modal, Select, SearchField)
@@ -123,13 +123,13 @@ No `.tokens.json` file exists. The CSS file is the single source of truth.
 | `error-alert.tsx` | `ErrorAlert` |
 | `search-input.tsx` | `SearchInput` |
 | `filter-dropdown.tsx` | `FilterDropdown` |
-| `tab-nav.tsx` | `TabNav` |
+| `tabs.tsx` | `Tabs`, `TabItem` |
 | `confirm-dialog.tsx` | `ConfirmDialog` |
 | `data-table.tsx` | `DataTable`, `DataTableColumn`, `SortDirection` |
 
 React Aria wrappers for `Dialog`/`Modal`, `Select`, and `SearchField` live inside `confirm-dialog.tsx`, `filter-dropdown.tsx`, and `search-input.tsx` respectively. Route files never import `react-aria-components` directly.
 
-**Note on `TabNav`:** Admin detail pages use URL-addressable tabs (each tab is a separate Next.js route). React Aria `Tabs` is for in-page panel switching. `TabNav` renders navigation links with active state driven by the caller passing `active: boolean` per item. Route files call `usePathname()` and compare against each item's `href`.
+**Note on `Tabs`:** Admin detail pages use URL-addressable tabs (each tab is a separate Next.js route). `Tabs` supports this by accepting `href` items and rendering React Aria tab anchors through Next `Link`; route files call `usePathname()` and pass the matching `selectedKey`. The same component also supports in-page panel switching when items provide `content` instead of `href`. Do not mix `href` and `content` items in the same instance.
 
 ### 3.3 Layer 3 — Screen Specs
 

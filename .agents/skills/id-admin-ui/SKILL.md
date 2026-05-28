@@ -65,7 +65,7 @@ Every new admin screen follows this order. Do not skip or reorder steps. Full ra
 
 ```tsx
 import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
-import { AdminTopbar, AdminSidebarNav, AdminMobileNav } from "../../workers/ui/src/app/admin/_components/admin-nav";
+import { AdminTopbar, AdminSidebarNav, AdminMobileNav, AdminMobileRouteTabs } from "../../workers/ui/src/app/admin/_components/admin-nav";
 import { setMockPathname } from "../../.ladle/mocks/next-navigation";
 
 export function AdminShell({ activePath, children }: { activePath: string; children: ReactNode }) {
@@ -74,6 +74,7 @@ export function AdminShell({ activePath, children }: { activePath: string; child
   return (
     <AppShell>
       <Topbar><AdminTopbar /></Topbar>
+      <AdminMobileRouteTabs />
       <SidebarLayout>
         <Sidebar><AdminSidebarNav /></Sidebar>
         <MainContent>{children}</MainContent>
@@ -200,6 +201,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `SidebarLayout` | `children` | Flex row between Topbar and MobileDock; `flex-1 min-h-0 overflow-hidden` |
 | `Sidebar` | `children` | `hidden lg:block w-72 shrink-0 border-r border-base-300 bg-base-100 p-4 overflow-y-auto` |
 | `MainContent` | `children` | `<main>` inside SidebarLayout; `flex-col flex-1 min-h-0 overflow-y-auto` |
+| `MobileRouteTabs` | `children` | Mobile-only wrapper for section-level route tabs; `lg:hidden border-b border-base-300 bg-base-100 px-6` |
 | `MobileDock` | `children`, `ariaLabel?` | DaisyUI `dock` (= `dock-md` default), `bg-base-100 border-t border-base-300 lg:hidden` |
 
 ### Layout — Content
@@ -261,7 +263,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `TabNav` | `items: { href, label, active? }[]` | URL-routed tab bar. Set `active` from `usePathname()` in route file. Not React Aria Tabs — each tab is a navigation link. |
+| `Tabs` | `items: { id, label, disabled?, content }[]` OR `items: { id, label, disabled?, href }[]`, `ariaLabel`, `selectedKey?`, `defaultSelectedKey?`, `disabledKeys?`, `onSelectionChange?`, `size?: "sm"\|"md"`, `variant?: "border"\|"box"\|"lift"` | Single React Aria Tabs primitive styled with DaisyUI `tabs`/`tab` classes. Use `content` items for in-page panels. Use `href` items for URL-addressable Next.js route tabs and pass `selectedKey` from route state. Do not mix `content` and `href` items in one instance. |
 | `NavMenu` | `children`, `label?` | Renders `<nav><ul class="menu w-full p-0">`. Wraps sidebar navigation. |
 | `NavLink` | `href`, `active?`, `current?`, `iconName?`, `children` | Single menu link inside `<li>`. `iconName` accepts a lucide icon name string (see `NavIcon` registry). Active state uses DaisyUI `menu-active` class. |
 | `NavSection` | `title?`, `collapsible?`, `children` | Section header with nested items. When `collapsible`, renders `<details open><summary>{title}</summary>`. When not collapsible, renders `<h2 class="menu-title">`. |

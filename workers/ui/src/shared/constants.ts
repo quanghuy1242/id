@@ -12,6 +12,7 @@ export type AdminNavEntry =
 export type AdminMobileNavItem = {
   readonly label: string;
   readonly href: string;
+  readonly activeHref?: string;
   readonly exact?: boolean;
   readonly icon?: string;
 };
@@ -42,8 +43,8 @@ export const SIDEBAR_NAV: readonly AdminNavEntry[] = [
 /** Admin mobile dock — top-level section entries only. */
 export const MOBILE_NAV: readonly AdminMobileNavItem[] = [
   { label: "Dash", href: "/admin", exact: true, icon: "LayoutDashboard" },
-  { label: "Identity", href: "/admin/identity", icon: "Users" },
-  { label: "OAuth", href: "/admin/oauth", icon: "KeyRound" },
-  { label: "Security", href: "/admin/security", icon: "Fingerprint" },
-  { label: "System", href: "/admin/system", icon: "Settings" },
+  { label: "Identity", href: "/admin/identity/users", activeHref: "/admin/identity", icon: "Users" },
+  { label: "OAuth", href: "/admin/oauth/applications", activeHref: "/admin/oauth", icon: "KeyRound" },
+  { label: "Security", href: "/admin/security/jwks", activeHref: "/admin/security", icon: "Fingerprint" },
+  { label: "System", href: "/admin/system/service-accounts", activeHref: "/admin/system", icon: "Settings" },
 ];

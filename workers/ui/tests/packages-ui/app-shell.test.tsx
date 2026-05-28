@@ -16,6 +16,7 @@ import {
   AppShell,
   Topbar,
   Sidebar,
+  MobileRouteTabs,
   MobileDock,
 } from "@id/ui";
 
@@ -292,5 +293,18 @@ describe("MobileDock", () => {
   it("allows a specific accessible navigation label", () => {
     render(<MobileDock ariaLabel="Admin mobile navigation">Dock</MobileDock>);
     expect(screen.getByRole("navigation", { name: /admin mobile navigation/i })).toBeInTheDocument();
+  });
+});
+
+describe("MobileRouteTabs", () => {
+  it("renders a mobile-only route tab container", () => {
+    render(<MobileRouteTabs>Tabs</MobileRouteTabs>);
+    expect(screen.getByText(/tabs/i)).toHaveClass(
+      "lg:hidden",
+      "border-b",
+      "border-base-300",
+      "bg-base-100",
+      "px-6",
+    );
   });
 });

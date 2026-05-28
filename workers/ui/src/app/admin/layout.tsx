@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
-import { AdminTopbar, AdminSidebarNav, AdminMobileNav } from "./_components/admin-nav";
+import { AdminTopbar, AdminSidebarNav, AdminMobileNav, AdminMobileRouteTabs } from "./_components/admin-nav";
 
 export default function AdminLayout({ children }: { readonly children: ReactNode }) {
   return (
@@ -8,6 +8,7 @@ export default function AdminLayout({ children }: { readonly children: ReactNode
       <Topbar>
         <AdminTopbar />
       </Topbar>
+      <AdminMobileRouteTabs />
       <SidebarLayout>
         <Sidebar>
           <AdminSidebarNav />
