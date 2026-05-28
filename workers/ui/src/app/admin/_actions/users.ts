@@ -196,6 +196,8 @@ export async function revokeUserSessions(userId: string): Promise<{ success: boo
 
 export async function getCurrentSession(): Promise<CurrentSession> {
   const res = await fetch("/api/auth/get-session?disableRefresh=true&disableCookieCache=true", {
+    cache: "no-store",
+    credentials: "include",
     headers: { accept: "application/json" },
   });
   if (!res.ok) return null;
@@ -203,7 +205,14 @@ export async function getCurrentSession(): Promise<CurrentSession> {
 }
 
 export async function signOut(): Promise<void> {
-  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+  // Same-origin POST; the response Set-Cookie clears the host-only session cookie.
+  const res = await fetch("/api/auth/sign-out", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
   if (!res.ok) {
     throw new Error(`Sign-out failed with status ${res.status}`);
   }

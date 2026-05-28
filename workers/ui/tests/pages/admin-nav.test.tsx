@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { AdminMobileNav, AdminMobileRouteTabs } from "@/app/admin/_components/admin-nav";
+import {
+  AdminMobileNav,
+  AdminMobileRouteTabs,
+  AdminTopbar,
+} from "@/app/admin/_components/admin-nav";
+import { ADMIN_LOGIN_REDIRECT_URL } from "@/shared/constants";
 
 const navigationMock = vi.hoisted(() => ({ pathname: "/admin" }));
 
@@ -52,5 +57,23 @@ describe("Admin mobile navigation", () => {
     render(<AdminMobileRouteTabs />);
 
     expect(screen.queryByRole("tablist")).toBeNull();
+  });
+});
+
+describe("Admin topbar", () => {
+  it("routes successful admin logout back to the admin login callback", () => {
+    expect(ADMIN_LOGIN_REDIRECT_URL).toBe("/login?callbackURL=%2Fadmin");
+  });
+
+  it("wires the avatar menu logout action", async () => {
+    const onLogout = vi.fn<() => void>();
+    render(<AdminTopbar onLogout={onLogout} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open account menu/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /logout/i }));
+
+    await waitFor(() => {
+      expect(onLogout).toHaveBeenCalledTimes(1);
+    });
   });
 });

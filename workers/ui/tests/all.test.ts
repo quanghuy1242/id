@@ -13,6 +13,7 @@ await import("./packages-ui/form.test");
 await import("./packages-ui/inline.test");
 await import("./packages-ui/tabs.test");
 await import("./packages-ui/typography.test");
+await import("./pages/admin-actions.test");
 await import("./pages/admin-page.test");
 await import("./pages/admin-nav.test");
 await import("./pages/consent-form.test");

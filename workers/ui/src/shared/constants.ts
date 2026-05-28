@@ -5,6 +5,9 @@ export const WORKSPACE_CONTEXT_PREFIX = "workspace:";
 /** Minimum password length for sign-in form client-side validation (SEC-018). */
 export const MIN_PASSWORD_LENGTH = 12;
 
+/** Login target after an admin-initiated logout. */
+export const ADMIN_LOGIN_REDIRECT_URL = "/login?callbackURL=%2Fadmin";
+
 export type AdminNavEntry =
   | { readonly type: "item"; readonly label: string; readonly href: string; readonly exact?: boolean; readonly icon?: string }
   | { readonly type: "section"; readonly label: string };

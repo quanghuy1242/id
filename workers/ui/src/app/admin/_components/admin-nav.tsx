@@ -15,7 +15,7 @@ import {
   TopbarEnd,
   TopbarStart,
 } from "@id/ui";
-import { MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
+import { ADMIN_LOGIN_REDIRECT_URL, MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
 import { signOut } from "../_actions/users";
 
 type SidebarItem = { label: string; href: string; exact?: boolean; icon?: string };
@@ -167,17 +167,21 @@ export function AdminMobileRouteTabs() {
   );
 }
 
-async function handleLogout() {
-  try {
-    await signOut();
-  } catch {
-    // sign-out network error — navigate anyway so the middleware
-    // redirects unauthenticated requests to /login
-  }
-  window.location.href = "/login";
+type LogoutLocation = {
+  href: string;
+};
+
+export async function handleLogout(location: LogoutLocation = window.location): Promise<void> {
+  // Navigate only after sign-out succeeds, never while still authenticated.
+  await signOut();
+  location.href = ADMIN_LOGIN_REDIRECT_URL;
 }
 
-export function AdminTopbar() {
+type AdminTopbarProps = {
+  readonly onLogout?: () => void;
+};
+
+export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
   const pathname = usePathname();
   const currentPageLabel = getCurrentPageLabel(pathname);
 
@@ -192,7 +196,7 @@ export function AdminTopbar() {
         <TopbarAvatarMenu
           initials="AD"
           items={[
-            { label: "Logout", onAction: () => { void handleLogout(); } },
+            { label: "Logout", onAction: onLogout ?? (() => { void handleLogout(); }) },
           ]}
         />
       </TopbarEnd>

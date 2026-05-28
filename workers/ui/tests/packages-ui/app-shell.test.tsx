@@ -18,6 +18,7 @@ import {
   Sidebar,
   MobileRouteTabs,
   MobileDock,
+  TopbarAvatarMenu,
 } from "@id/ui";
 
 describe("Page", () => {
@@ -267,6 +268,13 @@ describe("Topbar", () => {
     render(<Topbar>Top</Topbar>);
     const header = screen.getByText(/top/i).closest("header");
     expect(header).toHaveClass("navbar", "bg-base-100", "border-b");
+  });
+});
+
+describe("TopbarAvatarMenu", () => {
+  it("labels the avatar menu trigger", () => {
+    render(<TopbarAvatarMenu items={[{ label: "Logout", onAction: () => undefined }]} />);
+    expect(screen.getByRole("button", { name: /open account menu/i })).toBeInTheDocument();
   });
 });
 

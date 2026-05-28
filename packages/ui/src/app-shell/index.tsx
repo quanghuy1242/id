@@ -360,7 +360,7 @@ export function TopbarAvatarMenu({
 }: TopbarAvatarMenuProps) {
   return (
     <AriaMenuTrigger aria-label={ariaLabel}>
-      <Button variant="ghost" size="sm" circle aria-label={ariaLabel}>
+      <Button variant="ghost" size="sm" circle ariaLabel={ariaLabel}>
         <Avatar initials={initials} size="sm" />
       </Button>
       <Popover
