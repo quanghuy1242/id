@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button as AriaButton } from "react-aria-components";
 import { NavIcon } from "./nav-icons";
 
-type ButtonVariant = "primary" | "secondary" | "danger";
+type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "sm" | "md";
 
 type ButtonProps = {
@@ -16,6 +16,7 @@ type ButtonProps = {
   readonly name?: string;
   readonly value?: string;
   readonly disabled?: boolean;
+  readonly circle?: boolean;
   readonly children: ReactNode;
   readonly onClick?: () => void;
   readonly iconName?: string;
@@ -29,6 +30,7 @@ export function Button({
   name,
   value,
   disabled,
+  circle,
   children,
   onClick,
   iconName,
@@ -38,6 +40,7 @@ export function Button({
     primary: "btn-primary",
     secondary: "btn-outline",
     danger: "btn-error",
+    ghost: "btn-ghost",
   }[variant];
   const sizeClass = {
     sm: "btn-sm",
@@ -53,7 +56,7 @@ export function Button({
       value={value}
       isDisabled={disabled}
       onPress={onClick}
-      className={`btn ${sizeClass} ${variantClass}`.trim()}
+      className={`btn ${sizeClass} ${variantClass}${circle ? " btn-circle" : ""}`.trim()}
     >
       {iconPosition === "left" && icon}
       {children}
@@ -74,6 +77,7 @@ export function LinkButton({ href, variant = "primary", size = "md", children }:
     primary: "btn-primary",
     secondary: "btn-outline",
     danger: "btn-error",
+    ghost: "btn-ghost",
   }[variant];
   const sizeClass = {
     sm: "btn-sm",

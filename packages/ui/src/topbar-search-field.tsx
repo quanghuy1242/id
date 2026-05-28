@@ -1,7 +1,8 @@
 // DaisyUI 5: https://daisyui.com/components/input/
+// React Aria: https://react-spectrum.adobe.com/react-aria/SearchField.html
 "use client";
 
-import { Input, SearchField } from "react-aria-components";
+import { Button, Input, SearchField } from "react-aria-components";
 
 type TopbarSearchFieldProps = {
   readonly placeholder?: string;
@@ -9,11 +10,17 @@ type TopbarSearchFieldProps = {
 
 export function TopbarSearchField({ placeholder = "Search" }: TopbarSearchFieldProps) {
   return (
-    <SearchField aria-label={placeholder}>
+    <SearchField aria-label={placeholder} className="relative flex items-center">
       <Input
         placeholder={placeholder}
-        className="input input-bordered input-sm w-24 md:w-auto"
+        className="input input-bordered min-w-24 md:w-48 bg-base-100 text-base-content focus:input-primary pr-7"
       />
+      <Button
+        aria-label="Clear search"
+        className="absolute right-2 text-base-content/40 hover:text-base-content/70 text-base leading-none hidden group-data-empty:false:block"
+      >
+        ✕
+      </Button>
     </SearchField>
   );
 }

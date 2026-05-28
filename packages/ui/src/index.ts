@@ -15,3 +15,5 @@ export * from "./confirm-dialog";
 export * from "./data-table";
 export * from "./nav-icons";
 export * from "./topbar-search-field";
+export * from "./avatar";
+export * from "./menu";

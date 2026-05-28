@@ -294,9 +294,23 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `TopbarEnd` | `children` | Right section of Topbar |
 | `TopbarBrandLink` | `href`, `children` | Brand/app name link, `btn btn-ghost text-xl font-semibold` |
 | `TopbarBreadcrumb` | `items: string[]` | `breadcrumbs` DaisyUI component |
-| `TopbarSearchField` | `placeholder?` | React Aria SearchField styled with DaisyUI input classes (decorative, not wired to API) |
-| `TopbarAvatarMenu` | `ariaLabel?`, `initials?`, `items: { label, href, badge? }[]` | Avatar dropdown menu using DaisyUI `dropdown dropdown-end` |
+| `TopbarSearchField` | `placeholder?` | React Aria SearchField with Input + clear Button. Styled with DaisyUI `input input-bordered`. Shows `✕` clear button when non-empty. |
+| `TopbarAvatarMenu` | `ariaLabel?`, `initials?`, `items: { label, href, badge? }[]` | Composes `Avatar` (trigger) + RAC `MenuTrigger`/`Menu`/`MenuItem` (dropdown) styled with DaisyUI. |
 | `NavTitle` | `children` | Renders `<li><h2 class="menu-title">` — static section title without collapsible behavior |
+
+### Avatar
+
+| Component | Key props | Notes |
+|---|---|---|
+| `Avatar` | `initials?`, `image?`, `alt?`, `size?: "xs"\|"sm"\|"md"\|"lg"` | Pure DaisyUI: `avatar avatar-placeholder`. Shows image if `image` is provided, otherwise renders `initials` (first 2 chars) on a `bg-neutral text-neutral-content rounded-full` circle. Size maps: xs=20px, sm=28px, md=40px, lg=56px. |
+
+### Menu
+
+| Component | Key props | Notes |
+|---|---|---|
+| `MenuTrigger` | `children`, `isOpen?`, `onOpenChange?` | RAC `MenuTrigger` wrapper that splits `children` into trigger + menu slots. Renders `Popover` with `placement="bottom end"` and enter/exit animations. |
+| `Menu` | `children`, `items?`, `renderEmptyState?`, ... | RAC `Menu` styled with DaisyUI `menu menu-sm dropdown-content bg-base-100 rounded-box shadow`. |
+| `MenuItem` | `href?`, `label?`, `badge?`, `onAction?`, ... | RAC `MenuItem` with optional `menu-active` focus highlight. Accepts `badge` prop for a DaisyUI `badge badge-sm` suffix. |
 
 ## Screen Spec Format
 

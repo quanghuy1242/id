@@ -1,6 +1,11 @@
 // DaisyUI 5: https://daisyui.com/components/menu/
+"use client";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { MenuTrigger as AriaMenuTrigger, Popover } from "react-aria-components";
+import { Avatar } from "../avatar";
+import { Button } from "../button";
+import { Menu, MenuItem } from "../menu";
 import { NavIcon } from "../nav-icons";
 
 type Gap = "xs" | "sm" | "md" | "lg";
@@ -349,24 +354,22 @@ export function TopbarAvatarMenu({
   items,
 }: TopbarAvatarMenuProps) {
   return (
-    <details className="dropdown dropdown-end">
-      <summary className="btn btn-ghost btn-sm btn-circle avatar" aria-label={ariaLabel}>
-        <div className="avatar avatar-placeholder">
-          <div className="bg-neutral text-neutral-content w-8 rounded-full text-xs font-medium">
-            <span>{initials}</span>
-          </div>
-        </div>
-      </summary>
-      <ul className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
-        {items.map((item) => (
-          <li key={item.href}>
-            <Link href={item.href} className={item.badge ? "justify-between" : undefined}>
-              {item.label}
-              {item.badge ? <span className="badge badge-sm">{item.badge}</span> : null}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </details>
+    <AriaMenuTrigger aria-label={ariaLabel}>
+      <Button variant="ghost" size="sm" circle aria-label={ariaLabel}>
+        <Avatar initials={initials} size="sm" />
+      </Button>
+      <Popover
+        className="z-50 data-[entering]:animate-popover-in data-[exiting]:animate-popover-out"
+        placement="bottom end"
+        offset={4}
+        crossOffset={0}
+      >
+        <Menu>
+          {items.map((item) => (
+            <MenuItem key={item.href} href={item.href} badge={item.badge} label={item.label} />
+          ))}
+        </Menu>
+      </Popover>
+    </AriaMenuTrigger>
   );
 }
