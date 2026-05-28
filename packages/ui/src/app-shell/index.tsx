@@ -342,8 +342,9 @@ export function TopbarBreadcrumb({ items }: TopbarBreadcrumbProps) {
 
 type TopbarAvatarMenuItem = {
   readonly label: string;
-  readonly href: string;
   readonly badge?: string;
+  readonly href?: string;
+  readonly onAction?: () => void;
 };
 
 type TopbarAvatarMenuProps = {
@@ -370,7 +371,13 @@ export function TopbarAvatarMenu({
       >
         <Menu>
           {items.map((item) => (
-            <MenuItem key={item.href} href={item.href} badge={item.badge} label={item.label} />
+            <MenuItem
+              key={item.href ?? item.label}
+              href={item.href}
+              badge={item.badge}
+              label={item.label}
+              onAction={item.onAction}
+            />
           ))}
         </Menu>
       </Popover>

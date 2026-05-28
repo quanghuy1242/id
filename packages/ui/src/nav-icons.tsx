@@ -3,6 +3,7 @@
 import {
   Activity,
   AppWindow,
+  Bell,
   Bot,
   Building2,
   ChevronDown,
@@ -27,6 +28,7 @@ import {
 const iconMap: Record<string, LucideIcon> = {
   Activity,
   AppWindow,
+  Bell,
   Bot,
   Building2,
   ChevronDown,

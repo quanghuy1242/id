@@ -201,3 +201,7 @@ export async function getCurrentSession(): Promise<CurrentSession> {
   if (!res.ok) return null;
   return res.json() as Promise<CurrentSession>;
 }
+
+export async function signOut(): Promise<void> {
+  await fetch("/api/auth/sign-out", { method: "POST" });
+}

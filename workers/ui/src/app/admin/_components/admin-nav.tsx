@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import {
+  Button,
   DockLink,
   MobileRouteTabs,
   NavLink,
@@ -12,10 +13,10 @@ import {
   TopbarBreadcrumb,
   TopbarBrandLink,
   TopbarEnd,
-  TopbarSearchField,
   TopbarStart,
 } from "@id/ui";
 import { MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
+import { signOut } from "../_actions/users";
 
 type SidebarItem = { label: string; href: string; exact?: boolean; icon?: string };
 
@@ -166,6 +167,11 @@ export function AdminMobileRouteTabs() {
   );
 }
 
+async function handleLogout() {
+  await signOut();
+  window.location.href = "/admin/login";
+}
+
 export function AdminTopbar() {
   const pathname = usePathname();
   const currentPageLabel = getCurrentPageLabel(pathname);
@@ -177,13 +183,11 @@ export function AdminTopbar() {
         <TopbarBreadcrumb items={["Admin", currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
-        <TopbarSearchField placeholder="Search" />
+        <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" />
         <TopbarAvatarMenu
           initials="AD"
           items={[
-            { label: "Profile", href: "/admin/profile", badge: "New" },
-            { label: "Settings", href: "/admin/settings" },
-            { label: "Logout", href: "/logout" },
+            { label: "Logout", onAction: () => { void handleLogout(); } },
           ]}
         />
       </TopbarEnd>
