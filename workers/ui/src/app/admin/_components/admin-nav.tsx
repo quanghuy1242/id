@@ -20,14 +20,19 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
 }
 
 function getCurrentPageLabel(pathname: string): string {
-  const activeEntry = SIDEBAR_NAV.find((entry) => entry.type === "item" && isActive(pathname, entry.href, entry.exact));
+  const activeEntry = SIDEBAR_NAV.find(
+    (entry) => entry.type === "item" && isActive(pathname, entry.href, entry.exact),
+  );
   return activeEntry?.label ?? "Dashboard";
 }
 
 export function AdminSidebarNav() {
   const pathname = usePathname();
-  const groups: Array<{ title: string | null; items: Array<{ label: string; href: string; exact?: boolean }> }> = [];
-  const topLevelItems: Array<{ label: string; href: string; exact?: boolean }> = [];
+  const groups: Array<{
+    title: string | null;
+    items: Array<{ label: string; href: string; exact?: boolean; icon?: string }>;
+  }> = [];
+  const topLevelItems: Array<{ label: string; href: string; exact?: boolean; icon?: string }> = [];
 
   for (const entry of SIDEBAR_NAV) {
     if (entry.type === "section") {
@@ -48,19 +53,35 @@ export function AdminSidebarNav() {
       {topLevelItems.map((entry) => {
         const active = isActive(pathname, entry.href, entry.exact);
         return (
-          <NavLink key={entry.href} href={entry.href} active={active} current={active ? "page" : undefined}>
+          <NavLink
+            key={entry.href}
+            href={entry.href}
+            active={active}
+            current={active ? "page" : undefined}
+            iconName={entry.icon}
+          >
             {entry.label}
           </NavLink>
         );
       })}
       {groups.map((group, groupIndex) => (
-        <NavSection key={group.title ?? `root-${groupIndex}`} title={group.title ?? undefined}>
+        <NavSection
+          key={group.title ?? `root-${groupIndex}`}
+          title={group.title ?? undefined}
+          collapsible
+        >
           {group.items.map((entry) => {
             const active = isActive(pathname, entry.href, entry.exact);
             return (
-              <NavLink key={entry.href} href={entry.href} active={active} current={active ? "page" : undefined}>
-                {entry.label}
-              </NavLink>
+              <NavLink
+                key={entry.href}
+                href={entry.href}
+                active={active}
+                current={active ? "page" : undefined}
+                iconName={entry.icon}
+              >
+                  {entry.label}
+                </NavLink>
             );
           })}
         </NavSection>
@@ -83,6 +104,7 @@ export function AdminMobileNav() {
             current={active ? "page" : undefined}
             active={active}
             label={item.label}
+            iconName={item.icon}
           />
         );
       })}

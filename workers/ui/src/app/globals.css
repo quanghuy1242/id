@@ -22,6 +22,30 @@
   --noise: 0;
 }
 
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes modal-panel-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(8px); }
+}
+
+@theme {
+  --animate-modal-overlay-in: modal-overlay-in 200ms ease-out both;
+  --animate-modal-overlay-out: modal-overlay-out 150ms ease-in both;
+  --animate-modal-panel-in: modal-panel-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-modal-panel-out: modal-panel-out 150ms ease-in both;
+}
+
 @plugin "daisyui/theme" {
   name: "lumina-dark";
   prefersdark: true;

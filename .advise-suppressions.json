@@ -124,6 +124,30 @@
       "file": "workers/core/src/auth/plugins/scim-directory/schema.ts",
       "rule": "ai-slop/todo-stub",
       "reason": "TODO comment at architectural boundary tracking Better Auth content-type support for SCIM OpenAPI docs."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/nav-icons.tsx",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Import block and icon map literal both enumerate the same icon names; explicit one-to-one name-to-component registry mapping is structurally required like mapper files."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_components/admin-nav.tsx",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Two NavLink render blocks (top-level items and group children) follow identical active-icon-link pattern across different data sources; structurally analogous to route-file duplication."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_components/identity/users-list-content.tsx",
+      "rule": "react-hooks/exhaustive-deps",
+      "reason": "Intentionally omits props.page from debounce effect deps — only search value drives the debounce reset; adding props.page would cause the offset to reset on page navigation."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_mocks/users.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Mock user fixture objects must explicitly list all User fields per type; structural repetition is required to make each fixture independently readable in stories."
     }
   ]
 }

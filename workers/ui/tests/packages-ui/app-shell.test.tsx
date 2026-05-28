@@ -281,7 +281,7 @@ describe("MobileDock", () => {
   it("renders as a dock nav", () => {
     render(<MobileDock>Dock</MobileDock>);
     const nav = screen.getByText(/dock/i).closest("nav");
-    expect(nav).toHaveClass("dock", "dock-sm", "lg:hidden");
+    expect(nav).toHaveClass("dock", "bg-base-100", "border-t", "border-base-300", "lg:hidden");
   });
 
   it("exposes an accessible navigation label for mobile layouts", () => {

@@ -41,23 +41,20 @@ export function ConfirmDialog({
       isOpen={open}
       onOpenChange={onOpenChange}
       isDismissable
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="modal modal-open bg-black/40 data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out"
     >
-      <Modal className="bg-base-100 border border-base-300 rounded-box shadow-xl w-full max-w-md mx-4 p-6">
-        <Dialog className="outline-none flex flex-col gap-4">
+      <Modal className="modal-box data-[entering]:animate-modal-panel-in data-[exiting]:animate-modal-panel-out">
+        <Dialog className="outline-none">
           {({ close }) => (
             <>
-              <DialogHeading
-                slot="title"
-                className="text-lg font-semibold text-base-content"
-              >
+              <DialogHeading slot="title" className="font-bold text-lg">
                 {title}
               </DialogHeading>
               {description && (
-                <p className="text-sm text-base-content/70">{description}</p>
+                <p className="py-4 text-base-content/70">{description}</p>
               )}
-              {children && <div className="flex flex-col gap-3">{children}</div>}
-              <div className="flex justify-end gap-2 pt-2">
+              {children && <div className="flex flex-col gap-3 py-2">{children}</div>}
+              <div className="modal-action">
                 <Button variant="secondary" onClick={close}>
                   {cancelLabel}
                 </Button>

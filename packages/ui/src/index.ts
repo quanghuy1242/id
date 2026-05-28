@@ -13,3 +13,4 @@ export * from "./filter-dropdown";
 export * from "./tab-nav";
 export * from "./confirm-dialog";
 export * from "./data-table";
+export * from "./nav-icons";

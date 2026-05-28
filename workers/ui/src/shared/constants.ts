@@ -6,39 +6,44 @@ export const WORKSPACE_CONTEXT_PREFIX = "workspace:";
 export const MIN_PASSWORD_LENGTH = 12;
 
 export type AdminNavEntry =
-  | { readonly type: "item"; readonly label: string; readonly href: string; readonly exact?: boolean }
+  | { readonly type: "item"; readonly label: string; readonly href: string; readonly exact?: boolean; readonly icon?: string }
   | { readonly type: "section"; readonly label: string };
+
+export type AdminMobileNavItem = {
+  readonly label: string;
+  readonly href: string;
+  readonly exact?: boolean;
+  readonly icon?: string;
+};
 
 /** Admin sidebar navigation — section headers and links in render order. */
 export const SIDEBAR_NAV: readonly AdminNavEntry[] = [
-  { type: "item", label: "Dashboard", href: "/admin", exact: true },
+  { type: "item", label: "Dashboard", href: "/admin", exact: true, icon: "LayoutDashboard" },
   { type: "section", label: "Identity" },
-  { type: "item", label: "Users", href: "/admin/identity/users" },
-  { type: "item", label: "Organizations", href: "/admin/identity/organizations" },
+  { type: "item", label: "Users", href: "/admin/identity/users", icon: "Users" },
+  { type: "item", label: "Organizations", href: "/admin/identity/organizations", icon: "Building2" },
   { type: "section", label: "OAuth" },
-  { type: "item", label: "Applications", href: "/admin/oauth/applications" },
-  { type: "item", label: "Resource APIs", href: "/admin/oauth/resource-apis" },
-  { type: "item", label: "Scope Catalog", href: "/admin/oauth/scope-catalog" },
-  { type: "item", label: "M2M Bindings", href: "/admin/oauth/m2m-bindings" },
-  { type: "item", label: "Sessions & Tokens", href: "/admin/oauth/sessions-tokens" },
+  { type: "item", label: "Applications", href: "/admin/oauth/applications", icon: "AppWindow" },
+  { type: "item", label: "Resource APIs", href: "/admin/oauth/resource-apis", icon: "Server" },
+  { type: "item", label: "Scope Catalog", href: "/admin/oauth/scope-catalog", icon: "Tags" },
+  { type: "item", label: "M2M Bindings", href: "/admin/oauth/m2m-bindings", icon: "Link2" },
+  { type: "item", label: "Sessions & Tokens", href: "/admin/oauth/sessions-tokens", icon: "KeyRound" },
   { type: "section", label: "Security" },
-  { type: "item", label: "JWKS", href: "/admin/security/jwks" },
-  { type: "item", label: "Consents", href: "/admin/security/consents" },
+  { type: "item", label: "JWKS", href: "/admin/security/jwks", icon: "Fingerprint" },
+  { type: "item", label: "Consents", href: "/admin/security/consents", icon: "FileCheck2" },
   { type: "section", label: "System" },
-  { type: "item", label: "Service Accounts", href: "/admin/system/service-accounts" },
-  { type: "item", label: "Issuer Metadata", href: "/admin/system/issuer-metadata" },
-  { type: "item", label: "SCIM Status", href: "/admin/system/scim-status" },
-  { type: "item", label: "Health", href: "/admin/system/health" },
-  { type: "item", label: "Settings", href: "/admin/system/settings" },
+  { type: "item", label: "Service Accounts", href: "/admin/system/service-accounts", icon: "Bot" },
+  { type: "item", label: "Issuer Metadata", href: "/admin/system/issuer-metadata", icon: "Globe" },
+  { type: "item", label: "SCIM Status", href: "/admin/system/scim-status", icon: "Activity" },
+  { type: "item", label: "Health", href: "/admin/system/health", icon: "HeartPulse" },
+  { type: "item", label: "Settings", href: "/admin/system/settings", icon: "Settings" },
 ];
-
-export type AdminMobileNavItem = { readonly label: string; readonly href: string; readonly exact?: boolean };
 
 /** Admin mobile dock — top-level section entries only. */
 export const MOBILE_NAV: readonly AdminMobileNavItem[] = [
-  { label: "Dash", href: "/admin", exact: true },
-  { label: "Identity", href: "/admin/identity" },
-  { label: "OAuth", href: "/admin/oauth" },
-  { label: "Security", href: "/admin/security" },
-  { label: "System", href: "/admin/system" },
+  { label: "Dash", href: "/admin", exact: true, icon: "LayoutDashboard" },
+  { label: "Identity", href: "/admin/identity", icon: "Users" },
+  { label: "OAuth", href: "/admin/oauth", icon: "KeyRound" },
+  { label: "Security", href: "/admin/security", icon: "Fingerprint" },
+  { label: "System", href: "/admin/system", icon: "Settings" },
 ];

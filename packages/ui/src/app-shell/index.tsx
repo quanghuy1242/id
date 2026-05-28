@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { NavIcon } from "../nav-icons";
 
 type Gap = "xs" | "sm" | "md" | "lg";
 type Align = "start" | "center" | "end" | "stretch";
@@ -218,7 +219,7 @@ type MobileDockProps = SurfaceProps & {
 };
 
 export function MobileDock({ ariaLabel = "Primary mobile navigation", children }: MobileDockProps) {
-  return <nav aria-label={ariaLabel} className="dock dock-sm bg-base-100 border-t border-base-300 lg:hidden">{children}</nav>;
+  return <nav aria-label={ariaLabel} className="dock bg-base-100 border-t border-base-300 lg:hidden">{children}</nav>;
 }
 
 type NavMenuProps = SurfaceProps & {
@@ -237,9 +238,23 @@ export function NavMenu({ label, children }: NavMenuProps) {
 
 type NavSectionProps = SurfaceProps & {
   readonly title?: string;
+  readonly collapsible?: boolean;
 };
 
-export function NavSection({ title, children }: NavSectionProps) {
+export function NavSection({ title, collapsible = false, children }: NavSectionProps) {
+  if (collapsible && title) {
+    return (
+      <li>
+        <details open>
+          <summary>{title}</summary>
+          <ul>
+            {children}
+          </ul>
+        </details>
+      </li>
+    );
+  }
+
   return (
     <li>
       {title ? <h2 className="menu-title">{title}</h2> : null}
@@ -254,21 +269,15 @@ type NavLinkProps = {
   readonly href: string;
   readonly active?: boolean;
   readonly current?: "page";
+  readonly iconName?: string;
   readonly children: ReactNode;
 };
 
-export function NavLink({ href, active = false, current, children }: NavLinkProps) {
+export function NavLink({ href, active = false, current, iconName, children }: NavLinkProps) {
   return (
     <li>
-      <a
-        href={href}
-        aria-current={current}
-        className={
-          active
-            ? "font-medium text-base-content"
-            : "text-base-content/85 hover:text-base-content"
-        }
-      >
+      <a href={href} aria-current={current} className={active ? "menu-active" : undefined}>
+        {iconName ? <NavIcon name={iconName} variant="sidebar" /> : null}
         {children}
       </a>
     </li>
@@ -280,14 +289,22 @@ type DockLinkProps = {
   readonly active?: boolean;
   readonly current?: "page";
   readonly label: string;
+  readonly iconName?: string;
 };
 
-export function DockLink({ href, active = false, current, label }: DockLinkProps) {
+export function DockLink({ href, active = false, current, label, iconName }: DockLinkProps) {
   return (
-    <a href={href} aria-current={current} className={active ? "dock-active" : undefined}>
-      <span className="size-[0.35rem] rounded-full bg-current opacity-70" aria-hidden="true" />
+    <button
+      onClick={() => { window.location.href = href; }}
+      aria-current={current}
+      className={active ? "dock-active" : undefined}
+    >
+      {iconName
+        ? <NavIcon name={iconName} variant="dock" />
+        : <span className="size-[0.35rem] rounded-full bg-current opacity-70" aria-hidden="true" />
+      }
       <span className="dock-label">{label}</span>
-    </a>
+    </button>
   );
 }
 

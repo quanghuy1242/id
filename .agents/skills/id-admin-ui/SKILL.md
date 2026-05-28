@@ -16,24 +16,137 @@ Full architecture rationale lives in `docs/022_admin-ui-system.md`.
 ## Workflow
 
 1. Confirm you are working in `/home/quanghuy1242/pjs/auth`.
-2. For a **new page**: read the screen spec in `workers/ui/docs/screens/<section>.md` before writing any code. If no spec exists, draft one and get approval before implementing.
-3. For a **new component**: add it to `packages/ui/src/`, add the DaisyUI 5 link comment, export from `packages/ui/src/index.ts`, then use it.
+2. **Always load this skill before any admin-UI task.** Do not skip this.
+3. For a **new page**: read the screen spec in `workers/ui/docs/screens/<section>.md` before writing any code. If no spec exists, draft one and get approval before implementing.
+4. For a **new component**: add it to `packages/ui/src/`, add the DaisyUI 5 link comment (see below), export from `packages/ui/src/index.ts`, then use it. **Update this registry immediately** after the component is added.
+   **DaisyUI 5 link comment format:** Every file in `packages/ui/src/` must start with a comment citing the relevant DaisyUI component page. Even if the file uses only Tailwind utilities or third-party libraries, cite the DaisyUI component that the sizing/styling conventions come from.
+   ```ts
+   // DaisyUI 5: https://daisyui.com/components/menu/
+   ```
    **Tree-shaking constraint:** `packages/ui/package.json` declares `"sideEffects": false`. Every component file must be side-effect-free at module level — no `import "./styles.css"`, no global registry calls, no top-level mutations. If a file must have a side effect, add it to the `sideEffects` array in package.json explicitly (e.g. `"sideEffects": ["./src/that-file.tsx"]`) rather than changing `false` to `true`.
-4. For a **spec draft**: use the exact format in the Screen Spec Format section below.
-5. Keep route files under `workers/ui/src/app/admin/**` as composition boundaries — assemble `@id/ui` primitives, pass data, no raw markup.
-6. Run `pnpm lint` and `pnpm check` after any change to `packages/ui` or `workers/ui`.
-7. Run `pnpm deploy:ui:dry-run` after any non-trivial change to `packages/ui` or `workers/ui`. This does a full Cloudflare Worker build and verifies the bundle assembles correctly without deploying. Fix any build errors before completing.
+5. For a **spec draft**: use the exact format in the Screen Spec Format section below.
+6. Keep route files under `workers/ui/src/app/admin/**` as composition boundaries — assemble `@id/ui` primitives, pass data, no raw markup.
+7. Run `pnpm lint` and `pnpm check` after any change to `packages/ui` or `workers/ui`.
+8. Run `pnpm deploy:ui:dry-run` after any non-trivial change to `packages/ui` or `workers/ui`. This does a full Cloudflare Worker build and verifies the bundle assembles correctly without deploying. Fix any build errors before completing.
+
+## Screen Implementation Workflow
+
+Every new admin screen follows this order. Do not skip or reorder steps. Full rationale and code examples live in `docs/023_admin-screen-story-strategy.md`.
+
+1. **Spec** — confirm `workers/ui/docs/screens/<section>.md` has a complete entry (ASCII sketch + Components block + Data block). Draft it if missing; get approval before continuing.
+2. **Mocks** — create `workers/ui/src/app/admin/_mocks/<domain>.ts` with realistic data covering all badge/status combinations.
+3. **Actions** — create `workers/ui/src/app/admin/_actions/<domain>.ts` with one typed async function per API endpoint. Plain functions, no React.
+4. **Shell decorator** — create `stories/_decorators/shell.tsx` if it does not exist yet (once, shared by all stories).
+5. **Content component** — create `workers/ui/src/app/admin/_components/<section>/<name>-content.tsx`. It must:
+   - Own its data lifecycle: call action functions in `useEffect`, store results in internal state.
+   - Accept `loading?: boolean` and `error?: string` override props that skip the fetch and force the skeleton/error display.
+   - Accept optional state-override props for search, filter, sort, page (route file passes these from `useSearchParams`).
+   - Manage internal `useState` for all UI state when overrides are not provided.
+   - Fire navigation callbacks (`onRowClick`, `onBackClick`) — never call `router.push()` directly.
+   - Own zero URL logic — no `useSearchParams`, no `usePathname`, no `useRouter`.
+   - Render only `@id/ui` components.
+6. **Story** — create `stories/<section>/<name>.stories.tsx`. Minimum exports: `Populated`, `Empty`, `Loading`, `Error`. Use `vi.mock` on the `_actions/` module. Wrap every story in `<AdminShell activePath="...">`. **Always wrap the content component in `<PageBody>` inside `AdminShell`** — `AdminShell` puts children directly in `<MainContent>` with no padding; without `PageBody` the story has no content padding and looks different from the real app.
+7. **Ladle verify** — run `pnpm dev:i` and confirm all four states render correctly. This gate must pass before the route file is created.
+8. **Route file** — create `workers/ui/src/app/admin/<path>/page.tsx` (≤ 40 lines). Read URL params via `useSearchParams`, pass as override props to the content component, pass navigation callbacks wired to `router.push()`. **Split the page into two components**: the outer component owns the `<Suspense fallback={<Content loading />}>` boundary; an inner component (`PageContent`) calls `useSearchParams()`. Never call `useSearchParams()` in the same component that owns the Suspense boundary — Next.js App Router de-opts the entire route to dynamic rendering and causes hydration flicker.
+
+### Story state conventions
+
+| Story export | How to implement |
+|---|---|
+| `Populated` | `vi.mock` the actions module; set `mockListX.mockResolvedValue({ items: mockData, total: ... })` |
+| `Empty` | Same mock, return `{ items: [], total: 0 }` |
+| `Loading` | Pass `loading` prop — component skips fetch, shows `Skeleton` immediately |
+| `Error` | Pass `error="..."` prop — component skips fetch, shows `ErrorAlert` immediately |
+
+### AdminShell decorator
+
+`stories/_decorators/shell.tsx` mirrors `workers/ui/src/app/admin/layout.tsx` and uses the real nav components:
+
+```tsx
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
+import { AdminTopbar, AdminSidebarNav, AdminMobileNav } from "../../workers/ui/src/app/admin/_components/admin-nav";
+import { setMockPathname } from "../../.ladle/mocks/next-navigation";
+
+export function AdminShell({ activePath, children }: { activePath: string; children: ReactNode }) {
+  setMockPathname(activePath);
+  if (typeof window !== "undefined") window.history.replaceState({}, "", activePath);
+  return (
+    <AppShell>
+      <Topbar><AdminTopbar /></Topbar>
+      <SidebarLayout>
+        <Sidebar><AdminSidebarNav /></Sidebar>
+        <MainContent>{children}</MainContent>
+      </SidebarLayout>
+      <MobileDock><AdminMobileNav /></MobileDock>
+    </AppShell>
+  );
+}
+```
+
+**`AdminShell` has no `PageBody` inside it** — `MainContent` renders children with no padding. Every story must wrap the content component in `<PageBody>` explicitly:
+
+```tsx
+// CORRECT — matches route file structure
+export const Populated: Story = () => (
+  <AdminShell activePath="/admin/identity/users">
+    <PageBody>
+      <UsersListContent />
+    </PageBody>
+  </AdminShell>
+);
+
+// WRONG — content flush against edges, no padding, looks different from real app
+export const Populated: Story = () => (
+  <AdminShell activePath="/admin/identity/users">
+    <UsersListContent />
+  </AdminShell>
+);
+```
 
 ## Hard Rules
 
 - Do not put raw `div`, `main`, `section`, `header`, `nav`, `aside`, `footer` in route files.
 - Do not put raw typography tags (`h1`–`h3`, `p`, `span`) in route files. Use `Text` or `Heading`.
 - Do not put DaisyUI classes (`btn`, `card`, `menu`, `navbar`, `input`, `badge`, `alert`, `table`, etc.) in route files.
-- Do not put Tailwind visual utilities (`flex`, `grid`, `gap-*`, `p-*`, `m-*`, `text-*`, `bg-*`, `border-*`, `rounded-*`) in route files.
-- Do not expose raw `className` as the primary styling API on new `packages/ui` components.
+- Do not put Tailwind visual utilities (`flex`, `grid`, `gap-*`, `p-*`, `m-*`, `text-*`, `bg-*`, `border-*`, `rounded-*`, `size-*`, `shrink-*`, etc.) in route files — not even as className overrides on `@id/ui` components. If a component needs size or style control, add a typed prop to the component.
+- Do not expose raw `className` as the primary styling API on new `packages/ui` components. Use typed props (variant, size, tone) that map to DaisyUI classes internally.
 - Do not import `react-aria-components` directly in route files. Use `@id/ui` wrappers only.
+- Do not import `lucide-react` directly in route files. Use `NavIcon` from `@id/ui` via `iconName` string props on navigational components.
 - Do not create a new `/admin` route without a spec entry in `workers/ui/docs/screens/`.
 - Do not invent new component names — use exact exports from `@id/ui` listed in the registry below.
+- Do not construct ReactNode icons (JSX `<SomeIcon/>`) in route files. Pass icon names as strings via `iconName` props.
+- **Do not call `fetch()` directly inside content components or route files.** All API calls go through `_actions/<domain>.ts` functions.
+- **Do not use `useSearchParams`, `usePathname`, or `useRouter` inside content components.** URL logic belongs exclusively in the route file.
+- **Do not pass fetched data (`users`, `total`, `items`, etc.) as required props to content components.** Content components own their data lifecycle and populate data internally via action calls.
+- **Every new admin route must have a corresponding Ladle story.** The story (with all four states verified in Ladle) is a hard prerequisite for creating the route file.
+- **Do not mock `window.fetch` in stories.** Mock the `_actions/` module with `vi.mock` instead.
+- **Do not hardcode `sm` as a default size in any `packages/ui` component.** Default is always `md`. Expose size as a typed `"sm" | "md"` prop. Hardcoded `sm` on controls like `FilterDropdown`, `SearchInput`, or `DataTable` causes height mismatches with `Button` (which defaults to `md`) in the same toolbar row.
+- **Do not use `btn-neutral` for any button variant.** The `secondary` variant maps to `btn-outline`. `btn-neutral` uses DaisyUI's default dark/near-black neutral (undefined in the custom theme) and looks wrong in the light theme.
+- **Do not call `useSearchParams()` in the same component that owns the Suspense boundary.** See route file rule above.
+
+## DaisyUI Convention Rules
+
+These rules prevent re-learning the same mistakes:
+
+1. **DaisyUI collapsible menu:** Use `<details open>` with bare `<summary>` — no extra classes on `<summary>`. The parent `menu` class handles all styling. Do NOT use `menu-title` on `<summary>`; `menu-title` is for static non-collapsible section headers only.
+   ```html
+   <li>
+     <details open>
+       <summary>Parent</summary>
+       <ul><li><a>Item</a></li></ul>
+     </details>
+   </li>
+   ```
+2. **DaisyUI dock icon sizing:** The icon class `size-[1.2em]` IS the DaisyUI-native pattern — it appears in every dock example (xs through xl). It is em-relative and scales with the dock's font size automatically. Do not second-guess this; map it inside `packages/ui` components as a variant token.
+3. **Dock size default:** `dock-md` is the DaisyUI default (no modifier class needed). `dock-sm`, `dock-xs`, `dock-lg`, `dock-xl` add the respective class.
+4. **Menu active item:** Use DaisyUI's `menu-active` class on the `<a>` element. Do not use custom font/text classes for active state.
+5. **When the DaisyUI docs show a class on elements inside a component (e.g., `size-[1.2em]` on SVG inside dock), that class IS the DaisyUI-native approach.** Map it to a typed prop inside `packages/ui`; never pass it as a raw string from a route file.
+6. **FilterDropdown trigger class:** Use `select select-bordered` (not `btn btn-neutral`). Add `bg-none` to the trigger to suppress DaisyUI's built-in CSS background-image arrow — without it, two arrows appear: one from the `select` class and one from the custom `<ChevronDown>` icon.
+7. **FilterDropdown popover width:** React Aria's `Popover` sets `--trigger-width` as a CSS custom property. Use `w-(--trigger-width)` on `Popover` and `w-full` on `ListBox` to match the trigger width. Do NOT read `ref.current?.offsetWidth` inline during render — refs are not reactive and the value is stale on first open.
+8. **ConfirmDialog DaisyUI classes:** Use `modal modal-open bg-black/40` on `ModalOverlay`, `modal-box` on `Modal`, `modal-action` on the button row. Always keep `bg-black/40` — `div.modal` has no backdrop color (`dialog::backdrop` is a pseudo-element only available on native `<dialog>` elements, not React Aria's div-based overlay). `modal-open` is required on div-based modals because DaisyUI hides `div.modal` by default.
+9. **Modal enter/exit animations:** React Aria sets `data-entering` and `data-exiting` on `ModalOverlay` and `Modal` during transitions, and holds elements in the DOM until the exit animation completes. Define `@keyframes` and `@theme` animation variables in `globals.css`. Apply as `data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out` etc. No plugin needed — this is native Tailwind v4 + React Aria.
+10. **Ladle portal theme scope:** React Aria portals (`ConfirmDialog`, `FilterDropdown` popover) render on `<body>`, which is outside the Ladle Provider's `<div data-theme="...">` wrapper. The `useEffect` in `.ladle/components.tsx` that stamps `data-theme` onto `document.documentElement` is **essential** — without it, portals in stories get no theme tokens and show wrong colors. Do not remove or simplify this effect.
+11. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, etc.).
 
 ## Token Reference
 
@@ -56,6 +169,8 @@ Use DaisyUI semantic classes (`bg-base-100`, `text-primary`, `border-base-300`) 
 
 ## Component Registry
 
+> **When adding, removing, or changing a component in `packages/ui/src/`, update this registry immediately.** Outdated registries cause sessions to recommend non-existent props.
+
 All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 ### Layout — Shell
@@ -63,12 +178,11 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | Component | Key props | Notes |
 |---|---|---|
 | `AppShell` | `children` | Root wrapper, `h-screen overflow-hidden flex flex-col bg-base-200` |
-| `Topbar` | `children` | `navbar` DaisyUI, `h-14 shrink-0`, `bg-base-100`, border-b |
+| `Topbar` | `children` | `navbar` DaisyUI, `min-h-16 shrink-0`, `bg-base-100`, border-b |
 | `SidebarLayout` | `children` | Flex row between Topbar and MobileDock; `flex-1 min-h-0 overflow-hidden` |
-| `Sidebar` | `children` | `menu menu-sm w-64 shrink-0`; **hidden on mobile** (`hidden lg:flex`), `overflow-y-auto` |
+| `Sidebar` | `children` | `hidden lg:block w-72 shrink-0 border-r border-base-300 bg-base-100 p-4 overflow-y-auto` |
 | `MainContent` | `children` | `<main>` inside SidebarLayout; `flex-col flex-1 min-h-0 overflow-y-auto` |
-| `MobileDock` | `children`, `ariaLabel?` | DaisyUI `dock dock-sm`, `lg:hidden` |
-| `Page` | `layout?: "centered" \| "dashboard"` | Centered = auth pages; dashboard = legacy (prefer AdminLayout) |
+| `MobileDock` | `children`, `ariaLabel?` | DaisyUI `dock` (= `dock-md` default), `bg-base-100 border-t border-base-300 lg:hidden` |
 
 ### Layout — Content
 
@@ -96,84 +210,138 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Button` | `variant?: "primary"\|"secondary"\|"danger"`, `size?: "sm"\|"md"`, `type?`, `disabled?`, `onClick?` | Form/action button |
+| `Button` | `variant?: "primary"\|"secondary"\|"danger"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"` | Form/action button. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. |
 | `LinkButton` | `href`, `variant?`, `size?` | Navigation, renders `<a>` |
 
 ### Form
 
 | Component | Key props | Notes |
 |---|---|---|
-| `TextInput` | `label`, `name`, `type?`, `autoComplete?`, `required?`, `defaultValue?`, `error?` | Labeled input with error display |
+| `TextInput` | `label`, `name`, `type?: "email"\|"password"\|"text"`, `size?`, `autoComplete?`, `required?`, `defaultValue?`, `error?`, `onChange?: (value: string) => void` | Labeled input with error display. No `placeholder` prop. No `type="number"` — use text+validation. Use `onChange` to collect values in modal state (avoid raw `<form>` refs). |
 | `HiddenInput` | `name`, `value` | Hidden form field |
-| `RadioGroup` | `title`, `name`, `options`, `value`, `onChange` | Controlled radio set |
+| `RadioGroup` | `title`, `name`, `options: {value,label}[]`, `value`, `size?`, `onChange` | Controlled radio set. No `default` prop — manage value in parent state. |
 
 ### Feedback
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Alert` | `tone?: "error"\|"success"\|"warning"\|"info"` | Full-width alert with icon |
-| `Badge` | `tone?: "neutral"\|"primary"\|"secondary"\|"accent"\|"success"\|"warning"\|"error"\|"info"` | `badge-sm badge-outline` |
+| `Alert` | `tone?: "error"\|"success"\|"warning"\|"info"`, `children` | Full-width alert with icon |
+| `Badge` | `tone?: "neutral"\|"primary"\|"secondary"\|"accent"\|"success"\|"warning"\|"error"\|"info"`, `size?: "sm"\|"md"`, `children` | `badge-sm badge-outline`. Note: `"ghost"` is NOT a valid tone. Use `"neutral"` for dimmed/expired states. |
 | `Skeleton` | `rows?: number`, `height?: "xs"\|"sm"\|"md"` | Loading placeholder rows |
-| `EmptyState` | `message`, `cta?`, `onCta?` | Centered empty message + optional CTA |
+| `EmptyState` | `message`, `cta?`, `onCta?` | Centered empty message + optional CTA. `cta`/`onCta` must be passed as props, NOT as child Button components. |
 | `ErrorAlert` | `message?`, `onRetry?` | Error alert with inline retry button |
 
 ### Data
 
 | Component | Key props | Notes |
 |---|---|---|
-| `DataTable` | `columns`, `rows`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?` | Sortable, paginated table. `columns` is `DataTableColumn<T>[]`. |
+| `DataTable` | `columns: DataTableColumn<T>[]`, `rows: T[]`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?: {total,limit,offset,onChange}` | Sortable, paginated table. Pagination is a single object with `total`, `limit`, `offset`, `onChange` — not separate `paginated`/`pageSize` props. |
 
 ### Navigation
 
 | Component | Key props | Notes |
 |---|---|---|
 | `TabNav` | `items: { href, label, active? }[]` | URL-routed tab bar. Set `active` from `usePathname()` in route file. Not React Aria Tabs — each tab is a navigation link. |
+| `NavMenu` | `children`, `label?` | Renders `<nav><ul class="menu w-full p-0">`. Wraps sidebar navigation. |
+| `NavLink` | `href`, `active?`, `current?`, `iconName?`, `children` | Single menu link inside `<li>`. `iconName` accepts a lucide icon name string (see `NavIcon` registry). Active state uses DaisyUI `menu-active` class. |
+| `NavSection` | `title?`, `collapsible?`, `children` | Section header with nested items. When `collapsible`, renders `<details open><summary>{title}</summary>`. When not collapsible, renders `<h2 class="menu-title">`. |
+| `DockLink` | `href`, `active?`, `current?`, `label`, `iconName?` | Mobile dock button. `iconName` accepts a lucide icon name string. Active state uses DaisyUI `dock-active` class. Without `iconName`, renders a small dot indicator. |
 
 ### Overlays
 
 | Component | Key props | Notes |
 |---|---|---|
-| `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel?`, `cancelLabel?`, `variant?`, `onConfirm`, `confirmDisabled?`, `children?` | React Aria Modal + Dialog. Pass form fields as `children`. |
+| `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel?`, `cancelLabel?`, `variant?`, `onConfirm`, `confirmDisabled?`, `children?` | React Aria Modal + Dialog. Uses DaisyUI `modal modal-open modal-box modal-action` classes. Enter/exit animations via `data-[entering]`/`data-[exiting]`. Pass form fields as `children`. |
 
 ### Inputs
 
 | Component | Key props | Notes |
 |---|---|---|
-| `SearchInput` | `value`, `onChange`, `placeholder?` | React Aria SearchField. Controlled. Shows clear button when non-empty. |
-| `FilterDropdown` | `label`, `options: { value, label }[]`, `value`, `onChange` | React Aria Select styled as a filter pill. |
+| `SearchInput` | `value`, `onChange`, `placeholder?`, `grow?`, `size?: "sm"\|"md"` | React Aria SearchField. Controlled. Shows clear button when non-empty. `grow` adds `flex-1`. Default size `"md"`. |
+| `FilterDropdown` | `label`, `options: { value, label }[]`, `value`, `onChange`, `size?: "sm"\|"md"` | React Aria Select styled as a filter pill. Default size `"md"`. |
+
+### Icons
+
+| Component | Key props | Notes |
+|---|---|---|
+| `NavIcon` | `name?: string`, `variant?: "sidebar"\|"dock"` | Renders a lucide-react icon by name. Sidebar variant = `size-4`, dock variant = `size-[1.2em]` (DaisyUI-native). Used internally by `NavLink`, `DockLink`, and `Button`; never instantiate directly in route files. **Icon must be registered in `iconMap` in `nav-icons.tsx` before use** — unknown names render nothing. |
+
+### Topbar Sub-components
+
+| Component | Key props | Notes |
+|---|---|---|
+| `TopbarStart` | `children` | Left section of Topbar |
+| `TopbarEnd` | `children` | Right section of Topbar |
+| `TopbarBrandLink` | `href`, `children` | Brand/app name link, `btn btn-ghost text-xl font-semibold` |
+| `TopbarBreadcrumb` | `items: string[]` | `breadcrumbs` DaisyUI component |
+| `TopbarSearchField` | `placeholder?` | Topbar search input (decorative, not wired to API) |
+| `TopbarAvatarMenu` | `ariaLabel?`, `initials?`, `items: { label, href, badge? }[]` | Avatar dropdown menu using DaisyUI `dropdown dropdown-end` |
+| `NavTitle` | `children` | Renders `<li><h2 class="menu-title">` — static section title without collapsible behavior |
 
 ## Screen Spec Format
 
 File location: `workers/ui/docs/screens/<section>.md`
 One file per admin section. Use second-level headings for detail pages within a section.
 
+### Spec structure
+
+Include a "Component gaps" table at the top listing any referenced components that don't exist yet in `@id/ui`:
+
+```markdown
+## Component gaps
+
+| Component | Used on | Notes |
+|---|---|---|
+| `Avatar` | User detail | Image with fallback initials. Not yet in `@id/ui`. |
+```
+
+Then the screen spec:
+
 ```markdown
 ## /admin/path/to/page
 
-[ASCII sketch — rough is fine, typos allowed]
-+-- Header -------------------------+
-| Title           [Filter] [+ New]  |
-+-----------------------------------+
-| Col A   | Col B  | Col C          |
-| row...  | ...    | ...            |
-+-----------------------------------+
+[ASCII sketch showing full shell (topbar + sidebar + content) and ALL states:
+ loading, empty, error, populated, AND all modals]
 
 Components:
-  AppShell > Topbar + Sidebar + PageBody
+  AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
   PageHeader: Inline(justify="between") > Text(variant="h1") + Inline > FilterDropdown + LinkButton(variant="primary")
   Panel(padding="none") > DataTable(columns=[...])
-  Empty: EmptyState(cta="Create ...")
-  Delete: ConfirmDialog
+  Empty: EmptyState(message="...", cta="...", onCta=...)
+  Delete: ConfirmDialog(title="...", variant="danger", onConfirm=...)
 
 Data: GET /api/auth/some-endpoint → { items: [...], total }
-      GET /api/auth/other-endpoint (for filter dropdown options)
-      "org" column hidden when actor.role === "org_admin"
+      POST /api/auth/other-endpoint  body: { ... }
 
-States: loading → Skeleton ×5 | empty → EmptyState | error → ErrorAlert + retry
+Behavior:
+  - Describe what happens on each interaction
+  - Debounce timing, filter composition, edge cases
 
-Notes: bulk delete requires ConfirmDialog before calling DELETE
-       platform admin sees org column; org admin does not
+States: loading → Skeleton ×5 | empty → EmptyState | error → ErrorAlert(message, onRetry)
+
+Notes: ...
 ```
+
+### Rules for ASCII sketches
+
+- Show the full shell (topbar breadcrumb, sidebar nav, tab nav, content area) on every screen — not just the content panel.
+- Show ALL states: loading (skeleton bars), empty, error, populated data, AND every modal (Create, Edit, Delete, Confirm) in the same sketch.
+- Column headers and data values must be fully readable — no abbreviations past 3 chars.
+- Use box-drawing characters: ┌─┐ └─┘ ├─┤ │
+
+### Rules for Components block
+
+- Use EXACT component names and prop names from the registry above.
+- Nesting: use `>` to show parent-child relationships.
+- Controlled components: describe the state variables they bind to (e.g., `value={role}`, `onChange={setRole}`).
+- Modals: describe what ConfirmDialog wraps (form fields as children) and which API it calls on confirm.
+
+### Rules for Data block
+
+- List every API endpoint the page calls.
+- Show the request shape (GET params or POST body).
+- Show the response shape.
+- Note any schema gaps (e.g., "Member schema has no user.name — must join via get-user").
 
 The ASCII sketch resolves spatial relationships (left/right, stacked/inline, column order).
 The Components block resolves exact `@id/ui` names and nesting — this is the LLM anchor.
@@ -182,8 +350,12 @@ Do not omit either. Both are required.
 ## References
 
 - `docs/022_admin-ui-system.md` — architecture rationale, full token table, decisions
+- `docs/023_admin-screen-story-strategy.md` — screen + story implementation contract (content component contract, actions file contract, route file contract, story file contract, shell decorator, workflow)
 - `workers/ui/docs/screens/` — screen specs for all implemented and planned admin pages
 - `workers/ui/src/app/globals.css` — DaisyUI theme definition (token source of truth)
-- `packages/ui/src/` — component implementations
+- `packages/ui/src/` — component implementations (source of truth for prop shapes)
+- `stories/_decorators/shell.tsx` — `AdminShell` decorator (for stories only, not exported from `@id/ui`)
 - DaisyUI 5 docs: https://daisyui.com/components/
-- React Aria Components: https://react-spectrum.adobe.com/react-aria/components.html
+- DaisyUI 5 llms.txt (contract): https://daisyui.com/llms.txt
+- React Aria Components docs: https://react-spectrum.adobe.com/react-aria/components.html
+- React Aria llms.txt (contract): https://react-aria.adobe.com/llms.txt

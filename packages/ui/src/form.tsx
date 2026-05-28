@@ -8,6 +8,7 @@ type TextInputProps = {
   readonly required?: boolean;
   readonly defaultValue?: string;
   readonly error?: string;
+  readonly onChange?: (value: string) => void;
 };
 
 export function TextInput({
@@ -19,6 +20,7 @@ export function TextInput({
   required,
   defaultValue,
   error,
+  onChange,
 }: TextInputProps) {
   const sizeClass = size === "sm" ? "input-sm" : "";
 
@@ -36,6 +38,7 @@ export function TextInput({
         defaultValue={defaultValue}
         aria-label={label}
         aria-invalid={error ? true : undefined}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         className={`input input-bordered ${sizeClass} w-full bg-base-100 text-base-content focus:input-primary${error ? " input-error" : ""}`.trim()}
       />
       {error && (

@@ -22,7 +22,7 @@ describe("Button", () => {
   it("applies secondary variant class", () => {
     render(<Button variant="secondary">Secondary</Button>);
     const button = screen.getByRole("button", { name: /secondary/i });
-    expect(button).toHaveClass("btn-neutral");
+    expect(button).toHaveClass("btn-outline");
   });
 
   it("applies danger variant class", () => {
@@ -89,7 +89,7 @@ describe("LinkButton", () => {
   it("applies secondary variant when specified", () => {
     render(<LinkButton href="/test" variant="secondary">Secondary</LinkButton>);
     const link = screen.getByRole("link", { name: /secondary/i });
-    expect(link).toHaveClass("btn-neutral");
+    expect(link).toHaveClass("btn-outline");
   });
 
   it("applies danger variant when specified", () => {

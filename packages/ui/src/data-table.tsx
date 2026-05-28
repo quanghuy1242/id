@@ -4,7 +4,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
 export type SortDirection = "asc" | "desc";
 
-export type DataTableColumn<T> = {
+export type DataTableColumn<T extends object> = {
   readonly key: string;
   readonly label: string;
   readonly sortable?: boolean;
@@ -18,7 +18,7 @@ type Pagination = {
   readonly onChange: (offset: number) => void;
 };
 
-type DataTableProps<T extends Record<string, unknown>> = {
+type DataTableProps<T extends object> = {
   readonly columns: ReadonlyArray<DataTableColumn<T>>;
   readonly rows: ReadonlyArray<T>;
   readonly getRowKey: (row: T) => string;
@@ -48,7 +48,7 @@ function PaginationBar({ total, limit, offset, onChange }: Pagination) {
   return (
     <div className="flex items-center justify-end gap-1 px-4 py-3 border-t border-base-300">
       <button
-        className="btn btn-sm btn-ghost"
+        className="btn btn-ghost"
         disabled={currentPage === 0}
         onClick={() => onChange((currentPage - 1) * limit)}
         aria-label="Previous page"
@@ -58,7 +58,7 @@ function PaginationBar({ total, limit, offset, onChange }: Pagination) {
       {pages.map((p) => (
         <button
           key={p}
-          className={`btn btn-sm ${p === currentPage ? "btn-primary" : "btn-ghost"}`}
+          className={`btn ${p === currentPage ? "btn-primary" : "btn-ghost"}`}
           onClick={() => onChange(p * limit)}
           aria-current={p === currentPage ? "page" : undefined}
         >
@@ -66,7 +66,7 @@ function PaginationBar({ total, limit, offset, onChange }: Pagination) {
         </button>
       ))}
       <button
-        className="btn btn-sm btn-ghost"
+        className="btn btn-ghost"
         disabled={currentPage === totalPages - 1}
         onClick={() => onChange((currentPage + 1) * limit)}
         aria-label="Next page"
@@ -77,7 +77,7 @@ function PaginationBar({ total, limit, offset, onChange }: Pagination) {
   );
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T extends object>({
   columns,
   rows,
   getRowKey,
@@ -96,7 +96,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className="table table-sm w-full">
+      <table className="table w-full">
         <thead>
           <tr className="border-b border-base-300 bg-base-200/50">
             {columns.map((col) => (
@@ -127,7 +127,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 <td key={col.key} className="text-sm text-base-content">
                   {col.render
                     ? col.render(row)
-                    : String(row[col.key] ?? "")}
+                    : String((row as Record<string, unknown>)[col.key] ?? "")}
                 </td>
               ))}
             </tr>

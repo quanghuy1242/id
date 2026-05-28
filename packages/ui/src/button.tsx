@@ -1,5 +1,6 @@
 // DaisyUI 5: https://daisyui.com/components/button/
 import type { ReactNode } from "react";
+import { NavIcon } from "./nav-icons";
 
 type ButtonVariant = "primary" | "secondary" | "danger";
 type ButtonSize = "sm" | "md";
@@ -13,6 +14,8 @@ type ButtonProps = {
   readonly disabled?: boolean;
   readonly children: ReactNode;
   readonly onClick?: () => void;
+  readonly iconName?: string;
+  readonly iconPosition?: "left" | "right";
 };
 
 export function Button({
@@ -24,16 +27,20 @@ export function Button({
   disabled,
   children,
   onClick,
+  iconName,
+  iconPosition = "left",
 }: ButtonProps) {
   const variantClass = {
     primary: "btn-primary",
-    secondary: "btn-neutral",
+    secondary: "btn-outline",
     danger: "btn-error",
   }[variant];
   const sizeClass = {
     sm: "btn-sm",
     md: "",
   }[size];
+
+  const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
 
   return (
     <button
@@ -44,7 +51,9 @@ export function Button({
       onClick={onClick}
       className={`btn ${sizeClass} ${variantClass}`.trim()}
     >
+      {iconPosition === "left" && icon}
       {children}
+      {iconPosition === "right" && icon}
     </button>
   );
 }
@@ -59,7 +68,7 @@ type LinkButtonProps = {
 export function LinkButton({ href, variant = "primary", size = "md", children }: LinkButtonProps) {
   const variantClass = {
     primary: "btn-primary",
-    secondary: "btn-neutral",
+    secondary: "btn-outline",
     danger: "btn-error",
   }[variant];
   const sizeClass = {

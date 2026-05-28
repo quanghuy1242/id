@@ -17,27 +17,35 @@ type FilterOption = {
   readonly label: string;
 };
 
+type Size = "sm" | "md";
+
 type FilterDropdownProps = {
   readonly label: string;
   readonly options: ReadonlyArray<FilterOption>;
   readonly value: string;
   readonly onChange: (value: string) => void;
+  readonly size?: Size;
 };
 
-export function FilterDropdown({ label, options, value, onChange }: FilterDropdownProps) {
+const sizeClass: Record<Size, string> = {
+  sm: "select select-bordered select-sm",
+  md: "select select-bordered",
+};
+
+export function FilterDropdown({ label, options, value, onChange, size = "md" }: FilterDropdownProps) {
   return (
     <Select
       aria-label={label}
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
     >
-      <SelectTrigger className="btn btn-sm btn-neutral flex items-center gap-1">
-        <span className="text-base-content/60 text-xs mr-0.5">{label}:</span>
-        <SelectValue className="text-sm" />
-        <ChevronDown className="h-3 w-3 text-base-content/60" aria-hidden="true" />
+      <SelectTrigger className={`${sizeClass[size]} bg-none flex items-center gap-1 w-auto`}>
+        <span className="text-base-content/50 mr-0.5">{label}:</span>
+        <SelectValue />
+        <ChevronDown className="h-3 w-3 text-base-content/50 shrink-0" aria-hidden="true" />
       </SelectTrigger>
-      <Popover className="z-50 min-w-32">
-        <ListBox className="menu menu-sm bg-base-100 border border-base-300 rounded-box shadow-lg p-1">
+      <Popover className="z-50 w-(--trigger-width)">
+        <ListBox className="menu menu-sm bg-base-100 border border-base-300 rounded-box shadow-lg p-1 box-border w-full">
           {options.map((opt) => (
             <ListBoxItem
               key={opt.value}
