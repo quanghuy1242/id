@@ -1,4 +1,4 @@
-import { Button, LinkButton, Stack, Inline, Text } from "@id/ui";
+import { Button, Form, LinkButton, Stack, Inline, Text } from "@id/ui";
 import type { Story } from "@ladle/react";
 
 export const Variants: Story = () => (
@@ -66,7 +66,7 @@ export const Disabled: Story = () => (
 
 export const SubmitButton: Story = () => (
   <Stack align="start">
-    <form
+    <Form
       onSubmit={(e) => {
         e.preventDefault();
         alert("Submitted!");
@@ -76,7 +76,7 @@ export const SubmitButton: Story = () => (
         <Text variant="body">This button submits a form</Text>
         <Button variant="primary" type="submit">Submit</Button>
       </Stack>
-    </form>
+    </Form>
     <Text variant="caption">With onClick handler:</Text>
     <Button variant="secondary" onClick={() => alert("Clicked!")}>
       Click me

@@ -52,12 +52,22 @@
   from { opacity: 1; transform: scale(1) translateY(0); }
   to { opacity: 0; transform: scale(0.95) translateY(8px); }
 }
+@keyframes popover-in {
+  from { opacity: 0; transform: scale(0.98) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes popover-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.98) translateY(-4px); }
+}
 
 @theme {
   --animate-modal-overlay-in: modal-overlay-in 200ms ease-out both;
   --animate-modal-overlay-out: modal-overlay-out 150ms ease-in both;
   --animate-modal-panel-in: modal-panel-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-modal-panel-out: modal-panel-out 150ms ease-in both;
+  --animate-popover-in: popover-in 140ms ease-out both;
+  --animate-popover-out: popover-out 100ms ease-in both;
 }
 
 @plugin "daisyui/theme" {

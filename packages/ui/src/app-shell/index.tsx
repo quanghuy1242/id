@@ -315,21 +315,6 @@ export function TopbarBrandLink({ href, children }: BrandLinkProps) {
   return <Link href={href} className="btn btn-ghost text-xl font-semibold normal-case">{children}</Link>;
 }
 
-type TopbarSearchFieldProps = {
-  readonly placeholder?: string;
-};
-
-export function TopbarSearchField({ placeholder = "Search" }: TopbarSearchFieldProps) {
-  return (
-    <input
-      type="text"
-      placeholder={placeholder}
-      aria-label={placeholder}
-      className="input input-bordered input-sm w-24 md:w-auto"
-    />
-  );
-}
-
 type TopbarBreadcrumbProps = {
   readonly items: readonly string[];
 };

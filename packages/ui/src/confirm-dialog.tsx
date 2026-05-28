@@ -2,14 +2,16 @@
 
 // DaisyUI 5: https://daisyui.com/components/modal/
 // React Aria: https://react-spectrum.adobe.com/react-aria/Dialog.html
-import type { ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Dialog,
   Modal,
   ModalOverlay,
   Heading as DialogHeading,
 } from "react-aria-components";
+import { Alert } from "./alert";
 import { Button } from "./button";
+import { Form } from "./form";
 
 type ConfirmDialogProps = {
   readonly open: boolean;
@@ -19,10 +21,21 @@ type ConfirmDialogProps = {
   readonly confirmLabel?: string;
   readonly cancelLabel?: string;
   readonly variant?: "primary" | "danger";
-  readonly onConfirm: () => void;
+  readonly error?: string;
+  readonly onConfirm: (formData: FormData) => boolean | void | Promise<boolean | void>;
   readonly confirmDisabled?: boolean;
   readonly children?: ReactNode;
 };
+
+function getActiveThemeName(): string {
+  if (typeof document === "undefined") return "lumina-light";
+  return (
+    document.documentElement.getAttribute("data-theme") ||
+    document.body.getAttribute("data-theme") ||
+    document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
+    "lumina-light"
+  );
+}
 
 export function ConfirmDialog({
   open,
@@ -32,10 +45,17 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "primary",
+  error,
   onConfirm,
   confirmDisabled,
   children,
 }: ConfirmDialogProps) {
+  const [themeName, setThemeName] = useState("lumina-light");
+
+  useEffect(() => {
+    setThemeName(getActiveThemeName());
+  }, [open]);
+
   return (
     <ModalOverlay
       isOpen={open}
@@ -43,33 +63,47 @@ export function ConfirmDialog({
       isDismissable
       className="modal modal-open bg-black/40 data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out"
     >
-      <Modal className="modal-box data-[entering]:animate-modal-panel-in data-[exiting]:animate-modal-panel-out">
+      <Modal
+        data-theme={themeName}
+        className="modal-box data-[entering]:animate-modal-panel-in data-[exiting]:animate-modal-panel-out"
+      >
         <Dialog className="outline-none">
           {({ close }) => (
-            <>
+            <Form
+              onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                void (async () => {
+                  try {
+                    const shouldClose = await onConfirm(formData);
+                    if (shouldClose !== false) close();
+                  } catch {
+                    // Keep the dialog open when submit fails; callers can surface errors via the error prop.
+                  }
+                })();
+              }}
+            >
               <DialogHeading slot="title" className="font-bold text-lg">
                 {title}
               </DialogHeading>
               {description && (
                 <p className="py-4 text-base-content/70">{description}</p>
               )}
+              {error ? <Alert tone="error">{error}</Alert> : null}
               {children && <div className="flex flex-col gap-3 py-2">{children}</div>}
               <div className="modal-action">
-                <Button variant="secondary" onClick={close}>
+                <Button type="button" variant="secondary" onClick={close}>
                   {cancelLabel}
                 </Button>
                 <Button
+                  type="submit"
                   variant={variant === "danger" ? "danger" : "primary"}
                   disabled={confirmDisabled}
-                  onClick={() => {
-                    onConfirm();
-                    close();
-                  }}
                 >
                   {confirmLabel}
                 </Button>
               </div>
-            </>
+            </Form>
           )}
         </Dialog>
       </Modal>

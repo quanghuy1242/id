@@ -135,9 +135,15 @@ importers:
       react:
         specifier: 19.2.6
         version: 19.2.6
+      react-aria:
+        specifier: 3.48.0
+        version: 3.48.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react-aria-components:
         specifier: 1.17.0
         version: 1.17.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react-stately:
+        specifier: 3.46.0
+        version: 3.46.0(react@19.2.6)
 
   workers/core: {}
 

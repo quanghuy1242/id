@@ -1,6 +1,9 @@
 // DaisyUI 5: https://daisyui.com/components/button/
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Button as AriaButton } from "react-aria-components";
 import { NavIcon } from "./nav-icons";
 
 type ButtonVariant = "primary" | "secondary" | "danger";
@@ -44,18 +47,18 @@ export function Button({
   const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
 
   return (
-    <button
+    <AriaButton
       type={type}
       name={name}
       value={value}
-      disabled={disabled}
-      onClick={onClick}
+      isDisabled={disabled}
+      onPress={onClick}
       className={`btn ${sizeClass} ${variantClass}`.trim()}
     >
       {iconPosition === "left" && icon}
       {children}
       {iconPosition === "right" && icon}
-    </button>
+    </AriaButton>
   );
 }
 

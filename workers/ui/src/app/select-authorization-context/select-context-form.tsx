@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Inline, RadioGroup, Stack, Text } from "@id/ui";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { Alert, Button, Form, Inline, RadioGroup, Stack, Text } from "@id/ui";
 import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
 import { useOauthQuery, useOauthRequestDescription } from "@/lib/oauth-query";
 import { DIRECT_SHARE_VALUE, WORKSPACE_CONTEXT_PREFIX } from "@/shared/constants";
@@ -49,7 +49,8 @@ export function SelectContextForm() {
     });
   }, []);
 
-  const handleContinue = async () => {
+  const handleContinue = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
@@ -89,23 +90,27 @@ export function SelectContextForm() {
 
   return (
     <Stack>
-      <Text variant="body">{description}</Text>
+      <Form onSubmit={handleContinue}>
+        <Stack>
+          <Text variant="body">{description}</Text>
 
-      {organizations.length > 0 ? (
-        <RadioGroup title="Workspace access" name="context-workspace" options={workspaceOptions} value={selection} onChange={setSelection} />
-      ) : (
-        <Text variant="caption">No organizations available.</Text>
-      )}
+          {organizations.length > 0 ? (
+            <RadioGroup title="Workspace access" name="context-workspace" options={workspaceOptions} value={selection} onChange={setSelection} />
+          ) : (
+            <Text variant="caption">No organizations available.</Text>
+          )}
 
-      <RadioGroup title="Individual access" name="context-individual" options={individualOptions} value={selection} onChange={setSelection} />
+          <RadioGroup title="Individual access" name="context-individual" options={individualOptions} value={selection} onChange={setSelection} />
 
-      {error && <Alert tone="error">{error}</Alert>}
+          {error && <Alert tone="error">{error}</Alert>}
 
-      <Inline justify="end">
-        <Button variant="primary" disabled={loading || !selection} onClick={handleContinue}>
-          {loading ? "Processing..." : "Continue"}
-        </Button>
-      </Inline>
+          <Inline justify="end">
+            <Button type="submit" variant="primary" disabled={loading || !selection}>
+              {loading ? "Processing..." : "Continue"}
+            </Button>
+          </Inline>
+        </Stack>
+      </Form>
     </Stack>
   );
 }

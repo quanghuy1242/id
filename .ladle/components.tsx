@@ -10,9 +10,10 @@ export const Provider: GlobalProvider = ({ globalState, children }) => {
   const themeName = getThemeName(globalState.theme);
 
   // React Aria portals render on <body>, outside the wrapper div.
-  // Setting data-theme on <html> ensures portals inherit the correct theme tokens.
+  // Setting data-theme on both document roots ensures portals inherit theme tokens.
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", themeName);
+    document.body.setAttribute("data-theme", themeName);
   }, [themeName]);
 
   return (

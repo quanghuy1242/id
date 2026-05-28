@@ -1,8 +1,19 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { TextInput, HiddenInput, RadioGroup } from "@id/ui";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { Checkbox, Form, HiddenInput, RadioGroup, TextInput } from "@id/ui";
+
+describe("Form", () => {
+  it("renders a form element", () => {
+    render(
+      <Form>
+        <button type="submit">Submit</button>
+      </Form>
+    );
+    expect(screen.getByRole("button", { name: /submit/i }).closest("form")).toBeInTheDocument();
+  });
+});
 
 describe("TextInput", () => {
   it("renders a labeled input", () => {
@@ -163,7 +174,7 @@ describe("RadioGroup", () => {
   });
 
   it("applies radio-sm when small size is specified", () => {
-    render(
+    const { container } = render(
       <RadioGroup
         title="Select"
         name="selection"
@@ -173,6 +184,113 @@ describe("RadioGroup", () => {
         onChange={() => {}}
       />
     );
-    expect(screen.getByLabelText(/option 1/i)).toHaveClass("radio-sm");
+    expect(container.querySelector(".radio")).toHaveClass("radio-sm");
+  });
+
+  it("uses a real DaisyUI radio input for the active radio", () => {
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        value="option1"
+        onChange={() => {}}
+      />
+    );
+    const selectedRadio = screen.getByLabelText(/option 1/i);
+    expect(selectedRadio).toHaveAttribute("type", "radio");
+    expect(selectedRadio).toHaveClass("radio", "radio-primary");
+    expect(selectedRadio).toBeChecked();
+  });
+
+  it("shows error message when error prop is set", () => {
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        error="You must pick an option."
+      />
+    );
+    expect(screen.getByText("You must pick an option.")).toBeInTheDocument();
+  });
+
+  it("works uncontrolled with defaultValue", () => {
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        defaultValue="option2"
+      />
+    );
+    expect(screen.getByLabelText(/option 1/i)).not.toBeChecked();
+    expect(screen.getByLabelText(/option 2/i)).toBeChecked();
+  });
+
+  it("selects option when clicked in uncontrolled mode", () => {
+    const onChange = vi.fn<(value: string) => void>();
+    render(
+      <RadioGroup
+        title="Select"
+        name="selection"
+        options={options}
+        defaultValue="option1"
+        onChange={onChange}
+      />
+    );
+    fireEvent.click(screen.getByLabelText(/option 2/i));
+    expect(screen.getByLabelText(/option 2/i)).toBeChecked();
+    expect(onChange).toHaveBeenCalledWith("option2");
+  });
+});
+
+describe("Checkbox", () => {
+  it("renders a labeled checkbox", () => {
+    render(<Checkbox label="Accept terms" name="terms" value="yes" />);
+    const checkbox = screen.getByLabelText(/accept terms/i);
+    expect(checkbox).toHaveAttribute("type", "checkbox");
+    expect(checkbox).toHaveAttribute("name", "terms");
+    expect(checkbox).toHaveAttribute("value", "yes");
+  });
+
+  it("applies checkbox-sm when small size is specified", () => {
+    const { container } = render(<Checkbox label="Accept terms" name="terms" size="sm" />);
+    expect(container.querySelector(".checkbox")).toHaveClass("checkbox-sm");
+  });
+
+  it("calls onChange when toggled", () => {
+    const onChange = vi.fn<(selected: boolean) => void>();
+    render(<Checkbox label="Subscribe" name="subscribe" value="yes" onChange={onChange} />);
+    fireEvent.click(screen.getByLabelText(/subscribe/i));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("renders as checked when selected", () => {
+    render(<Checkbox label="Accept" name="accept" selected />);
+    expect(screen.getByLabelText(/accept/i)).toBeChecked();
+  });
+
+  it("renders as unchecked by default", () => {
+    render(<Checkbox label="Accept" name="accept" />);
+    expect(screen.getByLabelText(/accept/i)).not.toBeChecked();
+  });
+
+  it("shows error message when error prop is set", () => {
+    render(<Checkbox label="Accept" name="accept" error="Required field" />);
+    expect(screen.getByText("Required field")).toBeInTheDocument();
+  });
+
+  it("renders indeterminate checkbox", () => {
+    render(<Checkbox label="Select all" name="selectAll" indeterminate />);
+    const input = screen.getByLabelText(/select all/i) as HTMLInputElement;
+    expect(input.indeterminate).toBe(true);
+  });
+
+  it("shows checked + indeterminate together", () => {
+    render(<Checkbox label="Parent" name="parent" selected indeterminate />);
+    const input = screen.getByLabelText(/parent/i) as HTMLInputElement;
+    expect(input).toBeChecked();
+    expect(input.indeterminate).toBe(true);
   });
 });

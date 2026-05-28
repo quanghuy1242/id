@@ -28,6 +28,7 @@ Full architecture rationale lives in `docs/022_admin-ui-system.md`.
 6. Keep route files under `workers/ui/src/app/admin/**` as composition boundaries — assemble `@id/ui` primitives, pass data, no raw markup.
 7. Run `pnpm lint` and `pnpm check` after any change to `packages/ui` or `workers/ui`.
 8. Run `pnpm deploy:ui:dry-run` after any non-trivial change to `packages/ui` or `workers/ui`. This does a full Cloudflare Worker build and verifies the bundle assembles correctly without deploying. Fix any build errors before completing.
+9. **Every `packages/ui` component change or addition must include tests.** Add tests to `workers/ui/tests/packages-ui/<component>.test.tsx` and register the file in `workers/ui/tests/all.test.ts`. Test at minimum: rendering, interaction callbacks (`onChange`, `onClick`, `onSort`), state variants (selected, disabled, error, empty), sizing props, and DaisyUI class presence. Do not submit component code without corresponding tests.
 
 ## Screen Implementation Workflow
 
@@ -123,6 +124,8 @@ export const Populated: Story = () => (
 - **Do not hardcode `sm` as a default size in any `packages/ui` component.** Default is always `md`. Expose size as a typed `"sm" | "md"` prop. Hardcoded `sm` on controls like `FilterDropdown`, `SearchInput`, or `DataTable` causes height mismatches with `Button` (which defaults to `md`) in the same toolbar row.
 - **Do not use `btn-neutral` for any button variant.** The `secondary` variant maps to `btn-outline`. `btn-neutral` uses DaisyUI's default dark/near-black neutral (undefined in the custom theme) and looks wrong in the light theme.
 - **Do not call `useSearchParams()` in the same component that owns the Suspense boundary.** See route file rule above.
+- **When DaisyUI classes depend on native element selectors (`:checked`, `:is([type="radio"])`, etc.), prefer `react-aria` hooks over `react-aria-components` wrappers.** RAC wraps the native input in `HiddenInput` (clipped to 1px) and renders custom indicator elements — DaisyUI classes applied to those indicators cannot produce `:checked` styles, size variants, or animations. Instead, use the corresponding hook from `react-aria` (`useRadioGroup`/`useRadio` for radio groups, `useCheckbox`/`useToggleState` for checkboxes) paired with a native `<input>` element. The hook provides `inputProps` (containing `type`, `checked`, `onChange`, keyboard handlers, and ARIA attributes) to spread onto the native input. This gives full React Aria keyboard navigation + ARIA while the native input carries DaisyUI classes directly. Dependencies: `react-aria` and `react-stately` are declared in `packages/ui/package.json`. See `packages/ui/src/form.tsx` for the reference implementation.
+- **Do not create a fake indicator (`<span>`/`<div>` with DaisyUI classes) as a workaround for RAC's hidden input.** This loses native pseudo-class behavior (`:checked`, `:focus-visible`) and DaisyUI animations. Use hooks + native inputs instead.
 
 ## DaisyUI Convention Rules
 
@@ -143,10 +146,11 @@ These rules prevent re-learning the same mistakes:
 5. **When the DaisyUI docs show a class on elements inside a component (e.g., `size-[1.2em]` on SVG inside dock), that class IS the DaisyUI-native approach.** Map it to a typed prop inside `packages/ui`; never pass it as a raw string from a route file.
 6. **FilterDropdown trigger class:** Use `select select-bordered` (not `btn btn-neutral`). Add `bg-none` to the trigger to suppress DaisyUI's built-in CSS background-image arrow — without it, two arrows appear: one from the `select` class and one from the custom `<ChevronDown>` icon.
 7. **FilterDropdown popover width:** React Aria's `Popover` sets `--trigger-width` as a CSS custom property. Use `w-(--trigger-width)` on `Popover` and `w-full` on `ListBox` to match the trigger width. Do NOT read `ref.current?.offsetWidth` inline during render — refs are not reactive and the value is stale on first open.
-8. **ConfirmDialog DaisyUI classes:** Use `modal modal-open bg-black/40` on `ModalOverlay`, `modal-box` on `Modal`, `modal-action` on the button row. Always keep `bg-black/40` — `div.modal` has no backdrop color (`dialog::backdrop` is a pseudo-element only available on native `<dialog>` elements, not React Aria's div-based overlay). `modal-open` is required on div-based modals because DaisyUI hides `div.modal` by default.
-9. **Modal enter/exit animations:** React Aria sets `data-entering` and `data-exiting` on `ModalOverlay` and `Modal` during transitions, and holds elements in the DOM until the exit animation completes. Define `@keyframes` and `@theme` animation variables in `globals.css`. Apply as `data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out` etc. No plugin needed — this is native Tailwind v4 + React Aria.
-10. **Ladle portal theme scope:** React Aria portals (`ConfirmDialog`, `FilterDropdown` popover) render on `<body>`, which is outside the Ladle Provider's `<div data-theme="...">` wrapper. The `useEffect` in `.ladle/components.tsx` that stamps `data-theme` onto `document.documentElement` is **essential** — without it, portals in stories get no theme tokens and show wrong colors. Do not remove or simplify this effect.
-11. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, etc.).
+8. **FilterDropdown popover animation:** React Aria sets `data-entering` and `data-exiting` on `Popover`. Apply `data-[entering]:animate-popover-in data-[exiting]:animate-popover-out` so Select popovers keep the native expand/collapse feel.
+9. **ConfirmDialog DaisyUI classes:** Use `modal modal-open bg-black/40` on `ModalOverlay`, `modal-box` on `Modal`, `modal-action` on the button row. Always keep `bg-black/40` — `div.modal` has no backdrop color (`dialog::backdrop` is a pseudo-element only available on native `<dialog>` elements, not React Aria's div-based overlay). `modal-open` is required on div-based modals because DaisyUI hides `div.modal` by default. Do not put `data-theme` on the overlay itself; the global `[data-theme]` background rule can override the dimmed backdrop. Put the theme attribute on the `modal-box` panel instead.
+10. **Modal enter/exit animations:** React Aria sets `data-entering` and `data-exiting` on `ModalOverlay` and `Modal` during transitions, and holds elements in the DOM until the exit animation completes. Define `@keyframes` and `@theme` animation variables in `globals.css`. Apply as `data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out` etc. No plugin needed — this is native Tailwind v4 + React Aria.
+11. **Ladle portal theme scope:** React Aria portals (`ConfirmDialog`, `FilterDropdown` popover) render on `<body>`, which is outside the Ladle Provider's `<div data-theme="...">` wrapper. The `useEffect` in `.ladle/components.tsx` that stamps `data-theme` onto both `document.documentElement` and `document.body` is **essential** — without it, portals in stories get no theme tokens and show wrong colors. Do not remove or simplify this effect.
+12. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, etc.).
 
 ## Token Reference
 
@@ -224,16 +228,18 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Button` | `variant?: "primary"\|"secondary"\|"danger"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"` | Form/action button. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. |
-| `LinkButton` | `href`, `variant?`, `size?` | Navigation, renders `<a>` |
+| `Button` | `variant?: "primary"\|"secondary"\|"danger"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. |
+| `LinkButton` | `href`, `variant?`, `size?` | Navigation, renders Next `Link` with DaisyUI button classes. |
 
 ### Form
 
 | Component | Key props | Notes |
 |---|---|---|
-| `TextInput` | `label`, `name`, `type?: "email"\|"password"\|"text"`, `size?`, `autoComplete?`, `required?`, `defaultValue?`, `error?`, `onChange?: (value: string) => void` | Labeled input with error display. No `placeholder` prop. No `type="number"` — use text+validation. Use `onChange` to collect values in modal state (avoid raw `<form>` refs). |
+| `Form` | `children`, `onSubmit?`, `onInvalid?`, `action?`, `method?`, `validationBehavior?`, `validationErrors?` | React Aria Form wrapper. Use this instead of raw `<form>` in `workers/ui` and stories. |
+| `TextInput` | `label`, `name`, `type?: "email"\|"password"\|"text"`, `size?`, `autoComplete?`, `required?`, `defaultValue?`, `error?`, `validate?`, `onChange?: (value: string) => void` | React Aria TextField styled with DaisyUI input classes and FieldError. No `placeholder` prop. No `type="number"` — use text+validation. Prefer FormData/native validation over manual field state when possible. |
 | `HiddenInput` | `name`, `value` | Hidden form field |
-| `RadioGroup` | `title`, `name`, `options: {value,label}[]`, `value`, `size?`, `onChange` | Controlled radio set. No `default` prop — manage value in parent state. |
+| `RadioGroup` | `title`, `name`, `options: {value,label}[]`, `value?`, `defaultValue?`, `size?`, `required?`, `error?`, `onChange?` | Uses `react-aria` hooks (`useRadioGroupState` + `useRadioGroup` + `useRadio`) with native `<input type="radio">` elements carrying DaisyUI `radio` classes. Full keyboard nav + ARIA via hooks; visual via DaisyUI's native `:checked` pseudo-class. Use `defaultValue` for uncontrolled form submission and `value`/`onChange` for controlled flows. |
+| `Checkbox` | `label`, `name`, `value?`, `selected?`, `defaultSelected?`, `required?`, `size?`, `error?`, `onChange?` | Uses `react-aria` hooks (`useToggleState` + `useCheckbox`) with native `<input type="checkbox">` elements carrying DaisyUI `checkbox` classes. Full keyboard + ARIA via hooks; visual via DaisyUI's native `:checked` pseudo-class (checkmark animation included). |
 
 ### Feedback
 
@@ -249,7 +255,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `DataTable` | `columns: DataTableColumn<T>[]`, `rows: T[]`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?: {total,limit,offset,onChange}` | Sortable, paginated table. Pagination is a single object with `total`, `limit`, `offset`, `onChange` — not separate `paginated`/`pageSize` props. |
+| `DataTable` | `columns: DataTableColumn<T>[]`, `rows: T[]`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?: {total,limit,offset,onChange}` | React Aria Table backed by DaisyUI `table` class. Built-in keyboard navigation, sort indicators (chevron icons via `SortIcon`), and `onRowAction` handler. Renders native `<table>`/`<thead>`/`<tbody>` elements so DaisyUI classes apply directly. Sort state managed externally via `sortBy`/`sortDirection`/`onSort` (maps to RAC's `sortDescriptor`). Pagination rendered separately as `PaginationBar` (RAC Table has no built-in page pagination). |
 
 ### Navigation
 
@@ -265,14 +271,14 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel?`, `cancelLabel?`, `variant?`, `onConfirm`, `confirmDisabled?`, `children?` | React Aria Modal + Dialog. Uses DaisyUI `modal modal-open modal-box modal-action` classes. Enter/exit animations via `data-[entering]`/`data-[exiting]`. Pass form fields as `children`. |
+| `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel?`, `cancelLabel?`, `variant?`, `error?`, `onConfirm(formData)`, `confirmDisabled?`, `children?` | React Aria Modal + Dialog with an internal React Aria Form. Uses DaisyUI `modal modal-open modal-box modal-action` classes. Enter/exit animations via `data-[entering]`/`data-[exiting]`. Pass form fields as `children`; confirm is `type="submit"` and supplies `FormData`. Return `false` from `onConfirm` to keep the dialog open for API/server errors; pass `error` to show a dialog-local alert. |
 
 ### Inputs
 
 | Component | Key props | Notes |
 |---|---|---|
 | `SearchInput` | `value`, `onChange`, `placeholder?`, `grow?`, `size?: "sm"\|"md"` | React Aria SearchField. Controlled. Shows clear button when non-empty. `grow` adds `flex-1`. Default size `"md"`. |
-| `FilterDropdown` | `label`, `options: { value, label }[]`, `value`, `onChange`, `size?: "sm"\|"md"` | React Aria Select styled as a filter pill. Default size `"md"`. |
+| `FilterDropdown` | `label`, `options: { value, label }[]`, `value`, `onChange`, `size?: "sm"\|"md"` | React Aria Select styled as a filter pill. Default size `"md"`. Popover animates via React Aria `data-entering`/`data-exiting`. |
 
 ### Icons
 
@@ -288,7 +294,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `TopbarEnd` | `children` | Right section of Topbar |
 | `TopbarBrandLink` | `href`, `children` | Brand/app name link, `btn btn-ghost text-xl font-semibold` |
 | `TopbarBreadcrumb` | `items: string[]` | `breadcrumbs` DaisyUI component |
-| `TopbarSearchField` | `placeholder?` | Topbar search input (decorative, not wired to API) |
+| `TopbarSearchField` | `placeholder?` | React Aria SearchField styled with DaisyUI input classes (decorative, not wired to API) |
 | `TopbarAvatarMenu` | `ariaLabel?`, `initials?`, `items: { label, href, badge? }[]` | Avatar dropdown menu using DaisyUI `dropdown dropdown-end` |
 | `NavTitle` | `children` | Renders `<li><h2 class="menu-title">` — static section title without collapsible behavior |
 

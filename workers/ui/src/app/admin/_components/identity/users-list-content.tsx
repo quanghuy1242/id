@@ -19,9 +19,21 @@ import {
   Text,
   TextInput,
 } from "@id/ui";
-import { listUsers, createUser, type User } from "../../_actions/users";
+import {
+  createUser as createUserAction,
+  listUsers as listUsersAction,
+  type CreateUserBody,
+  type ListUsersParams,
+  type ListUsersResponse,
+  type User,
+} from "../../_actions/users";
 
 const pageLimit = 25;
+
+const defaultActions = {
+  listUsers: listUsersAction,
+  createUser: createUserAction,
+};
 
 const roleFilterOptions = [
   { value: "all", label: "All Roles" },
@@ -65,9 +77,9 @@ const columns: DataTableColumn<User>[] = [
     label: "Verified",
     render: (u) =>
       u.emailVerified ? (
-        <Badge tone="success" size="sm">Verified</Badge>
+        <Badge tone="success">Verified</Badge>
       ) : (
-        <Badge tone="warning" size="sm">Unverified</Badge>
+        <Badge tone="warning">Unverified</Badge>
       ),
   },
   {
@@ -94,6 +106,11 @@ type UsersListContentProps = {
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
+  defaultCreateOpen?: boolean;
+  actions?: {
+    listUsers: (params: ListUsersParams) => Promise<ListUsersResponse>;
+    createUser: (body: CreateUserBody) => Promise<{ user: User }>;
+  };
 };
 
 type FetchedData = {
@@ -106,8 +123,10 @@ type FetchedData = {
 export function UsersListContent({
   loading: loadingOverride,
   error: errorOverride,
+  actions = defaultActions,
   onRetry,
   onRowClick,
+  defaultCreateOpen = false,
   ...props
 }: UsersListContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -123,11 +142,7 @@ export function UsersListContent({
   const [fetchError, setFetchError] = useState<string | undefined>();
   const [fetchKey, setFetchKey] = useState(0);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createEmail, setCreateEmail] = useState("");
-  const [createPassword, setCreatePassword] = useState("");
-  const [createRole, setCreateRole] = useState("user");
+  const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
 
   const effectiveSearch = props.searchValue ?? internalSearch;
@@ -188,7 +203,7 @@ export function UsersListContent({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await listUsers(params);
+        const res = await actions.listUsers(params);
         if (!cancelled) { setData(res); setIsLoading(false); }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -199,7 +214,7 @@ export function UsersListContent({
     })();
 
     return () => { cancelled = true; };
-  }, [loadingOverride, errorOverride, debouncedSearch, effectiveRole, effectiveSortBy, effectiveSortDir, effectiveOffset, fetchKey]); // handlers are stable per render; no stale-closure risk here
+  }, [actions, loadingOverride, errorOverride, debouncedSearch, effectiveRole, effectiveSortBy, effectiveSortDir, effectiveOffset, fetchKey]); // handlers are stable per render; no stale-closure risk here
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? fetchError;
@@ -218,29 +233,27 @@ export function UsersListContent({
     setFetchKey((k) => k + 1);
   }
 
-  function handleCreateConfirm() {
-    void (async () => {
-      try {
-        await createUser({
-          name: createName,
-          email: createEmail,
-          password: createPassword || undefined,
-          role: createRole,
-        });
-        setFetchKey((k) => k + 1);
-      } catch (err: unknown) {
-        setCreateError(err instanceof Error ? err.message : "Failed to create user");
-      }
-    })();
+  async function handleCreateConfirm(formData: FormData) {
+    setCreateError(undefined);
+    try {
+      const password = String(formData.get("password") ?? "");
+      await actions.createUser({
+        name: String(formData.get("name") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        password: password || undefined,
+        role: String(formData.get("role") ?? "user"),
+      });
+      setFetchKey((k) => k + 1);
+      return true;
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create user");
+      return false;
+    }
   }
 
   function handleCreateOpenChange(open: boolean) {
     setCreateOpen(open);
     if (!open) {
-      setCreateName("");
-      setCreateEmail("");
-      setCreatePassword("");
-      setCreateRole("user");
       setCreateError(undefined);
     }
   }
@@ -295,9 +308,6 @@ export function UsersListContent({
 
   return (
     <Stack gap="md">
-      {createError && (
-        <ErrorAlert message={createError} onRetry={() => setCreateError(undefined)} />
-      )}
       <Panel>
         <Stack gap="sm">
           <Inline justify="between">
@@ -338,17 +348,17 @@ export function UsersListContent({
         onOpenChange={handleCreateOpenChange}
         title="Create User"
         confirmLabel="Create"
+        error={createError}
         onConfirm={handleCreateConfirm}
       >
-        <TextInput label="Name" name="name" required onChange={setCreateName} />
-        <TextInput label="Email" name="email" type="email" required onChange={setCreateEmail} />
-        <TextInput label="Password" name="password" type="password" onChange={setCreatePassword} />
+        <TextInput label="Name" name="name" required />
+        <TextInput label="Email" name="email" type="email" required />
+        <TextInput label="Password" name="password" type="password" />
         <RadioGroup
           title="Role"
           name="role"
           options={roleOptions}
-          value={createRole}
-          onChange={setCreateRole}
+          defaultValue="user"
         />
       </ConfirmDialog>
     </Stack>

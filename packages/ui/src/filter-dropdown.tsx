@@ -44,7 +44,7 @@ export function FilterDropdown({ label, options, value, onChange, size = "md" }:
         <SelectValue />
         <ChevronDown className="h-3 w-3 text-base-content/50 shrink-0" aria-hidden="true" />
       </SelectTrigger>
-      <Popover className="z-50 w-(--trigger-width)">
+      <Popover className="z-50 w-(--trigger-width) data-[entering]:animate-popover-in data-[exiting]:animate-popover-out">
         <ListBox className="menu menu-sm bg-base-100 border border-base-300 rounded-box shadow-lg p-1 box-border w-full">
           {options.map((opt) => (
             <ListBoxItem

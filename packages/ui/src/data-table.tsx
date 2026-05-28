@@ -1,6 +1,16 @@
 // DaisyUI 5: https://daisyui.com/components/table/
+"use client";
 import type { ReactNode } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import {
+  Cell as AriaCell,
+  Column as AriaColumn,
+  Row as AriaRow,
+  Table as AriaTable,
+  TableBody as AriaTableBody,
+  TableHeader as AriaTableHeader,
+  type SortDescriptor,
+} from "react-aria-components";
 
 export type SortDirection = "asc" | "desc";
 
@@ -29,9 +39,9 @@ type DataTableProps<T extends object> = {
   readonly pagination?: Pagination;
 };
 
-function SortIcon({ colKey, sortBy, sortDirection }: { colKey: string; sortBy?: string; sortDirection?: SortDirection }) {
-  if (colKey !== sortBy) return <ChevronsUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />;
-  if (sortDirection === "asc") return <ChevronUp className="h-3 w-3" aria-hidden="true" />;
+function SortIcon({ direction, active }: { direction?: SortDirection; active: boolean }) {
+  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />;
+  if (direction === "asc") return <ChevronUp className="h-3 w-3" aria-hidden="true" />;
   return <ChevronDown className="h-3 w-3" aria-hidden="true" />;
 }
 
@@ -87,53 +97,71 @@ export function DataTable<T extends object>({
   onSort,
   pagination,
 }: DataTableProps<T>) {
-  function handleSort(key: string) {
+  const sortDescriptor: SortDescriptor | undefined =
+    sortBy
+      ? { column: sortBy, direction: sortDirection === "desc" ? "descending" : "ascending" }
+      : undefined;
+
+  function handleSortChange(descriptor: SortDescriptor) {
     if (!onSort) return;
-    const nextDir: SortDirection =
-      key === sortBy && sortDirection === "asc" ? "desc" : "asc";
-    onSort(key, nextDir);
+    const dir: SortDirection = descriptor.direction === "descending" ? "desc" : "asc";
+    onSort(String(descriptor.column), dir);
   }
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className="table w-full">
-        <thead>
-          <tr className="border-b border-base-300 bg-base-200/50">
-            {columns.map((col) => (
-              <th key={col.key} className="font-medium text-base-content/70 text-xs uppercase tracking-wide">
+      <AriaTable
+        aria-label="Data table"
+        className="table w-full"
+        sortDescriptor={sortDescriptor}
+        onSortChange={handleSortChange}
+        onRowAction={
+          onRowClick
+            ? (key) => {
+                const row = rows.find((r) => getRowKey(r) === String(key));
+                if (row) onRowClick(row);
+              }
+            : undefined
+        }
+      >
+        <AriaTableHeader>
+          {columns.map((col) => (
+            <AriaColumn
+              key={col.key}
+              id={col.key}
+              isRowHeader={col.key === columns[0]?.key}
+              allowsSorting={col.sortable}
+              className="font-medium text-base-content/70 text-xs uppercase tracking-wide"
+            >
+              <div className="flex items-center gap-1">
+                {col.label}
                 {col.sortable ? (
-                  <button
-                    className="flex items-center gap-1 hover:text-base-content transition-colors"
-                    onClick={() => handleSort(col.key)}
-                  >
-                    {col.label}
-                    <SortIcon colKey={col.key} sortBy={sortBy} sortDirection={sortDirection} />
-                  </button>
-                ) : (
-                  col.label
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={getRowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b border-base-300/50 ${onRowClick ? "cursor-pointer hover:bg-base-200/60" : ""}`}
+                  <SortIcon
+                    direction={sortBy === col.key ? sortDirection : undefined}
+                    active={sortBy === col.key}
+                  />
+                ) : null}
+              </div>
+            </AriaColumn>
+          ))}
+        </AriaTableHeader>
+        <AriaTableBody items={rows}>
+          {(row) => (
+            <AriaRow
+              id={getRowKey(row)}
+              className={onRowClick ? "cursor-pointer hover:bg-base-200/60" : ""}
             >
               {columns.map((col) => (
-                <td key={col.key} className="text-sm text-base-content">
+                <AriaCell key={col.key} className="text-sm text-base-content">
                   {col.render
                     ? col.render(row)
                     : String((row as Record<string, unknown>)[col.key] ?? "")}
-                </td>
+                </AriaCell>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </AriaRow>
+          )}
+        </AriaTableBody>
+      </AriaTable>
       {pagination && <PaginationBar {...pagination} />}
     </div>
   );

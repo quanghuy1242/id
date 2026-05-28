@@ -14,3 +14,4 @@ export * from "./tab-nav";
 export * from "./confirm-dialog";
 export * from "./data-table";
 export * from "./nav-icons";
+export * from "./topbar-search-field";
