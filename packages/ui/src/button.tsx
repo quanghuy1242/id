@@ -24,6 +24,22 @@ type ButtonProps = {
   readonly iconPosition?: "left" | "right";
 };
 
+function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean): string {
+  const variantClass = {
+    primary: "btn-primary",
+    secondary: "btn-outline",
+    danger: "btn-error",
+    ghost: "btn-ghost",
+  }[variant];
+  const sizeClass = {
+    sm: "btn-sm",
+    md: "",
+  }[size];
+  const shapeClass = circle ? " btn-circle" : "";
+
+  return `btn ${sizeClass} ${variantClass}${shapeClass}`.trim();
+}
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -38,20 +54,8 @@ export function Button({
   iconName,
   iconPosition = "left",
 }: ButtonProps) {
-  const variantClass = {
-    primary: "btn-primary",
-    secondary: "btn-outline",
-    danger: "btn-error",
-    ghost: "btn-ghost",
-  }[variant];
-  const sizeClass = {
-    sm: "btn-sm",
-    md: "",
-  }[size];
-
   const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
-  const isIconOnly = !children && iconName;
-  const shapeClass = circle || isIconOnly ? " btn-circle" : "";
+  const isIconOnly = Boolean(!children && iconName);
 
   return (
     <AriaButton
@@ -61,7 +65,7 @@ export function Button({
       isDisabled={disabled}
       onPress={onClick}
       aria-label={ariaLabel}
-      className={`btn ${sizeClass} ${variantClass}${shapeClass}`.trim()}
+      className={buttonClass(variant, size, circle || isIconOnly)}
     >
       {iconPosition === "left" && icon}
       {children}
@@ -78,19 +82,8 @@ type LinkButtonProps = {
 };
 
 export function LinkButton({ href, variant = "primary", size = "md", children }: LinkButtonProps) {
-  const variantClass = {
-    primary: "btn-primary",
-    secondary: "btn-outline",
-    danger: "btn-error",
-    ghost: "btn-ghost",
-  }[variant];
-  const sizeClass = {
-    sm: "btn-sm",
-    md: "",
-  }[size];
-
   return (
-    <Link href={href} className={`btn ${sizeClass} ${variantClass}`.trim()}>
+    <Link href={href} className={buttonClass(variant, size)}>
       {children}
     </Link>
   );

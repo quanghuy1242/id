@@ -347,13 +347,14 @@ export function UsersListContent({
         open={createOpen}
         onOpenChange={handleCreateOpenChange}
         title="Create User"
+        description="Create a local user record. Leave password blank only when another sign-in or password setup flow is available."
         confirmLabel="Create"
         error={createError}
         onConfirm={handleCreateConfirm}
       >
         <TextInput label="Name" name="name" required />
         <TextInput label="Email" name="email" type="email" required />
-        <TextInput label="Password" name="password" type="password" />
+        <TextInput label="Password" name="password" type="password" autoComplete="new-password" />
         <RadioGroup
           title="Role"
           name="role"

@@ -148,6 +148,30 @@
       "file": "workers/ui/src/app/admin/_mocks/users.ts",
       "rule": "code-quality/duplicate-block",
       "reason": "Mock user fixture objects must explicitly list all User fields per type; structural repetition is required to make each fixture independently readable in stories."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_mocks/organizations.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Mock invitation fixture objects intentionally list all Invitation fields for each status so story data remains independently readable."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/avatar.tsx",
+      "rule": "next/no-img-element",
+      "reason": "Shared UI Avatar accepts arbitrary user-supplied image URLs across Vinext/Ladle contexts; Next Image optimization and remote allowlists are not appropriate at this primitive boundary."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/page.tsx",
+      "rule": "ai-slop/todo-stub",
+      "reason": "Security TODO documents the explicit future MFA/session-freshness requirement for the temporary admin scaffold page."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/page.tsx",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment is intentional security context for the temporary admin scaffold page until the MFA/session-freshness work lands."
     }
   ]
 }

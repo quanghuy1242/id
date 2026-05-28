@@ -2,7 +2,10 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { OrganizationDetailContent } from "@/app/admin/_components/identity/organization-detail-content";
+import { Stack } from "@id/ui";
+import { OrgDetailProvider } from "@/app/admin/_components/identity/org-detail-context";
+import { OrgDetailHeaderContent } from "@/app/admin/_components/identity/org-detail-header-content";
+import { OrgDetailOverviewContent } from "@/app/admin/_components/identity/org-detail-overview-content";
 import { mockOrganizations } from "@/app/admin/_mocks/organizations";
 import type { Organization } from "@/app/admin/_actions/organizations";
 
@@ -21,27 +24,52 @@ function makeActions(org: Organization) {
   };
 }
 
-describe("OrganizationDetailContent", () => {
+function renderOrgDetail({
+  org = baseOrg,
+  orgId = "org_001",
+  loading,
+  error,
+  actions = makeActions(org),
+  onNavigateToOrgs,
+}: {
+  org?: Organization;
+  orgId?: string;
+  loading?: boolean;
+  error?: string;
+  actions?: ReturnType<typeof makeActions>;
+  onNavigateToOrgs?: () => void;
+} = {}) {
+  return render(
+    <OrgDetailProvider orgId={orgId} loading={loading} error={error} actions={actions}>
+      <Stack gap="md">
+        <OrgDetailHeaderContent activeTab="overview" actions={actions} onNavigateToOrgs={onNavigateToOrgs} />
+        <OrgDetailOverviewContent actions={actions} />
+      </Stack>
+    </OrgDetailProvider>,
+  );
+}
+
+describe("Organization detail nested content", () => {
   it("renders loading skeleton when loading prop passed", () => {
-    render(<OrganizationDetailContent orgId="org_001" loading />);
+    renderOrgDetail({ loading: true });
     expect(document.querySelector(".skeleton")).toBeInTheDocument();
   });
 
   it("renders error alert when error prop passed", () => {
-    render(<OrganizationDetailContent orgId="org_001" error="Not found" />);
+    renderOrgDetail({ error: "Not found" });
     expect(screen.getByRole("alert")).toHaveTextContent("Not found");
   });
 
   it("renders org name and slug badge", async () => {
     const actions = makeActions(baseOrg);
-    render(<OrganizationDetailContent orgId="org_001" actions={actions} />);
+    renderOrgDetail({ actions });
     await waitFor(() => expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0));
     expect(screen.getByText("#acme")).toBeInTheDocument();
   });
 
   it("opens Edit Organization dialog", async () => {
     const actions = makeActions(baseOrg);
-    render(<OrganizationDetailContent orgId="org_001" actions={actions} />);
+    renderOrgDetail({ actions });
     await waitFor(() => screen.getByRole("button", { name: /edit organization/i }));
     fireEvent.click(screen.getByRole("button", { name: /edit organization/i }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -49,7 +77,7 @@ describe("OrganizationDetailContent", () => {
 
   it("delete confirm button disabled until correct slug typed", async () => {
     const actions = makeActions(baseOrg);
-    render(<OrganizationDetailContent orgId="org_001" actions={actions} />);
+    renderOrgDetail({ actions });
     await waitFor(() => screen.getByRole("button", { name: /^delete$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));
@@ -62,7 +90,7 @@ describe("OrganizationDetailContent", () => {
   it("calls deleteOrganization and fires navigation callback", async () => {
     const onNavigate = vi.fn<() => void>();
     const actions = makeActions(baseOrg);
-    render(<OrganizationDetailContent orgId="org_001" actions={actions} onNavigateToOrgs={onNavigate} />);
+    renderOrgDetail({ actions, onNavigateToOrgs: onNavigate });
     await waitFor(() => screen.getByRole("button", { name: /^delete$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));

@@ -10,7 +10,7 @@ All components exist in `packages/ui/src/` with the exact props described in thi
 `Text`, `Heading`,
 `Button` (variant/size/iconName/iconPosition/ariaLabel/circle/disabled/onClick — `children` optional for icon-only buttons),
 `LinkButton` (href/variant/size/children),
-`TextInput` (label/name/type/required/defaultValue/error/onChange — no `placeholder`, no `type="number"`),
+`TextInput` (label/name/type/required/defaultValue/autoComplete/error/validate/onChange — no `placeholder`, no `type="number"`),
 `Textarea` (label/name/required/defaultValue/error/rows/placeholder/onChange — monospace font-mono, used for JSON/multiline fields),
 `RadioGroup` (title/name/options/value/onChange — fully controlled),
 `Avatar` (initials/image/alt/size),
@@ -37,15 +37,19 @@ Covers all routes under `/admin/identity`. Actor-scoping rules:
 
 Box-drawing key: ┌─┐ top edge · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no
 
-**Ladle story pattern for org sub-pages (Members / Teams / Invitations):**
-Each story renders both `OrganizationDetailContent` (provides header + tabs) AND the sub-content component together,
-matching the route file structure. This ensures the tab context is visible in every story state.
+**Ladle story pattern for nested detail pages:**
+User and organization detail routes use a nested layout. Stories render the provider, header content, and route-specific content together,
+matching the route file structure. This ensures the shared header, active tab, and child panel are visible in every story state.
 ```tsx
 export const OrgMembers_Populated: Story = () => (
   <AdminShell activePath="/admin/identity/organizations/org_001/members">
     <PageBody>
-      <OrganizationDetailContent orgId="org_001" actions={detailActions} />
-      <OrganizationMembersContent orgId="org_001" actions={membersActions} />
+      <OrgDetailProvider orgId="org_001" actions={detailActions}>
+        <Stack gap="md">
+          <OrgDetailHeaderContent activeTab="members" actions={detailActions} />
+          <OrganizationMembersContent orgId="org_001" actions={membersActions} />
+        </Stack>
+      </OrgDetailProvider>
     </PageBody>
   </AdminShell>
 );
@@ -231,8 +235,10 @@ Badge mappings:
 
 Components:
   AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
-  MainContent > PageBody > Stack(gap="md")
-    PageHeader: Inline(justify="between")
+  MainContent > users/:userId/layout.tsx
+    PageBody > UserDetailProvider > Stack(gap="md")
+    UserDetailHeaderContent:
+      Inline(justify="between")
       Inline(gap="sm")
         LinkButton(href="/admin/identity/users", variant="secondary", "← Users")
         Text(variant="h1", children=user.name)
@@ -250,18 +256,15 @@ Components:
       ]
     )
 
+    users/:userId/page.tsx:
+      UserDetailOverviewContent(onNavigateToUsers)
+
     — If banned: Alert(tone="warning") showing "This user is banned. Reason: {banReason}. Expires: {banExpires}."
     — If loading: Skeleton(rows=4, height="md")
 
     Panel(tone="base") — Profile
       Grid(columns="two")
-        — Column 1: Avatar area + Text pairs
-          NOTE: no Avatar component exists in @id/ui yet. For initial implementation, either:
-            a) Create a minimal avatar in the route using raw markup inside a div,
-               since this is a one-off detail-view requirement, OR
-            b) Show no avatar, just the text pairs.
-          If avatar implemented: show <img> if user.image set (mask-squircle via class),
-          else show circle with initials.
+        — Column 1: Avatar(initials/image/alt/size)
         — All label/value pairs: Text(variant="caption") for labels, Text(variant="body") for values
         Fields: Name, Email, Role, Email Verified (Badge), Banned (Badge/Yes-No), Created At
 
@@ -287,7 +290,7 @@ Components:
       On confirm: POST /api/auth/admin/set-role { userId, role }
 
     Reset Password: ConfirmDialog(title="Reset Password", confirmLabel="Set Password", onConfirm)
-      TextInput(label="New Password", name="password", type="password")
+      TextInput(label="New Password", name="password", type="password", autoComplete="new-password", validate=min 12 chars)
       On confirm: POST /api/auth/admin/set-user-password { newPassword, userId }
 
     Ban User: ConfirmDialog(title="Ban User", confirmLabel="Ban User", variant="danger", onConfirm)
@@ -542,8 +545,10 @@ Behavior:
 
 Components:
   AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
-  MainContent > PageBody > Stack(gap="md")
-    PageHeader: Inline(justify="between")
+  MainContent > organizations/:orgId/layout.tsx
+    PageBody > OrgDetailProvider > Stack(gap="md")
+    OrgDetailHeaderContent:
+      Inline(justify="between")
       Inline(gap="sm")
         LinkButton(href="/admin/identity/organizations", variant="secondary", "← Organizations")
         Text(variant="h1", org.name)
@@ -560,14 +565,15 @@ Components:
         {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"}
       ]
     )
-    — NOTE: sub-page route files (members/teams/invitations) pass activeTab="members"|"teams"|"invitations"
-      to OrganizationDetailContent so the correct tab is highlighted.
-      Sub-pages also wrap both OrganizationDetailContent + sub-content in Stack(gap="md") for spacing.
+    — NOTE: the layout derives activeTab from pathname and renders the shared header once.
+      Sub-page route files render only OrganizationMembersContent, OrganizationTeamsContent, or OrganizationInvitationsContent.
+
+    organizations/:orgId/page.tsx:
+      OrgDetailOverviewContent
 
     Panel
-      Grid(columns="two")
-        — Left: Logo preview (if org.logo: <img> else placeholder text "No logo")
-        — Right + below: label/value pairs using Text(variant="caption") / Text(variant="body")
+      Stack(gap="xs") label/value pairs using Text(variant="caption") / Text(variant="body")
+      Panel(tone="muted", padding="sm") for formatted metadata
       Inline(justify="end")
         Button(variant="secondary", onClick=openEditModal, "Edit Organization")
 
@@ -658,7 +664,7 @@ Components:
     FilterDropdown(label="Role",
       options=[{value:"all",label:"All"},{value:"owner",label:"Owner"},{value:"admin",label:"Admin"},{value:"member",label:"Member"}],
       value=roleFilter, onChange=setRoleFilter)
-    LinkButton(href="#", variant="primary", "+ Invite Member") — opens Invite modal
+    Button(variant="primary", iconName="Plus", "Invite Member") — opens Invite modal
 
   Panel(padding="none") > DataTable(
     columns=[name, email, role(col with Badge), joinedAt(sortable)],
@@ -679,6 +685,7 @@ Modals:
       options=[{value:"owner",label:"Owner"},{value:"admin",label:"Admin"},{value:"member",label:"Member"}],
       value=selectedRole, onChange=setSelectedRole)
       — Pre-select current role. Show current role name in description.
+      — Guard on submit: if this is the last owner, block changing the role away from owner.
     On confirm: POST /api/auth/organization/update-member-role { memberId, role }
 
   Remove: ConfirmDialog(title=`Remove {memberName}`, confirmLabel="Remove", variant="danger", onConfirm)
@@ -910,10 +917,11 @@ Components:
         {value:"pending",label:"Pending"},
         {value:"expired",label:"Expired"},
         {value:"accepted",label:"Accepted"},
-        {value:"rejected",label:"Rejected"}
+        {value:"rejected",label:"Rejected"},
+        {value:"cancelled",label:"Cancelled"}
       ],
       value=statusFilter, onChange=setStatusFilter)
-    Button(variant="primary", onClick=openInviteModal, "+ Invite Member")
+    Button(variant="primary", iconName="Plus", onClick=openInviteModal, "Invite Member")
 
   Panel(padding="none") > DataTable(
     columns=[email(sortable), role(col), team(col), inviterName(col), expiresAt(sortable), status(col), actions(col)],

@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
-import { useState } from "react";
-import { Badge, DataTable, type DataTableColumn, Inline, Stack, Text } from "@id/ui";
-import type { SortDirection } from "@id/ui";
+import { useState, type ReactNode } from "react";
+import { Badge, DataTable, type DataTableColumn, Inline, Stack, type SortDirection, Text } from "@id/ui";
 import type { Story } from "@ladle/react";
 
 type FileItem = {

@@ -50,6 +50,18 @@ Every new admin screen follows this order. Do not skip or reorder steps. Full ra
 7. **Ladle verify** — run `pnpm dev:i` and confirm all four states render correctly. This gate must pass before the route file is created.
 8. **Route file** — create `workers/ui/src/app/admin/<path>/page.tsx` (≤ 40 lines). Read URL params via `useSearchParams`, pass as override props to the content component, pass navigation callbacks wired to `router.push()`. **Split the page into two components**: the outer component owns the `<Suspense fallback={<Content loading />}>` boundary; an inner component (`PageContent`) calls `useSearchParams()`. Never call `useSearchParams()` in the same component that owns the Suspense boundary — Next.js App Router de-opts the entire route to dynamic rendering and causes hydration flicker.
 
+### Nested Detail Layout Pattern
+
+Use this pattern for admin detail areas where multiple child routes share the same fetched entity, header, tabs, and destructive header action.
+
+- Create `_components/<section>/<entity>-detail-context.tsx` with a provider that owns the entity fetch, `loading`/`error` story overrides, `set<Entity>`, and `refetch`.
+- Create `<entity>-detail-header-content.tsx` for back link, title/badges, shared actions, and route tabs. It reads the provider and receives `activeTab` from the layout.
+- Create `<entity>-detail-overview-content.tsx` for overview-only fields and overview-only mutation dialogs.
+- Create `app/admin/<section>/<entityPlural>/[id]/layout.tsx` to render `PageBody > Provider > Stack(gap="md") > Header + children`. The layout may use `useParams`, `usePathname`, and `useRouter` because URL logic belongs at the route boundary.
+- Child `page.tsx` files under the detail route render only their own content component. They may read the provider hook for `id` and display names, but they must not repeat the shared header, tabs, or entity fetch.
+- Ladle stories for child routes must mirror the layout: `AdminShell > PageBody > Provider > Stack > Header + child content`.
+- Keep list/search routes on the normal Suspense + `useSearchParams` split pattern above. The nested layout pattern is for shared detail route state, not list query-state pages.
+
 ### Story state conventions
 
 | Story export | How to implement |

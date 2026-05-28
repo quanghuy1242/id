@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
+  Alert,
   Button,
   ConfirmDialog,
   DataTable,
@@ -72,6 +73,7 @@ export function OrganizationTeamsContent({
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | undefined>();
+  const [addMemberError, setAddMemberError] = useState<string | undefined>();
 
   const [renameTarget, setRenameTarget] = useState<Team | null>(null);
   const [renameError, setRenameError] = useState<string | undefined>();
@@ -82,14 +84,14 @@ export function OrganizationTeamsContent({
   const [removeMemberTarget, setRemoveMemberTarget] = useState<EnrichedTeamMember | null>(null);
   const [removeMemberError, setRemoveMemberError] = useState<string | undefined>();
 
-  async function enrichUsers(userIds: string[], currentCache: Map<string, User>): Promise<Map<string, User>> {
+  const enrichUsers = useCallback(async (userIds: string[], currentCache: Map<string, User>): Promise<Map<string, User>> => {
     const missing = userIds.filter((id) => !currentCache.has(id));
     if (missing.length === 0) return currentCache;
     const fetched = await Promise.all(missing.map((id) => actions.getUser(id).then((r) => r.user).catch(() => null)));
     const next = new Map(currentCache);
     missing.forEach((id, i) => { if (fetched[i]) next.set(id, fetched[i]!); });
     return next;
-  }
+  }, [actions]);
 
   useEffect(() => {
     if (loadingOverride || errorOverride) return;
@@ -123,7 +125,7 @@ export function OrganizationTeamsContent({
       }
     })();
     return () => { cancelled = true; };
-  }, [actions, orgId, loadingOverride, errorOverride, fetchKey]);
+  }, [actions, orgId, loadingOverride, errorOverride, fetchKey, enrichUsers]);
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? fetchError;
@@ -131,6 +133,7 @@ export function OrganizationTeamsContent({
   async function handleExpandTeam(team: Team) {
     if (expandedTeamId === team.id) { setExpandedTeamId(null); return; }
     setExpandedTeamId(team.id);
+    setAddMemberError(undefined);
     setExpandLoading(true);
     try {
       const tms = await actions.listTeamMembers(team.id);
@@ -144,6 +147,7 @@ export function OrganizationTeamsContent({
   }
 
   async function handleAddMember(teamId: string, userId: string) {
+    setAddMemberError(undefined);
     try {
       await actions.addTeamMember(teamId, userId, orgId);
       const tms = await actions.listTeamMembers(teamId);
@@ -152,7 +156,9 @@ export function OrganizationTeamsContent({
       setUserCache(cache);
       setExpandedMembers(tms.map((tm) => Object.assign({}, tm, { user: cache.get(tm.userId) ?? null })));
       setMemberCounts((prev) => new Map(prev).set(teamId, tms.length));
-    } catch { /* surface via alert if needed */ }
+    } catch (err: unknown) {
+      setAddMemberError(err instanceof Error ? err.message : "Failed to add team member");
+    }
   }
 
   async function handleCreate(formData: FormData) {
@@ -268,8 +274,8 @@ export function OrganizationTeamsContent({
     <Stack gap="md">
       <Inline justify="between">
         <Text variant="h3">Teams ({teams.length})</Text>
-        <Button variant="primary" onClick={() => { setCreateError(undefined); setCreateOpen(true); }}>
-          + Create Team
+        <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateOpen(true); }}>
+          Create Team
         </Button>
       </Inline>
 
@@ -308,6 +314,7 @@ export function OrganizationTeamsContent({
                     />
                   )}
                 </Inline>
+                {addMemberError && <Alert tone="error">{addMemberError}</Alert>}
                 {expandLoading && <Skeleton rows={2} />}
                 {!expandLoading && expandedMembers.length === 0 && (
                   <EmptyState message="No members in this team" />
@@ -338,6 +345,7 @@ export function OrganizationTeamsContent({
         open={createOpen}
         onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreateError(undefined); }}
         title="Create Team"
+        description="Teams group existing organization members. Add people after the team is created."
         confirmLabel="Create"
         error={createError}
         onConfirm={handleCreate}
@@ -350,11 +358,12 @@ export function OrganizationTeamsContent({
         open={Boolean(renameTarget)}
         onOpenChange={(o) => { if (!o) { setRenameTarget(null); setRenameError(undefined); } }}
         title="Rename Team"
+        description="Renaming a team keeps its members and organization membership unchanged."
         confirmLabel="Save"
         error={renameError}
         onConfirm={handleRename}
       >
-        <TextInput label="Team Name" name="name" defaultValue={renameTarget?.name ?? ""} />
+        <TextInput label="Team Name" name="name" defaultValue={renameTarget?.name ?? ""} required />
       </ConfirmDialog>
 
       {/* Delete Team */}

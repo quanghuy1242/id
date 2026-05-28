@@ -183,6 +183,10 @@ export function OrganizationMembersContent({
     setChangeRoleError(undefined);
     try {
       const role = String(formData.get("role") ?? selectedRole);
+      if (changeRoleTarget.role === "owner" && role !== "owner" && owners.length === 1) {
+        setChangeRoleError("Add another owner before changing the last owner's role");
+        return false;
+      }
       await actions.updateMemberRole(changeRoleTarget.id, role);
       setFetchKey((k) => k + 1);
       return true;
@@ -245,8 +249,12 @@ export function OrganizationMembersContent({
           value={effectiveRoleFilter}
           onChange={handleRoleFilter}
         />
-        <Button variant="primary" onClick={() => { setInviteRole("member"); setInviteError(undefined); setInviteOpen(true); }}>
-          + Invite Member
+        <Button
+          variant="primary"
+          iconName="Plus"
+          onClick={() => { setInviteRole("member"); setInviteError(undefined); setInviteOpen(true); }}
+        >
+          Invite Member
         </Button>
       </Inline>
 
@@ -259,6 +267,7 @@ export function OrganizationMembersContent({
         open={Boolean(changeRoleTarget)}
         onOpenChange={(o) => { if (!o) { setChangeRoleTarget(null); setChangeRoleError(undefined); } }}
         title={`Change role for ${changeRoleTarget?.user?.name ?? "member"}`}
+        description="Owners can manage billing and organization deletion. Keep at least one owner on the organization."
         confirmLabel="Save"
         error={changeRoleError}
         onConfirm={handleChangeRole}
@@ -289,6 +298,7 @@ export function OrganizationMembersContent({
         open={inviteOpen}
         onOpenChange={(o) => { setInviteOpen(o); if (!o) setInviteError(undefined); }}
         title="Invite Member"
+        description={`Send an invitation to join ${orgName ?? "this organization"}. Assign the lowest role that fits the work.`}
         confirmLabel="Send Invite"
         error={inviteError}
         onConfirm={handleInvite}

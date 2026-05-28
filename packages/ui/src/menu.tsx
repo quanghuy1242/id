@@ -48,6 +48,12 @@ type MenuItemHref = {
 
 export function MenuItem(props: MenuItemProps & Partial<MenuItemHref>) {
   const textValue = props.textValue ?? props.label ?? (typeof props.children === "string" ? props.children : undefined);
+  const content = (
+    <>
+      {props.label ?? (props.children as ReactNode)}
+      {props.badge ? <span className="badge badge-sm">{props.badge}</span> : null}
+    </>
+  );
 
   return (
     <AriaMenuItem
@@ -56,15 +62,12 @@ export function MenuItem(props: MenuItemProps & Partial<MenuItemHref>) {
       render={((dp: Record<string, unknown>) =>
         "href" in dp ? (
           <li>
-            <a {...dp} />
+            <a {...dp}>{content}</a>
           </li>
         ) : (
-          <li {...dp} />
+          <li {...dp}>{content}</li>
         )
       ) as never}
-    >
-      {props.label ?? (props.children as ReactNode)}
-      {props.badge ? <span className="badge badge-sm">{props.badge}</span> : null}
-    </AriaMenuItem>
+    />
   );
 }

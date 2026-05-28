@@ -1,29 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { useUserDetail } from "../../../../_components/identity/user-detail-context";
 import { UserSessionsContent } from "../../../../_components/identity/user-sessions-content";
 
 export default function UserSessionsPage() {
-  return (
-    <PageBody>
-      <Suspense fallback={<UserSessionsContent userId="" loading />}>
-        <UserSessionsPageContent />
-      </Suspense>
-    </PageBody>
-  );
-}
+  const { userId, user } = useUserDetail();
 
-function UserSessionsPageContent() {
-  const params = useParams();
-  const router = useRouter();
-  const userId = String(params.userId ?? "");
-
-  return (
-    <UserSessionsContent
-      userId={userId}
-      onNavigateToOverview={() => router.push(`/admin/identity/users/${userId}`)}
-    />
-  );
+  return <UserSessionsContent userId={userId} userName={user?.name} />;
 }

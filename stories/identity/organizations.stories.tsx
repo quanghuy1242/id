@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
 import { PageBody, Stack } from "@id/ui";
 import { OrganizationsListContent } from "../../workers/ui/src/app/admin/_components/identity/organizations-list-content";
-import { OrganizationDetailContent } from "../../workers/ui/src/app/admin/_components/identity/organization-detail-content";
+import { OrgDetailProvider } from "../../workers/ui/src/app/admin/_components/identity/org-detail-context";
+import { OrgDetailHeaderContent } from "../../workers/ui/src/app/admin/_components/identity/org-detail-header-content";
+import { OrgDetailOverviewContent } from "../../workers/ui/src/app/admin/_components/identity/org-detail-overview-content";
 import { OrganizationMembersContent } from "../../workers/ui/src/app/admin/_components/identity/organization-members-content";
 import { OrganizationTeamsContent } from "../../workers/ui/src/app/admin/_components/identity/organization-teams-content";
 import { OrganizationInvitationsContent } from "../../workers/ui/src/app/admin/_components/identity/organization-invitations-content";
@@ -18,8 +21,6 @@ import {
 import { mockUsers } from "../../workers/ui/src/app/admin/_mocks/users";
 
 export default { title: "Identity / Organizations" } satisfies StoryDefault;
-
-// ─── Organizations List ───────────────────────────────────────────────────────
 
 function createListActions(orgs: Organization[]) {
   let current = [...orgs];
@@ -64,6 +65,18 @@ export const OrgList_Empty: Story = () => {
 };
 OrgList_Empty.storyName = "Org List / Empty";
 
+export const OrgList_CreateDialog: Story = () => {
+  const actions = createListActions(mockOrganizations);
+  return (
+    <AdminShell activePath="/admin/identity/organizations">
+      <PageBody>
+        <OrganizationsListContent actions={actions} defaultCreateOpen />
+      </PageBody>
+    </AdminShell>
+  );
+};
+OrgList_CreateDialog.storyName = "Org List / Create Dialog";
+
 export const OrgList_Loading: Story = () => (
   <AdminShell activePath="/admin/identity/organizations">
     <PageBody>
@@ -82,13 +95,11 @@ export const OrgList_Error: Story = () => (
 );
 OrgList_Error.storyName = "Org List / Error";
 
-// ─── Organization Detail ─────────────────────────────────────────────────────
-
 function createDetailActions(org: Organization) {
   let current = { ...org };
   return {
     getFullOrganization: async (_id: string) => current,
-    updateOrganization: async (_id: string, data: Partial<Organization>) => {
+    updateOrganization: async (_id: string, data: Partial<{ name: string; slug: string; logo: string; metadata: string }>) => {
       current = { ...current, ...data };
       return current;
     },
@@ -96,50 +107,79 @@ function createDetailActions(org: Organization) {
   };
 }
 
+type OrgDetailFrameActions =
+  NonNullable<Parameters<typeof OrgDetailProvider>[0]["actions"]> &
+  NonNullable<Parameters<typeof OrgDetailHeaderContent>[0]["actions"]>;
+
+function OrgDetailFrame({
+  activePath,
+  orgId,
+  activeTab,
+  actions,
+  loading,
+  error,
+  children,
+}: {
+  activePath: string;
+  orgId: string;
+  activeTab: "overview" | "members" | "teams" | "invitations";
+  actions?: OrgDetailFrameActions;
+  loading?: boolean;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <AdminShell activePath={activePath}>
+      <PageBody>
+        <OrgDetailProvider orgId={orgId} loading={loading} error={error} actions={actions}>
+          <Stack gap="md">
+            <OrgDetailHeaderContent activeTab={activeTab} actions={actions} />
+            {children}
+          </Stack>
+        </OrgDetailProvider>
+      </PageBody>
+    </AdminShell>
+  );
+}
+
 export const OrgOverview_Populated: Story = () => {
   const actions = createDetailActions(mockOrganizations[0]);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001">
-      <PageBody>
-        <OrganizationDetailContent orgId="org_001" activeTab="overview" actions={actions} />
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001" orgId="org_001" activeTab="overview" actions={actions}>
+      <OrgDetailOverviewContent actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgOverview_Populated.storyName = "Org Overview / Populated";
 
 export const OrgOverview_Empty: Story = () => {
-  // Beta Inc has no logo and no metadata — minimal org
   const actions = createDetailActions(mockOrganizations[1]);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_002">
-      <PageBody>
-        <OrganizationDetailContent orgId="org_002" activeTab="overview" actions={actions} />
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_002" orgId="org_002" activeTab="overview" actions={actions}>
+      <OrgDetailOverviewContent actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgOverview_Empty.storyName = "Org Overview / Empty";
 
 export const OrgOverview_Loading: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001">
-    <PageBody>
-      <OrganizationDetailContent orgId="org_001" activeTab="overview" loading />
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame activePath="/admin/identity/organizations/org_001" orgId="org_001" activeTab="overview" loading>
+    <OrgDetailOverviewContent />
+  </OrgDetailFrame>
 );
 OrgOverview_Loading.storyName = "Org Overview / Loading";
 
 export const OrgOverview_Error: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001">
-    <PageBody>
-      <OrganizationDetailContent orgId="org_001" activeTab="overview" error="Failed to load organization" />
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame
+    activePath="/admin/identity/organizations/org_001"
+    orgId="org_001"
+    activeTab="overview"
+    error="Failed to load organization"
+  >
+    <OrgDetailOverviewContent />
+  </OrgDetailFrame>
 );
 OrgOverview_Error.storyName = "Org Overview / Error";
-
-// ─── Organization Members ────────────────────────────────────────────────────
 
 const userMap = new Map<string, User>(mockUsers.map((u) => [u.id, u]));
 
@@ -165,14 +205,9 @@ export const OrgMembers_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createMembersActions(mockMembers);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/members">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="members" actions={detail} />
-          <OrganizationMembersContent orgId="org_001" orgName="Acme Corp" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/members" orgId="org_001" activeTab="members" actions={detail}>
+      <OrganizationMembersContent orgId="org_001" orgName="Acme Corp" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgMembers_Populated.storyName = "Org Members / Populated";
@@ -181,43 +216,31 @@ export const OrgMembers_Empty: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createMembersActions([]);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/members">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="members" actions={detail} />
-          <OrganizationMembersContent orgId="org_001" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/members" orgId="org_001" activeTab="members" actions={detail}>
+      <OrganizationMembersContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgMembers_Empty.storyName = "Org Members / Empty";
 
 export const OrgMembers_Loading: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/members">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="members" loading />
-        <OrganizationMembersContent orgId="org_001" loading />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame activePath="/admin/identity/organizations/org_001/members" orgId="org_001" activeTab="members" loading>
+    <OrganizationMembersContent orgId="org_001" loading />
+  </OrgDetailFrame>
 );
 OrgMembers_Loading.storyName = "Org Members / Loading";
 
 export const OrgMembers_Error: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/members">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="members" error="Failed to load organization" />
-        <OrganizationMembersContent orgId="org_001" error="Failed to load members" />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame
+    activePath="/admin/identity/organizations/org_001/members"
+    orgId="org_001"
+    activeTab="members"
+    error="Failed to load organization"
+  >
+    <OrganizationMembersContent orgId="org_001" error="Failed to load members" />
+  </OrgDetailFrame>
 );
 OrgMembers_Error.storyName = "Org Members / Error";
-
-// ─── Organization Teams ───────────────────────────────────────────────────────
 
 function createTeamsActions(teams: Team[]) {
   let currentTeams = [...teams];
@@ -251,14 +274,9 @@ export const OrgTeams_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createTeamsActions(mockTeams);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/teams">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="teams" actions={detail} />
-          <OrganizationTeamsContent orgId="org_001" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/teams" orgId="org_001" activeTab="teams" actions={detail}>
+      <OrganizationTeamsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgTeams_Populated.storyName = "Org Teams / Populated";
@@ -267,43 +285,31 @@ export const OrgTeams_Empty: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createTeamsActions([]);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/teams">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="teams" actions={detail} />
-          <OrganizationTeamsContent orgId="org_001" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/teams" orgId="org_001" activeTab="teams" actions={detail}>
+      <OrganizationTeamsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgTeams_Empty.storyName = "Org Teams / Empty";
 
 export const OrgTeams_Loading: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/teams">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="teams" loading />
-        <OrganizationTeamsContent orgId="org_001" loading />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame activePath="/admin/identity/organizations/org_001/teams" orgId="org_001" activeTab="teams" loading>
+    <OrganizationTeamsContent orgId="org_001" loading />
+  </OrgDetailFrame>
 );
 OrgTeams_Loading.storyName = "Org Teams / Loading";
 
 export const OrgTeams_Error: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/teams">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="teams" error="Failed to load organization" />
-        <OrganizationTeamsContent orgId="org_001" error="Failed to load teams" />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame
+    activePath="/admin/identity/organizations/org_001/teams"
+    orgId="org_001"
+    activeTab="teams"
+    error="Failed to load organization"
+  >
+    <OrganizationTeamsContent orgId="org_001" error="Failed to load teams" />
+  </OrgDetailFrame>
 );
 OrgTeams_Error.storyName = "Org Teams / Error";
-
-// ─── Organization Invitations ─────────────────────────────────────────────────
 
 function createInvsActions(invs: Invitation[]) {
   let current = [...invs];
@@ -324,14 +330,9 @@ export const OrgInvitations_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createInvsActions(mockInvitations);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/invitations">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="invitations" actions={detail} />
-          <OrganizationInvitationsContent orgId="org_001" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/invitations" orgId="org_001" activeTab="invitations" actions={detail}>
+      <OrganizationInvitationsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgInvitations_Populated.storyName = "Org Invitations / Populated";
@@ -340,38 +341,28 @@ export const OrgInvitations_Empty: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createInvsActions([]);
   return (
-    <AdminShell activePath="/admin/identity/organizations/org_001/invitations">
-      <PageBody>
-        <Stack gap="md">
-          <OrganizationDetailContent orgId="org_001" activeTab="invitations" actions={detail} />
-          <OrganizationInvitationsContent orgId="org_001" actions={actions} />
-        </Stack>
-      </PageBody>
-    </AdminShell>
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/invitations" orgId="org_001" activeTab="invitations" actions={detail}>
+      <OrganizationInvitationsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
   );
 };
 OrgInvitations_Empty.storyName = "Org Invitations / Empty";
 
 export const OrgInvitations_Loading: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/invitations">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="invitations" loading />
-        <OrganizationInvitationsContent orgId="org_001" loading />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame activePath="/admin/identity/organizations/org_001/invitations" orgId="org_001" activeTab="invitations" loading>
+    <OrganizationInvitationsContent orgId="org_001" loading />
+  </OrgDetailFrame>
 );
 OrgInvitations_Loading.storyName = "Org Invitations / Loading";
 
 export const OrgInvitations_Error: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/invitations">
-    <PageBody>
-      <Stack gap="md">
-        <OrganizationDetailContent orgId="org_001" activeTab="invitations" error="Failed to load organization" />
-        <OrganizationInvitationsContent orgId="org_001" error="Failed to load invitations" />
-      </Stack>
-    </PageBody>
-  </AdminShell>
+  <OrgDetailFrame
+    activePath="/admin/identity/organizations/org_001/invitations"
+    orgId="org_001"
+    activeTab="invitations"
+    error="Failed to load organization"
+  >
+    <OrganizationInvitationsContent orgId="org_001" error="Failed to load invitations" />
+  </OrgDetailFrame>
 );
 OrgInvitations_Error.storyName = "Org Invitations / Error";

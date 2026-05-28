@@ -38,6 +38,7 @@ const statusFilterOptions = [
   { value: "expired", label: "Expired" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 const inviteRoleOptions = [
@@ -247,8 +248,12 @@ export function OrganizationInvitationsContent({
           value={effectiveStatus}
           onChange={handleStatusChange}
         />
-        <Button variant="primary" onClick={() => { setInviteRole("member"); setInviteError(undefined); setInviteOpen(true); }}>
-          + Invite Member
+        <Button
+          variant="primary"
+          iconName="Plus"
+          onClick={() => { setInviteRole("member"); setInviteError(undefined); setInviteOpen(true); }}
+        >
+          Invite Member
         </Button>
       </Inline>
 
@@ -284,6 +289,7 @@ export function OrganizationInvitationsContent({
         open={inviteOpen}
         onOpenChange={(o) => { setInviteOpen(o); if (!o) setInviteError(undefined); }}
         title="Invite Member"
+        description="Invitations are sent by email. Use owner or admin only for people who need organization management access."
         confirmLabel="Send Invite"
         error={inviteError}
         onConfirm={handleInvite}

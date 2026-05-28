@@ -48,6 +48,7 @@ type OrgsListContentProps = {
   onRowClick?: (orgId: string) => void;
   loading?: boolean;
   error?: string;
+  defaultCreateOpen?: boolean;
   actions?: typeof defaultActions;
 };
 
@@ -55,6 +56,7 @@ export function OrganizationsListContent({
   loading: loadingOverride,
   error: errorOverride,
   onRowClick,
+  defaultCreateOpen = false,
   actions = defaultActions,
   ...props
 }: OrgsListContentProps) {
@@ -67,7 +69,7 @@ export function OrganizationsListContent({
   const [internalSortBy, setInternalSortBy] = useState("name");
   const [internalSortDir, setInternalSortDir] = useState<"asc" | "desc">("asc");
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
   const [metadataError, setMetadataError] = useState<string | undefined>();
 
@@ -205,6 +207,7 @@ export function OrganizationsListContent({
         open={createOpen}
         onOpenChange={(o) => { setCreateOpen(o); if (!o) { setCreateError(undefined); setMetadataError(undefined); } }}
         title="Create Organization"
+        description="Choose a stable slug. It can be used by integrations and should remain unique."
         confirmLabel="Create"
         error={createError}
         onConfirm={handleCreate}
@@ -223,6 +226,7 @@ export function OrganizationsListContent({
             catch { setMetadataError("Must be valid JSON"); }
           }}
         />
+        <Text variant="caption">Metadata is optional and must be a JSON object or valid JSON value.</Text>
       </ConfirmDialog>
     </Stack>
   );
