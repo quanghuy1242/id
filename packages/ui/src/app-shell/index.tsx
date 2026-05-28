@@ -1,4 +1,6 @@
+// DaisyUI 5: https://daisyui.com/components/menu/
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { NavIcon } from "../nav-icons";
 
 type Gap = "xs" | "sm" | "md" | "lg";
@@ -276,10 +278,10 @@ type NavLinkProps = {
 export function NavLink({ href, active = false, current, iconName, children }: NavLinkProps) {
   return (
     <li>
-      <a href={href} aria-current={current} className={active ? "menu-active" : undefined}>
+      <Link href={href} aria-current={current} className={active ? "menu-active" : undefined}>
         {iconName ? <NavIcon name={iconName} variant="sidebar" /> : null}
         {children}
-      </a>
+      </Link>
     </li>
   );
 }
@@ -294,17 +296,13 @@ type DockLinkProps = {
 
 export function DockLink({ href, active = false, current, label, iconName }: DockLinkProps) {
   return (
-    <button
-      onClick={() => { window.location.href = href; }}
-      aria-current={current}
-      className={active ? "dock-active" : undefined}
-    >
+    <Link href={href} aria-current={current} className={active ? "dock-active" : undefined}>
       {iconName
         ? <NavIcon name={iconName} variant="dock" />
         : <span className="size-[0.35rem] rounded-full bg-current opacity-70" aria-hidden="true" />
       }
       <span className="dock-label">{label}</span>
-    </button>
+    </Link>
   );
 }
 
@@ -314,7 +312,7 @@ type BrandLinkProps = {
 };
 
 export function TopbarBrandLink({ href, children }: BrandLinkProps) {
-  return <a href={href} className="btn btn-ghost text-xl font-semibold normal-case">{children}</a>;
+  return <Link href={href} className="btn btn-ghost text-xl font-semibold normal-case">{children}</Link>;
 }
 
 type TopbarSearchFieldProps = {
@@ -377,10 +375,10 @@ export function TopbarAvatarMenu({
       <ul className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
         {items.map((item) => (
           <li key={item.href}>
-            <a href={item.href} className={item.badge ? "justify-between" : undefined}>
+            <Link href={item.href} className={item.badge ? "justify-between" : undefined}>
               {item.label}
               {item.badge ? <span className="badge badge-sm">{item.badge}</span> : null}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

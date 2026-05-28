@@ -1,3 +1,6 @@
+// DaisyUI 5: https://daisyui.com/components/tab/
+import Link from "next/link";
+
 type TabNavItem = {
   readonly href: string;
   readonly label: string;
@@ -12,7 +15,7 @@ export function TabNav({ items }: TabNavProps) {
   return (
     <nav className="flex gap-1 border-b border-base-300 px-6" aria-label="Page tabs">
       {items.map((item) => (
-        <a
+        <Link
           key={item.href}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
@@ -23,7 +26,7 @@ export function TabNav({ items }: TabNavProps) {
           }`}
         >
           {item.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );

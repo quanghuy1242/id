@@ -1,5 +1,6 @@
 // DaisyUI 5: https://daisyui.com/components/button/
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { NavIcon } from "./nav-icons";
 
 type ButtonVariant = "primary" | "secondary" | "danger";
@@ -77,8 +78,8 @@ export function LinkButton({ href, variant = "primary", size = "md", children }:
   }[size];
 
   return (
-    <a href={href} className={`btn ${sizeClass} ${variantClass}`.trim()}>
+    <Link href={href} className={`btn ${sizeClass} ${variantClass}`.trim()}>
       {children}
-    </a>
+    </Link>
   );
 }
