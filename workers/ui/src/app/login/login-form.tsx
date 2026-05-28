@@ -32,10 +32,38 @@ function isSameOrigin(url: string): boolean {
   }
 }
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+function safeAdminCallbackURL(value: string | null): string {
+  if (typeof window === "undefined") return "";
+  if (!value) return "";
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin || !isAdminPath(url.pathname)) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+}
+
+function currentAdminCallbackURL(): string {
+  if (typeof window === "undefined") return "";
+  return safeAdminCallbackURL(new URL(window.location.href).searchParams.get("callbackURL"));
+}
+
+function initialError(): string {
+  if (typeof window === "undefined") return "";
+  return new URL(window.location.href).searchParams.get("error") === "admin_required"
+    ? "Admin access is required."
+    : "";
+}
+
 export function LoginForm() {
   const router = useRouter();
   const oauthQuery = useOauthQuery();
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
 
@@ -57,11 +85,15 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const body = await postAuthApi("/sign-in/email", {
+      const payload: Record<string, string> = {
         email: data.email,
         password: data.password,
         [OAUTH_QUERY_PARAM]: data[OAUTH_QUERY_PARAM],
-      });
+      };
+      const callbackURL = currentAdminCallbackURL();
+      if (callbackURL) payload.callbackURL = callbackURL;
+
+      const body = await postAuthApi("/sign-in/email", payload);
 
       if (body.redirect) {
         const url = (body.url || body.redirectURL || "/") as string;

@@ -9,7 +9,7 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS",
-    "run_worker_first": ["/login", "/consent", "/select-authorization-context", "/admin", "/admin/*"]
+    "run_worker_first": ["/login", "/consent", "/select-authorization-context", "/admin", "/admin/*", "/ui-health"]
   },
   "routes": [
     // Login and consent pages (OAuth browser flows)
@@ -19,6 +19,8 @@
     // UI administration pages (management forms)
     { "pattern": "id.quanghuy.dev/admin", "zone_name": "quanghuy.dev" },
     { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" },
+    // UI Worker health endpoint. Kept outside /admin so the admin proxy can protect all admin pages.
+    { "pattern": "id.quanghuy.dev/ui-health", "zone_name": "quanghuy.dev" },
     // Client-side assets (JS, CSS) referenced by UI pages
     { "pattern": "id.quanghuy.dev/assets/*", "zone_name": "quanghuy.dev" }
   ]

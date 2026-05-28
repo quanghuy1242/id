@@ -16,10 +16,21 @@ async function expectOk(url) {
   }
 }
 
+async function expectRedirectToLogin(url) {
+  const response = await fetch(url, { redirect: "manual" });
+  if (response.status !== 307) {
+    throw new Error(`Smoke check failed: ${url} returned ${response.status}, expected 307`);
+  }
+  const location = response.headers.get("location");
+  if (!location || new URL(location, url).pathname !== "/login") {
+    throw new Error(`Smoke check failed: ${url} did not redirect to /login`);
+  }
+}
+
 await expectOk(new URL("/health", coreUrl));
 await expectOk(new URL("/api/auth/jwks", coreUrl));
 await expectOk(new URL("/.well-known/oauth-authorization-server/api/auth", coreUrl));
-await expectOk(new URL("/admin", uiUrl));
-await expectOk(new URL("/admin/health", uiUrl));
+await expectOk(new URL("/ui-health", uiUrl));
+await expectRedirectToLogin(new URL("/admin", uiUrl));
 
 console.log("remote smoke checks passed");

@@ -26,14 +26,14 @@ Identify which boundary the change touches:
 - `workers/core/src/http/**`: Hono routes and presenters.
 - `workers/core/src/domain/**` or `application/**`: entities, policies, use cases, repository interfaces.
 - `workers/core/src/infrastructure/**`: Drizzle/D1 persistence for Hono-owned resources only.
-- `workers/ui/**`: Vinext admin presentation under `/admin/*` and UI-owned BFF placeholders under `/admin/api`.
+- `workers/ui/**`: Vinext admin presentation under `/admin/*`, hosted auth pages, `/ui-health`, and UI-owned BFF placeholders under `/admin/api`.
 - `packages/lib/**`: framework-free shared contracts.
 - `packages/ui/**`: reusable UI primitives.
 - docs/skills only: keep architecture claims synchronized with current code and pinned package types.
 
 ## Hard Invariants
 
-- Two Workers: `core-id` owns Better Auth, OAuth, D1/KV, JWKS, admin APIs, and domain rules; `ui-id` owns presentation under `/admin/*` and calls same-origin core `/api/auth/*` endpoints from browser pages when needed.
+- Two Workers: `core-id` owns Better Auth, OAuth, D1/KV, JWKS, admin APIs, and domain rules; `ui-id` owns presentation under `/admin/*`, hosted auth pages, `/ui-health`, and calls same-origin core `/api/auth/*` endpoints from browser pages when needed.
 - Workers never import each other. Shared code lives in `packages/`.
 - `packages/lib` is framework-free.
 - Better Auth imports stay in `workers/core/src/auth/**`, approved mounting/schema files, or tests.

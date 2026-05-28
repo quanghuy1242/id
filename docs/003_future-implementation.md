@@ -657,7 +657,7 @@ Dynamic Workers remain the right choice if pipeline scripts need arbitrary npm p
 
 ### 6.1 Deferred From First Batch
 
-The first batch scaffolds `ui-id` under `/admin/*` with hosted login/consent pages, `/admin/health`, and a `/admin/api` placeholder. Full admin pages and the admin dashboard are deferred.
+The first batch scaffolds `ui-id` under `/admin/*` with hosted login/consent pages, `/ui-health`, and a `/admin/api` placeholder. Full admin pages and the admin dashboard are deferred.
 
 **Temporary OAuth page scaffold:** `workers/ui/src/main.ts` currently serves raw HTML/CSS/JavaScript for `/login` and `/consent`. This is a first-release browser OAuth testing scaffold only. Phase 7 must replace these routes with proper Vinext App Router pages using `@id/ui` primitives such as `Page`, `Stack`, `Panel`, and `Button`. The replacement pages must live under `workers/ui/src/app/login/` and `workers/ui/src/app/consent/` so the `ui-route-composition` lint rule covers them.
 

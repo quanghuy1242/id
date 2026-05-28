@@ -14,7 +14,7 @@ export function EmptyState({ message, cta, onCta }: EmptyStateProps) {
       <Inbox className="h-10 w-10" aria-hidden="true" />
       <p className="text-sm">{message}</p>
       {cta && onCta && (
-        <Button variant="secondary" onClick={onCta}>
+        <Button variant="primary" onClick={onCta}>
           {cta}
         </Button>
       )}

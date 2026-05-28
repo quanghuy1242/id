@@ -5,7 +5,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
-- `ui-id` Worker — admin UI scaffold under `/admin/*`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
+- `ui-id` Worker — admin UI scaffold under `/admin/*`, hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
 
 ## Contracts
 
@@ -123,7 +123,7 @@ pnpm dev:ui                      # ui-id Worker (Vinext dev)
 pnpm dev:ladle                   # Ladle component workshop for @id/ui
 ```
 
-In production, route specificity sends `/admin/*` and `/assets/*` to `ui-id` and `/api/auth/*` plus metadata routes to `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
+In production, route specificity sends `/admin`, `/admin/*`, `/login`, `/consent`, `/select-authorization-context`, `/ui-health`, and `/assets/*` to `ui-id`; `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
 
 ## First Admin And API-Only Operation
 
@@ -204,7 +204,7 @@ pnpm auth:api:logout
 `pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict, and Vitest. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
 Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `workers/ui/tests/all.test.ts`) to avoid repeated environment/import setup. Add new test files to the matching barrel instead of widening the project `include` patterns.
-`pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks stay under `/admin/*`, including `/admin/health`, because production only routes `/admin/*` to `ui-id`.
+`pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks use `/ui-health` for the public UI Worker liveness probe and `/admin/*` for admin page routing, because production only routes explicit UI paths to `ui-id`.
 `pnpm deploy:ui:dry-run` mirrors the Cloudflare deploy path: it builds from `workers/ui`, lets Vinext/@cloudflare/vite-plugin generate `workers/ui/dist/server/wrangler.json`, then runs Wrangler deploy with `--dry-run`.
 `pnpm dev:ladle` serves the shared `@id/ui` component stories from `.ladle/` and `stories/` without booting the full UI worker. `pnpm build:ladle` generates a static Ladle build under `.ladle/build`.
 

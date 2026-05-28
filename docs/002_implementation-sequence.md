@@ -230,7 +230,7 @@ All must be satisfied before Phase 5 is complete.
 Full admin pages are deferred per `001_first-batch-plan.md` Section 10. First batch delivers:
 
 - [x] Vinext App Router scaffold in `workers/ui/` with `packages/ui` component stubs
-- [x] Health-check route at `/admin/health` that confirms the UI worker runs under the routable `/admin/*` surface
+- [x] Health-check route moved to `/ui-health` so `/admin` and `/admin/*` can be uniformly protected by the admin proxy without taking over core `/health`
 - [x] Placeholder `/admin/api` endpoint reserved for future UI-owned BFF behavior; current hosted auth pages call core `/api/auth/*` directly
 - [x] All admin pages pass `pnpm lint` with `architecture/ui-route-composition` active
 

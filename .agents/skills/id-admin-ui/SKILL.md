@@ -162,6 +162,20 @@ Two themes: `lumina-light` (default) and `lumina-dark` (prefers-dark).
 | `base-content` | `#1f2328` | `#f3f4f6` | Primary text |
 | `primary` | `#155eef` | `#155eef` | Actions, links, focus ring |
 | `primary-content` | `#ffffff` | `#ffffff` | Text on primary |
+| `secondary` | `#475467` | `#94a3b8` | Secondary semantic tone |
+| `secondary-content` | `#ffffff` | `#0f172a` | Text on secondary |
+| `accent` | `#0f766e` | `#2dd4bf` | Accent semantic tone |
+| `accent-content` | `#ffffff` | `#052f2b` | Text on accent |
+| `neutral` | `#1f2328` | `#f3f4f6` | Neutral badges/avatars |
+| `neutral-content` | `#ffffff` | `#121316` | Text on neutral |
+| `info` | `#2563eb` | `#60a5fa` | Informational feedback |
+| `info-content` | `#ffffff` | `#071a3d` | Text on info |
+| `success` | `#00c896` | `#00e0a4` | Success/active state |
+| `success-content` | `#042f2e` | `#03231c` | Text on success |
+| `warning` | `#f59e0b` | `#fbbf24` | Warning/unverified state |
+| `warning-content` | `#2f1b00` | `#2f1b00` | Text on warning |
+| `error` | `#ff4d6d` | `#fb7185` | Error/banned/destructive state |
+| `error-content` | `#3f0713` | `#3f0713` | Text on error |
 | `radius-field` | `0.375rem` | same | Input, button corner radius |
 | `radius-box` | `0.5rem` | same | Card, panel corner radius |
 
@@ -226,9 +240,9 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | Component | Key props | Notes |
 |---|---|---|
 | `Alert` | `tone?: "error"\|"success"\|"warning"\|"info"`, `children` | Full-width alert with icon |
-| `Badge` | `tone?: "neutral"\|"primary"\|"secondary"\|"accent"\|"success"\|"warning"\|"error"\|"info"`, `size?: "sm"\|"md"`, `children` | `badge-sm badge-outline`. Note: `"ghost"` is NOT a valid tone. Use `"neutral"` for dimmed/expired states. |
+| `Badge` | `tone?: "neutral"\|"primary"\|"secondary"\|"accent"\|"success"\|"warning"\|"error"\|"info"`, `size?: "sm"\|"md"`, `children` | `badge-sm badge-outline`. Note: `"ghost"` is NOT a valid tone. Use `"neutral"` for dimmed/expired states; badge tones depend on the `lumina-*` DaisyUI semantic color tokens in `globals.css`. |
 | `Skeleton` | `rows?: number`, `height?: "xs"\|"sm"\|"md"` | Loading placeholder rows |
-| `EmptyState` | `message`, `cta?`, `onCta?` | Centered empty message + optional CTA. `cta`/`onCta` must be passed as props, NOT as child Button components. |
+| `EmptyState` | `message`, `cta?`, `onCta?` | Centered empty message + optional primary CTA. `cta`/`onCta` must be passed as props, NOT as child Button components. |
 | `ErrorAlert` | `message?`, `onRetry?` | Error alert with inline retry button |
 
 ### Data

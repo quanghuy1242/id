@@ -147,7 +147,7 @@ Remaining sections (`oauth.md`, `security.md`, `system.md`, `dashboard.md`) are 
 | File | Route | Status |
 |---|---|---|
 | `workers/ui/src/app/admin/page.tsx` | `/admin` | Scaffold — empty or placeholder |
-| `workers/ui/src/app/admin/health/route.ts` | `/admin/health` | API route, no UI |
+| `workers/ui/src/app/ui-health/route.ts` | `/ui-health` | API route, no UI; kept outside `/admin` so the admin proxy protects every admin path and core keeps `/health` |
 
 All other admin pages from `docs/003` §6.1 are unimplemented.
 

@@ -812,7 +812,7 @@ ui-id worker (admin dashboard scaffold)
 ├── /login                              OAuth login page
 ├── /consent                            OAuth consent page
 ├── /admin/*                            admin UI pages
-├── /admin/health                       UI worker health
+├── /ui-health                          UI worker health
 ├── /admin/api                          placeholder for future UI-owned BFF endpoints
 ├── /assets/*                           client-side JS/CSS bundles
 ```
@@ -1268,7 +1268,7 @@ Acceptance criteria:
 Scaffold the UI Worker with minimal content:
 
 - Vinext App Router project skeleton with Lumina component stubs.
-- A health-check route at `/admin/health` that confirms the worker is running.
+- A health-check route at `/ui-health` that confirms the worker is running without bypassing admin page protection.
 - A placeholder `/admin/api` endpoint for future UI-owned BFF behavior.
 - No full admin pages implemented.
 

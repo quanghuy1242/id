@@ -1,8 +1,10 @@
 await import("./lib/oauth-query.test");
+await import("./middleware.test");
 await import("./packages-ui/alert.test");
 await import("./packages-ui/app-shell.test");
 await import("./packages-ui/badge.test");
 await import("./packages-ui/button.test");
+await import("./packages-ui/empty-state.test");
 await import("./packages-ui/edge-cases.test");
 await import("./packages-ui/form.test");
 await import("./packages-ui/inline.test");
@@ -10,6 +12,7 @@ await import("./packages-ui/typography.test");
 await import("./pages/admin-page.test");
 await import("./pages/consent-form.test");
 await import("./pages/consent-page.test");
+await import("./pages/health-route.test");
 await import("./pages/layout.test");
 await import("./pages/login-form.test");
 await import("./pages/login-page.test");

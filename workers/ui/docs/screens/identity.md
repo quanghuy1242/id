@@ -12,13 +12,13 @@ They must be built before the corresponding screens can be implemented.
 **Everything else exists** in `packages/ui/src/` with the exact props described in this spec:
 `AppShell`, `Topbar`, `TopbarStart`, `TopbarEnd`, `TopbarBrandLink`, `TopbarSearchField`, `TopbarBreadcrumb`, `TopbarAvatarMenu`,
 `Sidebar`, `SidebarLayout`, `MainContent`, `MobileDock`,
-`Page`, `PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,
+`PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,
 `NavMenu`, `NavSection`, `NavLink`, `DockLink`, `NavTitle`,
 `Text`, `Heading`, `Button`, `LinkButton`,
-`TextInput` (label/name/type/required/defaultValue/error — no `placeholder` prop; no `type="number"`, use text+validation),
+`TextInput` (label/name/type/required/defaultValue/error/onChange — no `placeholder` prop; no `type="number"`, use text+validation),
 `RadioGroup` (title/name/options/value/onChange — fully controlled, no `default`),
 `Alert` (tone); `Badge` (tone/size/children); `Skeleton` (rows/height); `EmptyState` (message/cta/onCta);
-`ErrorAlert` (message/onRetry); `SearchInput` (value/onChange/placeholder); `FilterDropdown` (label/options/value/onChange);
+`ErrorAlert` (message/onRetry); `SearchInput` (value/onChange/placeholder/grow/size); `FilterDropdown` (label/options/value/onChange/size);
 `TabNav` (items); `ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/children);
 `DataTable` (columns/rows/getRowKey/onRowClick/sortBy/sortDirection/onSort/pagination={total/limit/offset/onChange}).
 
@@ -34,67 +34,73 @@ Box-drawing key: ┌─┐ top edge · └─┘ bottom · ├─┤ mid · │ 
 
 ## /admin/identity/users
 
-Platform admin only. Full-shell sketch with all states.
+Platform admin only. Implemented route: `workers/ui/src/app/admin/identity/users/page.tsx`.
+The admin shell is supplied by `workers/ui/src/app/admin/layout.tsx`; this route owns only the `PageBody` content.
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│ ◈ id admin   ▸ Admin ▸ Users              [🔍         ]  [👤]  │
-├──────────────────┬───────────────────────────────────────────────┤
-│ ▸ Dashboard      │ ┌───────────────────────────────────────────┐ │
-│                  │ │ Users  [Role ▾] [Status ▾]                │ │
-│ ▸ Identity       │ │ [🔍 Search name or email…     ]  [+ New] │ │
-│   ▸ Users        │ └───────────────────────────────────────────┘ │
-│   · Organizatns  │ ┌───────────────────────────────────────────┐ │
-│                  │ │ Name ↕      Email ↕       Role  Status Vfy│ │
-│ ▸ OAuth          │ │ John Doe    j@acme.com    admin  ●     ✓ │ │
-│   · Applicatns   │ │ Jane Adams  j@beta.com    user   ○     ✗ │ │
-│   · Resource APIs│ │ Bob King    b@corp.com    user   ●     ✓ │ │
-│   · Scope Catlg  │ │              Showing 1-3 of 42      ‹   ›│ │
-│   · M2M Bindngs  │ └───────────────────────────────────────────┘ │
-│   · Sessns&Tokns │                                               │
-│                  │  ┌── loading ──────────────────────────────┐  │
-│ ▸ Security       │  │ ∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎│  │
-│   · JWKS         │  │ ∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎│  │
-│   · Consents     │  └─────────────────────────────────────────┘  │
-│                  │                                               │
-│ ▸ System         │  ┌── empty ────────────────────────────────┐  │
-│   · Service Accts│  │  📥  No users found                     │  │
-│   · Issuer Metadt│  │       [Create User]                      │  │
-│   · SCIM Status  │  └─────────────────────────────────────────┘  │
-│   · Health       │                                               │
-│   · Settings     │  ┌── search-empty ─────────────────────────┐  │
-│                  │  │  📥  No users match your search          │  │
-│                  │  │       [Clear search]                      │  │
-│                  │  └─────────────────────────────────────────┘  │
-│                  │                                               │
-│                  │  ┌── error ────────────────────────────────┐  │
-│                  │  │  ⚠ Something went wrong.   [Retry]       │  │
-│                  │  └─────────────────────────────────────────┘  │
-│                  │                                               │
-│                  │  ┌── Create User modal ────────────────────┐  │
-│                  │  │ Create User                              │  │
-│                  │  │ Name   [                    ]            │  │
-│                  │  │ Email  [                    ]            │  │
-│                  │  │ Password [           ]  (optional)       │  │
-│                  │  │ Role   ○ user  ● admin                  │  │
-│                  │  │         [Cancel]  [Create]               │  │
-│                  │  └─────────────────────────────────────────┘  │
-└──────────────────┴───────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ Users                              [Role: All Roles ▾] [Status: All ▾] │
+│ │ [Search name or email...                                  ] [+ New] │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ Name ↕        Email ↕          Role      Status     Verified Created ↕ │
+│ │ John Doe      john@acme.com    admin     Active     Verified 1/15/2024 │
+│ │ Jane Adams    jane@beta.com    user      Banned     Unverified 2/1/2024│
+│ │ Bob King      bob@corp.com     user      Active     Verified 3/10/2024 │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌── loading ──────────────────────────────────────────────────────┐ │
+│ │ ∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎                │ │
+│ │ ∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎∎∎∎  ∎∎                │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌── empty ────────────────────────────────────────────────────────┐ │
+│ │                         [Inbox icon]                            │ │
+│ │                         No users found                          │ │
+│ │                         [Create User]                           │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌── search-empty/filter-empty ────────────────────────────────────┐ │
+│ │                         [Inbox icon]                            │ │
+│ │       No users match your search / No users matching filters     │ │
+│ │                  [Clear search] / [Clear filters]                │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌── error ────────────────────────────────────────────────────────┐ │
+│ │ ⚠ Failed to load users                                      Retry│ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ ┌── Create User modal ────────────────────────────────────────────┐ │
+│ │ Create User                                                     │ │
+│ │ Name     [                                      ]                │ │
+│ │ Email    [                                      ]                │ │
+│ │ Password [                                      ]                │ │
+│ │ Role     ○ User  ● Admin                                        │ │
+│ │                                      [Cancel] [Create]          │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 Components:
-  AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
-  Sidebar: AdminSidebarNav (from admin-nav.tsx)
-  Topbar: AdminTopbar (from admin-nav.tsx)
-  MainContent > PageBody > Stack(gap="md")
-    Panel(padding="none") > Stack(gap="sm")
+  Admin layout owns AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
+  Route owns:
+  PageBody
+    Suspense(fallback=<UsersListContent loading />)
+      UsersListContent
+  UsersListContent:
+  Stack(gap="md")
+    Panel > Stack(gap="sm")
       Inline(justify="between")
+        Text(variant="h2", children="Users")
         Inline(gap="sm")
           FilterDropdown(label="Role", options=[{value:"all",label:"All Roles"},{value:"admin",label:"Admin"},{value:"user",label:"User"}], value, onChange)
           FilterDropdown(label="Status", options=[{value:"all",label:"All"},{value:"active",label:"Active"},{value:"banned",label:"Banned"}], value, onChange)
-        LinkButton(href="/admin/identity/users/new", variant="primary", "+ New")  — or SearchInput + LinkButton
-      Inline(justify="between")
-        SearchInput(placeholder="Search name or email…", value, onChange) — debounced 300ms, resets offset
+      Inline(gap="sm")
+        SearchInput(grow, placeholder="Search name or email...", value, onChange) — debounced 300ms, resets offset
+        Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New")
+    Panel(padding="none" when table has rows, else padding="md")
       DataTable(
         columns=[name(sortable), email(sortable), role(col), status(col), emailVerified(col), createdAt(sortable)],
         rows, getRowKey=(user)=>user.id,
@@ -102,15 +108,16 @@ Components:
         sortBy, sortDirection, onSort,
         pagination={ total, limit, offset, onChange: setOffset }
       )
-    Empty state: EmptyState(message="No users found", cta="Create User", onCta=openCreateModal)
-    Search-empty: EmptyState(message="No users match your search", cta="Clear search", onCta=clearSearch)
-    Filter-empty: EmptyState(message="No users matching filters", cta="Clear filters", onCta=clearFilters)
-    Error: ErrorAlert(message="Failed to load users", onRetry=refetch)
+      Loading: Skeleton(rows=5)
+      Empty state: EmptyState(message="No users found", cta="Create User", onCta=openCreateModal) — CTA renders primary
+      Search-empty: EmptyState(message="No users match your search", cta="Clear search", onCta=clearSearch)
+      Filter-empty: EmptyState(message="No users matching filters", cta="Clear filters", onCta=clearFilters)
+      Error: ErrorAlert(message=error, onRetry=refetch)
   Create modal:
     ConfirmDialog(open, onOpenChange, title="Create User", confirmLabel="Create", onConfirm)
       TextInput(label="Name", name="name", required)
       TextInput(label="Email", name="email", type="email", required)
-      TextInput(label="Password", name="password", type="password")  — optional
+      TextInput(label="Password", name="password", type="password") — optional; omit from request when empty
       RadioGroup(title="Role", name="role", options=[{value:"user",label:"User"},{value:"admin",label:"Admin"}], value=role, onChange=setRole)
     On confirm: POST /api/auth/admin/create-user; on success close modal + refresh list
 
@@ -120,16 +127,21 @@ Data: GET /api/auth/admin/list-users → { users: User[], total: number, limit: 
       POST /api/auth/admin/create-user → { user: User }
         body: { email: string, password?: string, name: string, role?: string }
 
-Defaults: searchField="email", searchOperator="contains", limit=25, sortBy="createdAt", sortDirection="desc"
+Route URL params: q, role, status, sortBy, sortDir, page
+Content defaults: searchField="email", searchOperator="contains", limit=25, sortBy="createdAt", sortDirection="desc",
+  role="all", status="all", page=1
 
 Behavior:
-  - SearchInput onChange → debounce 300ms → call list-users with searchValue, reset offset to 0
-  - FilterDropdown onChange → call list-users with filterField + filterValue + filterOperator="eq" + reset offset
-  - Filter "all" → omit filterField and filterValue params entirely
+  - Route file reads URL params with useSearchParams inside UsersPageContent only; outer UsersPage owns Suspense.
+  - SearchInput onChange → update q route param, debounce 300ms inside UsersListContent, call list-users with searchValue, reset page/offset.
+  - Role FilterDropdown onChange → update role route param; when not "all", call list-users with filterField="role", filterValue, filterOperator="eq".
+  - Status FilterDropdown onChange → update status route param; status filtering is currently applied client-side to the returned users page.
+  - Filter "all" → omit corresponding route/API filter params.
   - Sort: click column header → call onSort(key, "asc") first time, toggle "asc"/"desc" on repeated clicks
-  - Pagination: offset computed as (page-1)*limit; DataTable handles the ‹/› buttons internally
+  - Pagination: route `page` maps to offset `(page-1)*limit`; DataTable handles the ‹/› buttons internally.
   - Row click → navigate to /admin/identity/users/:userId
-  - All three (search + filter + sort) compose: each change preserves the others, only the changed param differs
+  - Search/filter/sort/page compose through URLSearchParams; each change preserves unrelated params and resets page where needed.
+  - Empty create CTA opens the same Create User modal as the toolbar `New` button.
 
 Badge mappings:
   role:  "admin"→Badge(tone="primary"),  "user"→Badge(tone="neutral")

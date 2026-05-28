@@ -41,7 +41,7 @@ Every new rule must include:
 - `architecture/auth-test-contract-fixtures`: test-only auth route contracts must not live in production `workers/core/src/auth/**` or be imported by production source.
 - `architecture/hono-admin-route-allowlist`: Hono `/api/admin/*` route literals are limited to allowlisted aggregate workflows; auth-owned CRUD belongs in Better Auth plugin endpoints under `/api/auth/admin/*`.
 - `architecture/auth-plugin-folder-shape`: custom Better Auth plugin folders must include `schema.ts`, `operations.ts`, `types.ts`, and `README.md` next to `index.ts`.
-- `architecture/route-path-contract`: Hono route literals and UI App Router filesystem routes must stay within worker ownership. Core must not serve `/admin/*`; UI must not define public App Router routes outside `workers/ui/src/app/admin/**` except root `layout.tsx` and `globals.css`. UI-owned BFF placeholders are allowed under `/admin/api`, while core auth/API routes remain under core-owned `/api/*`.
+- `architecture/route-path-contract`: Hono route literals and UI App Router filesystem routes must stay within worker ownership. Core must not serve `/admin/*`; UI must not define public App Router routes outside `workers/ui/src/app/{admin,login,consent,select-authorization-context,ui-health}/**` except root `layout.tsx` and `globals.css`. UI-owned BFF placeholders are allowed under `/admin/api`, `/ui-health` is the public UI liveness endpoint, and core auth/API routes remain under core-owned `/api/*`.
 
 ## Required Sync Points
 

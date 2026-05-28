@@ -159,7 +159,7 @@ The original hexagonal/clean architecture is good enough for `core-id`, but thre
    Admin route files must not draw UI directly. The route-file rules are strict and must become a mechanical gate, not just code review guidance.
 
 3. Route ownership boundary:
-   `ui-id` must only define public App Router routes under `/admin/*`. Core auth/API routes remain owned by `core-id`; UI pages call those endpoints directly through same-origin browser requests.
+   `ui-id` must only define public App Router routes under `/admin/*`, `/login`, `/consent`, `/select-authorization-context`, and `/ui-health`. Core auth/API routes remain owned by `core-id`; UI pages call those endpoints directly through same-origin browser requests.
 
 ## 3. Root Layout
 
@@ -266,10 +266,12 @@ Internet
     ├──> https://id.quanghuy.dev/api/admin/*      ──> core-id worker
     ├──> https://id.quanghuy.dev/login              ──> ui-id worker (OAuth login page)
     ├──> https://id.quanghuy.dev/consent            ──> ui-id worker (OAuth consent page)
+    ├──> https://id.quanghuy.dev/select-authorization-context ──> ui-id worker
+    ├──> https://id.quanghuy.dev/ui-health          ──> ui-id worker
     ├──> https://id.quanghuy.dev/admin/*            ──> ui-id worker
     └──> https://id.quanghuy.dev/assets/*           ──> ui-id worker (client-side JS/CSS bundles)
 
-Route specificity is part of the architecture. `/admin/*` and `/assets/*` are the UI Worker. Auth, OAuth, metadata, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
+Route specificity is part of the architecture. `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are the UI Worker. Auth, OAuth, metadata, core `/health`, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
 
 ### 4.1 `core-id` — Auth And OAuth Worker
 
@@ -359,7 +361,7 @@ Workers are build-time isolated and runtime-communicating. The rule is absolute.
 
 ### 4.4 Local Multi-Worker Development
 
-Cloudflare route specificity is the production integration boundary: `/admin/*` and `/assets/*` are served by `ui-id`, while `/api/auth/*`, metadata, and root health routes are served by `core-id`. Local development can run each Worker independently; full same-host routing is verified through deployment smoke tests.
+Cloudflare route specificity is the production integration boundary: `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`, while `/api/auth/*`, metadata, and core `/health` are served by `core-id`. Local development can run each Worker independently; full same-host routing is verified through deployment smoke tests.
 
 ```json
 {
@@ -376,7 +378,7 @@ Acceptance requirement:
 
 - `dev:ui` proves `/admin` pages render without core bindings.
 - `dev:core` proves auth and API routes run independently.
-- remote smoke proves same-host route ownership for core `/api/*` and UI `/admin/*`.
+- remote smoke proves same-host route ownership for core `/api/*`, core `/health`, UI `/ui-health`, and protected UI `/admin/*`.
 
 ## 5. Shared Packages
 
@@ -1265,7 +1267,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |
-| UI route ownership | UI App Router public routes stay under `/admin/**`; root `layout.tsx` and `globals.css` are the only root app exceptions. `/assets/*` is reserved for Vite-generated client bundles and is served by ui-id. | Oxlint `route-path-contract` |
+| UI route ownership | UI App Router public routes stay under `/admin/**`, `/login`, `/consent`, `/select-authorization-context`, and `/ui-health`; root `layout.tsx` and `globals.css` are the only root app exceptions. `/assets/*` is reserved for Vite-generated client bundles and is served by ui-id. | Oxlint `route-path-contract` |
 | UI route composition | no raw admin route UI | Oxlint `ui-route-composition` through `pnpm lint` |
 | Duplication | <3% mild duplication | `check:dup` |
 | Types | strict and no explicit `any` | TypeScript + oxlint |
@@ -1308,9 +1310,9 @@ Acceptance:
 
 - `core-id` starts independently;
 - `ui-id` starts independently;
-- `/admin/*` and `/assets/*` are served by `ui-id`;
+- `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`;
 - `/api/auth/*`, metadata, and `/health` are served by `core-id`;
-- UI App Router route ownership is enforced mechanically so future files cannot create public UI routes outside `/admin/**`.
+- UI App Router route ownership is enforced mechanically so future files cannot create public UI routes outside the explicit UI-owned paths.
 
 ### Spike D: UI Composition Gate
 
@@ -1428,6 +1430,6 @@ Required auth/platform outcomes:
 
 `id` is a strict two-worker identity-provider monorepo.
 
-`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*` and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
+`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`, hosted auth pages, `/ui-health`, and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
 
 The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route ownership/composition enforcement, and strict worker authorization invariant.
