@@ -9,16 +9,16 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS",
-    "run_worker_first": ["/login", "/consent", "/select-authorization-context", "/admin", "/admin/*", "/ui-health"]
+    "run_worker_first": ["/login*", "/consent*", "/select-authorization-context*", "/admin*", "/ui-health"]
   },
   "routes": [
-    // Login and consent pages (OAuth browser flows)
-    { "pattern": "id.quanghuy.dev/login", "zone_name": "quanghuy.dev" },
-    { "pattern": "id.quanghuy.dev/consent", "zone_name": "quanghuy.dev" },
-    { "pattern": "id.quanghuy.dev/select-authorization-context", "zone_name": "quanghuy.dev" },
+    // Login and consent pages (OAuth browser flows). These routes must end in *
+    // because Cloudflare route matching includes the query string.
+    { "pattern": "id.quanghuy.dev/login*", "zone_name": "quanghuy.dev" },
+    { "pattern": "id.quanghuy.dev/consent*", "zone_name": "quanghuy.dev" },
+    { "pattern": "id.quanghuy.dev/select-authorization-context*", "zone_name": "quanghuy.dev" },
     // UI administration pages (management forms)
-    { "pattern": "id.quanghuy.dev/admin", "zone_name": "quanghuy.dev" },
-    { "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" },
+    { "pattern": "id.quanghuy.dev/admin*", "zone_name": "quanghuy.dev" },
     // UI Worker health endpoint. Kept outside /admin so the admin proxy can protect all admin pages.
     { "pattern": "id.quanghuy.dev/ui-health", "zone_name": "quanghuy.dev" },
     // Client-side assets (JS, CSS) referenced by UI pages

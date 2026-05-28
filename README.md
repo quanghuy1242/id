@@ -123,7 +123,7 @@ pnpm dev:ui                      # ui-id Worker (Vinext dev)
 pnpm dev:ladle                   # Ladle component workshop for @id/ui
 ```
 
-In production, route specificity sends `/admin`, `/admin/*`, `/login`, `/consent`, `/select-authorization-context`, `/ui-health`, and `/assets/*` to `ui-id`; `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
+In production, route specificity sends `/admin*`, `/login*`, `/consent*`, `/select-authorization-context*`, `/ui-health`, and `/assets/*` to `ui-id`; `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. The wildcard suffix is required on browser page routes because Cloudflare Worker route matching includes query strings. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
 
 ## First Admin And API-Only Operation
 

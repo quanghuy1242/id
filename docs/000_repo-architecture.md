@@ -271,7 +271,7 @@ Internet
     ├──> https://id.quanghuy.dev/admin/*            ──> ui-id worker
     └──> https://id.quanghuy.dev/assets/*           ──> ui-id worker (client-side JS/CSS bundles)
 
-Route specificity is part of the architecture. `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are the UI Worker. Auth, OAuth, metadata, core `/health`, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
+Route specificity is part of the architecture. `/admin*`, hosted auth pages with wildcard suffixes, `/ui-health`, and `/assets/*` are the UI Worker. The wildcard suffix is required for query-bearing browser URLs because Cloudflare Worker route matching includes query strings. Auth, OAuth, metadata, core `/health`, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
 
 ### 4.1 `core-id` — Auth And OAuth Worker
 

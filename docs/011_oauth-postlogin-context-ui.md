@@ -87,16 +87,21 @@ postLogin: {
 
 ### 3.2 UI Worker Routes Have Explicit Allowlists
 
-`workers/ui/wrangler.jsonc` has four route patterns:
+`workers/ui/wrangler.jsonc` has explicit UI route patterns. Browser page routes end with `*`
+because Cloudflare Worker route matching includes the query string, and OAuth/login pages
+are normally reached with query parameters.
 
 ```jsonc
-{ "pattern": "id.quanghuy.dev/login", "zone_name": "quanghuy.dev" },
-{ "pattern": "id.quanghuy.dev/consent", "zone_name": "quanghuy.dev" },
-{ "pattern": "id.quanghuy.dev/admin/*", "zone_name": "quanghuy.dev" },
+{ "pattern": "id.quanghuy.dev/login*", "zone_name": "quanghuy.dev" },
+{ "pattern": "id.quanghuy.dev/consent*", "zone_name": "quanghuy.dev" },
+{ "pattern": "id.quanghuy.dev/select-authorization-context*", "zone_name": "quanghuy.dev" },
+{ "pattern": "id.quanghuy.dev/admin*", "zone_name": "quanghuy.dev" },
+{ "pattern": "id.quanghuy.dev/ui-health", "zone_name": "quanghuy.dev" },
 { "pattern": "id.quanghuy.dev/assets/*", "zone_name": "quanghuy.dev" }
 ```
 
-`/select-authorization-context` is not listed. The Worker will not receive requests for this path.
+`/select-authorization-context` is listed because product-scope OAuth flows can redirect there
+after login.
 
 ### 3.3 UI Page Pattern Is Established
 
@@ -149,7 +154,7 @@ A new page at `workers/ui/src/app/select-authorization-context/` that:
 Add to `workers/ui/wrangler.jsonc`:
 
 ```jsonc
-{ "pattern": "id.quanghuy.dev/select-authorization-context", "zone_name": "quanghuy.dev" }
+{ "pattern": "id.quanghuy.dev/select-authorization-context*", "zone_name": "quanghuy.dev" }
 ```
 
 ## 5. Architecture Decisions
@@ -193,7 +198,7 @@ Implementation tasks:
 - [ ] Add route entry to `workers/ui/wrangler.jsonc`:
 
 ```jsonc
-{ "pattern": "id.quanghuy.dev/select-authorization-context", "zone_name": "quanghuy.dev" }
+{ "pattern": "id.quanghuy.dev/select-authorization-context*", "zone_name": "quanghuy.dev" }
 ```
 
 Acceptance:

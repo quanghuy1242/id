@@ -31,6 +31,8 @@ await expectOk(new URL("/health", coreUrl));
 await expectOk(new URL("/api/auth/jwks", coreUrl));
 await expectOk(new URL("/.well-known/oauth-authorization-server/api/auth", coreUrl));
 await expectOk(new URL("/ui-health", uiUrl));
+await expectOk(new URL("/login?callbackURL=%2Fadmin", uiUrl));
 await expectRedirectToLogin(new URL("/admin", uiUrl));
+await expectRedirectToLogin(new URL("/admin?from=smoke", uiUrl));
 
 console.log("remote smoke checks passed");
