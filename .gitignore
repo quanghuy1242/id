@@ -8,5 +8,6 @@ coverage
 *.tsbuildinfo
 pass
 passs
+passss
 workers/ui/.next/
 workers/ui/next-env.d.ts

@@ -2,11 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+const localLoginParams = new Set(["callbackURL", "error"]);
+
+function oauthQueryFromHref(href: string): string {
+  const params = new URL(href).searchParams;
+  for (const key of localLoginParams) {
+    params.delete(key);
+  }
+  return params.toString();
+}
+
 export function useOauthQuery(): string {
   const [oauthQuery, setOauthQuery] = useState("");
 
   useEffect(() => {
-    setOauthQuery(new URL(window.location.href).searchParams.toString());
+    setOauthQuery(oauthQueryFromHref(window.location.href));
   }, []);
 
   return oauthQuery;

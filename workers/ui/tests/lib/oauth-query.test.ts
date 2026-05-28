@@ -28,6 +28,28 @@ describe("useOauthQuery", () => {
 
     expect(result.current).toBe("client_id=test&scope=openid");
   });
+
+  it("omits login-local callback and error params from oauth query", () => {
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      href: "http://localhost/login?callbackURL=%2Fadmin&error=admin_required",
+    } as Location);
+
+    const { result } = renderHook(() => useOauthQuery());
+
+    expect(result.current).toBe("");
+  });
+
+  it("keeps oauth params while omitting login-local params", () => {
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      href: "http://localhost/login?client_id=test&scope=openid&callbackURL=%2Fadmin",
+    } as Location);
+
+    const { result } = renderHook(() => useOauthQuery());
+
+    expect(result.current).toBe("client_id=test&scope=openid");
+  });
 });
 
 describe("useOauthRequestDescription", () => {
