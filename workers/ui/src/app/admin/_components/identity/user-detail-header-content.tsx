@@ -9,6 +9,9 @@ import {
   ErrorAlert,
   Inline,
   LinkButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   Skeleton,
   Tabs,
   Text,
@@ -82,9 +85,7 @@ export function UserDetailHeaderContent({
     <>
       <Inline justify="between">
         <Inline gap="sm">
-          <LinkButton href="/admin/identity/users" variant="secondary">
-            ← Users
-          </LinkButton>
+          <LinkButton href="/admin/identity/users" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Users" />
           {user && (
             <>
               <Text variant="h1">{user.name}</Text>
@@ -94,15 +95,30 @@ export function UserDetailHeaderContent({
           {error && !user && <Text variant="h1">User unavailable</Text>}
         </Inline>
         {!error && (
-          isImpersonating ? (
-            <Button variant="secondary" onClick={handleStopImpersonating}>
-              Stop Impersonating
-            </Button>
-          ) : (
-            <Button variant="secondary" onClick={() => setImpersonateOpen(true)}>
-              Impersonate
-            </Button>
-          )
+          <>
+            {isImpersonating ? (
+              <Button variant="secondary" hideOnMobile onClick={handleStopImpersonating}>
+                Stop Impersonating
+              </Button>
+            ) : (
+              <Button variant="secondary" hideOnMobile onClick={() => setImpersonateOpen(true)}>
+                Impersonate
+              </Button>
+            )}
+            <MenuTrigger>
+              <Button variant="ghost" size="sm" hideOnDesktop iconName="Ellipsis" ariaLabel="Actions" />
+              <Menu onAction={(key) => {
+                if (key === "impersonate") setImpersonateOpen(true);
+                if (key === "stop-impersonating") handleStopImpersonating();
+              }}>
+                {isImpersonating ? (
+                  <MenuItem id="stop-impersonating">Stop Impersonating</MenuItem>
+                ) : (
+                  <MenuItem id="impersonate">Impersonate</MenuItem>
+                )}
+              </Menu>
+            </MenuTrigger>
+          </>
         )}
       </Inline>
 

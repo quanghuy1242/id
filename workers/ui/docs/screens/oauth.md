@@ -9,11 +9,12 @@ All components exist in `packages/ui/src/` with the exact props described in thi
 `NavMenu`, `NavSection`, `NavLink`, `DockLink`, `NavTitle`,
 `Text`, `Heading`,
 `Button`, `LinkButton`, `TextInput`, `RadioGroup`, `Avatar`, `Alert`, `Badge`, `Skeleton`, `EmptyState`,
-`ErrorAlert`, `SearchInput`, `FilterDropdown`, `Tabs`, `ConfirmDialog`, `DataTable`, `Textarea`.
+`ErrorAlert`, `SearchInput`, `FilterDropdown`, `Tabs`, `ConfirmDialog`, `DataTable`, `Textarea`,
+`MobileFilterMenu`, `ResponsiveBreadcrumb`, `MenuTrigger`/`Menu`/`MenuItem`.
 
-**Icon names registered in nav-icons.tsx:** See identity.md for full list. Add new icons (e.g. `RefreshCw`) to `iconMap` before using.
+**Icon names registered in nav-icons.tsx:** See identity.md for full list. Add new icons to `iconMap` before using.
 
-**Icon-only buttons:** `Button(size="sm" variant="secondary" iconName="..." ariaLabel="...")` with no `children`.
+**Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, action folding via MenuTrigger, visibility props on Button/LinkButton.
 
 Covers all routes under `/admin/oauth`. Platform admin only — all org-scoped endpoints use the admin session's organization context.
 

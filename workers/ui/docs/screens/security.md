@@ -4,6 +4,8 @@
 
 Same component set as identity.md and oauth.md. All components exist in `@id/ui`.
 
+**Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, visibility props on Button/LinkButton.
+
 Covers routes under `/admin/security`. Platform admin only.
 
 Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no

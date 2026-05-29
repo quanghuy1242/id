@@ -83,3 +83,32 @@ export const SubmitButton: Story = () => (
     </Button>
   </Stack>
 );
+
+export const IconOnly: Story = () => (
+  <Stack gap="md">
+    <Text variant="h2">Icon-only (no auto-circle)</Text>
+    <Inline gap="sm">
+      <Button iconName="Plus" ariaLabel="Add" variant="secondary" />
+      <Button iconName="Plus" ariaLabel="Add" variant="primary" />
+      <Button iconName="Trash2" ariaLabel="Delete" variant="danger" />
+    </Inline>
+    <Text variant="h2">Icon-only with circle</Text>
+    <Inline gap="sm">
+      <Button iconName="Plus" circle ariaLabel="Add" variant="primary" />
+      <Button iconName="Plus" circle ariaLabel="Add" variant="secondary" />
+      <Button iconName="Trash2" circle ariaLabel="Delete" variant="danger" />
+    </Inline>
+  </Stack>
+);
+
+export const Visibility: Story = () => (
+  <Stack gap="md" align="start">
+    <Text variant="h2">Responsive visibility (resize viewport)</Text>
+    <Inline gap="sm">
+      <Button hideOnDesktop variant="ghost" size="sm" iconName="Ellipsis" ariaLabel="Actions" />
+      <Button hideOnMobile variant="secondary">Desktop only</Button>
+      <LinkButton href="#" hideOnMobile>← Back</LinkButton>
+    </Inline>
+    <Text variant="caption">hideOnDesktop: lg:hidden · hideOnMobile: hidden lg:inline-flex</Text>
+  </Stack>
+);

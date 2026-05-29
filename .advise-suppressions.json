@@ -178,6 +178,24 @@
       "file": "workers/core/src/auth/plugins/admin-sign-in-guard/index.ts",
       "rule": "ai-slop/double-type-assertion",
       "reason": "Better Auth does not export a precise type for ctx.context inside a hooks.before matcher; the narrowed AdminSignInGuardContext assertion mirrors the established pattern in oauth-m2m-bridge (ctx.context.adapter as unknown as ...)."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/mobile-filter-menu.tsx",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "DaisyUI and React Aria link comments are required on every packages/ui component file — all existing components use the same pattern."
+    },
+    {
+      "tool": "aislop",
+      "file": "stories/mobile-filter-menu.stories.tsx",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Story files have structurally similar filter group configurations by design — each story sets up the same filter groups with different initial values."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/responsive-breadcrumb.tsx",
+      "rule": "complexity/function-too-long",
+      "reason": "ResizeObserver overflow measurement logic is inherently verbose; splitting would scatter sibling DOM reads/writes across helpers and obscure the collapse/expand algorithm."
     }
   ]
 }

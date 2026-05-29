@@ -25,6 +25,7 @@ type FilterDropdownProps = {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly size?: Size;
+  readonly className?: string;
 };
 
 const sizeClass: Record<Size, string> = {
@@ -32,12 +33,13 @@ const sizeClass: Record<Size, string> = {
   md: "select select-bordered",
 };
 
-export function FilterDropdown({ label, options, value, onChange, size = "md" }: FilterDropdownProps) {
+export function FilterDropdown({ label, options, value, onChange, size = "md", className }: FilterDropdownProps) {
   return (
     <Select
       aria-label={label}
       selectedKey={value}
       onSelectionChange={(key) => onChange(String(key))}
+      className={className}
     >
       <SelectTrigger className={`${sizeClass[size]} bg-none flex items-center gap-1 w-auto`}>
         <span className="text-base-content/50 mr-0.5">{label}:</span>

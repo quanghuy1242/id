@@ -22,9 +22,11 @@ type ButtonProps = {
   readonly onClick?: () => void;
   readonly iconName?: string;
   readonly iconPosition?: "left" | "right";
+  readonly hideOnDesktop?: boolean;
+  readonly hideOnMobile?: boolean;
 };
 
-function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean): string {
+function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean, hideOnDesktop?: boolean, hideOnMobile?: boolean): string {
   const variantClass = {
     primary: "btn-primary",
     secondary: "btn-outline",
@@ -36,8 +38,9 @@ function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean)
     md: "",
   }[size];
   const shapeClass = circle ? " btn-circle" : "";
+  const hideClass = [hideOnDesktop ? "lg:hidden" : "", hideOnMobile ? "hidden lg:inline-flex" : ""].filter(Boolean).join(" ");
 
-  return `btn ${sizeClass} ${variantClass}${shapeClass}`.trim();
+  return `btn ${sizeClass} ${variantClass}${shapeClass} ${hideClass}`.trim();
 }
 
 export function Button({
@@ -53,9 +56,10 @@ export function Button({
   onClick,
   iconName,
   iconPosition = "left",
+  hideOnDesktop,
+  hideOnMobile,
 }: ButtonProps) {
   const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
-  const isIconOnly = Boolean(!children && iconName);
 
   return (
     <AriaButton
@@ -65,7 +69,7 @@ export function Button({
       isDisabled={disabled}
       onPress={onClick}
       aria-label={ariaLabel}
-      className={buttonClass(variant, size, circle || isIconOnly)}
+      className={buttonClass(variant, size, circle, hideOnDesktop, hideOnMobile)}
     >
       {iconPosition === "left" && icon}
       {children}
@@ -78,12 +82,18 @@ type LinkButtonProps = {
   readonly href: string;
   readonly variant?: ButtonVariant;
   readonly size?: ButtonSize;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
+  readonly hideOnMobile?: boolean;
+  readonly iconName?: string;
+  readonly ariaLabel?: string;
 };
 
-export function LinkButton({ href, variant = "primary", size = "md", children }: LinkButtonProps) {
+export function LinkButton({ href, variant = "primary", size = "md", children, hideOnMobile, iconName, ariaLabel }: LinkButtonProps) {
+  const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
+
   return (
-    <Link href={href} className={buttonClass(variant, size)}>
+    <Link href={href} className={buttonClass(variant, size, false, false, hideOnMobile)} aria-label={ariaLabel}>
+      {icon}
       {children}
     </Link>
   );

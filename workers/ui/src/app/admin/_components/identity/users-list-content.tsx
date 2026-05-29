@@ -12,6 +12,7 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  MobileFilterMenu,
   Panel,
   RadioGroup,
   SearchInput,
@@ -292,12 +293,32 @@ export function UsersListContent({
                 options={roleFilterOptions}
                 value={effectiveRole}
                 onChange={handleRoleFilterChange}
+                className="hidden lg:block"
               />
               <FilterDropdown
                 label="Status"
                 options={statusFilterOptions}
                 value={effectiveStatus}
                 onChange={handleStatusFilterChange}
+                className="hidden lg:block"
+              />
+              <MobileFilterMenu
+                groups={[
+                  {
+                    key: "role",
+                    label: "Role",
+                    options: roleFilterOptions,
+                    value: effectiveRole,
+                    onChange: handleRoleFilterChange,
+                  },
+                  {
+                    key: "status",
+                    label: "Status",
+                    options: statusFilterOptions,
+                    value: effectiveStatus,
+                    onChange: handleStatusFilterChange,
+                  },
+                ]}
               />
             </Inline>
           </Inline>

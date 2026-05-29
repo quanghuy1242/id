@@ -10,10 +10,10 @@ import {
   NavSection,
   Tabs,
   TopbarAvatarMenu,
-  TopbarBreadcrumb,
   TopbarBrandLink,
   TopbarEnd,
   TopbarStart,
+  ResponsiveBreadcrumb,
 } from "@id/ui";
 import { ADMIN_LOGIN_REDIRECT_URL, MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
 import { signOut } from "../_actions/users";
@@ -189,7 +189,7 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
     <>
       <TopbarStart>
         <TopbarBrandLink href="/admin">id admin</TopbarBrandLink>
-        <TopbarBreadcrumb items={["Admin", currentPageLabel]} />
+        <ResponsiveBreadcrumb items={["Admin", currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
         <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" />

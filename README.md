@@ -9,7 +9,7 @@ This repo implements the first-batch documented scope:
 
 ## Contracts
 
-This implementation follows the planning and architecture documents:
+This implementation follows the planning and architecture documents:   ffffffffdddddddddddddddfadfd
 
 - [docs/000_repo-architecture.md](docs/000_repo-architecture.md) — layer architecture, design patterns, enforcement rules, two-worker topology
 - [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done

@@ -59,7 +59,7 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 
 Components:
   AppShell > Topbar + AdminMobileRouteTabs + SidebarLayout + MobileDock
-  Topbar: AdminTopbar (`usePathname()`-driven breadcrumb in `navbar-start`; DaisyUI navbar with `btn btn-ghost text-xl normal-case` brand button, `breadcrumbs text-sm`, `input input-bordered input-sm w-24 md:w-auto` search field, and `dropdown dropdown-end` avatar menu in `navbar-end`)
+  Topbar: AdminTopbar (`usePathname()`-driven breadcrumb in `navbar-start`; DaisyUI navbar with `btn btn-ghost text-xl normal-case` brand button, `ResponsiveBreadcrumb(items)` (auto-collapses overflow with ResizeObserver), and avatar menu in `navbar-end`)
   AdminMobileRouteTabs: `MobileRouteTabs` > section-level `Tabs` using URL-route items from the active sidebar section, inset with the content gutter
   SidebarLayout > Sidebar + MainContent
   Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile) rendered as one `ul.menu.bg-base-200.rounded-box`; top-level items are direct `li > a`, grouped sections use `li > h2.menu-title + ul > li > a`

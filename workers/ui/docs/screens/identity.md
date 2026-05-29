@@ -18,16 +18,27 @@ All components exist in `packages/ui/src/` with the exact props described in thi
 `ErrorAlert` (message/onRetry); `SearchInput` (value/onChange/placeholder/grow/size); `FilterDropdown` (label/options/value/onChange/size);
 `Tabs` (ariaLabel/selectedKey/items/onSelectionChange — route-tab items with href);
 `ConfirmDialog` (open/onOpenChange/title/description/confirmLabel/cancelLabel/variant/onConfirm/confirmDisabled/error/children);
-`DataTable` (columns/rows/getRowKey/onRowClick/sortBy/sortDirection/onSort/pagination={total/limit/offset/onChange}).
+`DataTable` (columns/rows/getRowKey/onRowClick/sortBy/sortDirection/onSort/pagination={total/limit/offset/onChange});
+`MobileFilterMenu` (groups=[{key,label,options,value,onChange}], size) — folds multiple FilterDropdowns into a … menu on mobile;
+`ResponsiveBreadcrumb` (items=string[]) — auto-collapses overflow items into a … menu using ResizeObserver;
+`MenuTrigger` > `Button` + `Menu` > `MenuItem` — generic dropdown menu pattern used for mobile action folding.
 
-**Icon names registered in nav-icons.tsx:** Activity, AppWindow, Bot, Building2, ChevronDown, ChevronRight,
-FileCheck2, Fingerprint, Globe, HeartPulse, KeyRound, LayoutDashboard, Link2, Pencil, Plus, Server, Settings, Tags, Trash2, Users.
+**Button/LinkButton responsive props:** `hideOnMobile` adds `hidden lg:inline-flex`, `hideOnDesktop` adds `lg:hidden`. Use these to swap desktop/mobile controls without raw className in admin route files.
+
+**Icon names registered in nav-icons.tsx:** Activity, AppWindow, Bot, Building2, ChevronDown, ChevronLeft, ChevronRight,
+Ellipsis, FileCheck2, Fingerprint, Globe, HeartPulse, KeyRound, LayoutDashboard, Link2, Pencil, Plus, Server, Settings, Tags, Trash2, Users.
 Add new icons to `iconMap` in `packages/ui/src/nav-icons.tsx` before using them.
 
-**Icon-only buttons:** Pass `iconName` + `ariaLabel` with no `children`. The button auto-applies `btn-circle`. Example:
+**Icon-only LinkButton:** Pass `iconName` + `ariaLabel` + `href` with no `children`.
 ```tsx
-<Button size="sm" variant="secondary" iconName="Pencil" ariaLabel="Rename team" onClick={...} />
+<LinkButton href="/admin/identity/users" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Users" />
 ```
+
+**Mobile patterns (summary):**
+- Filter bars → `MobileFilterMenu` (folds N FilterDropdowns into a single … menu on mobile)
+- Single action buttons → `MenuTrigger` > `Button(iconName="Ellipsis", hideOnDesktop)` + `Menu(MenuItem)` on mobile, `Button(hideOnMobile)` on desktop
+- Detail back buttons → `LinkButton(iconName="ChevronLeft", size="sm", hideOnMobile)`
+- Breadcrumbs → `ResponsiveBreadcrumb(items)` instead of `TopbarBreadcrumb` — auto-collapses at any viewport, no manual breakpoints
 
 ---
 
@@ -120,8 +131,9 @@ Components:
       Inline(justify="between")
         Text(variant="h2", children="Users")
         Inline(gap="sm")
-          FilterDropdown(label="Role", options=[{value:"all",label:"All Roles"},{value:"admin",label:"Admin"},{value:"user",label:"User"}], value, onChange)
-          FilterDropdown(label="Status", options=[{value:"all",label:"All"},{value:"active",label:"Active"},{value:"banned",label:"Banned"}], value, onChange)
+          FilterDropdown(label="Role", options=[{value:"all",label:"All Roles"},{value:"admin",label:"Admin"},{value:"user",label:"User"}], value, onChange, className="hidden lg:block")
+          FilterDropdown(label="Status", options=[{value:"all",label:"All"},{value:"active",label:"Active"},{value:"banned",label:"Banned"}], value, onChange, className="hidden lg:block")
+          MobileFilterMenu(groups=[{key:"role",label:"Role",options:[...],value,onChange},{key:"status",label:"Status",options:[...],value,onChange}])
       Inline(gap="sm")
         SearchInput(grow, placeholder="Search name or email...", value, onChange) — debounced 300ms, resets offset
         Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New")
@@ -240,13 +252,12 @@ Components:
     UserDetailHeaderContent:
       Inline(justify="between")
       Inline(gap="sm")
-        LinkButton(href="/admin/identity/users", variant="secondary", "← Users")
+        LinkButton(href="/admin/identity/users", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Users")
         Text(variant="h1", children=user.name)
         Badge(tone=role==="admin"?"primary":"neutral", children=user.role)
-      — If impersonating (current session.impersonatedBy is set):
-        Button(variant="secondary", onClick=stopImpersonating, "Stop Impersonating")
-      — If not impersonating:
-        Button(variant="secondary", onClick=openImpersonateModal, "Impersonate")
+      — Desktop: Button(variant="secondary", hideOnMobile, onClick=... "Impersonate")
+      — Mobile:  MenuTrigger > Button(variant="ghost", size="sm", hideOnDesktop, iconName="Ellipsis", ariaLabel="Actions") + Menu(MenuItem("Impersonate")|MenuItem("Stop Impersonating"))
+      — (Same pattern for both impersonate/stop-impersonating states — conditional menu item)
 
     Tabs(
       selectedKey="overview",
@@ -550,7 +561,7 @@ Components:
     OrgDetailHeaderContent:
       Inline(justify="between")
       Inline(gap="sm")
-        LinkButton(href="/admin/identity/organizations", variant="secondary", "← Organizations")
+        LinkButton(href="/admin/identity/organizations", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Organizations")
         Text(variant="h1", org.name)
         Badge(tone="neutral", children=`#${org.slug}`)
       Button(variant="danger", onClick=openDeleteModal, "Delete")

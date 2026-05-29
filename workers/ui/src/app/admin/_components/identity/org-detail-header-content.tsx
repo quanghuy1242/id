@@ -72,9 +72,7 @@ export function OrgDetailHeaderContent({
     <>
       <Inline justify="between">
         <Inline gap="sm">
-          <LinkButton href="/admin/identity/organizations" variant="secondary">
-            ← Organizations
-          </LinkButton>
+          <LinkButton href="/admin/identity/organizations" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Organizations" />
           {org && (
             <>
               <Text variant="h1">{org.name}</Text>

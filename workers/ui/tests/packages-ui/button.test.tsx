@@ -103,4 +103,52 @@ describe("LinkButton", () => {
     const link = screen.getByRole("link", { name: /small link/i });
     expect(link).toHaveClass("btn-sm");
   });
+
+  it("applies hideOnMobile visibility class", () => {
+    render(<LinkButton href="/test" hideOnMobile>Hidden on mobile</LinkButton>);
+    const link = screen.getByRole("link", { name: /hidden on mobile/i });
+    expect(link).toHaveClass("hidden");
+    expect(link).toHaveClass("lg:inline-flex");
+  });
+
+  it("does not have hideOnMobile class when not set", () => {
+    render(<LinkButton href="/test">No hide</LinkButton>);
+    const link = screen.getByRole("link", { name: /no hide/i });
+    expect(link).not.toHaveClass("hidden");
+  });
+});
+
+describe("Button visibility props", () => {
+  it("hideOnDesktop adds lg:hidden class", () => {
+    render(<Button hideOnDesktop>Desktop Hidden</Button>);
+    const button = screen.getByRole("button", { name: /desktop hidden/i });
+    expect(button).toHaveClass("lg:hidden");
+  });
+
+  it("hideOnMobile adds hidden lg:inline-flex classes", () => {
+    render(<Button hideOnMobile>Mobile Hidden</Button>);
+    const button = screen.getByRole("button", { name: /mobile hidden/i });
+    expect(button).toHaveClass("hidden");
+    expect(button).toHaveClass("lg:inline-flex");
+  });
+});
+
+describe("Button circle prop", () => {
+  it("adds btn-circle when circle is true", () => {
+    render(<Button circle>Circle</Button>);
+    const button = screen.getByRole("button", { name: /circle/i });
+    expect(button).toHaveClass("btn-circle");
+  });
+
+  it("does not auto-apply btn-circle when icon-only without children", () => {
+    render(<Button iconName="Plus" ariaLabel="Add" />);
+    const button = screen.getByRole("button", { name: /add/i });
+    expect(button).not.toHaveClass("btn-circle");
+  });
+
+  it("applies btn-circle when both circle and iconName are set", () => {
+    render(<Button iconName="Plus" circle ariaLabel="Add" />);
+    const button = screen.getByRole("button", { name: /add/i });
+    expect(button).toHaveClass("btn-circle");
+  });
 });
