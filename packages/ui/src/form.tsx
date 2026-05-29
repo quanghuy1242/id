@@ -87,7 +87,10 @@ export function TextInput({
       className="form-control w-full"
     >
       <Label className="label">
-        <span className="label-text text-base font-medium text-base-content">{label}</span>
+        <span className="label-text text-base font-medium text-base-content">
+          {label}
+          {!required ? " (Optional)" : ""}
+        </span>
       </Label>
       <Input
         name={name}
@@ -307,7 +310,10 @@ export function Textarea({
       className="form-control w-full"
     >
       <Label className="label">
-        <span className="label-text text-base font-medium text-base-content">{label}</span>
+        <span className="label-text text-base font-medium text-base-content">
+          {label}
+          {!required ? " (Optional)" : ""}
+        </span>
       </Label>
       <TextArea
         name={name}
