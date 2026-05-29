@@ -1,7 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { PageBody, Panel, Stack, Text, Heading, Button } from "@id/ui";
+import { PageBody, Panel, Stack, Text, Heading, LinkButton } from "@id/ui";
 
 export default function AdminNotFound() {
   return (
@@ -9,13 +6,13 @@ export default function AdminNotFound() {
       <Stack gap="md">
         <Heading level="h1">Page not found</Heading>
         <Panel>
-          <Stack gap="md">
+          <Stack gap="md" align="start">
             <Text variant="body">
               This page isn&apos;t available yet. It may appear in a future update.
             </Text>
-            <Link href="/admin">
-              <Button variant="primary" size="sm">Back to Dashboard</Button>
-            </Link>
+            <LinkButton href="/admin" variant="primary">
+              Back to Dashboard
+            </LinkButton>
           </Stack>
         </Panel>
       </Stack>
