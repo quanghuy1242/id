@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { LoginForm } from "@/app/login/login-form";
 
 const mockPush = vi.fn<() => void>();
-const mockPostAuthApi = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
 let mockOauthQuery = "";
 
 vi.mock("next/navigation", () => ({
@@ -20,7 +20,7 @@ vi.mock("@/lib/oauth-query", () => ({
 
 vi.mock("@id/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
-  postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
+  authApiPost: (...args: unknown[]) => mockAuthApiPost(...args),
 }));
 
 describe("LoginForm", () => {
@@ -68,7 +68,7 @@ describe("LoginForm", () => {
   });
 
   it("submits the form with valid credentials and defaults the admin callbackURL", async () => {
-    mockPostAuthApi.mockResolvedValue({});
+    mockAuthApiPost.mockResolvedValue({});
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
@@ -76,7 +76,7 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
         email: "test@example.com",
         password: "password12345",
         oauth_query: "",
@@ -86,7 +86,7 @@ describe("LoginForm", () => {
   });
 
   it("redirects on successful login with redirect flag", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/dashboard" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/dashboard" });
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
@@ -99,7 +99,7 @@ describe("LoginForm", () => {
   });
 
   it("shows error message on failed login", async () => {
-    mockPostAuthApi.mockResolvedValue({ message: "Invalid credentials" });
+    mockAuthApiPost.mockResolvedValue({ message: "Invalid credentials" });
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
@@ -112,7 +112,7 @@ describe("LoginForm", () => {
   });
 
   it("shows network error on fetch failure", async () => {
-    mockPostAuthApi.mockRejectedValue(new Error("Network error"));
+    mockAuthApiPost.mockRejectedValue(new Error("Network error"));
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
@@ -125,7 +125,7 @@ describe("LoginForm", () => {
   });
 
   it("shows loading state while submitting", async () => {
-    mockPostAuthApi.mockImplementation(
+    mockAuthApiPost.mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ redirect: true, url: "/" }), 100))
     );
 
@@ -142,7 +142,7 @@ describe("LoginForm", () => {
   });
 
   it("includes oauth query parameter in submission", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/" });
     mockOauthQuery = "client_id=test&scope=openid";
 
     render(<LoginForm />);
@@ -151,7 +151,7 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
         email: "test@example.com",
         password: "password12345",
         oauth_query: "client_id=test&scope=openid",
@@ -160,7 +160,7 @@ describe("LoginForm", () => {
   });
 
   it("passes a safe admin callback URL to Better Auth sign-in", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/admin/identity/users" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/admin/identity/users" });
     window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fidentity%2Fusers%3Frole%3Dadmin");
 
     render(<LoginForm />);
@@ -169,7 +169,7 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
@@ -179,7 +179,7 @@ describe("LoginForm", () => {
   });
 
   it("drops unsafe callback URLs and falls back to the default admin callbackURL", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/" });
     window.history.replaceState({}, "", "/login?callbackURL=https%3A%2F%2Fevil.example%2Fadmin");
 
     render(<LoginForm />);
@@ -188,7 +188,7 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
@@ -198,7 +198,7 @@ describe("LoginForm", () => {
   });
 
   it("does not default a callbackURL during the OAuth flow", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/" });
     mockOauthQuery = "client_id=test&scope=openid";
 
     render(<LoginForm />);
@@ -207,7 +207,7 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
         email: "user@example.com",
         password: "password12345",
         oauth_query: "client_id=test&scope=openid",
@@ -216,7 +216,7 @@ describe("LoginForm", () => {
   });
 
   it("reveals the OTP input on an admin_otp_required response and resubmits with the code", async () => {
-    mockPostAuthApi.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
+    mockAuthApiPost.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "admin@example.com" } });
@@ -233,12 +233,12 @@ describe("LoginForm", () => {
     expect(screen.getByRole("button", { name: /verify and sign in/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
 
-    mockPostAuthApi.mockResolvedValueOnce({ redirect: true, url: "/admin" });
+    mockAuthApiPost.mockResolvedValueOnce({ redirect: true, url: "/admin" });
     fireEvent.change(screen.getByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenLastCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenLastCalledWith("/sign-in/email", {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
@@ -250,7 +250,7 @@ describe("LoginForm", () => {
   });
 
   it("starts over explicitly when changing email during an OTP challenge", async () => {
-    mockPostAuthApi.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
+    mockAuthApiPost.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
 
     render(<LoginForm />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "admin@example.com" } });
@@ -265,11 +265,11 @@ describe("LoginForm", () => {
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: "owner@example.com" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "new-password123" } });
 
-    mockPostAuthApi.mockResolvedValueOnce({});
+    mockAuthApiPost.mockResolvedValueOnce({});
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenLastCalledWith("/sign-in/email", {
+      expect(mockAuthApiPost).toHaveBeenLastCalledWith("/sign-in/email", {
         email: "owner@example.com",
         password: "new-password123",
         oauth_query: "",

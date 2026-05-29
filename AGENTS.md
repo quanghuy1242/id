@@ -87,6 +87,8 @@ Load the `id-admin-ui` skill when working on any of the following:
 
 The skill contains the full component registry, token reference, screen spec format, and hard rules. Do not implement admin UI pages without it.
 
+All admin UI `/api/auth` calls must use the type-safe helpers from `@id/lib` (`authApiGetOrThrow`, `authApiPostOrThrow`, `authApiGet`, `authApiPost`); never write raw `fetch()` against `/api/auth` in admin or UI action files.
+
 **Hard gate:** A new `/admin` route file must not be created before a corresponding spec entry exists in `workers/ui/docs/screens/<section>.md`. Draft the spec, get approval, then implement. The spec must contain at minimum the ASCII sketch, the `Components:` block, and the `Data:` line.
 
 Design system architecture rationale lives in `docs/022_admin-ui-system.md`.

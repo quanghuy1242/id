@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ConsentForm } from "@/app/consent/consent-form";
 
 const mockPush = vi.fn<() => void>();
-const mockPostAuthApi = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
 let mockOauthQuery = "";
 
 vi.mock("next/navigation", () => ({
@@ -26,7 +26,7 @@ vi.mock("@/lib/oauth-query", () => ({
 
 vi.mock("@id/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
-  postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
+  authApiPost: (...args: unknown[]) => mockAuthApiPost(...args),
 }));
 
 describe("ConsentForm", () => {
@@ -63,13 +63,13 @@ describe("ConsentForm", () => {
   });
 
   it("submits accept when allow is clicked", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /allow/i }).click();
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/oauth2/consent", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/oauth2/consent", {
         accept: true,
         oauth_query: "",
       });
@@ -77,14 +77,14 @@ describe("ConsentForm", () => {
   });
 
   it("submits deny when deny is clicked", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
     mockOauthQuery = "client_id=client_1&scope=openid";
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /deny/i }).click();
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith("/oauth2/consent", {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/oauth2/consent", {
         accept: false,
         oauth_query: "client_id=client_1&scope=openid",
       });
@@ -92,7 +92,7 @@ describe("ConsentForm", () => {
   });
 
   it("redirects on successful consent", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /allow/i }).click();
@@ -103,7 +103,7 @@ describe("ConsentForm", () => {
   });
 
   it("redirects when Better Auth returns a url field", async () => {
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "https://app.example.com/callback?code=abc" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "https://app.example.com/callback?code=abc" });
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /allow/i }).click();
@@ -114,7 +114,7 @@ describe("ConsentForm", () => {
   });
 
   it("shows error message on consent failure", async () => {
-    mockPostAuthApi.mockResolvedValue({ message: "Consent denied" });
+    mockAuthApiPost.mockResolvedValue({ message: "Consent denied" });
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /allow/i }).click();
@@ -125,7 +125,7 @@ describe("ConsentForm", () => {
   });
 
   it("shows network error on fetch failure", async () => {
-    mockPostAuthApi.mockRejectedValue(new Error("Network error"));
+    mockAuthApiPost.mockRejectedValue(new Error("Network error"));
 
     render(<ConsentForm />);
     screen.getByRole("button", { name: /allow/i }).click();
@@ -137,7 +137,7 @@ describe("ConsentForm", () => {
 
   it("disables buttons while loading", async () => {
     let resolvePromise: (value: unknown) => void;
-    mockPostAuthApi.mockImplementation(
+    mockAuthApiPost.mockImplementation(
       () => new Promise((resolve) => {
         resolvePromise = resolve;
       })

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Form, Inline, RadioGroup, Stack, Text } from "@id/ui";
-import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
+import { authApiGetOrThrow, authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
 import { useOauthQuery, useOauthRequestDescription } from "@/lib/oauth-query";
 import { DIRECT_SHARE_VALUE, WORKSPACE_CONTEXT_PREFIX } from "@/shared/constants";
 
@@ -24,8 +24,7 @@ const organizationSchema = { parse: (data: unknown): readonly Organization[] => 
 
 async function fetchOrganizations(): Promise<readonly Organization[]> {
   try {
-    const res = await fetch("/api/auth/organization/list", { headers: { accept: "application/json" } });
-    const data: unknown = await res.json();
+    const data = await authApiGetOrThrow<unknown>("/organization/list");
     return organizationSchema.parse(data);
   } catch {
     return [];
@@ -55,10 +54,10 @@ export function SelectContextForm() {
     setLoading(true);
 
     try {
-      const body = await postAuthApi(
+      const body = await authApiPost<Record<string, unknown>>(
         "/oauth2/continue",
         { postLogin: true, [OAUTH_QUERY_PARAM]: oauthQuery },
-        { "x-id-oauth-context": selection },
+        { headers: { "x-id-oauth-context": selection } },
       );
 
       const redirectUrl = body.redirect_uri || body.url || body.redirectURL;

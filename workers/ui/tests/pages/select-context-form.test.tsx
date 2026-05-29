@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { SelectContextForm } from "@/app/select-authorization-context/select-context-form";
 
 const mockPush = vi.fn<() => void>();
-const mockPostAuthApi = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
 const mockFetch = vi.fn<typeof globalThis.fetch>();
 
 vi.mock("next/navigation", () => ({
@@ -21,7 +21,11 @@ vi.mock("@/lib/oauth-query", () => ({
 
 vi.mock("@id/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
-  postAuthApi: (...args: unknown[]) => mockPostAuthApi(...args),
+  authApiPost: (...args: unknown[]) => mockAuthApiPost(...args),
+  authApiGetOrThrow: (path: string, params?: Record<string, string | number | undefined>) => {
+    const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)])).toString() : "";
+    return fetch(`/api/auth${path}${qs ? `?${qs}` : ""}`).then((r: Response) => r.json());
+  },
 }));
 
 describe("SelectContextForm", () => {
@@ -78,7 +82,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([]),
     });
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -87,10 +91,10 @@ describe("SelectContextForm", () => {
     screen.getByRole("button", { name: /continue/i }).click();
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith(
+      expect(mockAuthApiPost).toHaveBeenCalledWith(
         "/oauth2/continue",
         { postLogin: true, oauth_query: "" },
-        { "x-id-oauth-context": "direct-share" }
+        { headers: { "x-id-oauth-context": "direct-share" } },
       );
     });
   });
@@ -99,7 +103,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([{ id: "org1", name: "Acme Corp" }]),
     });
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -108,10 +112,10 @@ describe("SelectContextForm", () => {
     screen.getByRole("button", { name: /continue/i }).click();
 
     await waitFor(() => {
-      expect(mockPostAuthApi).toHaveBeenCalledWith(
+      expect(mockAuthApiPost).toHaveBeenCalledWith(
         "/oauth2/continue",
         { postLogin: true, oauth_query: "" },
-        { "x-id-oauth-context": "workspace:org1" }
+        { headers: { "x-id-oauth-context": "workspace:org1" } }
       );
     });
   });
@@ -120,7 +124,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([]),
     });
-    mockPostAuthApi.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
+    mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -137,7 +141,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([]),
     });
-    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "https://app.example.com/callback?code=abc" });
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "https://app.example.com/callback?code=abc" });
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -154,7 +158,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([]),
     });
-    mockPostAuthApi.mockResolvedValue({ message: "Selection failed" });
+    mockAuthApiPost.mockResolvedValue({ message: "Selection failed" });
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -171,7 +175,7 @@ describe("SelectContextForm", () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve([]),
     });
-    mockPostAuthApi.mockRejectedValue(new Error("Network error"));
+    mockAuthApiPost.mockRejectedValue(new Error("Network error"));
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -189,7 +193,7 @@ describe("SelectContextForm", () => {
       json: () => Promise.resolve([]),
     });
     let resolvePromise: (value: unknown) => void;
-    mockPostAuthApi.mockImplementation(
+    mockAuthApiPost.mockImplementation(
       () => new Promise((resolve) => {
         resolvePromise = resolve;
       })

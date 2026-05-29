@@ -56,7 +56,7 @@ describe("admin auth actions", () => {
   it("rejects on a failed sign-out response", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: "bad" }, { status: 500 }));
 
-    await expect(signOut()).rejects.toThrow("Sign-out failed with status 500");
+    await expect(signOut()).rejects.toThrow('{"error":"bad"}');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

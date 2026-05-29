@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Inline, Stack, Text } from "@id/ui";
-import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
+import { authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 type ClientInfo = {
@@ -32,7 +32,7 @@ export function ConsentForm() {
     setLoading(true);
 
     try {
-      const body = await postAuthApi("/oauth2/consent", {
+      const body = await authApiPost<Record<string, unknown>>("/oauth2/consent", {
         accept,
         [OAUTH_QUERY_PARAM]: oauthQuery,
       });

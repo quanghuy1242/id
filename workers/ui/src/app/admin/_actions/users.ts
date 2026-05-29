@@ -1,3 +1,5 @@
+import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+
 export type User = {
   id: string;
   name: string;
@@ -39,26 +41,6 @@ export type CreateUserBody = {
   role?: string;
 };
 
-export async function listUsers(params: ListUsersParams): Promise<ListUsersResponse> {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") search.set(key, String(value));
-  }
-  const res = await fetch(`/api/auth/admin/list-users?${search.toString()}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<ListUsersResponse>;
-}
-
-export async function createUser(body: CreateUserBody): Promise<{ user: User }> {
-  const res = await fetch("/api/auth/admin/create-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ user: User }>;
-}
-
 export type Session = {
   id: string;
   token: string;
@@ -79,141 +61,71 @@ export type CurrentSession = {
   };
 } | null;
 
+export async function listUsers(params: ListUsersParams): Promise<ListUsersResponse> {
+  return authApiGetOrThrow<ListUsersResponse>("/admin/list-users", params as Record<string, string | number | undefined>);
+}
+
+export async function createUser(body: CreateUserBody): Promise<{ user: User }> {
+  return authApiPostOrThrow<{ user: User }>("/admin/create-user", body);
+}
+
 export async function getUser(userId: string): Promise<{ user: User }> {
-  const res = await fetch(`/api/auth/admin/get-user?id=${encodeURIComponent(userId)}`);
-  if (!res.ok) throw new Error(await res.text());
-  const user = await res.json() as User;
+  const user = await authApiGetOrThrow<User>("/admin/get-user", { id: userId });
   return { user };
 }
 
 export async function updateUser(userId: string, data: Partial<{ name: string; email: string; image: string }>): Promise<{ user: User }> {
-  const res = await fetch("/api/auth/admin/update-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, data: JSON.stringify(data) }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ user: User }>;
+  return authApiPostOrThrow<{ user: User }>("/admin/update-user", { userId, data: JSON.stringify(data) });
 }
 
 export async function setRole(userId: string, role: string): Promise<{ user: User }> {
-  const res = await fetch("/api/auth/admin/set-role", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, role }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ user: User }>;
+  return authApiPostOrThrow<{ user: User }>("/admin/set-role", { userId, role });
 }
 
 export async function setUserPassword(userId: string, newPassword: string): Promise<{ status: boolean }> {
-  const res = await fetch("/api/auth/admin/set-user-password", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ newPassword, userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ status: boolean }>;
+  return authApiPostOrThrow<{ status: boolean }>("/admin/set-user-password", { newPassword, userId });
 }
 
 export async function banUser(userId: string, banReason?: string, banExpiresIn?: number): Promise<{ user: User }> {
-  const res = await fetch("/api/auth/admin/ban-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, ...(banReason ? { banReason } : {}), ...(banExpiresIn ? { banExpiresIn } : {}) }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ user: User }>;
+  return authApiPostOrThrow<{ user: User }>("/admin/ban-user", { userId, ...(banReason ? { banReason } : {}), ...(banExpiresIn ? { banExpiresIn } : {}) });
 }
 
 export async function unbanUser(userId: string): Promise<{ user: User }> {
-  const res = await fetch("/api/auth/admin/unban-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ user: User }>;
+  return authApiPostOrThrow<{ user: User }>("/admin/unban-user", { userId });
 }
 
 export async function impersonateUser(userId: string): Promise<{ session: unknown; user: User }> {
-  const res = await fetch("/api/auth/admin/impersonate-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ session: unknown; user: User }>;
+  return authApiPostOrThrow<{ session: unknown; user: User }>("/admin/impersonate-user", { userId });
 }
 
 export async function stopImpersonating(): Promise<void> {
-  const res = await fetch("/api/auth/admin/stop-impersonating", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(await res.text());
+  await authApiPostOrThrow("/admin/stop-impersonating", {});
 }
 
 export async function removeUser(userId: string): Promise<{ success: boolean }> {
-  const res = await fetch("/api/auth/admin/remove-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ success: boolean }>;
+  return authApiPostOrThrow<{ success: boolean }>("/admin/remove-user", { userId });
 }
 
 export async function listUserSessions(userId: string): Promise<{ sessions: Session[] }> {
-  const res = await fetch("/api/auth/admin/list-user-sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ sessions: Session[] }>;
+  return authApiPostOrThrow<{ sessions: Session[] }>("/admin/list-user-sessions", { userId });
 }
 
 export async function revokeUserSession(sessionToken: string): Promise<{ success: boolean }> {
-  const res = await fetch("/api/auth/admin/revoke-user-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionToken }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ success: boolean }>;
+  return authApiPostOrThrow<{ success: boolean }>("/admin/revoke-user-session", { sessionToken });
 }
 
 export async function revokeUserSessions(userId: string): Promise<{ success: boolean }> {
-  const res = await fetch("/api/auth/admin/revoke-user-sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ success: boolean }>;
+  return authApiPostOrThrow<{ success: boolean }>("/admin/revoke-user-sessions", { userId });
 }
 
 export async function getCurrentSession(): Promise<CurrentSession> {
-  const res = await fetch("/api/auth/get-session?disableRefresh=true&disableCookieCache=true", {
-    cache: "no-store",
-    credentials: "include",
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) return null;
-  return res.json() as Promise<CurrentSession>;
+  try {
+    return await authApiGetOrThrow<CurrentSession>("/get-session", { disableRefresh: "true", disableCookieCache: "true" }, { cache: "no-store", credentials: "include" });
+  } catch {
+    return null;
+  }
 }
 
 export async function signOut(): Promise<void> {
-  // Same-origin POST; the response Set-Cookie clears the host-only session cookie.
-  const res = await fetch("/api/auth/sign-out", {
-    method: "POST",
-    cache: "no-store",
-    credentials: "include",
-    headers: { accept: "application/json", "content-type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!res.ok) {
-    throw new Error(`Sign-out failed with status ${res.status}`);
-  }
+  await authApiPostOrThrow("/sign-out", {}, { cache: "no-store", credentials: "include" });
 }

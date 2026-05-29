@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useRef, useState } from "react";
 import { Alert, Button, Form, HiddenInput, Inline, Stack, TextInput } from "@id/ui";
-import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
+import { authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -97,7 +97,7 @@ type PendingChallenge = {
 };
 
 async function submitLogin(data: Record<string, string>): Promise<LoginResult> {
-  const body = await postAuthApi("/sign-in/email", loginPayload(data));
+  const body = await authApiPost<Record<string, unknown>>("/sign-in/email", loginPayload(data));
   const redirectUrl = body.redirect
     ? (body.url || body.redirectURL || "/") as string
     : body.url as string | undefined;
