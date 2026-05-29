@@ -181,7 +181,7 @@ const callbackURL = data[OAUTH_QUERY_PARAM]
   : (currentAdminCallbackURL() || "/admin");  // admin: default to /admin
 ```
 
-**OTP challenge UI:** On an `admin_otp_required` response, reveal a 6-digit OTP `TextInput`. The email/password fields keep their values (uncontrolled inputs), the user enters the code, and resubmits the same form — the body now includes `otp`.
+**OTP challenge UI:** On an `admin_otp_required` response, freeze the submitted email/password as a pending local challenge, replace the editable credential fields with the challenged email plus a secondary "Use a different email" action, reveal a 6-digit OTP `TextInput`, and resubmit using the frozen credentials plus `otp`.
 
 ```
 POST /api/auth/sign-in/email
@@ -388,11 +388,12 @@ Add the `"admin-otp"` case to the `renderAuthEmail` rendering used by the Resend
 
 - **Default `callbackURL`** to `"/admin"` only when not an OAuth flow (§4.2 snippet); forward `data.otp` when present.
 - **`submitLogin()`** returns `{ redirectUrl?, error?, errorCode?, maskedEmail? }`, reading `body.code` / `body.maskedEmail` from the (non-2xx) JSON body.
-- **`handleSubmit`**: on `errorCode === "admin_otp_required"`, set `otpRequired` state and a helper message (`Enter the code sent to ${maskedEmail}`); otherwise fall back to the existing error display.
-- **OTP input** rendered only when `otpRequired`:
+- **`handleSubmit`**: on `errorCode === "admin_otp_required"`, store pending credentials in a ref, show the challenged email in local state, and show a helper message (`Enter the code sent to ${maskedEmail}`); otherwise fall back to the existing error display.
+- **Changing email/password mid-challenge**: do not silently accept edits. The editable credential fields are hidden during the OTP step; the user must click **Use a different email** to clear the pending challenge locally and restart with editable credentials. No server-side cancel endpoint is needed because the old OTP expires, and a new OTP for the same user overwrites the old one.
+- **OTP input** rendered only when a pending challenge exists:
 
 ```tsx
-{otpRequired && (
+{pendingChallenge && (
   <TextInput
     label="Verification code"
     name="otp"
@@ -413,7 +414,7 @@ Remove the stale MFA TODO (it proposes user-scoped TOTP and session-freshness, b
 The OTP challenge is a UI state worth a visual story alongside the existing `Login`/`Consent` stories. Add an `AdminLoginOtpChallenge` story that:
 
 - `setMockUrl("/login", "")` (admin context — no `oauth_query`).
-- Installs a `window.fetch` mock (same pattern as `installOrganizationFetchMock`) for `POST /api/auth/sign-in/email` returning HTTP 401 with `{ "code": "admin_otp_required", "maskedEmail": "a***@e***.com" }`, so the rendered form advances to the OTP-input state.
+- Installs a `window.fetch` mock (same pattern as `installOrganizationFetchMock`) for `POST /api/auth/sign-in/email`: first credential submits return HTTP 401 with `{ "code": "admin_otp_required", "maskedEmail": "a***@e***.com" }`; OTP `123456` returns `{ "redirect": true, "url": "/admin" }`; other OTPs return `invalid_otp`. This lets the locked challenge, explicit restart action, and final OTP submit be exercised locally in Ladle.
 - Renders `<LoginPage />`.
 
 Keep it in the existing `stories/` folder (Ladle `stories` glob already includes `stories/**/*.stories.tsx`). Follow the side-effect-free module rule for any shared component touched (`packages/ui` `sideEffects: false`).
@@ -466,10 +467,10 @@ Keep it in the existing `stories/` folder (Ladle `stories` glob already includes
 - [x] Credential lookup uses `providerId === "credential"`; OTP generation uses `node:crypto` `randomInt`; OTP storage uses purpose-bound HMAC-SHA256 with `BETTER_AUTH_SECRET`; rate-limit checked before OTP storage; timing-parity `password.hash` on invalid-credential branches; unverified-email short-circuit; timing-safe OTP compare.
 - [x] Plugin registered in `getAuthOptions()` after `idOAuthM2MBridge()`.
 - [x] `AuthEmailMessage` widened to a discriminated union with `"admin-otp"`; `resend-email.ts` renders the code (no link).
-- [x] `login-form.tsx` defaults `callbackURL` to `"/admin"` only for non-OAuth flows; shows OTP input on `admin_otp_required`; `submitLogin()` extracts `code`/`maskedEmail`. The OTP prompt renders as an `info` Alert (not an error).
+- [x] `login-form.tsx` defaults `callbackURL` to `"/admin"` only for non-OAuth flows; locks submitted credentials during the OTP challenge; exposes **Use a different email** as an explicit local restart; shows OTP input on `admin_otp_required`; `submitLogin()` extracts `code`/`maskedEmail`. The OTP prompt renders as an `info` Alert (not an error).
 - [x] `admin/page.tsx` MFA TODO removed and replaced with a pointer to this doc.
 - [x] `AdminLoginOtpChallenge` Ladle story added in `stories/auth-flow.stories.tsx`.
-- [x] Plugin and client tests added to the respective barrels and passing (`pnpm test` — 545 passing). Existing contextless test sign-ins migrated to a shared `adminOtpSignIn`/`signInViaAdminOtp` helper.
-- [x] `pnpm lint` clean (architecture gate). `pnpm typecheck` clean. `pnpm advise` clean.
+- [x] Plugin and client tests added to the respective barrels and passing (`pnpm test` — 546 passing). Existing contextless test sign-ins migrated to a shared `adminOtpSignIn`/`signInViaAdminOtp` helper.
+- [x] `pnpm lint` clean (architecture gate). `pnpm typecheck` clean. `pnpm advise` was skipped on the follow-up UX update by request.
 - [ ] Manual smoke: `/login` direct → sign in → OTP prompt → enter code → redirected to `/admin`.
 - [ ] Manual smoke: OAuth flow (`/oauth2/authorize?...`) → sign in → no OTP prompt → redirected to client app.

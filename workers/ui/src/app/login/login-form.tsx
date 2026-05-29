@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { Alert, Button, Form, HiddenInput, Inline, Stack, TextInput } from "@id/ui";
 import { OAUTH_QUERY_PARAM, postAuthApi } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
@@ -86,6 +86,16 @@ type LoginResult = {
   maskedEmail?: string;
 };
 
+type PendingCredentials = {
+  readonly email: string;
+  readonly password: string;
+  readonly oauthQuery: string;
+};
+
+type PendingChallenge = {
+  readonly email: string;
+};
+
 async function submitLogin(data: Record<string, string>): Promise<LoginResult> {
   const body = await postAuthApi("/sign-in/email", loginPayload(data));
   const redirectUrl = body.redirect
@@ -109,14 +119,33 @@ function validateOtp(value: string): string | undefined {
   return /^\d{6}$/.test(value) ? undefined : "Enter the 6-digit code";
 }
 
+function otpValidationErrorsFor(data: Record<string, string>): Record<string, string> {
+  const otpErr = validateOtp(data.otp ?? "");
+  return otpErr ? { otp: otpErr } : {};
+}
+
 export function LoginForm() {
   const router = useRouter();
   const oauthQuery = useOauthQuery();
+  const pendingCredentials = useRef<PendingCredentials | null>(null);
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [otpRequired, setOtpRequired] = useState(false);
+  const [pendingChallenge, setPendingChallenge] = useState<PendingChallenge | null>(null);
+  const [emailDefault, setEmailDefault] = useState("");
+  const submitLabel = pendingChallenge ? "Verify and sign in" : "Sign in";
+  const loadingLabel = pendingChallenge ? "Verifying..." : "Signing in...";
+
+  const handleUseDifferentEmail = () => {
+    const email = pendingCredentials.current?.email ?? pendingChallenge?.email ?? "";
+    pendingCredentials.current = null;
+    setPendingChallenge(null);
+    setEmailDefault(email);
+    setError("");
+    setNotice("");
+    setValidationErrors({});
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -125,8 +154,19 @@ export function LoginForm() {
     setValidationErrors({});
 
     const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    const nextValidationErrors = validationErrorsFor(data);
+    const formData = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    const activePendingCredentials = pendingCredentials.current;
+    const data = activePendingCredentials
+      ? {
+          email: activePendingCredentials.email,
+          password: activePendingCredentials.password,
+          [OAUTH_QUERY_PARAM]: activePendingCredentials.oauthQuery,
+          otp: formData.otp ?? "",
+        }
+      : formData;
+    const nextValidationErrors = activePendingCredentials
+      ? otpValidationErrorsFor(data)
+      : validationErrorsFor(data);
     if (Object.keys(nextValidationErrors).length > 0) {
       setValidationErrors(nextValidationErrors);
       return;
@@ -138,7 +178,12 @@ export function LoginForm() {
       const result = await submitLogin(data);
       if (result.redirectUrl) { router.push(result.redirectUrl); return; }
       if (result.errorCode === "admin_otp_required") {
-        setOtpRequired(true);
+        pendingCredentials.current = {
+          email: data.email,
+          password: data.password,
+          oauthQuery: data[OAUTH_QUERY_PARAM] ?? "",
+        };
+        setPendingChallenge({ email: data.email });
         setNotice(
           result.maskedEmail
             ? `We sent a verification code to ${result.maskedEmail}. Enter it below to continue.`
@@ -161,23 +206,46 @@ export function LoginForm() {
       <Form onSubmit={handleSubmit} validationErrors={validationErrors}>
         <Stack>
           <HiddenInput name={OAUTH_QUERY_PARAM} value={oauthQuery} />
-          <TextInput
-            label="Email"
-            name="email"
-            type="email"
-            autoComplete="username"
-            required
-            validate={validateEmail}
-          />
-          <TextInput
-            label="Password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            validate={validatePassword}
-          />
-          {otpRequired && (
+          {pendingChallenge ? (
+            <div className="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+              <Inline justify="between">
+                <div>
+                  <div className="text-xs font-medium uppercase text-base-content/60">Email</div>
+                  <div className="text-sm font-medium text-base-content">{pendingChallenge.email}</div>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={loading}
+                  onClick={handleUseDifferentEmail}
+                >
+                  Use a different email
+                </Button>
+              </Inline>
+            </div>
+          ) : (
+            <>
+              <TextInput
+                label="Email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                required
+                defaultValue={emailDefault}
+                validate={validateEmail}
+              />
+              <TextInput
+                label="Password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                validate={validatePassword}
+              />
+            </>
+          )}
+          {pendingChallenge && (
             <TextInput
               label="Verification code"
               name="otp"
@@ -189,7 +257,7 @@ export function LoginForm() {
           )}
           <Inline justify="end">
             <Button type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? loadingLabel : submitLabel}
             </Button>
           </Inline>
         </Stack>

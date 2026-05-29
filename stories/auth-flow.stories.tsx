@@ -20,6 +20,21 @@ function installAdminOtpFetchMock() {
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
     if (url.startsWith("/api/auth/sign-in/email")) {
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) as { otp?: string } : {};
+      if (body.otp) {
+        return new Response(
+          JSON.stringify(
+            body.otp === "123456"
+              ? { redirect: true, url: "/admin" }
+              : { code: "invalid_otp", message: "Invalid or expired code" },
+          ),
+          {
+            status: body.otp === "123456" ? 200 : 401,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
       return new Response(
         JSON.stringify({ code: "admin_otp_required", maskedEmail: "a***@e***.com" }),
         {

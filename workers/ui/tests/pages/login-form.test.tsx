@@ -226,11 +226,16 @@ describe("LoginForm", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("We sent a verification code to a***@e***.com");
     });
+    expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
+    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /use a different email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /verify and sign in/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
 
     mockPostAuthApi.mockResolvedValueOnce({ redirect: true, url: "/admin" });
     fireEvent.change(screen.getByLabelText(/verification code/i), { target: { value: "123456" } });
-    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    fireEvent.click(screen.getByRole("button", { name: /verify and sign in/i }));
 
     await waitFor(() => {
       expect(mockPostAuthApi).toHaveBeenLastCalledWith("/sign-in/email", {
@@ -242,6 +247,35 @@ describe("LoginForm", () => {
       });
     });
     expect(mockPush).toHaveBeenCalledWith("/admin");
+  });
+
+  it("starts over explicitly when changing email during an OTP challenge", async () => {
+    mockPostAuthApi.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /use a different email/i }));
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: "owner@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "new-password123" } });
+
+    mockPostAuthApi.mockResolvedValueOnce({});
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockPostAuthApi).toHaveBeenLastCalledWith("/sign-in/email", {
+        email: "owner@example.com",
+        password: "new-password123",
+        oauth_query: "",
+        callbackURL: "/admin",
+      });
+    });
   });
 
   it("shows admin-required redirects as login errors", async () => {
