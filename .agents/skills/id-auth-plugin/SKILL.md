@@ -13,6 +13,16 @@ Read `workers/core/src/auth/plugins/README.md` before changing plugin structure,
 
 For the current concrete template, also read `workers/core/src/auth/plugins/resource-server/README.md` when working on `id-resource-server` or modeling a new plugin after it.
 
+## Before Writing Plugin Code
+
+Before creating a new plugin or modifying an existing one, perform these discovery steps in order:
+
+1. **Poke 2 existing plugins** to learn the established patterns. Open `resource-server/` (a table-owning CRUD plugin with schema endpoints) and one of `admin-sign-in-guard/` or `oauth-m2m-bridge/` (behavior-only plugins with hooks.before guards). Note how each splits responsibilities across `index.ts` (BA contract surface), `schema.ts` (data shapes), `types.ts` (composition hooks), and `operations.ts` (business-rule helpers). Your new code must follow the same file-role division.
+
+2. **Browse `workers/core/src/shared/`** — especially `constants.ts` (BA model names like `RESOURCE_SERVER_MODEL`, framework model names like `USER_MODEL`, `MEMBER_MODEL`, `JWKS_MODEL`) and `request.ts` (shared context-access helpers `readBody`, `readString`, `extractBearerToken`). If your plugin needs a model name or a context-access helper, it must come from here; add a new constant/helper to the shared file before using it in your plugin.
+
+3. **Read `workers/core/src/auth/plugins/README.md`** for the current file-structure rules, model-name-constant rule, and data-driven stub generation rule. Consciously verify your plugin conforms to every rule before declaring it done.
+
 ## Core Rules
 
 - Keep custom plugins inside the `auth/` boundary: Better Auth schema, `createAuthEndpoint`, adapter context, validation, and plugin-local helpers.

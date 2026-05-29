@@ -44,6 +44,9 @@ plugins/<name>/
 - Custom plugin modules may use JSDoc at architectural boundaries. Keep comments focused on ownership and invariants rather than narrating each assignment.
 - Use Zod for runtime data boundaries: plugin rows, request bodies, response bodies, OpenAPI fragments, and env/config values. Use TypeScript-only types for internal callback options and adapter capability surfaces that are never parsed from untrusted input.
 - Natural-key uniqueness for plugin rows must be represented through supported plugin schema fields. For compound logical keys, persist a deterministic internal key with `unique: true`, compute it only in the owning endpoint operations, and omit it from public responses.
+- Every model name passed to a BA adapter (`adapter.findOne`, `adapter.findMany`, `adapter.create`, `adapter.update`, `adapter.delete`) **must** use a `SCREAMING_SNAKE_CASE` constant from `src/shared/constants.ts`. Bare string literals (`"user"`, `"member"`, `"jwks"`) are forbidden. Add the missing constant to `shared/constants.ts` with JSDoc before creating the first adapter call that uses it.
+- Reusable context-access utilities that serve **multiple** plugins or route files belong in `src/shared/request.ts`, not in individual plugin `index.ts` files. This includes body-parsing helpers (`readBody`, `readString`) and header extraction (`extractBearerToken`). Duplicating these in each plugin is an architecture violation.
+- For mutation-rejection endpoint stubs that share identical handler logic (e.g. SCIM read-only 405s), declare the (key, path, method) tuples in a module-scope data structure and generate the endpoints with a loop or `Object.fromEntries` rather than repeating `createAuthEndpoint` for each method. Explicit `createAuthEndpoint` declarations remain preferred for endpoints that contain unique handler logic.
 
 ## Writing a new plugin
 

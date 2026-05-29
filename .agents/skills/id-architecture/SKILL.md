@@ -55,6 +55,9 @@ Custom tables belong to Better Auth plugins, not standalone Drizzle schemas.
 
 ## Pattern Reminders
 
+- **Before writing any new code in `workers/core`**, browse `workers/core/src/shared/` to discover existing utilities, constants, errors, and helpers. Check `shared/constants.ts` for model names and cross-cutting values, `shared/request.ts` for body-parsing and header-extraction helpers, `shared/errors.ts` for typed errors, and `shared/http-status.ts` for status code constants. If the needed abstraction already exists here, import it — do not rewrite it inline.
+- **Before writing new auth infrastructure**, check `workers/core/src/auth/adapters/` for existing cache, email, password, storage, and well-known adapters before inlining the same mechanics in a route or plugin file.
+
 - Put reusable auth-runtime mechanics in `workers/core/src/auth/adapters/**`. Route files and plugin runtime companions may call adapters, but should not inline Cache API wrappers, TTL memory-cache bookkeeping, secondary-storage wrappers, password hashing, email sending, or other reusable auth infrastructure mechanics.
 - Keep numeric policy/config values named in the approved constant sites. Better Auth integration constants belong in `workers/core/src/auth/config.ts`; ordinary auth adapters/plugins import them instead of inlining numbers.
 - Keep HTTP route files focused on routing and request orchestration. For example, JWKS response caching belongs in an auth adapter, while `auth-mount.ts` only decides when to use it.

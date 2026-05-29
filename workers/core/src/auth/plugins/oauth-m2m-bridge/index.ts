@@ -1,12 +1,9 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { OAUTH_CLIENT_GRANT_TYPE_M2M, OAUTH_CLIENT_MODEL } from "../../../shared/constants";
+import { readBody } from "../../../shared/request";
 import { clientHasGrantType } from "./operations";
 import type { OAuthClientRow, OAuthM2MBridgeAdapter } from "./types";
-
-function readBody(ctx: { readonly body?: unknown }): Record<string, unknown> {
-  return ctx.body && typeof ctx.body === "object" ? (ctx.body as Record<string, unknown>) : {};
-}
 
 function pathMatches(ctx: { readonly path?: string }, suffix: string): boolean {
   return typeof ctx.path === "string" && (ctx.path === suffix || ctx.path.endsWith(suffix));

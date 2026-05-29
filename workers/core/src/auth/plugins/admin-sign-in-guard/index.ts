@@ -1,6 +1,7 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { ADMIN_OTP_TTL_SECONDS } from "../../config";
+import { readBody, readString } from "../../../shared/request";
 import {
   assertOtpGenerateLimit,
   assertOtpVerifyLimit,
@@ -13,14 +14,6 @@ import {
   timingSafeEqualHex,
 } from "./operations";
 import type { AdminSignInGuardContext, AdminSignInGuardOptions } from "./types";
-
-function readBody(ctx: { readonly body?: unknown }): Record<string, unknown> {
-  return ctx.body && typeof ctx.body === "object" ? (ctx.body as Record<string, unknown>) : {};
-}
-
-function readString(body: Record<string, unknown>, key: string): string | undefined {
-  return typeof body[key] === "string" ? (body[key] as string) : undefined;
-}
 
 /**
  * Companion guard for `POST /sign-in/email` enforcing doc 024.

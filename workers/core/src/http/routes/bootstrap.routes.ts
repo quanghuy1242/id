@@ -5,6 +5,7 @@ import type { CoreEnv } from "../../config/env";
 import { getAuth } from "../../auth/get-auth";
 import { nativeAdminExists } from "../../infrastructure/persistence/bootstrap-store";
 import { MIN_BOOTSTRAP_PASSWORD_LENGTH, MIN_BOOTSTRAP_TOKEN_LENGTH, BOOTSTRAP_RATE_LIMIT_MAX_ATTEMPTS, BOOTSTRAP_RATE_LIMIT_TTL_SECONDS, BOOTSTRAP_LOCK_TTL_SECONDS } from "../../shared/constants";
+import { extractBearerToken } from "../../shared/request";
 import { HTTP_BAD_REQUEST, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, HTTP_TOO_MANY_REQUESTS, HTTP_SERVICE_UNAVAILABLE } from "../../shared/http-status";
 
 /*
@@ -26,11 +27,6 @@ const bootstrapAdminBody = z.object({
 });
 
 type BootstrapContext = Context<{ Bindings: CoreEnv }>;
-
-function bearerToken(header: string | null): string | null {
-  const prefix = "Bearer ";
-  return header?.startsWith(prefix) ? header.slice(prefix.length) : null;
-}
 
 function safeBearerEquals(provided: string | null, expected: string): boolean {
   if (!provided) return false;
@@ -65,7 +61,7 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
     return c.json({ error: "too_many_attempts" }, HTTP_TOO_MANY_REQUESTS);
   }
 
-  if (!safeBearerEquals(bearerToken(c.req.header("authorization") ?? null), expectedToken)) {
+  if (!safeBearerEquals(extractBearerToken(c.req.header("authorization") ?? null), expectedToken)) {
     await env.KV.put(attemptKey, String(attemptCount + 1), { expirationTtl: BOOTSTRAP_RATE_LIMIT_TTL_SECONDS });
     return c.json({ error: "unauthorized" }, HTTP_UNAUTHORIZED);
   }

@@ -1,3 +1,15 @@
+/** BA model name for the user table. */
+export const USER_MODEL = "user" as const;
+
+/** BA model name for the member (organization membership) table. */
+export const MEMBER_MODEL = "member" as const;
+
+/** BA model name for the team table. */
+export const TEAM_MODEL = "team" as const;
+
+/** BA model name for the JWKS table. */
+export const JWKS_MODEL = "jwks" as const;
+
 /** BA model name for the resource-server plugin table. */
 export const RESOURCE_SERVER_MODEL = "resourceServer" as const;
 

@@ -1,3 +1,5 @@
+import { MEMBER_MODEL } from "../../shared/constants";
+
 export type AdminDbAdapter = {
   findMany: (params: { model: string; where?: Array<{ field: string; value: unknown }> }) => Promise<Array<Record<string, unknown>>>;
 };
@@ -12,7 +14,7 @@ export async function hasOrganizationAccess(
   organizationId: string,
 ): Promise<boolean> {
   const memberships = await adapter.findMany({
-    model: "member",
+    model: MEMBER_MODEL,
     where: [
       { field: "userId", value: userId },
       { field: "organizationId", value: organizationId },
@@ -21,8 +23,8 @@ export async function hasOrganizationAccess(
 
   return memberships.some(
     (m) =>
-      (m.userId === userId || m.user_id === userId) &&
-      (m.organizationId === organizationId || m.organization_id === organizationId) &&
+      m.userId === userId &&
+      m.organizationId === organizationId &&
       (m.role === "owner" || m.role === "admin"),
   );
 }

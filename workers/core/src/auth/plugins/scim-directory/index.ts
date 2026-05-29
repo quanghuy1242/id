@@ -141,6 +141,23 @@ const scimErrorMetadata = scimEndpointMeta({
   responseDescription: "405 Method Not Allowed",
 });
 
+/** Mutation-rejection stubs that return 405 for every read-only SCIM resource. */
+const scimMutationRejections: readonly { readonly key: string; readonly path: string; readonly method: "POST" | "PUT" | "PATCH" | "DELETE" }[] = [
+  { key: "scimCreateUserNotAllowed", path: "/scim/v2/Users", method: "POST" },
+  { key: "scimReplaceUserNotAllowed", path: "/scim/v2/Users/:userId", method: "PUT" },
+  { key: "scimPatchUserNotAllowed", path: "/scim/v2/Users/:userId", method: "PATCH" },
+  { key: "scimDeleteUserNotAllowed", path: "/scim/v2/Users/:userId", method: "DELETE" },
+  { key: "scimCreateOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users", method: "POST" },
+  { key: "scimReplaceOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "PUT" },
+  { key: "scimPatchOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "PATCH" },
+  { key: "scimDeleteOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "DELETE" },
+  { key: "scimBulkNotAllowed", path: "/scim/v2/Bulk", method: "POST" },
+  { key: "scimCreateGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups", method: "POST" },
+  { key: "scimReplaceGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "PUT" },
+  { key: "scimPatchGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "PATCH" },
+  { key: "scimDeleteGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "DELETE" },
+];
+
 /**
  * Read-only SCIM v2 directory plugin.
  *
@@ -253,34 +270,6 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
       },
     ),
 
-    /** POST /api/auth/scim/v2/Users — always 405 (read-only). */
-    scimCreateUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/Users",
-      { method: "POST", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PUT /api/auth/scim/v2/Users/:userId — always 405 (read-only). */
-    scimReplaceUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/Users/:userId",
-      { method: "PUT", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PATCH /api/auth/scim/v2/Users/:userId — always 405 (read-only). */
-    scimPatchUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/Users/:userId",
-      { method: "PATCH", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** DELETE /api/auth/scim/v2/Users/:userId — always 405 (read-only). */
-    scimDeleteUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/Users/:userId",
-      { method: "DELETE", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
     // ── Tenant-scoped user endpoints ──────────────────────────────────────────
 
     /**
@@ -310,41 +299,6 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
 
         return scimJsonResponse(toScimOrgUser(result.user, result.member, orgId, ctx.context.baseURL));
       },
-    ),
-
-    /** POST /api/auth/scim/v2/tenants/:orgId/Users — always 405 (read-only). */
-    scimCreateOrgUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Users",
-      { method: "POST", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PUT /api/auth/scim/v2/tenants/:orgId/Users/:userId — always 405 (read-only). */
-    scimReplaceOrgUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Users/:userId",
-      { method: "PUT", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PATCH /api/auth/scim/v2/tenants/:orgId/Users/:userId — always 405 (read-only). */
-    scimPatchOrgUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Users/:userId",
-      { method: "PATCH", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** DELETE /api/auth/scim/v2/tenants/:orgId/Users/:userId — always 405 (read-only). */
-    scimDeleteOrgUserNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Users/:userId",
-      { method: "DELETE", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** POST /api/auth/scim/v2/Bulk — always 405 (SCIM Bulk is not supported). */
-    scimBulkNotAllowed: createAuthEndpoint(
-      "/scim/v2/Bulk",
-      { method: "POST", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
     ),
 
     // ── Tenant-scoped group endpoints ─────────────────────────────────────────
@@ -467,32 +421,13 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
       },
     ),
 
-    /** POST /api/auth/scim/v2/tenants/:orgId/Groups — always 405 (read-only). */
-    scimCreateGroupNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Groups",
-      { method: "POST", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PUT /api/auth/scim/v2/tenants/:orgId/Groups/:groupId — always 405 (read-only). */
-    scimReplaceGroupNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Groups/:groupId",
-      { method: "PUT", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** PATCH /api/auth/scim/v2/tenants/:orgId/Groups/:groupId — always 405 (read-only). */
-    scimPatchGroupNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Groups/:groupId",
-      { method: "PATCH", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
-
-    /** DELETE /api/auth/scim/v2/tenants/:orgId/Groups/:groupId — always 405 (read-only). */
-    scimDeleteGroupNotAllowed: createAuthEndpoint(
-      "/scim/v2/tenants/:orgId/Groups/:groupId",
-      { method: "DELETE", disableBody: true, metadata: scimErrorMetadata },
-      async () => scimMethodNotAllowed(),
-    ),
+    ...Object.fromEntries(scimMutationRejections.map((stub) => [
+      stub.key,
+      createAuthEndpoint(
+        stub.path,
+        { method: stub.method, disableBody: true, metadata: scimErrorMetadata },
+        async () => scimMethodNotAllowed(),
+      ),
+    ])),
   },
 });

@@ -1,5 +1,7 @@
 import { APIError } from "better-auth/api";
 import { decodeProtectedHeader, importJWK, jwtVerify, type JWTPayload } from "jose";
+import { JWKS_MODEL } from "../shared/constants";
+import { extractBearerToken } from "../shared/request";
 
 type JwksRow = {
   readonly id: string;
@@ -10,12 +12,6 @@ type JwksRow = {
 type JwksReader = {
   readonly findMany: <T>(query: { model: string }) => Promise<T[]>;
 };
-
-function bearerToken(headers: Headers): string {
-  const authorization = headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) throw new APIError("UNAUTHORIZED");
-  return authorization.slice("Bearer ".length);
-}
 
 function tokenHasScope(scopeClaim: unknown, requiredScope: string): boolean {
   return typeof scopeClaim === "string" && scopeClaim.split(" ").includes(requiredScope);
@@ -33,7 +29,9 @@ export async function verifyScopedBearerToken(params: {
   readonly audience: string;
   readonly scope: string;
 }): Promise<JWTPayload> {
-  const token = bearerToken(params.headers);
+  const token = extractBearerToken(params.headers.get("authorization"));
+  if (!token) throw new APIError("UNAUTHORIZED");
+
   let header: Awaited<ReturnType<typeof decodeProtectedHeader>>;
   try {
     header = decodeProtectedHeader(token);
@@ -42,7 +40,7 @@ export async function verifyScopedBearerToken(params: {
   }
   if (!header.kid) throw new APIError("UNAUTHORIZED");
 
-  const keys = await params.adapter.findMany<JwksRow>({ model: "jwks" });
+  const keys = await params.adapter.findMany<JwksRow>({ model: JWKS_MODEL });
   const key = keys.find((row) => row.id === header.kid);
   if (!key) throw new APIError("UNAUTHORIZED");
 

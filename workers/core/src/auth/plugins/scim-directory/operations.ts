@@ -1,3 +1,4 @@
+import { MEMBER_MODEL, TEAM_MODEL, USER_MODEL } from "../../../shared/constants";
 import type { ScimAdapter } from "./types";
 
 export type UserRow = {
@@ -24,7 +25,7 @@ const adminRoles = new Set(["owner", "admin"]);
 /** Looks up a single user by ID. Returns the row or null when absent. */
 export async function findUser(adapter: ScimAdapter, userId: string): Promise<UserRow | null> {
   return adapter.findOne<UserRow>({
-    model: "user",
+    model: USER_MODEL,
     where: [{ field: "id", value: userId }],
   });
 }
@@ -42,7 +43,7 @@ export async function findOrgUser(
   if (!user) return null;
 
   const member = await adapter.findOne<MemberRow>({
-    model: "member",
+    model: MEMBER_MODEL,
     where: [
       { field: "userId", value: userId },
       { field: "organizationId", value: orgId },
@@ -59,7 +60,7 @@ export async function findOrgUser(
  */
 export async function findTeam(adapter: ScimAdapter, teamId: string, orgId: string): Promise<TeamRow | null> {
   const team = await adapter.findOne<TeamRow>({
-    model: "team",
+    model: TEAM_MODEL,
     where: [{ field: "id", value: teamId }],
   });
   if (!team || team.organizationId !== orgId) return null;
@@ -71,7 +72,7 @@ export async function findTeam(adapter: ScimAdapter, teamId: string, orgId: stri
  */
 export async function findOrgAdmins(adapter: ScimAdapter, orgId: string): Promise<MemberRow[]> {
   const members = await adapter.findMany<MemberRow>({
-    model: "member",
+    model: MEMBER_MODEL,
     where: [{ field: "organizationId", value: orgId }],
   });
   return members.filter((m) => adminRoles.has(m.role));
@@ -82,7 +83,7 @@ export async function findOrgAdmins(adapter: ScimAdapter, orgId: string): Promis
  */
 export async function isOrgAdmin(adapter: ScimAdapter, userId: string, orgId: string): Promise<boolean> {
   const member = await adapter.findOne<MemberRow>({
-    model: "member",
+    model: MEMBER_MODEL,
     where: [
       { field: "userId", value: userId },
       { field: "organizationId", value: orgId },

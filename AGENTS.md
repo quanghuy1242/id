@@ -1,3 +1,5 @@
+**Before starting any task, evaluate the prompt and load relevant skills using the skill tool.** Check the available skills list at the top of the system message for matches (e.g. `id-architecture`, `id-auth-plugin`, `id-admin-ui`). Do not analyze or modify architecture-boundary code without loading the applicable skill first.
+
 ## Commands
 
 - `pnpm check` — full CI gate: lint (oxlint architecture gate) → duplicate gate (Fallow mild) → typecheck → test

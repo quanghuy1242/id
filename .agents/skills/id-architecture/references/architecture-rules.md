@@ -176,6 +176,9 @@ Better Auth is a runtime integration boundary:
 - Forbidden: `domain`, `application`, ordinary `http` route modules, `infrastructure`, `packages/lib`, and `workers/ui`.
 - Custom first-batch tables live in Better Auth plugin `schema` definitions, not standalone Drizzle schemas.
 - The `idResourceServer` plugin owns resource server table schema and endpoints.
+- **BA adapter model-name rule**: Every model name passed to a Better Auth adapter method (`findOne`, `findMany`, `create`, `update`, `delete`) must use a `SCREAMING_SNAKE_CASE` constant from `workers/core/src/shared/constants.ts`. Bare string literals (`"user"`, `"member"`, `"jwks"`) are forbidden. If the model constant does not exist, add it to `shared/constants.ts` with JSDoc before the first adapter call.
+- **Shared context utilities rule**: Reusable request-context utilities that serve multiple plugins or route files (`readBody`, `readString`, `extractBearerToken`) belong in `workers/core/src/shared/request.ts`. Duplicating these in individual plugin or route files is an architecture violation.
+- **Mutation-rejection stubs rule**: For endpoint stubs that share identical handler logic (e.g. SCIM read-only 405s), declare the tuples in a module-scope data structure and generate the endpoints rather than repeating `createAuthEndpoint` for each method.
 
 ## Worker And Package Boundary Rules
 
