@@ -9,6 +9,7 @@ import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
+import { idAdminSignInGuard } from "./plugins/admin-sign-in-guard";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
@@ -123,6 +124,11 @@ export function getAuthOptions(
         },
       }),
       idOAuthM2MBridge(),
+      idAdminSignInGuard({
+        sendEmail: ({ to, otp }) =>
+          sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
+        kv: env.KV,
+      }),
       createOAuthProviderPlugin(env, catalog, runtime, isPlatformAdmin),
       idResourceServer({
         invalidateAudienceCache: () => invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),

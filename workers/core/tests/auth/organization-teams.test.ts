@@ -5,7 +5,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
+
+const capturedEmailSender = createCapturedAuthEmailSender();
 
 type RawStatement = {
   readonly all: () => Array<Record<string, unknown>>;
@@ -17,10 +21,11 @@ type RawSqlite = {
 };
 
 function createKv(): BetterAuthKvStorage {
+  const values = new Map<string, string>();
   return {
-    get: async () => null,
-    put: async () => undefined,
-    delete: async () => undefined,
+    get: async (key) => values.get(key) ?? null,
+    put: async (key, value) => { values.set(key, value); },
+    delete: async (key) => { values.delete(key); },
   };
 }
 
@@ -36,13 +41,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
 }
 
 async function signIn(auth: ReturnType<typeof betterAuth>, email: string): Promise<string> {
-  const response = await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "password123" }),
-    }),
-  );
+  const response = await adminOtpSignIn(auth, capturedEmailSender, { email, password: "password123" });
   expect(response.status).toBe(200);
   return response.headers.get("set-cookie") ?? "";
 }
@@ -51,12 +50,16 @@ describe("Better Auth team contract", () => {
   it("creates, lists, adds, and removes teams with stable org-scoped team IDs", async () => {
     const raw = await createMemoryDatabase();
     const auth = betterAuth(
-      getAuthOptions({
-        BETTER_AUTH_SECRET: "test-secret",
-        BETTER_AUTH_URL: "https://id.example.test",
-        DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
-        KV: createKv(),
-      }),
+      getAuthOptions(
+        {
+          BETTER_AUTH_SECRET: "test-secret",
+          BETTER_AUTH_URL: "https://id.example.test",
+          DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+          KV: createKv(),
+        },
+        undefined,
+        { emailSender: capturedEmailSender },
+      ),
     );
 
     const owner = await auth.api.createUser({

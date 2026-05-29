@@ -1,3 +1,4 @@
+await import("./auth/admin-sign-in-guard.test");
 await import("./auth/audiences.test");
 await import("./auth/auth-core.test");
 await import("./auth/bootstrap.test");

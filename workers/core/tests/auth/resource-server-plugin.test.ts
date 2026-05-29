@@ -5,13 +5,18 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
 
+const capturedEmailSender = createCapturedAuthEmailSender();
+
 function createKv(): BetterAuthKvStorage {
+  const values = new Map<string, string>();
   return {
-    get: async () => null,
-    put: async () => undefined,
-    delete: async () => undefined,
+    get: async (key) => values.get(key) ?? null,
+    put: async (key, value) => { values.set(key, value); },
+    delete: async (key) => { values.delete(key); },
   };
 }
 
@@ -26,16 +31,10 @@ async function signInSuperadmin(auth: ReturnType<typeof betterAuth>, _raw: { exe
     },
   });
 
-  const response = await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: "root@example.test",
-        password: "password123",
-      }),
-    }),
-  );
+  const response = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "root@example.test",
+    password: "password123",
+  });
   const cookie = response.headers.get("set-cookie");
   expect(cookie).toEqual(expect.any(String));
   return cookie ?? "";
@@ -68,6 +67,7 @@ describe("idResourceServer plugin endpoint", () => {
           KV: createKv(),
         },
         { validAudiences: [], scopes: [], scopeRows: [] },
+        { emailSender: capturedEmailSender },
       ),
     );
     const cookie = await signInSuperadmin(auth, raw);
@@ -113,12 +113,16 @@ describe("idResourceServer plugin endpoint", () => {
       schema: authSchema,
     });
     const auth = betterAuth(
-      getAuthOptions({
-        BETTER_AUTH_SECRET: "test-secret",
-        BETTER_AUTH_URL: "https://id.example.test",
-        DB: db,
-        KV: createKv(),
-      }),
+      getAuthOptions(
+        {
+          BETTER_AUTH_SECRET: "test-secret",
+          BETTER_AUTH_URL: "https://id.example.test",
+          DB: db,
+          KV: createKv(),
+        },
+        undefined,
+        { emailSender: capturedEmailSender },
+      ),
     );
 
     const owner = await auth.api.createUser({
@@ -151,13 +155,10 @@ describe("idResourceServer plugin endpoint", () => {
     raw.exec(
       `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('m_member', '${organizationOne.id}', '${member.user.id}', 'member', 1700000000000);`,
     );
-    const ownerSignIn = await auth.handler(
-      new Request("https://id.example.test/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "owner@example.test", password: "password123" }),
-      }),
-    );
+    const ownerSignIn = await adminOtpSignIn(auth, capturedEmailSender, {
+      email: "owner@example.test",
+      password: "password123",
+    });
     expect(ownerSignIn.status).toBe(200);
     const ownerCookie = ownerSignIn.headers.get("set-cookie") ?? "";
     const ownerSession = await auth.api.getSession({ headers: new Headers({ cookie: ownerCookie }) });
@@ -209,13 +210,10 @@ describe("idResourceServer plugin endpoint", () => {
     );
     expect(crossOrg.status).toBe(404);
 
-    const memberSignIn = await auth.handler(
-      new Request("https://id.example.test/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "member@example.test", password: "password123" }),
-      }),
-    );
+    const memberSignIn = await adminOtpSignIn(auth, capturedEmailSender, {
+      email: "member@example.test",
+      password: "password123",
+    });
     expect(memberSignIn.status).toBe(200);
     const memberCookie = memberSignIn.headers.get("set-cookie") ?? "";
     const memberList = await auth.handler(

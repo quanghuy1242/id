@@ -5,6 +5,10 @@ import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
+
+const capturedEmailSender = createCapturedAuthEmailSender();
 
 type TestAuth = ReturnType<typeof betterAuth>;
 type TokenResponse = { readonly access_token: string; readonly expires_in: number; readonly refresh_token?: string; readonly token_type: string };
@@ -33,7 +37,7 @@ async function createAuth(db: D1Database) {
       { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
       { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:share" },
     ],
-  }));
+  }, { emailSender: capturedEmailSender }));
 }
 
 async function createUserAndOrgAndTeam(auth: TestAuth, raw: RawSqlite) {
@@ -41,10 +45,7 @@ async function createUserAndOrgAndTeam(auth: TestAuth, raw: RawSqlite) {
     body: { name: "Alice", email: "alice@example.test", password: "password123", data: { emailVerified: true } },
   });
 
-  const adminR = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "alice@example.test", password: "password123" }),
-  }));
+  const adminR = await adminOtpSignIn(auth, capturedEmailSender, { email: "alice@example.test", password: "password123" });
   const cookie = adminR.headers.get("set-cookie") ?? "";
 
   const orgR = await auth.handler(new Request("https://id.example.test/api/auth/organization/create", {
@@ -82,10 +83,7 @@ async function createNativeClient(auth: TestAuth) {
     body: { name: "Admin", email: "admin@example.test", password: "password123", role: "admin", data: { emailVerified: true } },
   });
 
-  const signInR = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "admin@example.test", password: "password123" }),
-  }));
+  const signInR = await adminOtpSignIn(auth, capturedEmailSender, { email: "admin@example.test", password: "password123" });
   const adminCookie = signInR.headers.get("set-cookie") ?? "";
 
   const clientR = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/create-client", {
@@ -188,10 +186,7 @@ describe("OAuth PKCE direct-share flow", () => {
     await auth.api.createUser({
       body: { name: "Admin2", email: "admin2@example.test", password: "password123", role: "admin", data: { emailVerified: true } },
     });
-    const adminSignIn = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "admin2@example.test", password: "password123" }),
-    }));
+    const adminSignIn = await adminOtpSignIn(auth, capturedEmailSender, { email: "admin2@example.test", password: "password123" });
     const ac = adminSignIn.headers.get("set-cookie") ?? "";
     const clientR = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/create-client", {
       method: "POST", headers: { "content-type": "application/json", cookie: ac },

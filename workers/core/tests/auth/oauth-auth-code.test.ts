@@ -7,6 +7,8 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
 
 type RawSqlite = {
@@ -52,6 +54,8 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   return raw;
 }
 
+const capturedEmailSender = createCapturedAuthEmailSender();
+
 async function createAuth(raw: RawSqlite) {
   return betterAuth(
     getAuthOptions(
@@ -70,6 +74,7 @@ async function createAuth(raw: RawSqlite) {
           { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:share" },
         ],
       },
+      { emailSender: capturedEmailSender },
     ),
   );
 }
@@ -104,16 +109,10 @@ async function signInAdmin(auth: ReturnType<typeof betterAuth>): Promise<string>
       data: { emailVerified: true },
     },
   });
-  const response = await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: "admin@example.test",
-        password: "password123",
-      }),
-    }),
-  );
+  const response = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "admin@example.test",
+    password: "password123",
+  });
   expect(response.status).toBe(200);
   return response.headers.get("set-cookie") ?? "";
 }

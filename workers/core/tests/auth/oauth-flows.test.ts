@@ -4,6 +4,10 @@ import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
+
+const capturedEmailSender = createCapturedAuthEmailSender();
 
 type TestDatabase = {
   readonly db: D1Database;
@@ -41,6 +45,7 @@ async function createAuth(db: D1Database, validAudiences: readonly string[] = []
           { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
         ],
       },
+      { emailSender: capturedEmailSender },
     ),
   );
 }
@@ -56,16 +61,10 @@ async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<{ reado
     },
   });
 
-  const response = await auth.handler(
-    new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: "root@example.test",
-        password: "password123",
-      }),
-    }),
-  );
+  const response = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "root@example.test",
+    password: "password123",
+  });
 
   raw.exec(
     `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_root', 'org_1', '${created.user.id}', 'owner', 1700000000000);`,

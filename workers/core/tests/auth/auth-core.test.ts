@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { authPluginConfig } from "../../src/auth/config";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
+import { adminOtpSignIn, signInRequest } from "./admin-otp-sign-in";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
 
@@ -90,30 +91,19 @@ describe("Better Auth core flows", () => {
     );
     expect([...kv.values.keys()].some((key) => key.startsWith(authPluginConfig.emailVerificationStoragePrefix))).toBe(false);
 
+    // Admin-context sign-in (doc 024): the guard rejects an unverified email
+    // before issuing an OTP, matching the underlying email-verification gate.
     const blockedSignIn = await auth.handler(
-      new Request("https://id.example.test/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: "alice@example.test",
-          password: "password123",
-        }),
-      }),
+      signInRequest({ email: "alice@example.test", password: "password123", callbackURL: "/admin" }),
     );
     expect(blockedSignIn.status).toBe(403);
 
     raw.exec(`update "user" set "emailVerified" = 1 where "email" = 'alice@example.test';`);
 
-    const signin = await auth.handler(
-      new Request("https://id.example.test/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: "alice@example.test",
-          password: "password123",
-        }),
-      }),
-    );
+    const signin = await adminOtpSignIn(auth, emailSender, {
+      email: "alice@example.test",
+      password: "password123",
+    });
     expect(signin.status).toBe(200);
     const cookie = signin.headers.get("set-cookie");
     expect(cookie).toEqual(expect.any(String));

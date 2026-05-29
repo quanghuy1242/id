@@ -6,7 +6,10 @@ import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
+
+const capturedEmailSender = createCapturedAuthEmailSender();
 
 type RawSqlite = {
   readonly exec: (sql: string) => void;
@@ -31,7 +34,7 @@ async function createAuth(raw: RawSqlite) {
     getAuthOptions(
       { BETTER_AUTH_SECRET: "test-secret", BETTER_AUTH_URL: "https://id.example.test", DB: db, KV: createKv() },
       { validAudiences: [], scopes: [], scopeRows: [] },
-      { emailSender: createCapturedAuthEmailSender() },
+      { emailSender: capturedEmailSender },
     ),
   );
 }
@@ -49,10 +52,7 @@ async function createAndSignInUser(auth: TestAuth, raw: RawSqlite, name: string,
   await auth.api.createUser({
     body: { name, email, password: "password123", data: { emailVerified: true } },
   });
-  const r = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: "password123" }),
-  }));
+  const r = await adminOtpSignIn(auth, capturedEmailSender, { email, password: "password123" });
   return r.headers.get("set-cookie") ?? "";
 }
 
@@ -183,15 +183,19 @@ describe("Session management", () => {
       body: { name: "Dana", email: "dana@example.test", password: "password123", data: { emailVerified: true } },
     });
 
-    const first = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST", headers: { "content-type": "application/json", "user-agent": "first-browser" },
-      body: JSON.stringify({ email: "dana@example.test", password: "password123" }),
-    }));
+    const first = await adminOtpSignIn(
+      auth,
+      capturedEmailSender,
+      { email: "dana@example.test", password: "password123" },
+      { headers: { "user-agent": "first-browser" } },
+    );
     const firstCookie = first.headers.get("set-cookie") ?? "";
-    const second = await auth.handler(new Request("https://id.example.test/api/auth/sign-in/email", {
-      method: "POST", headers: { "content-type": "application/json", "user-agent": "second-browser" },
-      body: JSON.stringify({ email: "dana@example.test", password: "password123" }),
-    }));
+    const second = await adminOtpSignIn(
+      auth,
+      capturedEmailSender,
+      { email: "dana@example.test", password: "password123" },
+      { headers: { "user-agent": "second-browser" } },
+    );
     expect(second.status).toBe(200);
 
     const listR = await auth.handler(new Request("https://id.example.test/api/auth/list-sessions", {

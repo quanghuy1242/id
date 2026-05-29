@@ -22,6 +22,24 @@ export const MAX_TOKEN_TEAM_IDS = 128;
 /** OAuth context-selection cache TTL, in seconds. */
 export const OAUTH_CONTEXT_SELECTION_TTL_SECONDS = 300;
 
+/** Admin login one-time-passcode lifetime, in seconds. */
+export const ADMIN_OTP_TTL_SECONDS = 300;
+
+/** Maximum admin-login OTP emails per generation window. */
+export const ADMIN_OTP_GENERATE_MAX_ATTEMPTS = 3;
+
+/** Admin-login OTP generation rate-limit window, in seconds. */
+export const ADMIN_OTP_GENERATE_WINDOW_SECONDS = 900;
+
+/** Maximum admin-login OTP verification attempts per OTP window. */
+export const ADMIN_OTP_VERIFY_MAX_ATTEMPTS = 5;
+
+/** Smallest admin-login OTP value (inclusive) — keeps the code 6 digits. */
+export const ADMIN_OTP_MIN_INCLUSIVE = 100_000;
+
+/** Upper bound for admin-login OTP generation (exclusive). */
+export const ADMIN_OTP_MAX_EXCLUSIVE = 1_000_000;
+
 /** Test-only scrypt cost parameter for fast password hashing checks. */
 export const TEST_PASSWORD_SCRYPT_N = 64;
 
@@ -60,6 +78,9 @@ export type AuthPluginConfig = {
   readonly teamMembershipCachePrefix: string;
   readonly emailVerificationStoragePrefix: string;
   readonly passwordResetStoragePrefix: string;
+  readonly adminOtpStoragePrefix: string;
+  readonly adminOtpGenerateAttemptsPrefix: string;
+  readonly adminOtpVerifyAttemptsPrefix: string;
   readonly jwksPath: string;
   readonly jwksRotationIntervalSeconds: number;
   readonly jwksGracePeriodSeconds: number;
@@ -111,6 +132,9 @@ export const authPluginConfig = {
   teamMembershipCachePrefix: "id-teams:user:",
   emailVerificationStoragePrefix: "id-email:verification:",
   passwordResetStoragePrefix: "id-email:password-reset:",
+  adminOtpStoragePrefix: "id-admin-otp:code:",
+  adminOtpGenerateAttemptsPrefix: "id-admin-otp:generate:",
+  adminOtpVerifyAttemptsPrefix: "id-admin-otp:verify:",
   jwksPath: "/jwks",
   jwksRotationIntervalSeconds: JWKS_ROTATION_INTERVAL_SECONDS,
   jwksGracePeriodSeconds: JWKS_GRACE_PERIOD_SECONDS,

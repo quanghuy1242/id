@@ -67,7 +67,7 @@ describe("LoginForm", () => {
     });
   });
 
-  it("submits the form with valid credentials", async () => {
+  it("submits the form with valid credentials and defaults the admin callbackURL", async () => {
     mockPostAuthApi.mockResolvedValue({});
 
     render(<LoginForm />);
@@ -80,6 +80,7 @@ describe("LoginForm", () => {
         email: "test@example.com",
         password: "password12345",
         oauth_query: "",
+        callbackURL: "/admin",
       });
     });
   });
@@ -177,7 +178,7 @@ describe("LoginForm", () => {
     });
   });
 
-  it("does not pass unsafe callback URLs to Better Auth sign-in", async () => {
+  it("drops unsafe callback URLs and falls back to the default admin callbackURL", async () => {
     mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/" });
     window.history.replaceState({}, "", "/login?callbackURL=https%3A%2F%2Fevil.example%2Fadmin");
 
@@ -191,8 +192,56 @@ describe("LoginForm", () => {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
+        callbackURL: "/admin",
       });
     });
+  });
+
+  it("does not default a callbackURL during the OAuth flow", async () => {
+    mockPostAuthApi.mockResolvedValue({ redirect: true, url: "/" });
+    mockOauthQuery = "client_id=test&scope=openid";
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockPostAuthApi).toHaveBeenCalledWith("/sign-in/email", {
+        email: "user@example.com",
+        password: "password12345",
+        oauth_query: "client_id=test&scope=openid",
+      });
+    });
+  });
+
+  it("reveals the OTP input on an admin_otp_required response and resubmits with the code", async () => {
+    mockPostAuthApi.mockResolvedValueOnce({ code: "admin_otp_required", maskedEmail: "a***@e***.com" });
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("We sent a verification code to a***@e***.com");
+    });
+    expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+
+    mockPostAuthApi.mockResolvedValueOnce({ redirect: true, url: "/admin" });
+    fireEvent.change(screen.getByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockPostAuthApi).toHaveBeenLastCalledWith("/sign-in/email", {
+        email: "admin@example.com",
+        password: "password12345",
+        oauth_query: "",
+        callbackURL: "/admin",
+        otp: "123456",
+      });
+    });
+    expect(mockPush).toHaveBeenCalledWith("/admin");
   });
 
   it("shows admin-required redirects as login errors", async () => {

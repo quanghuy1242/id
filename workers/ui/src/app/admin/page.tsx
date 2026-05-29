@@ -1,6 +1,6 @@
-// TODO: Admin sign-in has no MFA requirement. This is an IdP — add TOTP (Better Auth twoFactor plugin)
-// enforced for admin role. Check in proxy.ts middleware after role=admin is confirmed.
-// Also consider session freshness: re-auth if session age > 1h for admin routes.
+// Admin-login MFA is handled server-side by the id-admin-sign-in-guard plugin
+// (per-login email OTP for /admin-context sign-ins). See docs/024_admin-login-context-guard.md;
+// account-level TOTP and session-freshness re-auth are tracked there as future work.
 import { PageBody, Panel, Stack } from "@id/ui";
 
 export default function AdminPage() {

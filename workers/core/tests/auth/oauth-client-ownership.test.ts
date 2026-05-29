@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bootstrapAdmin, createTestEnv } from "./m2m-helpers";
+import { bootstrapAdmin, createTestEnv, signInViaAdminOtp } from "./m2m-helpers";
 
 describe("OAuth client ownership via BA clientReference", () => {
   it("attaches referenceId from the active session's organization to newly created clients", async () => {
@@ -63,17 +63,7 @@ describe("OAuth client ownership via BA clientReference", () => {
        insert into "organization" ("id", "name", "slug", "createdAt") values ('org_owner', 'Owner Org', 'owner-org', 1700000000000);
        insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_owner', 'org_owner', '${owner.id}', 'owner', 1700000000000);`,
     );
-    const signIn = await test.app.request(
-      "/api/auth/sign-in/email",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "owner@example.test", password: "password12345" }),
-      },
-      test.env,
-    );
-    expect(signIn.status).toBe(200);
-    const ownerCookie = signIn.headers.get("set-cookie") ?? "";
+    const ownerCookie = await signInViaAdminOtp(test.env, { email: "owner@example.test", password: "password12345" });
     const setActive = await test.app.request(
       "/api/auth/organization/set-active",
       {
@@ -176,17 +166,7 @@ describe("OAuth client ownership via BA clientReference", () => {
     test.raw.exec(
       `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_admin_plain', 'org_plain', '${adminId.id}', 'owner', 1700000000000);`,
     );
-    const adminSignIn = await test.app.request(
-      "/api/auth/sign-in/email",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "root@example.test", password: "password12345" }),
-      },
-      test.env,
-    );
-    expect(adminSignIn.status).toBe(200);
-    const adminCookie2 = adminSignIn.headers.get("set-cookie") ?? "";
+    const adminCookie2 = await signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
 
     // Admin creates a client in org_plain for within-org rejection tests.
     const adminSetActive = await test.app.request(
@@ -248,17 +228,7 @@ describe("OAuth client ownership via BA clientReference", () => {
     const crossOrgClient = (await crossOrgClientResp.json()) as { readonly client_id: string };
 
     // Sign in as ordinary member.
-    const signIn = await test.app.request(
-      "/api/auth/sign-in/email",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "member@example.test", password: "password12345" }),
-      },
-      test.env,
-    );
-    expect(signIn.status).toBe(200);
-    const memberCookie = signIn.headers.get("set-cookie") ?? "";
+    const memberCookie = await signInViaAdminOtp(test.env, { email: "member@example.test", password: "password12345" });
     const setActive = await test.app.request(
       "/api/auth/organization/set-active",
       {

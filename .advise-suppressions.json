@@ -164,14 +164,20 @@
     {
       "tool": "aislop",
       "file": "workers/ui/src/app/admin/page.tsx",
-      "rule": "ai-slop/todo-stub",
-      "reason": "Security TODO documents the explicit future MFA/session-freshness requirement for the temporary admin scaffold page."
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Comment points to docs/024 explaining that admin-login MFA is enforced server-side by id-admin-sign-in-guard; account-level TOTP and session-freshness remain documented future work."
     },
     {
       "tool": "aislop",
-      "file": "workers/ui/src/app/admin/page.tsx",
-      "rule": "ai-slop/narrative-comment",
-      "reason": "Comment is intentional security context for the temporary admin scaffold page until the MFA/session-freshness work lands."
+      "file": "workers/core/src/auth/plugins/admin-sign-in-guard/operations.ts",
+      "rule": "ai-slop/thin-wrapper",
+      "reason": "assertOtpGenerateLimit/assertOtpVerifyLimit are intentional named bindings that keep KV key prefixes, attempt limits, and TTLs co-located in operations.ts rather than leaking those constants into the index.ts guard handler."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/admin-sign-in-guard/index.ts",
+      "rule": "ai-slop/double-type-assertion",
+      "reason": "Better Auth does not export a precise type for ctx.context inside a hooks.before matcher; the narrowed AdminSignInGuardContext assertion mirrors the established pattern in oauth-m2m-bridge (ctx.context.adapter as unknown as ...)."
     }
   ]
 }

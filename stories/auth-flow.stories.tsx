@@ -13,6 +13,26 @@ function setMockUrl(pathname: string, search = "") {
   window.history.replaceState({}, "", `${pathname}${suffix}`);
 }
 
+function installAdminOtpFetchMock() {
+  if (typeof window === "undefined") return;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+    if (url.startsWith("/api/auth/sign-in/email")) {
+      return new Response(
+        JSON.stringify({ code: "admin_otp_required", maskedEmail: "a***@e***.com" }),
+        {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }
+
+    return originalFetch(input, init);
+  };
+}
+
 function installOrganizationFetchMock() {
   if (typeof window === "undefined") return;
 
@@ -42,6 +62,12 @@ export default {
 
 export const Login: Story = () => {
   setMockUrl("/login", OAUTH_QUERY);
+  return <LoginPage />;
+};
+
+export const AdminLoginOtpChallenge: Story = () => {
+  setMockUrl("/login", "");
+  installAdminOtpFetchMock();
   return <LoginPage />;
 };
 

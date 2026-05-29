@@ -2,13 +2,19 @@ import type { BetterAuthOptions } from "better-auth";
 import type { BetterAuthKvStorage } from "./adapters/secondary-storage";
 import type { CoreEnv } from "../config/env";
 
-export type AuthEmailKind = "password-reset" | "verification";
+export type AuthEmailKind = "password-reset" | "verification" | "admin-otp";
 
-export type AuthEmailMessage = {
-  readonly kind: AuthEmailKind;
-  readonly to: string;
-  readonly url: string;
-};
+export type AuthEmailMessage =
+  | {
+      readonly kind: "password-reset" | "verification";
+      readonly to: string;
+      readonly url: string;
+    }
+  | {
+      readonly kind: "admin-otp";
+      readonly to: string;
+      readonly otp: string;
+    };
 
 export type AuthEmailSender = {
   readonly send: (message: AuthEmailMessage) => Promise<void>;

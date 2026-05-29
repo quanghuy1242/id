@@ -1,8 +1,11 @@
 import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/composition/create-app";
+import { getAuth } from "../../src/auth/get-auth";
 import type { CoreEnv } from "../../src/config/env";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
 
 function createKv(): KVNamespace {
   const values = new Map<string, string>();
@@ -48,15 +51,12 @@ async function bootstrap(app: ReturnType<typeof createApp>, env: CoreEnv): Promi
   );
   expect(response.status).toBe(200);
 
-  const signIn = await app.request(
-    "/api/auth/sign-in/email",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "root@example.test", password: "password12345" }),
-    },
-    env,
-  );
+  const sender = createCapturedAuthEmailSender();
+  const auth = getAuth(env, undefined, { emailSender: sender });
+  const signIn = await adminOtpSignIn(auth, sender, {
+    email: "root@example.test",
+    password: "password12345",
+  });
   expect(signIn.status).toBe(200);
   return signIn.headers.get("set-cookie") ?? "";
 }

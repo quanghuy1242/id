@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/composition/create-app";
 import type { CoreEnv } from "../../src/config/env";
 import { createMemoryD1 } from "./d1-test-helper";
+import { signInViaAdminOtp } from "./m2m-helpers";
 
 function createKv(): KVNamespace {
   const values = new Map<string, string>();
@@ -72,16 +73,9 @@ describe("bootstrap admin route", () => {
       }),
     );
 
-    const signIn = await app.request(
-      "/api/auth/sign-in/email",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "root@example.test", password: "password12345" }),
-      },
-      env,
-    );
-    expect(signIn.status).toBe(200);
+    // Post-bootstrap admin sign-in goes through the email-OTP step (doc 024);
+    // the helper asserts a 200 and returns the session cookie.
+    await signInViaAdminOtp(env, { email: "root@example.test", password: "password12345" });
 
     const secondRun = await app.request(
       "/api/bootstrap/admin",

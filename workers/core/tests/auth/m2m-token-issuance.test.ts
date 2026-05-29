@@ -7,6 +7,7 @@ import {
   createOAuthScope,
   createResourceServer,
   createTestEnv,
+  signInViaAdminOtp,
   tokenRequest,
 } from "./m2m-helpers";
 
@@ -104,14 +105,5 @@ describe("M2M token issuance", () => {
 });
 
 async function bootstrapAdminAgainCookieReturn(test: Awaited<ReturnType<typeof createTestEnv>>): Promise<string> {
-  const signIn = await test.app.request(
-    "/api/auth/sign-in/email",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "root@example.test", password: "password12345" }),
-    },
-    test.env,
-  );
-  return signIn.headers.get("set-cookie") ?? "";
+  return signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
 }

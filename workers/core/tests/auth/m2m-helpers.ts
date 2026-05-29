@@ -1,7 +1,10 @@
 import { expect } from "vitest";
 import { createApp } from "../../src/composition/create-app";
+import { getAuth } from "../../src/auth/get-auth";
 import type { CoreEnv } from "../../src/config/env";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
+import { adminOtpSignIn } from "./admin-otp-sign-in";
+import { createCapturedAuthEmailSender } from "../helpers/test-email";
 
 export type TestEnv = {
   readonly env: CoreEnv;
@@ -53,15 +56,22 @@ export async function bootstrapAdmin(test: TestEnv): Promise<string> {
     test.env,
   );
   expect(response.status).toBe(200);
-  const signIn = await test.app.request(
-    "/api/auth/sign-in/email",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "root@example.test", password: "password12345" }),
-    },
-    test.env,
-  );
+  return signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
+}
+
+/**
+ * Completes the admin email-OTP sign-in (doc 024) for a createApp-based test.
+ * Drives it through a side `getAuth` built with a captured email sender; it
+ * shares `env`'s DB + KV, so the session cookie it mints is valid for subsequent
+ * `app.request` calls against the same env.
+ */
+export async function signInViaAdminOtp(
+  env: CoreEnv,
+  creds: { readonly email: string; readonly password: string },
+): Promise<string> {
+  const sender = createCapturedAuthEmailSender();
+  const auth = getAuth(env, undefined, { emailSender: sender });
+  const signIn = await adminOtpSignIn(auth, sender, creds);
   expect(signIn.status).toBe(200);
   return signIn.headers.get("set-cookie") ?? "";
 }
