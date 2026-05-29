@@ -196,6 +196,18 @@
       "file": "packages/ui/src/responsive-breadcrumb.tsx",
       "rule": "complexity/function-too-long",
       "reason": "ResizeObserver overflow measurement logic is inherently verbose; splitting would scatter sibling DOM reads/writes across helpers and obscure the collapse/expand algorithm."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/layout.tsx",
+      "rule": "ai-slop/swallowed-exception",
+      "reason": "Empty catch block is standard no-flash theme initialization: localStorage might be unavailable in opaque origins; fallback to default theme is intentional and safe."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/layout.tsx",
+      "rule": "security/dangerously-set-innerhtml",
+      "reason": "Inline script content is a static theme-initialization string with no user-controlled input; same pattern as Next.js theme-flash-prevention examples."
     }
   ]
 }

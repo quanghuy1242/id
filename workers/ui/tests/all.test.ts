@@ -14,6 +14,7 @@ await import("./packages-ui/duration-input.test");
 await import("./packages-ui/inline.test");
 await import("./packages-ui/mobile-filter-menu.test");
 await import("./packages-ui/tabs.test");
+await import("./packages-ui/theme-dialog.test");
 await import("./packages-ui/typography.test");
 await import("./pages/admin-actions.test");
 await import("./pages/admin-page.test");

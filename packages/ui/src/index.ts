@@ -20,3 +20,5 @@ export * from "./topbar-search-field";
 export * from "./avatar";
 export * from "./menu";
 export * from "./duration-input";
+export * from "./theme-dialog";
+export * from "./theme";

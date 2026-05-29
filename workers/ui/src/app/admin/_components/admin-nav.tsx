@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Button,
@@ -9,6 +10,7 @@ import {
   NavMenu,
   NavSection,
   Tabs,
+  ThemeDialog,
   TopbarAvatarMenu,
   TopbarBrandLink,
   TopbarEnd,
@@ -184,6 +186,7 @@ type AdminTopbarProps = {
 export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
   const pathname = usePathname();
   const currentPageLabel = getCurrentPageLabel(pathname);
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
 
   return (
     <>
@@ -196,10 +199,12 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
         <TopbarAvatarMenu
           initials="AD"
           items={[
+            { label: "Theme", onAction: () => setThemeDialogOpen(true) },
             { label: "Logout", onAction: onLogout ?? (() => { void handleLogout(); }) },
           ]}
         />
       </TopbarEnd>
+      <ThemeDialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen} />
     </>
   );
 }
