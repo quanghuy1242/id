@@ -3,6 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
+import { authPluginConfig } from "../../src/auth/config";
+import { otpHmacHex } from "../../src/auth/plugins/admin-sign-in-guard/operations";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 import { createCapturedAuthEmailSender, type CapturedAuthEmailSender } from "../helpers/test-email";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
@@ -10,6 +12,7 @@ import * as authSchema from "../../src/db/auth-schema";
 
 const ADMIN_EMAIL = "admin@example.test";
 const ADMIN_PASSWORD = "password12345";
+const BETTER_AUTH_SECRET = "test-secret";
 const ORIGIN = "https://id.example.test";
 
 type Harness = {
@@ -40,7 +43,7 @@ async function buildHarness(): Promise<Harness> {
   const auth = betterAuth(
     getAuthOptions(
       {
-        BETTER_AUTH_SECRET: "test-secret",
+        BETTER_AUTH_SECRET,
         BETTER_AUTH_URL: ORIGIN,
         DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
         KV: kv,
@@ -72,6 +75,14 @@ function latestOtp(emailSender: CapturedAuthEmailSender): string {
   const message = emailSender.messages.findLast((m) => m.kind === "admin-otp");
   if (!message || message.kind !== "admin-otp") throw new Error("no admin-otp email captured");
   return message.otp;
+}
+
+function storedOtpEntry(kv: Harness["kv"]): readonly [string, string] {
+  const entries = [...kv.values.entries()].filter(([key]) =>
+    key.startsWith(authPluginConfig.adminOtpStoragePrefix),
+  );
+  if (entries.length !== 1) throw new Error(`expected one stored admin OTP, found ${entries.length}`);
+  return entries[0] as readonly [string, string];
 }
 
 describe("id-admin-sign-in-guard", () => {
@@ -137,6 +148,11 @@ describe("id-admin-sign-in-guard", () => {
       expect(harness.emailSender.messages).toContainEqual(
         expect.objectContaining({ kind: "admin-otp", to: ADMIN_EMAIL }),
       );
+      const otp = latestOtp(harness.emailSender);
+      const [key, stored] = storedOtpEntry(harness.kv);
+      const userId = key.slice(authPluginConfig.adminOtpStoragePrefix.length);
+      expect(stored).toBe(otpHmacHex(BETTER_AUTH_SECRET, userId, otp));
+      expect(stored).not.toBe(otp);
     });
 
     it("rejects invalid credentials without sending an OTP", async () => {

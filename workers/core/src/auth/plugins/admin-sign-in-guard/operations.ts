@@ -1,8 +1,9 @@
-import { randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { APIError } from "better-auth/api";
 import {
   ADMIN_OTP_GENERATE_MAX_ATTEMPTS,
   ADMIN_OTP_GENERATE_WINDOW_SECONDS,
+  ADMIN_OTP_HMAC_PURPOSE,
   ADMIN_OTP_MAX_EXCLUSIVE,
   ADMIN_OTP_MIN_INCLUSIVE,
   ADMIN_OTP_TTL_SECONDS,
@@ -21,16 +22,24 @@ export function generateOtp(): string {
   return String(randomInt(ADMIN_OTP_MIN_INCLUSIVE, ADMIN_OTP_MAX_EXCLUSIVE));
 }
 
-/** Hex-encoded SHA-256 of `input` (WebCrypto, available globally in Workers). */
-export async function sha256Hex(input: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Buffer.from(digest).toString("hex");
+/** Purpose-bound HMAC for low-entropy admin OTP codes stored in KV. */
+export function otpHmacHex(secret: string, userId: string, otp: string): string {
+  return createHmac("sha256", secret)
+    .update(ADMIN_OTP_HMAC_PURPOSE)
+    .update("\0")
+    .update(userId)
+    .update("\0")
+    .update(otp)
+    .digest("hex");
 }
 
 /** Constant-time comparison of two hex strings. Length mismatch is a non-match. */
 export function timingSafeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  const aBuffer = Buffer.from(a, "hex");
+  const bBuffer = Buffer.from(b, "hex");
+  if (aBuffer.length !== bBuffer.length) return false;
+  return timingSafeEqual(aBuffer, bBuffer);
 }
 
 /** Masks an email for display in the OTP challenge, e.g. `a***@e***.com`. */

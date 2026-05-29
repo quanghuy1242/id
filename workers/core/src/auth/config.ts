@@ -40,6 +40,9 @@ export const ADMIN_OTP_MIN_INCLUSIVE = 100_000;
 /** Upper bound for admin-login OTP generation (exclusive). */
 export const ADMIN_OTP_MAX_EXCLUSIVE = 1_000_000;
 
+/** Purpose label bound into admin-login OTP HMAC digests. */
+export const ADMIN_OTP_HMAC_PURPOSE = "admin-login-otp:v1";
+
 /** Test-only scrypt cost parameter for fast password hashing checks. */
 export const TEST_PASSWORD_SCRYPT_N = 64;
 

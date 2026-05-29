@@ -85,31 +85,36 @@ leave a session cookie behind.
    - *First submit (no `otp`)*: verify credentials mirroring `signInEmail`'s
      branches and timing (calls `password.hash` on the not-found/no-credential
      path for user-enumeration resistance), short-circuit unverified emails,
-     check the generation rate limit, store `sha256(otp)` in KV (5-minute TTL),
-     email the code, and throw `401 admin_otp_required` with a masked email.
+     check the generation rate limit, store a purpose-bound HMAC-SHA256 digest
+     in KV (5-minute TTL), email the code, and throw `401 admin_otp_required`
+     with a masked email.
    - *Second submit (`otp` present)*: check the verification rate limit, compare
-     the stored hash in constant time, delete it, and return so `signInEmail`
+     the stored digest in constant time, delete it, and return so `signInEmail`
      re-verifies the password and creates the session.
 
-**Storage.** OTP codes and rate-limit counters live in KV (`BetterAuthKvStorage`),
-keyed by the prefixes in `auth/config.ts`. KV read-modify-write is not atomic, so
-the rate limits are best-effort backstops; edge WAF remains the primary throttle
-for password guessing.
+**Storage.** OTP digests and rate-limit counters live in KV
+(`BetterAuthKvStorage`), keyed by the prefixes in `auth/config.ts`. OTP digests
+are HMAC-SHA256 values derived from `BETTER_AUTH_SECRET`, the user ID, and the
+purpose string `admin-login-otp:v1`, so a KV-only leak cannot brute-force the
+6-digit code offline. KV read-modify-write is not atomic, so the rate limits are
+best-effort backstops; edge WAF remains the primary throttle for password
+guessing.
 
 **File responsibilities.**
 
 - `index.ts` — the Better Auth contract surface: the plugin factory and the
   single `hooks.before` matcher/handler. No endpoints.
 - `operations.ts` — context-helpers unit-testable without a BA context: OTP
-  generation/hashing, email masking, the KV rate-limit helpers, and the
+  generation/HMAC digesting, email masking, the KV rate-limit helpers, and the
   invalid-credentials error.
-- `types.ts` — `AdminSignInGuardOptions` (injected `sendEmail`/`kv`) and the
-  narrow `AdminSignInGuardContext`/`AdminSignInGuardUser` runtime shapes.
+- `types.ts` — `AdminSignInGuardOptions` (injected `sendEmail`/`kv`/HMAC
+  secret) and the narrow `AdminSignInGuardContext`/`AdminSignInGuardUser`
+  runtime shapes.
 - `schema.ts` — linter-required marker only; the plugin owns no relational rows.
 
-**Boundaries & future work.** `sendEmail` and `kv` are injected from
-`get-auth.ts`; the plugin never reaches into the email sender or KV binding
-directly. Expansion (account-level TOTP via `twoFactor`, or OAuth step-up per
-RFC 9470) is additive: the context gate stays, and the OTP block is a contained
-region that can be removed when a standards-based mechanism supersedes it. See
-doc 024 §5.2.
+**Boundaries & future work.** `sendEmail`, `kv`, and the HMAC secret are injected
+from `get-auth.ts`; the plugin never reaches into the email sender, KV binding,
+or env directly. Expansion (account-level TOTP via `twoFactor`, or OAuth step-up
+per RFC 9470) is additive: the context gate stays, and the OTP block is a
+contained region that can be removed when a standards-based mechanism supersedes
+it. See doc 024 §5.2.

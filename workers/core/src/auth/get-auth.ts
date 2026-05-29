@@ -128,6 +128,7 @@ export function getAuthOptions(
         sendEmail: ({ to, otp }) =>
           sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
         kv: env.KV,
+        otpHmacSecret: env.BETTER_AUTH_SECRET,
       }),
       createOAuthProviderPlugin(env, catalog, runtime, isPlatformAdmin),
       idResourceServer({

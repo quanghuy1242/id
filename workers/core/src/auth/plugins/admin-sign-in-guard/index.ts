@@ -9,7 +9,7 @@ import {
   isAdminCallback,
   maskEmail,
   otpCodeKey,
-  sha256Hex,
+  otpHmacHex,
   timingSafeEqualHex,
 } from "./operations";
 import type { AdminSignInGuardContext, AdminSignInGuardOptions } from "./types";
@@ -82,9 +82,11 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
 
             await assertOtpGenerateLimit(opts.kv, found.user.id); // check before rotating the stored OTP
             const code = generateOtp();
-            await opts.kv.put(otpCodeKey(found.user.id), await sha256Hex(code), {
-              expirationTtl: ADMIN_OTP_TTL_SECONDS,
-            });
+            await opts.kv.put(
+              otpCodeKey(found.user.id),
+              otpHmacHex(opts.otpHmacSecret, found.user.id, code),
+              { expirationTtl: ADMIN_OTP_TTL_SECONDS },
+            );
             await opts.sendEmail({ to: email, otp: code });
 
             throw new APIError("UNAUTHORIZED", {
@@ -99,7 +101,8 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
           if (!found) throw invalidCredentialsError();
           await assertOtpVerifyLimit(opts.kv, found.user.id);
           const stored = await opts.kv.get(otpCodeKey(found.user.id));
-          if (!stored || !timingSafeEqualHex(stored, await sha256Hex(otp))) {
+          const submitted = otpHmacHex(opts.otpHmacSecret, found.user.id, otp);
+          if (!stored || !timingSafeEqualHex(stored, submitted)) {
             throw new APIError("UNAUTHORIZED", { code: "invalid_otp", message: "Invalid or expired code" });
           }
           await opts.kv.delete(otpCodeKey(found.user.id));

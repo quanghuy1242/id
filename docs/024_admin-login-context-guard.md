@@ -151,15 +151,15 @@ First submit (ctx.body.otp absent):
   - If user.user.emailVerified is false → throw EMAIL_NOT_VERIFIED now
     (do not send an OTP the handler would reject anyway — see §7).
   - Check the OTP-generation rate limit FIRST.
-  - generate 6-digit OTP, hash with SHA-256, store in KV
-    (key = "admin-otp:{userId}", value = sha256(otp), TTL = 300s).
+  - generate 6-digit OTP, HMAC with `BETTER_AUTH_SECRET`, store in KV
+    (key = "admin-otp:{userId}", value = HMAC-SHA256("admin-login-otp:v1", userId, otp), TTL = 300s).
   - queue OTP email via opts.sendEmail.
   - throw APIError("UNAUTHORIZED", { code: "admin_otp_required",
                                      maskedEmail: "a***@e***.com" })
 
 Second submit (ctx.body.otp present):
   - Check the OTP-verification rate limit.
-  - Read stored hash from KV; if missing or mismatched (timing-safe compare)
+  - Read stored digest from KV; if missing or mismatched (timing-safe compare)
     → throw APIError("UNAUTHORIZED", { code: "invalid_otp" }).
   - Delete the KV entry, then return (let signInEmail continue → it
     re-verifies the password and creates the session).
@@ -309,7 +309,11 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
 
             await assertOtpGenerateLimit(opts.kv, found.user.id); // check BEFORE rotating the stored OTP
             const code = generateOtp();
-            await opts.kv.put(otpKey(found.user.id), await sha256(code), { expirationTtl: 300 });
+            await opts.kv.put(
+              otpKey(found.user.id),
+              otpHmacHex(opts.otpHmacSecret, found.user.id, code),
+              { expirationTtl: 300 },
+            );
             await opts.sendEmail({ to: email, otp: code });
 
             throw new APIError("UNAUTHORIZED", {
@@ -322,7 +326,8 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
           if (!found) throw invalidCredentialsError();
           await assertOtpVerifyLimit(opts.kv, found.user.id);
           const stored = await opts.kv.get(otpKey(found.user.id));
-          if (!stored || !timingSafeEqualHex(stored, await sha256(otp))) {
+          const submitted = otpHmacHex(opts.otpHmacSecret, found.user.id, otp);
+          if (!stored || !timingSafeEqualHex(stored, submitted)) {
             throw new APIError("UNAUTHORIZED", { code: "invalid_otp" });
           }
           await opts.kv.delete(otpKey(found.user.id));
@@ -339,7 +344,7 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
 - `readBody(ctx)` — same shape guard as `oauth-m2m-bridge` (`ctx.body && typeof === "object" ? ... : {}`).
 - `otpKey(userId)` → `"admin-otp:{userId}"`.
 - `generateOtp()` → `String(randomInt(100000, 1000000))` using **`node:crypto`'s `randomInt`** (the global Workers `crypto` has no `randomInt`; `nodejs_compat` is enabled and the repo already imports from `node:crypto`).
-- `sha256(input)` → hex of `crypto.subtle.digest("SHA-256", encode(input))` (WebCrypto, available globally).
+- `otpHmacHex(secret, userId, otp)` → hex of `HMAC-SHA256(secret, "admin-login-otp:v1" + "\0" + userId + "\0" + otp)` using `BETTER_AUTH_SECRET` as the injected secret.
 - `timingSafeEqualHex(a, b)` → constant-time compare of two equal-length hex strings (`node:crypto`'s `timingSafeEqual`, as used in `bootstrap.routes.ts`).
 - `maskEmail(email)` → first char + `***` + masked domain.
 - `invalidCredentialsError()` → `new APIError("UNAUTHORIZED", { message: "Invalid email or password" })`.
@@ -352,7 +357,7 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
 3. The rate-limit check is performed **before** storing/rotating the OTP, so a throttled attempt cannot invalidate a legitimately pending code.
 4. Credential branches in step 1 **call `ctx.context.password.hash(password)`** on the not-found / no-credential path to match the handler's timing (user-enumeration resistance, mirroring sign-in.mjs:206/212/218).
 5. Unverified-email accounts are **short-circuited before** an OTP is generated/sent (the handler would otherwise reject with `EMAIL_NOT_VERIFIED` after the user already consumed an OTP).
-6. OTP hashes are compared **timing-safely**.
+6. OTP HMAC values are compared **timing-safely**.
 
 ### 6.2 Register the plugin: `get-auth.ts`
 
@@ -363,6 +368,7 @@ idAdminSignInGuard({
   sendEmail: ({ to, otp }) =>
     sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
   kv: env.KV,
+  otpHmacSecret: env.BETTER_AUTH_SECRET,
 }),
 ```
 
@@ -452,18 +458,18 @@ Keep it in the existing `stories/` folder (Ladle `stories` glob already includes
 | Concurrent OTP requests for one user | KV read-modify-write counters can both pass; limits are best-effort. A hard guarantee would require a Durable Object (out of scope) |
 | KV unavailable | `hooks.before` throws `500`; no session; user retries |
 | User with `role: "user"` logging in with `callbackURL=/admin` | `signInEmail` still creates a session after OTP; `guardAdmin()` redirects them to `/login?error=admin_required`. Session exists but admin UI is unreachable. Pre-existing behavior; a future role check in the guard could deny non-admins before OTP |
-| OTP hash exposure (KV dump) | SHA-256 of a 6-digit code is brute-forceable offline; the hash is defense-in-depth only. Real controls are the 300s TTL + verify limit |
+| OTP digest exposure (KV dump) | Stored value is a purpose-bound HMAC-SHA256 using `BETTER_AUTH_SECRET`, so a KV-only leak cannot brute-force the 6-digit code offline. If KV and the app secret are both exposed, the real controls are still the 300s TTL + verify limit |
 
 ## 8. Definition Of Done
 
 - [x] `id-admin-sign-in-guard` plugin created with `hooks.before` on `ctx.path === "/sign-in/email"`.
-- [x] Credential lookup uses `providerId === "credential"`; OTP generation uses `node:crypto` `randomInt`; rate-limit checked before OTP storage; timing-parity `password.hash` on invalid-credential branches; unverified-email short-circuit; timing-safe OTP compare.
+- [x] Credential lookup uses `providerId === "credential"`; OTP generation uses `node:crypto` `randomInt`; OTP storage uses purpose-bound HMAC-SHA256 with `BETTER_AUTH_SECRET`; rate-limit checked before OTP storage; timing-parity `password.hash` on invalid-credential branches; unverified-email short-circuit; timing-safe OTP compare.
 - [x] Plugin registered in `getAuthOptions()` after `idOAuthM2MBridge()`.
-- [x] `AuthEmailMessage` widened to a discriminated union with `"admin-otp"`; `sender-email.ts` renders the code (no link).
+- [x] `AuthEmailMessage` widened to a discriminated union with `"admin-otp"`; `resend-email.ts` renders the code (no link).
 - [x] `login-form.tsx` defaults `callbackURL` to `"/admin"` only for non-OAuth flows; shows OTP input on `admin_otp_required`; `submitLogin()` extracts `code`/`maskedEmail`. The OTP prompt renders as an `info` Alert (not an error).
 - [x] `admin/page.tsx` MFA TODO removed and replaced with a pointer to this doc.
 - [x] `AdminLoginOtpChallenge` Ladle story added in `stories/auth-flow.stories.tsx`.
-- [x] Plugin and client tests added to the respective barrels and passing (`pnpm test` — 544 passing). Existing contextless test sign-ins migrated to a shared `adminOtpSignIn`/`signInViaAdminOtp` helper.
+- [x] Plugin and client tests added to the respective barrels and passing (`pnpm test` — 545 passing). Existing contextless test sign-ins migrated to a shared `adminOtpSignIn`/`signInViaAdminOtp` helper.
 - [x] `pnpm lint` clean (architecture gate). `pnpm typecheck` clean. `pnpm advise` clean.
 - [ ] Manual smoke: `/login` direct → sign in → OTP prompt → enter code → redirected to `/admin`.
 - [ ] Manual smoke: OAuth flow (`/oauth2/authorize?...`) → sign in → no OTP prompt → redirected to client app.

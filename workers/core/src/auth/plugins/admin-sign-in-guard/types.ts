@@ -3,16 +3,18 @@ import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
 /**
  * Composition options for {@link idAdminSignInGuard}.
  *
- * `sendEmail` and `kv` are injected from `get-auth.ts` so the plugin never
- * reaches into the email sender or KV namespace directly. `kv` reuses the
- * worker's `BetterAuthKvStorage` surface (the same value passed to
- * `secondaryStorage`) so OTP storage and rate-limit counters share one binding.
+ * `sendEmail`, `kv`, and the HMAC secret are injected from `get-auth.ts` so the
+ * plugin never reaches into the email sender, KV namespace, or env directly.
+ * `kv` reuses the worker's `BetterAuthKvStorage` surface (the same value passed
+ * to `secondaryStorage`) so OTP storage and rate-limit counters share one binding.
  */
 export interface AdminSignInGuardOptions {
   /** Queues the admin OTP email (wired to `sendAuthEmail` in `get-auth.ts`). */
   readonly sendEmail: (params: { readonly to: string; readonly otp: string }) => Promise<void>;
   /** KV namespace for OTP storage and rate-limit counters. */
   readonly kv: BetterAuthKvStorage;
+  /** Secret used to HMAC low-entropy OTP codes before storing them in KV. */
+  readonly otpHmacSecret: string;
 }
 
 /**
