@@ -21,11 +21,22 @@ This implementation follows the planning and architecture documents:
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
 - [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, Sender email, API-only operation, incident runbooks
 - [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
+- [docs/009_plugin_first_auth_architecture.md](docs/009_plugin_first_auth_architecture.md) — first custom BA plugin architecture decisions and resource-server table design
+- [docs/010_organization-teams-oauth-flow.md](docs/010_organization-teams-oauth-flow.md) — organization/teams OAuth authorization context selection flow
+- [docs/011_oauth-postlogin-context-ui.md](docs/011_oauth-postlogin-context-ui.md) — OAuth post-login context-selection UI spec
+- [docs/012_random_thoughts.md](docs/012_random_thoughts.md) — misc design notes and architecture intuitions
 - [docs/013_identity-event-standards-and-decisions.md](docs/013_identity-event-standards-and-decisions.md) — standards landscape (SET/SSF/RISC/CAEP) and decision record for the identity event channel
 - [docs/014_identity-event-producer-id.md](docs/014_identity-event-producer-id.md) — producer-side implementation plan (`idIdentityEvents` plugin, transactional outbox, SET delivery)
 - [docs/015_identity-event-consumer-content-api-audit.md](docs/015_identity-event-consumer-content-api-audit.md) — consumer-side audit-mode plan for `content-api` (receipts, orphan-binding findings)
 - [docs/016_identity-event-consumer-content-api-fence-enforcement.md](docs/016_identity-event-consumer-content-api-fence-enforcement.md) — consumer-side fence enforcement plan (conditional, Phase 3)
 - [docs/017_scim-directory-and-m2m-principal-contract.md](docs/017_scim-directory-and-m2m-principal-contract.md) — proposal to replace custom user/team/admin principal-validation with read-only SCIM v2 and to resolve service-account/M2M binding semantics explicitly
+- [docs/018_m2m-oauth-client-org-binding.md](docs/018_m2m-oauth-client-org-binding.md) — M2M OAuth client organization binding rules, identity mirror, and reference-id immutability
+- [docs/019_content-api-gated-security-recommendations.md](docs/019_content-api-gated-security-recommendations.md) — content-api gated security recommendations
+- [docs/020_A4-content-api-scim-migration.md](docs/020_A4-content-api-scim-migration.md) — content-api SCIM directory migration plan
+- [docs/021_security-static-analysis-gate.md](docs/021_security-static-analysis-gate.md) — security static analysis gate design and integration
+- [docs/022_admin-ui-system.md](docs/022_admin-ui-system.md) — admin UI design system architecture and token reference
+- [docs/023_admin-screen-story-strategy.md](docs/023_admin-screen-story-strategy.md) — admin screen spec format and story-writing strategy
+- [docs/024_admin-login-context-guard.md](docs/024_admin-login-context-guard.md) — admin login context guard (sign-in gate + admin MFA OTP)
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
