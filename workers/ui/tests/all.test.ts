@@ -10,6 +10,7 @@ await import("./packages-ui/empty-state.test");
 await import("./packages-ui/edge-cases.test");
 await import("./packages-ui/filter-dropdown.test");
 await import("./packages-ui/form.test");
+await import("./packages-ui/duration-input.test");
 await import("./packages-ui/inline.test");
 await import("./packages-ui/mobile-filter-menu.test");
 await import("./packages-ui/tabs.test");

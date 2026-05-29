@@ -8,6 +8,9 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  DurationInput,
+  FilterDropdown,
+  HiddenInput,
   Inline,
   Panel,
   RadioGroup,
@@ -41,6 +44,18 @@ const roleOptions = [
   { value: "admin", label: "Admin" },
 ];
 
+const banDurationOptions = [
+  { value: "", label: "Permanent" },
+  { value: "3600", label: "1 hour" },
+  { value: "86400", label: "1 day" },
+  { value: "604800", label: "1 week" },
+  { value: "2592000", label: "1 month" },
+  { value: "7776000", label: "3 months" },
+  { value: "15552000", label: "6 months" },
+  { value: "31536000", label: "1 year" },
+  { value: "custom", label: "Custom..." },
+];
+
 type UserDetailOverviewContentProps = {
   onNavigateToUsers?: () => void;
   actions?: typeof defaultActions;
@@ -65,6 +80,7 @@ export function UserDetailOverviewContent({
 
   const [banOpen, setBanOpen] = useState(false);
   const [banError, setBanError] = useState<string | undefined>();
+  const [banPreset, setBanPreset] = useState("");
 
   const [unbanOpen, setUnbanOpen] = useState(false);
   const [unbanError, setUnbanError] = useState<string | undefined>();
@@ -288,7 +304,7 @@ export function UserDetailOverviewContent({
       {/* Ban User */}
       <ConfirmDialog
         open={banOpen}
-        onOpenChange={(o) => { setBanOpen(o); if (!o) setBanError(undefined); }}
+        onOpenChange={(o) => { setBanOpen(o); if (!o) { setBanError(undefined); setBanPreset(""); } }}
         title={`Ban ${user.name ?? "User"}`}
         description="Banned users cannot start new sessions. Existing sessions should be reviewed from the Sessions tab."
         confirmLabel="Ban User"
@@ -297,8 +313,18 @@ export function UserDetailOverviewContent({
         onConfirm={handleBan}
       >
         <TextInput label="Reason" name="banReason" />
-        <TextInput label="Ban duration (seconds)" name="banExpiresIn" />
-        <Text variant="caption">Leave duration blank for a permanent ban.</Text>
+        <FilterDropdown
+          label="Ban duration"
+          options={banDurationOptions}
+          value={banPreset}
+          onChange={setBanPreset}
+          showLabel
+        />
+        {banPreset === "custom" ? (
+          <DurationInput label="Custom duration" name="banExpiresIn" required />
+        ) : (
+          <HiddenInput name="banExpiresIn" value={banPreset} />
+        )}
       </ConfirmDialog>
 
       {/* Unban User */}

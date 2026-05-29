@@ -19,3 +19,4 @@ export * from "./nav-icons";
 export * from "./topbar-search-field";
 export * from "./avatar";
 export * from "./menu";
+export * from "./duration-input";
