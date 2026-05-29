@@ -5,20 +5,20 @@ export class AppError extends Error {
   }
 }
 
-export type SenderRateLimitMetadata = {
+export type EmailRateLimitMetadata = {
   readonly retryAfter?: string;
   readonly limit?: string;
   readonly remaining?: string;
   readonly reset?: string;
 };
 
-export class SenderEmailError extends Error {
+export class ResendEmailError extends Error {
   readonly status: number;
-  readonly rateLimit: SenderRateLimitMetadata;
+  readonly rateLimit: EmailRateLimitMetadata;
 
-  constructor(message: string, status: number, rateLimit: SenderRateLimitMetadata = {}) {
+  constructor(message: string, status: number, rateLimit: EmailRateLimitMetadata = {}) {
     super(message);
-    this.name = "SenderEmailError";
+    this.name = "ResendEmailError";
     this.status = status;
     this.rateLimit = rateLimit;
   }

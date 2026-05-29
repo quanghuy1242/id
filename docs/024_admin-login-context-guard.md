@@ -8,7 +8,7 @@
 >
 > - `workers/core/src/auth/plugins/` (new plugin)
 > - `workers/core/src/auth/get-auth.ts`
-> - `workers/core/src/auth/types.ts` + `workers/core/src/auth/sender-email.ts` (email message union)
+> - `workers/core/src/auth/types.ts` + `workers/core/src/auth/adapters/resend-email.ts` (email message union)
 > - `workers/ui/src/app/login/login-form.tsx`
 > - `workers/ui/src/app/admin/page.tsx` (resolve the existing MFA TODO)
 > - `stories/auth-flow.stories.tsx` (Ladle story for the OTP challenge state)
@@ -366,7 +366,7 @@ idAdminSignInGuard({
 }),
 ```
 
-### 6.3 Email message union: `types.ts` + `sender-email.ts`
+### 6.3 Email message union: `types.ts` + `resend-email.ts`
 
 The current `AuthEmailMessage` requires a `url`. An OTP message carries `otp`, not `url`, so widen the type into a discriminated union and add the render branch:
 
@@ -376,7 +376,7 @@ export type AuthEmailMessage =
   | { readonly kind: "admin-otp"; readonly to: string; readonly otp: string };
 ```
 
-Add the `"admin-otp"` case to `createSenderAuthEmailSender` rendering (subject + body containing the 6-digit code and a 5-minute expiry note). Do **not** put the code in a link.
+Add the `"admin-otp"` case to the `renderAuthEmail` rendering used by the Resend sender (subject + body containing the 6-digit code and a 5-minute expiry note). Do **not** put the code in a link.
 
 ### 6.4 Client: `login-form.tsx`
 

@@ -1,4 +1,4 @@
-import { createSenderAuthEmailSender } from "./sender-email";
+import { createResendAuthEmailSender } from "./resend-email";
 import type { AuthEmailMessage, AuthEmailSender, AuthOptionsEnv, BackgroundTaskRunner } from "../types";
 
 export async function sendAuthEmail(
@@ -16,8 +16,8 @@ export async function sendAuthEmail(
 }
 
 export function createAuthEmailSender(env: AuthOptionsEnv): AuthEmailSender {
-  return createSenderAuthEmailSender({
-    apiToken: env.SENDER_API_TOKEN ?? "",
+  return createResendAuthEmailSender({
+    apiKey: env.RESEND_API_KEY ?? "",
     fromEmail: env.EMAIL_FROM ?? "",
     fromName: env.EMAIL_FROM_NAME ?? "id",
   });

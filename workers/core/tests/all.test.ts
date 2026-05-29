@@ -26,7 +26,7 @@ await import("./auth/resource-server-operations.test");
 await import("./auth/resource-server-plugin.test");
 await import("./auth/resource-server-validation.test");
 await import("./auth/runtime-audience-worker.test");
-await import("./auth/sender-email.test");
+await import("./auth/resend-email.test");
 await import("./auth/well-known.test");
 await import("./oxlint-rules.test");
 await import("./scaffold.test");

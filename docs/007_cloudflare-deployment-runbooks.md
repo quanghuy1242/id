@@ -5,7 +5,7 @@
 Prerequisites:
 
 - Cloudflare account and Worker/D1/KV resources exist.
-- `BETTER_AUTH_SECRET`, `SENDER_API_TOKEN`, `EMAIL_FROM`, and any temporary bootstrap secrets are set as Cloudflare secrets.
+- `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, and any temporary bootstrap secrets are set as Cloudflare secrets.
 - `ID_CORE_URL` and `ID_UI_URL` repository variables point at the deployed Workers.
 
 Pipeline order:
@@ -35,19 +35,19 @@ The smoke checks verify:
 - OAuth authorization-server metadata alias;
 - UI `/admin` health scaffold.
 
-## Sender Transactional Email
+## Resend Transactional Email
 
-1. Create a Sender account on the Free plan.
+1. Create a Resend account.
 2. Add the sending domain and complete SPF, DKIM, and DMARC verification.
-3. Create a transactional API token.
+3. Create an API key (`re_...`).
 4. Store secrets:
 
 ```sh
-pnpm wrangler secret put SENDER_API_TOKEN --config workers/core/wrangler.jsonc
+pnpm wrangler secret put RESEND_API_KEY --config workers/core/wrangler.jsonc
 pnpm wrangler secret put EMAIL_FROM --config workers/core/wrangler.jsonc
 ```
 
-`EMAIL_FROM_NAME` is a non-secret Worker var. The Worker sends verification and password-reset emails through `POST https://api.sender.net/v2/message/send`. Sender failures are surfaced as operational errors with rate-limit metadata; raw auth URLs, tokens, and authorization headers are not logged by the adapter.
+`EMAIL_FROM` must be an address on a domain verified in Resend, and `EMAIL_FROM_NAME` is a non-secret Worker var. The Worker sends verification, password-reset, and admin-OTP emails through `POST https://api.resend.com/emails`. Resend failures are surfaced as operational errors with rate-limit metadata; raw auth URLs, tokens, codes, and authorization headers are not logged by the adapter.
 
 ## First Admin Bootstrap
 

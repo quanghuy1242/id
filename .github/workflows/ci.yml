@@ -60,10 +60,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          SENDER_API_TOKEN: ${{ secrets.SENDER_API_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ID_BOOTSTRAP_TOKEN: ${{ secrets.ID_BOOTSTRAP_TOKEN }}
         run: |
-          for var in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN BETTER_AUTH_SECRET SENDER_API_TOKEN ID_BOOTSTRAP_TOKEN; do
+          for var in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN BETTER_AUTH_SECRET RESEND_API_KEY ID_BOOTSTRAP_TOKEN; do
             if [ -z "${!var}" ]; then
               echo "::error::$var is missing"
               exit 1
@@ -87,11 +87,11 @@ jobs:
           command: deploy --config wrangler.jsonc
           secrets: |
             BETTER_AUTH_SECRET
-            SENDER_API_TOKEN
+            RESEND_API_KEY
             ID_BOOTSTRAP_TOKEN
         env:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          SENDER_API_TOKEN: ${{ secrets.SENDER_API_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ID_BOOTSTRAP_TOKEN: ${{ secrets.ID_BOOTSTRAP_TOKEN }}
 
       - name: Deploy ui-id

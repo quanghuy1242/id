@@ -5,7 +5,7 @@ export type CoreEnv = {
   readonly EMAIL_FROM?: string;
   readonly EMAIL_FROM_NAME?: string;
   readonly ID_BOOTSTRAP_TOKEN?: string;
-  readonly SENDER_API_TOKEN?: string;
+  readonly RESEND_API_KEY?: string;
   readonly DB: D1Database;
   readonly KV: KVNamespace;
 };

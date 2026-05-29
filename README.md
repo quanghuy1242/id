@@ -228,11 +228,11 @@ All secrets are read from GitHub Secrets at deploy time. No manual `wrangler sec
 - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with Workers and D1:Edit permissions
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
 - `BETTER_AUTH_SECRET` — Better Auth signing and encryption secret (min 32 chars)
-- `SENDER_API_TOKEN` — Sender transactional API token
+- `RESEND_API_KEY` — Resend transactional API key (`re_...`)
 
 Non-secret vars committed in `workers/core/wrangler.jsonc`:
 
-- `EMAIL_FROM` — verified Sender `from.email`
+- `EMAIL_FROM` — verified Resend sender address (on a domain verified in Resend)
 - `EMAIL_FROM_NAME` — sender display name
 - `BETTER_AUTH_COOKIE_DOMAIN` — shared cookie domain (e.g. `.quanghuy.dev`)
 
