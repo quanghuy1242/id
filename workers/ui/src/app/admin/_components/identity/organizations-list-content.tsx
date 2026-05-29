@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import useSWR from "swr";
 import {
   Button,
   ConfirmDialog,
@@ -22,6 +23,7 @@ import {
   createOrganization as createOrgAction,
   type Organization,
 } from "../../_actions/organizations";
+import { orgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   listOrganizations: listOrgsAction,
@@ -60,11 +62,6 @@ export function OrganizationsListContent({
   actions = defaultActions,
   ...props
 }: OrgsListContentProps) {
-  const [allOrgs, setAllOrgs] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
-
   const [internalSearch, setInternalSearch] = useState("");
   const [internalSortBy, setInternalSortBy] = useState("name");
   const [internalSortDir, setInternalSortDir] = useState<"asc" | "desc">("asc");
@@ -83,27 +80,15 @@ export function OrganizationsListContent({
     setInternalSortDir(dir);
   });
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const orgs = await actions.listOrganizations();
-        if (!cancelled) { setAllOrgs(orgs); setIsLoading(false); }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load organizations");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, loadingOverride, errorOverride, fetchKey]);
+  // Single server fetch; search and sort are applied client-side, so the key
+  // carries no params and typing/sorting triggers zero network calls.
+  const { data: allOrgs, isLoading, error, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : orgsListKey(),
+    () => actions.listOrganizations(),
+  );
 
   const displayedOrgs = useMemo(() => {
-    let orgs = allOrgs;
+    let orgs = allOrgs ?? [];
     if (effectiveSearch) {
       const q = effectiveSearch.toLowerCase();
       orgs = orgs.filter((o) => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q));
@@ -120,7 +105,7 @@ export function OrganizationsListContent({
   }, [allOrgs, effectiveSearch, effectiveSortBy, effectiveSortDir]);
 
   const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
   async function handleCreate(formData: FormData) {
     setCreateError(undefined);
@@ -137,7 +122,7 @@ export function OrganizationsListContent({
     const metadata = metaRaw || undefined;
     try {
       const org = await actions.createOrganization({ name, slug, ...(logo ? { logo } : {}), ...(metadata ? { metadata } : {}) });
-      setFetchKey((k) => k + 1);
+      await mutate();
       onRowClick?.(org.id);
       return true;
     } catch (err: unknown) {
@@ -148,7 +133,7 @@ export function OrganizationsListContent({
 
   function renderContent() {
     if (showLoading) return <Skeleton rows={5} />;
-    if (showError) return <ErrorAlert message={showError} onRetry={() => setFetchKey((k) => k + 1)} />;
+    if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (displayedOrgs.length === 0) {
       if (effectiveSearch) {
         return (

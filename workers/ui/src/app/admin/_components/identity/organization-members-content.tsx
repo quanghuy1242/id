@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import useSWR from "swr";
 import {
   Badge,
   Button,
@@ -25,6 +26,8 @@ import {
   type Member,
 } from "../../_actions/organizations";
 import { getUser as getUserAction, type User } from "../../_actions/users";
+import { orgMembersKey } from "@/app/admin/_data/swr-keys";
+import { useUsersByIds } from "@/app/admin/_data/use-users-by-ids";
 
 const defaultActions = {
   listMembers: listMembersAction,
@@ -73,11 +76,6 @@ export function OrganizationMembersContent({
   actions = defaultActions,
   ...props
 }: OrgMembersContentProps) {
-  const [enriched, setEnriched] = useState<EnrichedMember[]>([]);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
-
   const [internalRoleFilter, setInternalRoleFilter] = useState("all");
   const effectiveRoleFilter = props.roleFilter ?? internalRoleFilter;
   const handleRoleFilter = props.onRoleFilterChange ?? setInternalRoleFilter;
@@ -93,33 +91,25 @@ export function OrganizationMembersContent({
   const [inviteRole, setInviteRole] = useState("member");
   const [inviteError, setInviteError] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const members = await actions.listMembers(orgId);
-        const uniqueIds = [...new Set(members.map((m) => m.userId))];
-        const users = await Promise.all(uniqueIds.map((id) => actions.getUser(id).then((r) => r.user).catch(() => null)));
-        const userMap = new Map<string, User | null>(uniqueIds.map((id, i) => [id, users[i]]));
-        if (!cancelled) {
-          setEnriched(members.map((m) => Object.assign({}, m, { user: userMap.get(m.userId) ?? null })));
-          setIsLoading(false);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load members");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, orgId, loadingOverride, errorOverride, fetchKey]);
+  const { data: members, isLoading: membersLoading, error: membersError, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : orgMembersKey(orgId),
+    () => actions.listMembers(orgId),
+  );
 
-  const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  // Per-member user lookups go through the shared user cache so ids already
+  // seen on the user-detail page (or elsewhere) resolve without a network call.
+  const { usersById, isLoading: usersLoading } = useUsersByIds(
+    (members ?? []).map((m) => m.userId),
+    actions.getUser,
+  );
+
+  const enriched: EnrichedMember[] = useMemo(
+    () => (members ?? []).map((m) => Object.assign({}, m, { user: usersById.get(m.userId) ?? null })),
+    [members, usersById],
+  );
+
+  const showLoading = loadingOverride ?? (membersLoading || (Boolean(members?.length) && usersLoading));
+  const showError = errorOverride ?? (membersError instanceof Error ? membersError.message : membersError ? String(membersError) : undefined);
 
   const filteredMembers = useMemo(
     () => effectiveRoleFilter === "all" ? enriched : enriched.filter((m) => m.role === effectiveRoleFilter),
@@ -188,7 +178,7 @@ export function OrganizationMembersContent({
         return false;
       }
       await actions.updateMemberRole(changeRoleTarget.id, role);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setChangeRoleError(err instanceof Error ? err.message : "Failed to change role");
@@ -201,7 +191,7 @@ export function OrganizationMembersContent({
     setRemoveError(undefined);
     try {
       await actions.removeMember(removeTarget.id, orgId);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setRemoveError(err instanceof Error ? err.message : "Failed to remove member");
@@ -215,7 +205,7 @@ export function OrganizationMembersContent({
       const email = String(formData.get("email") ?? "").trim();
       const role = String(formData.get("role") ?? inviteRole);
       await actions.inviteMember(orgId, email, role);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setInviteError(err instanceof Error ? err.message : "Failed to send invite");
@@ -225,7 +215,7 @@ export function OrganizationMembersContent({
 
   function renderTable() {
     if (showLoading) return <Skeleton rows={5} />;
-    if (showError) return <ErrorAlert message={showError} onRetry={() => setFetchKey((k) => k + 1)} />;
+    if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (filteredMembers.length === 0) {
       return effectiveRoleFilter !== "all"
         ? <EmptyState message="No members with this role" />

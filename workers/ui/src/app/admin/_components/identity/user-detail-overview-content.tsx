@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSWRConfig } from "swr";
 import {
   Alert,
   Avatar,
@@ -24,6 +25,7 @@ import {
   removeUser as removeUserAction,
 } from "../../_actions/users";
 import { useUserDetail } from "./user-detail-context";
+import { isUsersListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   updateUser: updateUserAction,
@@ -49,6 +51,7 @@ export function UserDetailOverviewContent({
   actions = defaultActions,
 }: UserDetailOverviewContentProps) {
   const { userId, user, setUser, isLoading, error } = useUserDetail();
+  const { mutate: globalMutate } = useSWRConfig();
 
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
@@ -150,6 +153,7 @@ export function UserDetailOverviewContent({
     setDeleteError(undefined);
     try {
       await actions.removeUser(userId);
+      await globalMutate(isUsersListKey, undefined, { revalidate: false });
       onNavigateToUsers?.();
       return true;
     } catch (err: unknown) {

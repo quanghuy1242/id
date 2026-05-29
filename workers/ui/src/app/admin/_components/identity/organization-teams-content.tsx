@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import {
   Alert,
   Button,
@@ -28,9 +29,10 @@ import {
   removeTeamMember as removeTeamMemberAction,
   type Team,
   type TeamMember,
-  type Member,
 } from "../../_actions/organizations";
-import { getUser as getUserAction, type User } from "../../_actions/users";
+import { getUser as getUserAction } from "../../_actions/users";
+import { orgTeamsKey } from "@/app/admin/_data/swr-keys";
+import { useUsersByIds } from "@/app/admin/_data/use-users-by-ids";
 
 const defaultActions = {
   listTeams: listTeamsAction,
@@ -43,8 +45,6 @@ const defaultActions = {
   removeTeamMember: removeTeamMemberAction,
   getUser: getUserAction,
 };
-
-type EnrichedTeamMember = TeamMember & { user: User | null };
 
 type OrgTeamsContentProps = {
   orgId: string;
@@ -59,16 +59,34 @@ export function OrganizationTeamsContent({
   error: errorOverride,
   actions = defaultActions,
 }: OrgTeamsContentProps) {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [orgMembers, setOrgMembers] = useState<Member[]>([]);
-  const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
-  const [memberCounts, setMemberCounts] = useState<Map<string, number>>(new Map());
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
+  // One keyed fetch for the whole teams bundle: teams, org members, and the
+  // per-team member counts. Cross-navigation cached and deduplicated by SWR.
+  const { data, isLoading, error, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : orgTeamsKey(orgId),
+    async () => {
+      const [teams, orgMembers] = await Promise.all([
+        actions.listTeams(orgId),
+        actions.listMembers(orgId),
+      ]);
+      const counts = await Promise.all(
+        teams.map((t) => actions.listTeamMembers(t.id).then((tms) => tms.length).catch(() => 0)),
+      );
+      return { teams, orgMembers, memberCounts: new Map(teams.map((t, i) => [t.id, counts[i]])) };
+    },
+  );
+
+  const teams = data?.teams ?? [];
+  const orgMembers = data?.orgMembers ?? [];
+  const memberCounts = data?.memberCounts ?? new Map<string, number>();
+
+  // All names resolve through the shared user cache (team members ⊆ org members).
+  const { usersById, isLoading: usersLoading } = useUsersByIds(
+    orgMembers.map((m) => m.userId),
+    actions.getUser,
+  );
 
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
-  const [expandedMembers, setExpandedMembers] = useState<EnrichedTeamMember[]>([]);
+  const [expandedMembers, setExpandedMembers] = useState<TeamMember[]>([]);
   const [expandLoading, setExpandLoading] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -81,54 +99,13 @@ export function OrganizationTeamsContent({
   const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
-  const [removeMemberTarget, setRemoveMemberTarget] = useState<EnrichedTeamMember | null>(null);
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<TeamMember | null>(null);
   const [removeMemberError, setRemoveMemberError] = useState<string | undefined>();
 
-  const enrichUsers = useCallback(async (userIds: string[], currentCache: Map<string, User>): Promise<Map<string, User>> => {
-    const missing = userIds.filter((id) => !currentCache.has(id));
-    if (missing.length === 0) return currentCache;
-    const fetched = await Promise.all(missing.map((id) => actions.getUser(id).then((r) => r.user).catch(() => null)));
-    const next = new Map(currentCache);
-    missing.forEach((id, i) => { if (fetched[i]) next.set(id, fetched[i]!); });
-    return next;
-  }, [actions]);
+  const showLoading = loadingOverride ?? (isLoading || (orgMembers.length > 0 && usersLoading));
+  const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [fetchedTeams, members] = await Promise.all([
-          actions.listTeams(orgId),
-          actions.listMembers(orgId),
-        ]);
-        const counts = await Promise.all(
-          fetchedTeams.map((t) => actions.listTeamMembers(t.id).then((tms) => tms.length).catch(() => 0)),
-        );
-        const countMap = new Map(fetchedTeams.map((t, i) => [t.id, counts[i]]));
-        const allUserIds = [...new Set(members.map((m) => m.userId))];
-        const newCache = await enrichUsers(allUserIds, new Map());
-        if (!cancelled) {
-          setTeams(fetchedTeams);
-          setOrgMembers(members);
-          setMemberCounts(countMap);
-          setUserCache(newCache);
-          setIsLoading(false);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load teams");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, orgId, loadingOverride, errorOverride, fetchKey, enrichUsers]);
-
-  const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const userName = (userId: string) => usersById.get(userId)?.name ?? userId.slice(0, 12);
 
   async function handleExpandTeam(team: Team) {
     if (expandedTeamId === team.id) { setExpandedTeamId(null); return; }
@@ -136,11 +113,7 @@ export function OrganizationTeamsContent({
     setAddMemberError(undefined);
     setExpandLoading(true);
     try {
-      const tms = await actions.listTeamMembers(team.id);
-      const ids = tms.map((tm) => tm.userId);
-      const cache = await enrichUsers(ids, userCache);
-      setUserCache(cache);
-      setExpandedMembers(tms.map((tm) => Object.assign({}, tm, { user: cache.get(tm.userId) ?? null })));
+      setExpandedMembers(await actions.listTeamMembers(team.id));
     } finally {
       setExpandLoading(false);
     }
@@ -150,12 +123,8 @@ export function OrganizationTeamsContent({
     setAddMemberError(undefined);
     try {
       await actions.addTeamMember(teamId, userId, orgId);
-      const tms = await actions.listTeamMembers(teamId);
-      const ids = tms.map((tm) => tm.userId);
-      const cache = await enrichUsers(ids, userCache);
-      setUserCache(cache);
-      setExpandedMembers(tms.map((tm) => Object.assign({}, tm, { user: cache.get(tm.userId) ?? null })));
-      setMemberCounts((prev) => new Map(prev).set(teamId, tms.length));
+      setExpandedMembers(await actions.listTeamMembers(teamId));
+      await mutate();
     } catch (err: unknown) {
       setAddMemberError(err instanceof Error ? err.message : "Failed to add team member");
     }
@@ -164,9 +133,8 @@ export function OrganizationTeamsContent({
   async function handleCreate(formData: FormData) {
     setCreateError(undefined);
     try {
-      const name = String(formData.get("name") ?? "").trim();
-      await actions.createTeam(name, orgId);
-      setFetchKey((k) => k + 1);
+      await actions.createTeam(String(formData.get("name") ?? "").trim(), orgId);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create team");
@@ -178,9 +146,8 @@ export function OrganizationTeamsContent({
     if (!renameTarget) return false;
     setRenameError(undefined);
     try {
-      const name = String(formData.get("name") ?? "").trim();
-      await actions.updateTeam(renameTarget.id, name);
-      setFetchKey((k) => k + 1);
+      await actions.updateTeam(renameTarget.id, String(formData.get("name") ?? "").trim());
+      await mutate();
       return true;
     } catch (err: unknown) {
       setRenameError(err instanceof Error ? err.message : "Failed to rename team");
@@ -194,7 +161,7 @@ export function OrganizationTeamsContent({
     try {
       await actions.removeTeam(deleteTarget.id);
       if (expandedTeamId === deleteTarget.id) setExpandedTeamId(null);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete team");
@@ -207,9 +174,8 @@ export function OrganizationTeamsContent({
     setRemoveMemberError(undefined);
     try {
       await actions.removeTeamMember(expandedTeamId, removeMemberTarget.userId, orgId);
-      const tms = await actions.listTeamMembers(expandedTeamId);
-      setExpandedMembers(tms.map((tm) => ({ ...tm, user: userCache.get(tm.userId) ?? null })));
-      setMemberCounts((prev) => new Map(prev).set(expandedTeamId, tms.length));
+      setExpandedMembers(await actions.listTeamMembers(expandedTeamId));
+      await mutate();
       return true;
     } catch (err: unknown) {
       setRemoveMemberError(err instanceof Error ? err.message : "Failed to remove member");
@@ -221,10 +187,7 @@ export function OrganizationTeamsContent({
   const eligibleForAdd = orgMembers.filter(
     (m) => !expandedMembers.some((em) => em.userId === m.userId),
   );
-  const addMemberOptions = eligibleForAdd.map((m) => ({
-    value: m.userId,
-    label: userCache.get(m.userId)?.name ?? m.userId.slice(0, 12),
-  }));
+  const addMemberOptions = eligibleForAdd.map((m) => ({ value: m.userId, label: userName(m.userId) }));
 
   const columns: DataTableColumn<Team>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -281,7 +244,7 @@ export function OrganizationTeamsContent({
 
       {showLoading && <Skeleton rows={4} />}
       {!showLoading && showError && (
-        <ErrorAlert message={showError} onRetry={() => setFetchKey((k) => k + 1)} />
+        <ErrorAlert message={showError} onRetry={() => void mutate()} />
       )}
 
       {!showLoading && !showError && (
@@ -322,8 +285,8 @@ export function OrganizationTeamsContent({
                 {!expandLoading && expandedMembers.map((tm) => (
                   <Inline key={tm.id} justify="between">
                     <Inline gap="sm">
-                      <Text variant="body">{tm.user?.name ?? tm.userId.slice(0, 12)}</Text>
-                      <Text variant="caption">{tm.user?.email ?? ""}</Text>
+                      <Text variant="body">{userName(tm.userId)}</Text>
+                      <Text variant="caption">{usersById.get(tm.userId)?.email ?? ""}</Text>
                     </Inline>
                     <Button
                       variant="danger"
@@ -383,7 +346,7 @@ export function OrganizationTeamsContent({
         open={Boolean(removeMemberTarget)}
         onOpenChange={(o) => { if (!o) { setRemoveMemberTarget(null); setRemoveMemberError(undefined); } }}
         title="Remove Member"
-        description={`Remove ${removeMemberTarget?.user?.name ?? "member"} from ${expandedTeam?.name ?? "team"}?`}
+        description={`Remove ${removeMemberTarget ? userName(removeMemberTarget.userId) : "member"} from ${expandedTeam?.name ?? "team"}?`}
         confirmLabel="Remove"
         variant="danger"
         error={removeMemberError}

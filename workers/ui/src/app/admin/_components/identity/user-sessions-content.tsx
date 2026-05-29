@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import {
   Badge,
   Button,
@@ -19,6 +20,7 @@ import {
   revokeUserSessions as revokeUserSessionsAction,
   type Session,
 } from "../../_actions/users";
+import { userSessionsKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   listUserSessions: listUserSessionsAction,
@@ -45,10 +47,10 @@ export function UserSessionsContent({
   error: errorOverride,
   actions = defaultActions,
 }: UserSessionsContentProps) {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
+  const { data: sessions = [], isLoading, error, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : userSessionsKey(userId),
+    () => actions.listUserSessions(userId).then((r) => r.sessions),
+  );
 
   const [revokeTarget, setRevokeTarget] = useState<Session | null>(null);
   const [revokeError, setRevokeError] = useState<string | undefined>();
@@ -56,27 +58,8 @@ export function UserSessionsContent({
   const [revokeAllOpen, setRevokeAllOpen] = useState(false);
   const [revokeAllError, setRevokeAllError] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { sessions: fetched } = await actions.listUserSessions(userId);
-        if (!cancelled) { setSessions(fetched); setIsLoading(false); }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load sessions");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, userId, loadingOverride, errorOverride, fetchKey]);
-
   const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
   const columns: DataTableColumn<Session>[] = [
     { key: "ipAddress", label: "IP Address", render: (s) => s.ipAddress ?? "—" },
@@ -109,7 +92,7 @@ export function UserSessionsContent({
     setRevokeError(undefined);
     try {
       await actions.revokeUserSession(revokeTarget.token);
-      setSessions((prev) => prev.filter((s) => s.id !== revokeTarget.id));
+      await mutate((cur) => (cur ?? []).filter((s) => s.id !== revokeTarget.id), { revalidate: false });
       return true;
     } catch (err: unknown) {
       setRevokeError(err instanceof Error ? err.message : "Failed to revoke session");
@@ -121,7 +104,7 @@ export function UserSessionsContent({
     setRevokeAllError(undefined);
     try {
       await actions.revokeUserSessions(userId);
-      setFetchKey((k) => k + 1);
+      await mutate([], { revalidate: false });
       return true;
     } catch (err: unknown) {
       setRevokeAllError(err instanceof Error ? err.message : "Failed to revoke all sessions");
@@ -130,7 +113,7 @@ export function UserSessionsContent({
   }
 
   if (showLoading) return <Skeleton rows={4} />;
-  if (showError) return <ErrorAlert message={showError} onRetry={() => setFetchKey((k) => k + 1)} />;
+  if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
 
   return (
     <>

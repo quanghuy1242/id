@@ -1,0 +1,705 @@
+# OAuth Screens
+
+## Component registry (all implemented)
+
+All components exist in `packages/ui/src/` with the exact props described in this spec:
+`AppShell`, `Topbar`, `TopbarStart`, `TopbarEnd`, `TopbarBrandLink`, `TopbarBreadcrumb`, `TopbarAvatarMenu`,
+`Sidebar`, `SidebarLayout`, `MainContent`, `MobileDock`,
+`PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,
+`NavMenu`, `NavSection`, `NavLink`, `DockLink`, `NavTitle`,
+`Text`, `Heading`,
+`Button`, `LinkButton`, `TextInput`, `RadioGroup`, `Avatar`, `Alert`, `Badge`, `Skeleton`, `EmptyState`,
+`ErrorAlert`, `SearchInput`, `FilterDropdown`, `Tabs`, `ConfirmDialog`, `DataTable`, `Textarea`.
+
+**Icon names registered in nav-icons.tsx:** See identity.md for full list. Add new icons (e.g. `RefreshCw`) to `iconMap` before using.
+
+**Icon-only buttons:** `Button(size="sm" variant="secondary" iconName="..." ariaLabel="...")` with no `children`.
+
+Covers all routes under `/admin/oauth`. Platform admin only — all org-scoped endpoints use the admin session's organization context.
+
+Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● enabled · ○ disabled · ⊙ disabled
+
+---
+
+## /admin/oauth/applications
+
+Lists OAuth2 client applications registered through the OAuth Provider plugin.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ OAuth Applications        [🔍...]  [+ New App] │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌── loading ────────────────────────────────────┐ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── client list ─────────────────────────────────┐ │
+│                  │ │ Name ↕         Client ID              Type   ↕ │ │
+│                  │ │ Content API     cli_contentapi_...   M2M       │ │
+│                  │ │ Admin Client    cli_adminapp_...     Public    │ │
+│                  │ │ Vendor Portal   cli_portal_...       Confidntl │ │
+│                  │ │ ─────────────────────────────────────────────── │ │
+│                  │ │ Content API     cli_contentapi_...   M2M       │ │
+│                  │ │   ↳ Reference: org_001 (Acme Corp)             │ │
+│                  │ │   ↳ Client Secret ⋯⋯⋯⋯ [Rotate]               │ │
+│                  │ │   [Edit]                                  [×]  │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty ──────────────────────────────────────┐ │
+│                  │ │          📥  No OAuth applications            │ │
+│                  │ │               [Create Application]            │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Create App modal ───────────────────────────┐ │
+│                  │ │ Create OAuth Application                     │ │
+│                  │ │ Name      [Content API            ]           │ │
+│                  │ │ Type      ● Confidential  ○ Public  ○ M2M    │ │
+│                  │ │ Auth      ● client_secret_post ○ basic       │ │
+│                  │ │ Grant     ☑ auth_code  ☑ refresh   ☐ M2M    │ │
+│                  │ │ Rspnse    ☑ code                                  │ │
+│                  │ │ Scopes    [openid profile content:read     ]  │ │
+│                  │ │ Redirects [https://app.example.com/callback ]  │ │
+│                  │ │ Post-Logout[https://app.example.com/logged-out]│ │
+│                  │ │ URI       [https://app.example.com        ]  │ │
+│                  │ │ Logo URI  [https://app.example.com/logo.png]  │ │
+│                  │ │ TOS URI   [https://app.example.com/tos    ]  │ │
+│                  │ │ Policy URI[https://app.example.com/privacy ]  │ │
+│                  │ │ Contacts  [admin@example.com             ]  │ │
+│                  │ │                               [Cancel] [Create]│
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Edit App modal ───────────────────────────────┐ │
+│                  │ │ Edit Content API                               │ │
+│                  │ │ (Same fields as create, pre-filled)            │ │
+│                  │ │                                [Cancel] [Save] │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Rotate Secret modal ──────────────────────────┐ │
+│                  │ │ ⚠ Rotate Client Secret for Content API         │ │
+│                  │ │ This invalidates the current secret immediately.│ │
+│                  │ │ Make sure to update your application config.    │ │
+│                  │ │                                               │ │
+│                  │ │ New secret (shown once — copy now):            │ │
+│                  │ │ ┌───────────────────────────────────────┐      │ │
+│                  │ │ │ sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx   │      │ │
+│                  │ │ └───────────────────────────────────────┘      │ │
+│                  │ │                            [Close] [Copy]     │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Delete modal ────────────────────────────────┐ │
+│                  │ │ ⚠ Delete Content API?                        │ │
+│                  │ │ This will remove the OAuth application and    │ │
+│                  │ │ invalidate all tokens issued for this client.  │ │
+│                  │ │ All app integrations using this client will    │ │
+│                  │ │ stop working.                                  │ │
+│                  │ │              [Cancel]    [Delete Application]  │ │
+│                  │ └───────────────────────────────────────────────┘ │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > Suspense(fallback=<ApplicationsContent loading />)
+    ApplicationsContent
+    Stack(gap="md")
+      Panel > Inline(justify="between")
+        Text(variant="h2", "OAuth Applications")
+        Inline(gap="sm")
+          SearchInput(placeholder="Search applications...", value=search, onChange, grow)
+          Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New App")
+
+      Stack(gap="sm") — one Panel per client, each expandable:
+        Panel(tone="muted", padding="sm")
+          Inline(justify="between")
+            Inline(gap="sm")
+              Text(variant="body", children=client.client_name)
+              Badge(tone=typeBadge[clientType(client)], children=typeLabel[clientType(client)])
+              Badge(tone="neutral", children=client.client_id) — truncated, first 16 chars
+            Inline(gap="sm")
+              Button(size="sm", variant="secondary", iconName="Pencil", ariaLabel="Edit", onClick=openEdit(client))
+              Button(size="sm", variant="danger", iconName="Trash2", ariaLabel="Delete", onClick=openDelete(client))
+          Spacer(size="xs")
+          Inline(gap="md") — detail row (visible on expand or shown inline for all)
+            Text(variant="caption", "Client ID:") + Text(variant="body", client.client_id, mono)
+          Text(variant="caption", "Secret:") + Text(variant="body", "⋯⋯⋯⋯", mono)
+          Button(size="sm", variant="secondary", iconName="RefreshCw", onClick=openRotate(client), "Rotate")
+          Text(variant="caption", "Redirect URIs:") + Text(variant="body", (client.redirect_uris ?? []).join(", "))
+          Text(variant="caption", "Scopes:") + Inline(gap="xs") > scopeBadges (from client.scope.split(" "))
+          Text(variant="caption", "Grant Types:") + Inline(gap="xs") > grantBadges (from client.grant_types)
+
+  Representation note (the API boundary is snake_case — do NOT use the DB camelCase):
+    - GET /api/auth/oauth2/get-clients returns **OAuth2-formatted (snake_case)** objects — `client_id`,
+      `client_name`, `redirect_uris`, `post_logout_redirect_uris`, `grant_types`, `response_types`,
+      `token_endpoint_auth_method`, `client_uri`, `logo_uri`, `contacts`, `tos_uri`, `policy_uri`,
+      `software_id`, `software_version`, `software_statement`, and `scope` (a **space-delimited string**,
+      not an array). create-client / update-client use the same snake_case (RFC 7591). List/detail rendering
+      and modal form `name=` attributes are therefore ALL snake_case.
+    - The underlying `oauthClient` D1 table is camelCase (`clientId`, `name`, `redirectUris`, …), but that
+      shape is NOT what any OAuth2 endpoint returns. Do not read camelCase fields off the API response.
+    - There is no confidential/public/M2M `type` enum. `clientType(client)` is derived:
+      M2M if `grant_types` includes `"client_credentials"`; else Public if
+      `token_endpoint_auth_method === "none"`; else Confidential.
+
+      Empty: EmptyState(message="No OAuth applications", cta="Create Application", onCta=openCreateModal)
+
+  Create modal: ConfirmDialog(title="Create OAuth Application", confirmLabel="Create", onConfirm)
+    — Tab layout or sectioned fields:
+    TextInput(label="Name", name="client_name", required)
+    RadioGroup(title="Type", name="type", options=[
+      {value:"confidential", label:"Confidential"}, {value:"public", label:"Public"}, {value:"M2M", label:"M2M"}
+    ], defaultValue="confidential")
+    — "Type" is a UI convenience only; the API has no type enum. On submit, translate it into real
+      registration params:
+        Confidential → grant_types ["authorization_code","refresh_token"], public:false, token_endpoint_auth_method per the auth-method field
+        Public       → grant_types ["authorization_code","refresh_token"], public:true,  token_endpoint_auth_method:"none"
+        M2M          → grant_types ["client_credentials"], public:false, token_endpoint_auth_method:"client_secret_post"
+    — When type="M2M": hide redirect_uris in the form, but still send redirect_uris (required by the API — send []).
+      token_endpoint_auth_method locked to "client_secret_post".
+    RadioGroup(title="Token Auth Method", name="token_endpoint_auth_method", options=[
+      {value:"client_secret_post", label:"client_secret_post"},
+      {value:"client_secret_basic", label:"client_secret_basic"}
+    ], defaultValue="client_secret_post")
+    TextInput(label="Scopes (space-separated)", name="scope", placeholder="openid profile content:read")
+    TextInput(label="Redirect URIs (comma-separated)", name="redirect_uris")
+    TextInput(label="Post-Logout Redirect URIs", name="post_logout_redirect_uris")
+    TextInput(label="Client URI", name="client_uri")
+    TextInput(label="Logo URI", name="logo_uri")
+    TextInput(label="TOS URI", name="tos_uri")
+    TextInput(label="Policy URI", name="policy_uri")
+    TextInput(label="Contacts (comma-separated)", name="contacts")
+    On confirm: POST /api/auth/oauth2/create-client → { client_id, client_secret, ... }
+    — On success show the secret once: set a "showSecret" state, render a Panel with the client_secret and a Copy button.
+      Close modal closes both the create dialog and the secret reveal.
+
+  Edit modal: ConfirmDialog(title="Edit Application", confirmLabel="Save", onConfirm)
+    — Same fields as create, pre-filled. client_id and client_secret NOT editable.
+    On confirm: POST /api/auth/oauth2/update-client { client_id, update: { client_name?, scope?, redirect_uris?, ... } }
+      — The mutable fields are nested under `update:` (NOT `data:`). `scope` is a space-delimited string.
+
+  Rotate Secret modal: ConfirmDialog(title="Rotate Client Secret", confirmLabel="Rotate", variant="danger", onConfirm)
+    — After confirm, show the new secret in a monospace Panel with copy button.
+    On confirm: POST /api/auth/oauth2/client/rotate-secret { client_id }
+    — On success: render new `client_secret` in a `<Text variant="body">` with monospace font.
+      Add Button(variant="primary", onClick=copy, "Copy") — copy to clipboard via navigator.clipboard.writeText.
+
+  Delete modal: ConfirmDialog(title="Delete Application", confirmLabel="Delete", variant="danger", onConfirm)
+    On confirm: POST /api/auth/oauth2/delete-client { client_id }
+
+Data: GET /api/auth/oauth2/get-clients → OAuthClient[]  (OAuth2-formatted, snake_case; see shape below)
+      POST /api/auth/oauth2/create-client → { client_id, client_secret, ... }  (snake_case)
+        body (flat snake_case; redirect_uris REQUIRED): { client_name?, token_endpoint_auth_method?, scope?, redirect_uris[], grant_types?[], response_types?[], post_logout_redirect_uris?[], client_uri?, logo_uri?, tos_uri?, policy_uri?, contacts?[], ... }
+        — There is no `type` field; see clientType derivation above. To create an M2M client send grant_types: ["client_credentials"].
+      POST /api/auth/oauth2/update-client → OAuthClient
+        body: { client_id, update: { client_name?, scope?, redirect_uris?, ... } }  (mutable fields under `update:`, NOT `data:`)
+      POST /api/auth/oauth2/client/rotate-secret → { client_secret: string }
+        body: { client_id }
+      POST /api/auth/oauth2/delete-client → { }
+        body: { client_id }
+
+OAuthClient shape (the OAuth2-formatted response from get-clients/create/update — **snake_case**):
+  { client_id, client_secret?, client_name, redirect_uris: string[], post_logout_redirect_uris?: string[],
+    grant_types: string[], response_types: string[], token_endpoint_auth_method, scope: string (space-delimited),
+    client_uri?, logo_uri?, contacts?: string[], tos_uri?, policy_uri?, software_id?, software_version?,
+    software_statement? }
+  — `scope` is a SPACE-DELIMITED STRING, not an array — split on " " to render scope badges.
+  — `client_secret` is only present in create/rotate responses (and may be absent for public clients), never re-fetched by get-clients.
+  — The underlying `oauthClient` D1 table is camelCase (`clientId`, `name`, `redirectUris`, `grantTypes`,
+    `public`, `disabled`, `referenceId`, …); that is the storage shape, NOT the API response shape.
+
+Behavior:
+  - No server-side search; full client list fetched once. Client-side search filters by client_name and clientId.
+  - Expand rows: each Panel is a card showing summary + detail fields. Or use a table with row expansion.
+  - type labels: "confidential" → "Confidential", "public" → "Public", M2M ("client_credentials" in grantTypes) → "M2M"
+  - Badge tones for type: M2M→"accent", Confidential→"neutral", Public→"info"
+  - Secret rotation: show new secret once, auto-hide on modal close.
+  - The OAuth Provider's create-client response includes client_secret. Show modal after creation.
+  - Delete: no confirmation slug/email required; regular ConfirmDialog with danger variant.
+
+Badge mappings:
+  type: "confidential"→Badge(tone="neutral"), "public"→Badge(tone="info"), M2M→Badge(tone="accent")
+  disabled: true→Badge(tone="error", children="Disabled"), false→(no badge)
+
+---
+
+## /admin/oauth/resource-apis
+
+CRUD for OAuth resource servers (audience definitions for access tokens).
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ OAuth Resource APIs  [🔍...]  [+ New API]    │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌── loading ────────────────────────────────────┐ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── resource server list ────────────────────────┐ │
+│                  │ │ Name ↕        Slug ↕        Audience  Status ↕ │ │
+│                  │ │ Content API   content-api  https://.. ▸ Enabled │ │
+│                  │ │ Vendor API    vendor-api   https://.. ▸ Enabled │ │
+│                  │ │ Analytics     analytics    https://.. ⊙ Disabled│ │
+│                  │ │ ─────────────────────────────────────────────── │ │
+│                  │ │ id System     id-system    https://.. ▸ System  │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty ──────────────────────────────────────┐ │
+│                  │ │        📥  No resource APIs registered        │ │
+│                  │ │             [Register Resource API]           │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Create modal ───────────────────────────────┐ │
+│                  │ │ Register Resource API                        │ │
+│                  │ │ Name      [Content API             ]          │ │
+│                  │ │ Slug      [content-api             ]          │ │
+│                  │ │ Audience  [https://content-api.example.com]   │ │
+│                  │ │ Description[Main content API       ]          │ │
+│                  │ │ Organization ○ System (id-owned)              │ │
+│                  │ │               ● Acme Corp                    │ │
+│                  │ │              [Cancel]    [Register]           │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Edit modal ───────────────────────────────────┐ │
+│                  │ │ Edit Resource API                             │ │
+│                  │ │ (Same as create, organization not changeable)  │ │
+│                  │ │                                [Cancel] [Save] │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Disable modal ────────────────────────────────┐ │
+│                  │ │ Disable Content API?                           │ │
+│                  │ │ Tokens with this audience will be rejected.     │ │
+│                  │ │              [Cancel]    [Disable]              │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Delete modal ────────────────────────────────┐ │
+│                  │ │ ⚠ Delete Content API?                         │ │
+│                  │ │ This removes the resource server and ALL       │ │
+│                  │ │ associated OAuth scopes.                       │ │
+│                  │ │ All tokens issued for this audience will be    │ │
+│                  │ │ invalidated.                                    │ │
+│                  │ │              [Cancel]    [Delete]              │ │
+│                  │ └───────────────────────────────────────────────┘ │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > Suspense > ResourceApisContent
+  Stack(gap="md")
+    Panel > Inline(justify="between")
+      Text(variant="h2", "Resource APIs")
+      Inline(gap="sm")
+        SearchInput(placeholder="Search resource APIs...", value=search, onChange, grow)
+        Button(variant="primary", iconName="Plus", onClick=openCreateModal, "Register API")
+
+    Panel(padding="none")
+      DataTable(
+        columns=[name(sortable), slug, audience(col), status(col), description(col)],
+        rows=filteredServers, getRowKey=(rs)=>rs.id,
+        onRowClick=openDetail or navigate,
+        sortBy, sortDirection, onSort
+      )
+      Loading: Skeleton(rows=4)
+      Empty: EmptyState(message="No resource APIs registered", cta="Register Resource API", onCta=openCreateModal)
+      Error: ErrorAlert(message, onRetry=refetch)
+      Search-empty: EmptyState(message="No resource APIs match your search", cta="Clear search", onCta=clearSearch)
+
+  Create modal: ConfirmDialog(title="Register Resource API", confirmLabel="Register", onConfirm)
+    TextInput(label="Name", name="name", required)
+    TextInput(label="Slug", name="slug", required)
+    TextInput(label="Audience URL", name="audience", required)
+    TextInput(label="Description", name="description")
+    RadioGroup(title="Organization", name="organizationId", options=orgOptions, value=selectedOrgId, onChange=setSelectedOrgId)
+    On confirm: POST /api/auth/admin/resource-servers { name, slug, audience, description?, organizationId? }
+
+  Edit modal: ConfirmDialog(title="Edit Resource API", confirmLabel="Save", onConfirm)
+    TextInput(label="Name", name="name", defaultValue=rs.name, required)
+    TextInput(label="Slug", name="slug", defaultValue=rs.slug, required) — validate uniqueness on blur if changed
+    TextInput(label="Audience URL", name="audience", defaultValue=rs.audience, required)
+    TextInput(label="Description", name="description", defaultValue=rs.description||"")
+    On confirm: PATCH /api/auth/admin/resource-servers/{id} { slug?, name?, audience?, description? }
+      — Flat body (NOT wrapped in `data:`). This plugin uses a strict flat schema, unlike the BA
+        admin/organization update endpoints in identity.md which wrap payloads in `data:`.
+
+  Disable: ConfirmDialog(title="Disable API", confirmLabel="Disable", variant="danger", onConfirm)
+      On confirm: POST /api/auth/admin/resource-servers/{id}/disable { }  (no body)
+    — There is NO enable endpoint, and PATCH does not accept `enabled` (the update body is
+      { slug?, name?, audience?, description? } only). Disabling is currently one-way via the API.
+      Show the Disable action only for enabled servers; do not render an Enable action until a
+      re-enable endpoint exists (track as an API gap if the product needs it).
+
+  Delete modal: ConfirmDialog(title="Delete Resource API", confirmLabel="Delete", variant="danger", onConfirm)
+    On confirm: DELETE /api/auth/admin/resource-servers/{id}
+
+Data: GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer[] }
+      POST /api/auth/admin/resource-servers → ResourceServer
+        body: { name, slug, audience, description?, organizationId? }
+      GET /api/auth/admin/resource-servers/{id} → ResourceServer
+      PATCH /api/auth/admin/resource-servers/{id} → ResourceServer
+        body: { slug?, name?, audience?, description? }  (flat; description may be null to clear)
+      DELETE /api/auth/admin/resource-servers/{id} → { deleted: true }
+      POST /api/auth/admin/resource-servers/{id}/disable → ResourceServer
+
+ResourceServer shape: { id, organizationId, slug, name, audience, description?, enabled, createdBy, updatedBy, disabledAt?, disabledBy?, createdAt, updatedAt }
+  — Timestamps (createdAt, updatedAt, disabledAt) are **epoch milliseconds (numbers)**, not ISO strings —
+    unlike identity.md's `User` whose timestamps are ISO strings. The same applies to OAuthResourceScope and
+    OAuthClientResourceScope below. Use `new Date(ms)` for display.
+
+Behavior:
+  - No server-side pagination; fetch full list once. Client-side search by name/slug.
+  - Status column: enabled→"Enabled" Badge(tone="success"), disabled→"Disabled" Badge(tone="error")
+  - System resource servers (organizationId IS NULL, slug = "id-system") show "System" badge.
+  - Organization dropdown in create: fetch organization list, show "System (id-owned)" + org options.
+  - Slug validation on blur: check uniqueness via check-slug if slug changed in edit.
+  - Row click: navigate to detail view (or show inline expand/edit if we keep it simple).
+
+Badge mappings:
+  enabled: true→Badge(tone="success", "Enabled"), false→Badge(tone="error", "Disabled")
+  organizationId: null→Badge(tone="accent", "System")
+
+---
+
+## /admin/oauth/scope-catalog
+
+CRUD for OAuth scopes bound to resource servers.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ OAuth Scope Catalog  [🔍...]  [+ New Scope]  │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌── loading ────────────────────────────────────┐ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── scope list ──────────────────────────────────┐ │
+│                  │ │ Scope ↕          Resource API     Status Desc ↕│ │
+│                  │ │ content:read     Content API   ▸ Enabled  Read │ │
+│                  │ │ content:write    Content API   ▸ Enabled  Write│ │
+│                  │ │ content:admin    Content API   ⊙ Disabled Admin│ │
+│                  │ │ vendor:read      Vendor API    ▸ Enabled  Read │ │
+│                  │ │ ─────────────────────────────────────────────── │ │
+│                  │ │ content:read     Content API   ▸ Enabled  Read │ │
+│                  │ │   ↳ Package: content:read, content:write        │ │
+│                  │ │   [Edit]  [× Delete]                            │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty ──────────────────────────────────────┐ │
+│                  │ │        📥  No OAuth scopes defined            │ │
+│                  │ │             [Create Scope]                     │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Create modal ───────────────────────────────┐ │
+│                  │ │ Create OAuth Scope                           │ │
+│                  │ │ Resource API │ Content API (content-api) ▾    │ │
+│                  │ │ Scope        [content:read           ]        │ │
+│                  │ │ Description  [Read access to content  ]        │ │
+│                  │ │                              [Cancel] [Create] │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Edit modal ───────────────────────────────────┐ │
+│                  │ │ Edit OAuth Scope                              │ │
+│                  │ │ (Same as create; scope string not changeable)   │ │
+│                  │ │                                [Cancel] [Save] │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Delete modal ────────────────────────────────┐ │
+│                  │ │ ⚠ Delete Scope content:read?                   │ │
+│                  │ │ All existing client-resource-scope bindings    │ │
+│                  │ │ referencing this scope will be invalid.        │ │
+│                  │ │              [Cancel]    [Delete Scope]        │ │
+│                  │ └───────────────────────────────────────────────┘ │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > Suspense > ScopeCatalogContent
+  Stack(gap="md")
+    Panel > Inline(justify="between")
+      Text(variant="h2", "Scope Catalog")
+      Inline(gap="sm")
+        SearchInput(placeholder="Search scopes...", value=search, onChange, grow)
+        Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New Scope")
+
+    Panel(padding="none")
+      DataTable(
+        columns=[scope(sortable), resourceServer(col), status(col), description(col)],
+        rows=filteredScopes, getRowKey=(s)=>s.id,
+        onRowClick=openDetail,
+        sortBy, sortDirection, onSort
+      )
+      Loading: Skeleton(rows=4)
+      Empty: EmptyState(message="No OAuth scopes defined", cta="Create Scope", onCta=openCreateModal)
+      Error: ErrorAlert(message, onRetry=refetch)
+      Search-empty: EmptyState(message="No scopes match your search", cta="Clear search", onCta=clearSearch)
+
+  Create modal: ConfirmDialog(title="Create OAuth Scope", confirmLabel="Create", onConfirm)
+    FilterDropdown(label="Resource API", options=resourceServerOptions, value=selectedResourceServerId, onChange=setSelectedResourceServerId) — options: [{value:rs.id, label:`${rs.name} (${rs.slug})`}]
+    TextInput(label="Scope", name="scope", required, placeholder="content:read")
+    Textarea(label="Description", name="description", placeholder="Grants read access to content resources")
+    On confirm: POST /api/auth/admin/oauth-scopes { resourceServerId, scope, description? }
+
+  Edit modal: ConfirmDialog(title="Edit OAuth Scope", confirmLabel="Save", onConfirm)
+    — Scope string is NOT editable after creation (natural key)
+    TextInput(label="Scope", name="scope", defaultValue=scope.scope, disabled=true) — show but read-only
+    Textarea(label="Description", name="description", defaultValue=scope.description||"")
+    On confirm: PATCH /api/auth/admin/oauth-scopes/{id} { scope?, description?, enabled? }
+      — Flat body (NOT wrapped in `data:`). The API does allow updating `scope`, but the UI keeps it
+        read-only (natural key). `description` may be null to clear.
+
+  Delete modal: ConfirmDialog(title="Delete Scope", confirmLabel="Delete", variant="danger", onConfirm)
+    On confirm: (no admin DELETE endpoint for scopes — check API; if not available, note as TODO)
+
+Data: GET /api/auth/admin/oauth-scopes → { oauthScopes: OAuthResourceScope[] }
+      POST /api/auth/admin/oauth-scopes → OAuthResourceScope
+        body: { resourceServerId, scope, description? }  (strict — `enabled` is NOT accepted on create; defaults to true)
+      PATCH /api/auth/admin/oauth-scopes/{id} → OAuthResourceScope
+        body: { scope?, description?, enabled? }  (flat; not wrapped in `data:`)
+      — Note: No admin DELETE for individual scopes in current API. Document as limitation.
+      GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer[] }  (for dropdown options)
+
+OAuthResourceScope shape: { id, resourceServerId, scope, description?, enabled, createdBy, updatedBy, createdAt, updatedAt }
+
+Behavior:
+  - Fetch both scopes + resource servers on mount. Join scope to resource server by resourceServerId for display.
+  - FilterDropdown for Resource API selection in create modal populated from resource servers list.
+  - Client-side search by scope string.
+  - Scope string: lowercase, pattern `^[a-z][a-z0-9:_-]*$` (per OpenAPI). Validate client-side.
+  - If delete not available in API: gray out Delete button with tooltip "Delete not yet supported".
+  - Status: enabled/disabled toggle possible via PATCH with { enabled: true/false }.
+
+Badge mappings:
+  enabled: true→Badge(tone="success", "Enabled"), false→Badge(tone="error", "Disabled")
+
+---
+
+## /admin/oauth/m2m-bindings
+
+M2M client-to-resource-server scope subset bindings.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ OAuth M2M Bindings  [🔍...]  [+ New Binding] │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌── loading ────────────────────────────────────┐ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── binding list ────────────────────────────────┐ │
+│                  │ │ Client ↕         Resource API   Scopes    Sts ↕│ │
+│                  │ │ Content API      Content API     [ct:read] ▸   │ │
+│                  │ │ Vendor Svc       Vendor API      [all]     ▸   │ │
+│                  │ │ Analytics BOT    Analytics API   [an:rd]   ⊙   │ │
+│                  │ │ ─────────────────────────────────────────────── │ │
+│                  │ │ Content API      Content API     [ct:rd]   ▸   │ │
+│                  │ │   ↳ Scopes: content:read, content:write         │ │
+│                  │ │   [Edit]  [× Delete]                            │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty ──────────────────────────────────────┐ │
+│                  │ │       📥  No M2M client bindings              │ │
+│                  │ │            [Create Binding]                    │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Create modal ───────────────────────────────┐ │
+│                  │ │ Create M2M Binding                           │ │
+│                  │ │ Client  │ Content API (cli_contentapi_) ▾     │ │
+│                  │ │ Resource│ Content API (content-api)   ▾     │ │
+│                  │ │ Scopes  ☑ content:read  ☑ content:write       │ │
+│                  │ │         ☐ content:admin                       │ │
+│                  │ │                              [Cancel] [Create] │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Edit modal ───────────────────────────────────┐ │
+│                  │ │ Edit Content API → Content API Binding         │ │
+│                  │ │ (Client and Resource not changeable)            │ │
+│                  │ │ Scopes  ☑ content:read  ☐ content:write        │ │
+│                  │ │         ☑ content:admin                        │ │
+│                  │ │                                [Cancel] [Save] │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Delete modal ────────────────────────────────┐ │
+│                  │ │ Delete this M2M binding?                       │ │
+│                  │ │ The client will lose access to these scopes    │ │
+│                  │ │ for the selected resource server.              │ │
+│                  │ │              [Cancel]    [Delete]              │ │
+│                  │ └───────────────────────────────────────────────┘ │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > Suspense > M2mBindingsContent
+  Stack(gap="md")
+    Panel > Inline(justify="between")
+      Text(variant="h2", "M2M Bindings")
+      Inline(gap="sm")
+        SearchInput(placeholder="Search bindings...", value=search, onChange, grow)
+        Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New Binding")
+
+    Panel(padding="none")
+      DataTable(
+        columns=[client(col), resourceServer(col), scopes(col), status(col)],
+        rows=bindings, getRowKey=(b)=>b.id,
+        onRowClick=openExpand,
+        sortBy, sortDirection, onSort
+      )
+      Loading: Skeleton(rows=4)
+      Empty: EmptyState(message="No M2M client bindings", cta="Create Binding", onCta=openCreateModal)
+      Error: ErrorAlert(message, onRetry=refetch)
+      Search-empty: EmptyState(message="No bindings match your search", cta="Clear search", onCta=clearSearch)
+
+  Create modal: ConfirmDialog(title="Create M2M Binding", confirmLabel="Create", onConfirm)
+    FilterDropdown(label="Client", options=clientOptions, value=selectedClientId, onChange) — options: [{value:cli.clientId, label:`${cli.name} (${cli.clientId.slice(0,12)}...)`}]
+    FilterDropdown(label="Resource API", options=resourceServerOptions, value=selectedRSId, onChange)
+    Checkbox group — { scopeOptions.map(s => Checkbox(label=s.scope, name=s.scope, selected, onChange)) }
+      — Note: Checkboxes via multiple Checkbox components (not RadioGroup). Each controlled via useState.
+    On confirm: POST /api/auth/admin/oauth-client-resource-scopes { clientId, resourceServerId, allowedScopes: string[] }
+
+  Edit modal: ConfirmDialog(title="Edit M2M Binding", confirmLabel="Save", onConfirm)
+    Same checkboxes as create, pre-checked with binding's allowedScopes.
+    On confirm: PATCH /api/auth/admin/oauth-client-resource-scopes/{id} { allowedScopes?: string[], enabled? }
+      — Flat body (NOT wrapped in `data:`).
+
+  Delete modal: ConfirmDialog(title="Delete M2M Binding", confirmLabel="Delete", variant="danger", onConfirm)
+    On confirm: DELETE /api/auth/admin/oauth-client-resource-scopes/{id}
+
+Data: GET /api/auth/admin/oauth-client-resource-scopes → { oauthClientResourceScopes: ClientResourceScope[] }
+      POST /api/auth/admin/oauth-client-resource-scopes → ClientResourceScope
+        body: { clientId, resourceServerId, allowedScopes: string[] }
+      PATCH /api/auth/admin/oauth-client-resource-scopes/{id} → ClientResourceScope
+        body: { allowedScopes?: string[], enabled?: boolean }  (flat; not wrapped in `data:`)
+      DELETE /api/auth/admin/oauth-client-resource-scopes/{id} → { deleted: true }
+      GET /api/auth/oauth2/get-clients → OAuthClient[]          (for client dropdown)
+      GET /api/auth/admin/resource-servers → { resourceServers } (for RS dropdown)
+      GET /api/auth/admin/oauth-scopes → { oauthScopes }        (for scope checkboxes)
+
+ClientResourceScope shape: { id, clientId, resourceServerId, allowedScopes: string[], enabled, createdBy, updatedBy, createdAt, updatedAt }
+
+Behavior:
+  - Fetch bindings + clients + resource servers + scopes on mount (4 parallel GETs).
+  - Join: bindings join to client via clientId, to resourceServer via resourceServerId.
+  - Scope checkboxes in create/edit populated from oauthScopes filtered to the selected resourceServerId.
+  - Status column: enabled→Badge(tone="success", "Active"), disabled→Badge(tone="error", "Disabled")
+  - Client-side search by client name, resource server name.
+  - Scope column: show Badge array for each scope.
+  - When resourceServerId changes in create modal, re-filter scope checkboxes.
+
+Badge mappings:
+  enabled: true→Badge(tone="success", "Active"), false→Badge(tone="error", "Disabled")
+
+---
+
+## /admin/oauth/sessions-tokens
+
+Read-only view of active sessions and OAuth tokens. No mutations on this page.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ OAuth Sessions & Tokens         [🔍...]      │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌── Tabs ──────────────────────────────────────┐ │
+│                  │ │  ▸ Browser Sessions    OAuth Tokens           │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Sessions (loading) ──────────────────────────┐ │
+│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎  ∎∎∎∎∎∎∎∎∎         │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Sessions list ───────────────────────────────┐ │
+│                  │ │ User Email ↕     IP         Created ↕  Expires│ │
+│                  │ │ john@acme.com    192.168...  12/01/24  01/01   │ │
+│                  │ │ jane@beta.com    10.0.0.5    11/20/24  12/20   │ │
+│                  │ │ bob@corp.com     172.16...   11/15/24  11/15   │ │
+│                  │ │   (expired — dimmed row)                       │ │
+│                  │ │ ═══════════════════════════════════════════════ │ │
+│                  │ │ 25 active sessions of 47 total                 │ │
+│                  │ │   [Prev]   Page 1 of 2   [Next]               │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Tokens tab ───────────────────────────────────┐ │
+│                  │ │  ▸ Browser Sessions    OAuth Tokens             │ │
+│                  │ │ ───────────────────────────────────────────────  │ │
+│                  │ │ Token Type ↕    Client ↕        User ↕  Expires│ │
+│                  │ │ access_token    Content API     john@.. 01/01   │ │
+│                  │ │ refresh_token   Vendor API      jane@.. 02/15   │ │
+│                  │ │ access_token    Analytics       bob@... 01/05   │ │
+│                  │ │ ───────────────────────────────────────────────  │ │
+│                  │ │ 31 active tokens                             │ │
+│                  │ │   [Prev]   Page 1 of 2   [Next]               │ │
+│                  │ └─────────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty-sessions ──────────────────────────────┐ │
+│                  │ │           📥  No active sessions               │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── empty-tokens ────────────────────────────────┐ │
+│                  │ │           📥  No active OAuth tokens           │ │
+│                  │ └───────────────────────────────────────────────┘ │
+│                  │                                                    │
+│                  │ ┌── Revoke modal ────────────────────────────────┐ │
+│                  │ │ Revoke session for john@acme.com?              │ │
+│                  │ │ The user will be signed out immediately.        │ │
+│                  │ │              [Cancel]    [Revoke]              │ │
+│                  │ └───────────────────────────────────────────────┘ │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > Suspense > SessionsTokensContent
+  Stack(gap="md")
+    Tabs(
+      ariaLabel="Sessions and tokens",
+      selectedKey=activeTab,
+      items=[
+        {id:"sessions", label:"Browser Sessions"},
+        {id:"tokens", label:"OAuth Tokens"}
+      ]
+    )
+
+  Sessions tab:
+    Panel > Inline(justify="between")
+      Text(variant="h2", "Browser Sessions")
+      SearchInput(placeholder="Search by email or IP...", value=search, onChange, grow)
+    Panel(padding="none")
+      DataTable(
+        columns=[email(col), ipAddress, userAgent(col), createdAt(sortable), expiresAt],
+        rows=sessions, getRowKey=(s)=>s.id,
+        sortBy, sortDirection, onSort,
+        pagination={total,limit,offset,onChange}
+        — Per-row: revoke Button(variant="danger", size="sm", onClick=openRevokeModal(s.session))
+      )
+    Loading: Skeleton(rows=5)
+    Empty: EmptyState(message="No active browser sessions")
+
+  Tokens tab:
+    Panel > Inline(justify="between")
+      Text(variant="h2", "OAuth Tokens")
+      FilterDropdown(label="Type", options=[{value:"all",label:"All"},{value:"access",label:"Access"},{value:"refresh",label:"Refresh"}], value=typeFilter, onChange)
+      SearchInput(placeholder="Search by client or user...", value=search, onChange, grow)
+    Panel(padding="none")
+      DataTable(
+        columns=[type(col), client(col), user(col), expiresAt(sortable), scopes(col)],
+        rows=tokens, getRowKey=(t)=>t.id,
+        sortBy, sortDirection, onSort,
+        pagination={total,limit,offset,onChange}
+        — Per-row: if type=access AND not expired: revoke Button(size="sm")
+      )
+    Loading: Skeleton(rows=5)
+    Empty: EmptyState(message="No active OAuth tokens")
+
+  Revoke modal: ConfirmDialog(title="Revoke Session", confirmLabel="Revoke", variant="danger", onConfirm)
+    On confirm: POST /api/auth/admin/revoke-user-session { sessionToken }
+      — Existing BA admin endpoint (same one identity.md's user-sessions page uses). There is no
+        `/admin/revoke-session`.
+
+Data:
+  — Note: No single admin endpoint lists ALL sessions or tokens across users.
+    Sessions use per-user list-sessions (identity.md).
+    Tokens use `oauthAccessToken` / `oauthRefreshToken` tables — no admin list endpoint.
+    **This screen requires a new aggregate admin endpoint or direct D1 queries.**
+    Document as "API Gap" for first implementation.
+    Options: (a) placeholder page with "Coming soon", (b) implement per-user lookup loop,
+    (c) wait for aggregate admin session/token endpoint.
+
+Notes:
+  - This screen is deferred — it requires API support that doesn't exist yet.
+  - First implementation: show "Coming Soon" page with description.
+  - Future: use aggregate admin endpoints to list all active sessions and OAuth tokens.
+  - For now the route file renders a simple placeholder Panel with text.

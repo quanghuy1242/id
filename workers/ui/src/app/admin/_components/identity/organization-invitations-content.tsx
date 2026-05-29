@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import useSWR from "swr";
 import {
   Badge,
   Button,
@@ -24,6 +25,8 @@ import {
   type Invitation,
 } from "../../_actions/organizations";
 import { getUser as getUserAction } from "../../_actions/users";
+import { orgInvitationsKey } from "@/app/admin/_data/swr-keys";
+import { useUsersByIds } from "@/app/admin/_data/use-users-by-ids";
 
 const defaultActions = {
   listInvitations: listInvsAction,
@@ -70,12 +73,6 @@ export function OrganizationInvitationsContent({
   actions = defaultActions,
   ...props
 }: OrgInvsContentProps) {
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [inviterNames, setInviterNames] = useState<Map<string, string>>(new Map());
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
-
   const [internalStatus, setInternalStatus] = useState("all");
   const effectiveStatus = props.statusFilter ?? internalStatus;
   const handleStatusChange = props.onStatusFilterChange ?? setInternalStatus;
@@ -90,39 +87,25 @@ export function OrganizationInvitationsContent({
   const [inviteRole, setInviteRole] = useState("member");
   const [inviteError, setInviteError] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const invs = await actions.listInvitations(orgId);
-        const inviterIds = [...new Set(invs.map((i) => i.inviterId))];
-        const names = await Promise.all(
-          inviterIds.map((id) => actions.getUser(id).then((r) => r.user.name).catch(() => "—")),
-        );
-        const nameMap = new Map(inviterIds.map((id, i) => [id, names[i]]));
-        if (!cancelled) {
-          setInvitations(invs);
-          setInviterNames(nameMap);
-          setIsLoading(false);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load invitations");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, orgId, loadingOverride, errorOverride, fetchKey]);
+  const { data: invitations, isLoading, error, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : orgInvitationsKey(orgId),
+    () => actions.listInvitations(orgId),
+  );
+
+  // Inviter names resolve through the shared user cache.
+  const { usersById: inviters } = useUsersByIds(
+    (invitations ?? []).map((i) => i.inviterId),
+    actions.getUser,
+  );
 
   const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
   const filteredInvs = useMemo(
-    () => effectiveStatus === "all" ? invitations : invitations.filter((i) => i.status === effectiveStatus),
+    () => {
+      const all = invitations ?? [];
+      return effectiveStatus === "all" ? all : all.filter((i) => i.status === effectiveStatus);
+    },
     [invitations, effectiveStatus],
   );
 
@@ -146,7 +129,7 @@ export function OrganizationInvitationsContent({
     {
       key: "inviterId",
       label: "Invited By",
-      render: (inv) => inviterNames.get(inv.inviterId) ?? "—",
+      render: (inv) => inviters.get(inv.inviterId)?.name ?? "—",
     },
     {
       key: "expiresAt",
@@ -184,7 +167,7 @@ export function OrganizationInvitationsContent({
     setResendError(undefined);
     try {
       await actions.inviteMember(orgId, resendTarget.email, resendTarget.role, true);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setResendError(err instanceof Error ? err.message : "Failed to resend invitation");
@@ -197,7 +180,7 @@ export function OrganizationInvitationsContent({
     setCancelError(undefined);
     try {
       await actions.cancelInvitation(cancelTarget.id);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setCancelError(err instanceof Error ? err.message : "Failed to cancel invitation");
@@ -211,7 +194,7 @@ export function OrganizationInvitationsContent({
       const email = String(formData.get("email") ?? "").trim();
       const role = String(formData.get("role") ?? inviteRole);
       await actions.inviteMember(orgId, email, role);
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setInviteError(err instanceof Error ? err.message : "Failed to send invite");
@@ -221,7 +204,7 @@ export function OrganizationInvitationsContent({
 
   function renderTable() {
     if (showLoading) return <Skeleton rows={4} />;
-    if (showError) return <ErrorAlert message={showError} onRetry={() => setFetchKey((k) => k + 1)} />;
+    if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (filteredInvs.length === 0) {
       if (effectiveStatus !== "all") {
         return effectiveStatus === "pending"

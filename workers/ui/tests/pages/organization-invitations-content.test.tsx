@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithSwr as render } from "../_utils/swr-render";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationInvitationsContent } from "@/app/admin/_components/identity/organization-invitations-content";
 import { mockInvitations } from "@/app/admin/_mocks/organizations";

@@ -7,6 +7,7 @@
 ## Table Of Contents
 
 - [Shell chrome (Topbar / Sidebar / MobileDock)](shell.md) — layout.tsx for all `/admin` routes
+- [API Gaps](api-gaps.md) — endpoints the admin UI needs but don't exist yet; ordered by priority
 - [/admin — Dashboard](#admin--dashboard)
 - [/admin/identity — Users](#adminidentity--users)
 - [/admin/identity — Organizations](#adminidentity--organizations)
@@ -60,12 +61,9 @@ Actor-scoped. Platform admin sees all clients; org admin sees own org's clients 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/applications` | OAuth client list — name, type, org, status | — | planned |
-| `/admin/oauth/applications/:clientId` | Client overview — name, type, org, grant types, enabled status | — | planned |
-| `/admin/oauth/applications/:clientId/redirect-uris` | Redirect URI management — add, remove | — | planned |
-| `/admin/oauth/applications/:clientId/scopes` | Scope grants — `oauthClientResourceScope` builder: pick resource server → pick allowed scope subset | — | planned |
-| `/admin/oauth/applications/:clientId/secrets` | Secret management — rotate, view created-at | — | planned |
-| `/admin/oauth/applications/:clientId/consents` | Consent audit — user × scopes × timestamp, revoke | — | planned |
+| `/admin/oauth/applications` | OAuth client list — name, type, org, status, expand for detail, edit, rotate secret, delete | [oauth.md](oauth.md#adminoauthapplications) | specced |
+
+Note: Detail actions (redirect URIs, scopes, secrets) are inline modals on the list page rather than separate detail routes, following the pattern established by the OAuth Provider plugin's flat endpoint structure.
 
 ---
 
@@ -75,19 +73,21 @@ Actor-scoped. `resourceServer.organizationId` is nullable — null means platfor
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/resource-apis` | Resource server list — audience, org, enabled status | — | planned |
-| `/admin/oauth/resource-apis/:rsId` | Resource server overview — audience, org, edit, disable | — | planned |
-| `/admin/oauth/resource-apis/:rsId/scopes` | Scope catalog for this RS — declare `oauthResourceScope` rows, enable/disable | — | planned |
+| `/admin/oauth/resource-apis` | Resource server list — name, slug, audience, org, enabled status, create/edit/disable/delete modals | [oauth.md](oauth.md#adminoauthresource-apis) | specced |
+
+Note: Edit and disable actions are handled via inline modals on the list page. No separate detail route needed since the resource-server schema has few fields.
 
 ---
 
 ## /admin/oauth — Scope Catalog
 
-Cross-cutting read surface. Shows all `oauthResourceScope` rows across all resource servers. CRUD still lives on individual RS and client detail pages above.
+Cross-cutting read surface. Shows all `oauthResourceScope` rows across all resource servers. CRUD via modals on the list page.
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/scope-catalog` | All scopes across all resource servers — filterable by RS, shows enabled status and client binding count | — | planned |
+| `/admin/oauth/scope-catalog` | All scopes across all resource servers — filterable by RS, scope, enabled status; create/edit/disable via modals | [oauth.md](oauth.md#adminoauthscope-catalog) | specced |
+
+Note: Scope delete is not yet available in the API. Disable toggle via PATCH is available.
 
 ---
 
@@ -95,8 +95,8 @@ Cross-cutting read surface. Shows all `oauthResourceScope` rows across all resou
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — client × resource server × allowed scopes × enabled | — | planned |
-| `/admin/oauth/sessions-tokens` | Active OAuth sessions, token revocation, introspection test console | — | planned |
+| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — client × resource server × allowed scopes × enabled; create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | specced |
+| `/admin/oauth/sessions-tokens` | Active browser sessions and OAuth tokens — deferred pending API support | [oauth.md](oauth.md#adminoauthsessions-tokens) | specced |
 
 ---
 
@@ -121,8 +121,8 @@ Track B (SET/SSF async push) is **deferred** — docs 014/015/016 unimplemented.
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/security/jwks` | Keyset list — expiry dates, rotation trigger | — | planned |
-| `/admin/security/consents` | Global consent audit — user × client × scopes × timestamp, revoke | — | planned |
+| `/admin/security/jwks` | JWKS key list — active, rotated, expired keys; public JWK display; copy to clipboard | [security.md](security.md#adminsecurityjwks) | specced |
+| `/admin/security/consents` | Global consent audit — deferred pending API support; placeholder "Coming Soon" page | [security.md](security.md#adminsecurityconsents) | specced |
 | `/admin/security/policies` | CEL policy list — create, test expression console | — | deferred |
 
 `/admin/security/policies` deferred pending `idCelPolicy` plugin (docs/003 §2).

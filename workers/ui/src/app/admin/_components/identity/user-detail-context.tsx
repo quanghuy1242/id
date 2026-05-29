@@ -1,12 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import {
   getUser as getUserAction,
   getCurrentSession as getCurrentSessionAction,
   type CurrentSession,
   type User,
 } from "../../_actions/users";
+import { userDetailKey, currentSessionKey, isUsersListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultFetchActions = {
   getUser: getUserAction,
@@ -41,49 +43,55 @@ export function UserDetailProvider({
   actions = defaultFetchActions,
   children,
 }: UserDetailProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [currentSession, setCurrentSession] = useState<CurrentSession>(null);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
+  const { mutate: globalMutate } = useSWRConfig();
+  const skip = Boolean(loadingOverride || errorOverride) || !userId;
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride || !userId) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    setUser(null);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [{ user: fetched }, session] = await Promise.all([
-          actions.getUser(userId),
-          actions.getCurrentSession(),
-        ]);
-        if (!cancelled) {
-          setUser(fetched);
-          setCurrentSession(session);
-          setIsLoading(false);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load user");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [actions, userId, loadingOverride, errorOverride, fetchKey]);
+  const { data: userData, isLoading: userLoading, error: userError, mutate: mutateUser } = useSWR(
+    skip ? null : userDetailKey(userId),
+    () => actions.getUser(userId),
+  );
+  const { data: sessionData, mutate: mutateSession } = useSWR(
+    skip ? null : currentSessionKey(),
+    () => actions.getCurrentSession(),
+  );
+
+  // Local cache patch from a mutation response; also invalidates the users-list
+  // cache so the list reflects the change on next visit (no eager refetch).
+  const setUser = useCallback(
+    (u: User) => {
+      void mutateUser({ user: u }, { revalidate: false });
+      void globalMutate(isUsersListKey, undefined, { revalidate: false });
+    },
+    [mutateUser, globalMutate],
+  );
+
+  const setCurrentSession = useCallback(
+    (s: CurrentSession) => {
+      void mutateSession(s, { revalidate: false });
+    },
+    [mutateSession],
+  );
 
   const refetch = useCallback(() => {
-    setFetchKey((k) => k + 1);
-  }, []);
+    void mutateUser();
+    void mutateSession();
+  }, [mutateUser, mutateSession]);
 
-  const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const isLoading = loadingOverride ?? (errorOverride ? false : !userId || userLoading);
+  const error = errorOverride ?? (userError instanceof Error ? userError.message : userError ? String(userError) : undefined);
 
   return (
     <UserDetailContext.Provider
-      value={{ userId, user, setUser, currentSession, setCurrentSession, isLoading: showLoading, error: showError, refetch }}
+      value={{
+        userId,
+        user: userData?.user ?? null,
+        setUser,
+        currentSession: sessionData ?? null,
+        setCurrentSession,
+        isLoading,
+        error,
+        refetch,
+      }}
     >
       {children}
     </UserDetailContext.Provider>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import useSWR from "swr";
 import {
   Badge,
   Button,
@@ -27,6 +28,7 @@ import {
   type ListUsersResponse,
   type User,
 } from "../../_actions/users";
+import { usersListKey } from "@/app/admin/_data/swr-keys";
 
 const pageLimit = 25;
 
@@ -113,13 +115,6 @@ type UsersListContentProps = {
   };
 };
 
-type FetchedData = {
-  users: User[];
-  total: number;
-  limit: number;
-  offset: number;
-};
-
 export function UsersListContent({
   loading: loadingOverride,
   error: errorOverride,
@@ -136,11 +131,6 @@ export function UsersListContent({
   const [internalSortDir, setInternalSortDir] = useState<"asc" | "desc">("desc");
   const [internalOffset, setInternalOffset] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  const [data, setData] = useState<FetchedData | null>(null);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
 
   const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
@@ -181,43 +171,28 @@ export function UsersListContent({
     return () => clearTimeout(t);
   }, [effectiveSearch]); // intentionally omit props.page — only the search value drives debounce
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride) return;
+  // Server params only — status is filtered client-side (below) and must not
+  // enter the key; search is keyed on the debounced value, never raw input.
+  const params: ListUsersParams = useMemo(() => ({
+    limit: pageLimit,
+    offset: effectiveOffset,
+    sortBy: effectiveSortBy,
+    sortDirection: effectiveSortDir,
+    ...(debouncedSearch
+      ? { searchValue: debouncedSearch, searchField: "email" as const, searchOperator: "contains" as const }
+      : {}),
+    ...(effectiveRole !== "all"
+      ? { filterField: "role", filterValue: effectiveRole, filterOperator: "eq" }
+      : {}),
+  }), [effectiveOffset, effectiveSortBy, effectiveSortDir, debouncedSearch, effectiveRole]);
 
-    setIsLoading(true);
-    setFetchError(undefined);
-
-    const params = {
-      limit: pageLimit,
-      offset: effectiveOffset,
-      sortBy: effectiveSortBy,
-      sortDirection: effectiveSortDir,
-      ...(debouncedSearch
-        ? { searchValue: debouncedSearch, searchField: "email" as const, searchOperator: "contains" as const }
-        : {}),
-      ...(effectiveRole !== "all"
-        ? { filterField: "role", filterValue: effectiveRole, filterOperator: "eq" }
-        : {}),
-    };
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await actions.listUsers(params);
-        if (!cancelled) { setData(res); setIsLoading(false); }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load users");
-          setIsLoading(false);
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [actions, loadingOverride, errorOverride, debouncedSearch, effectiveRole, effectiveSortBy, effectiveSortDir, effectiveOffset, fetchKey]); // handlers are stable per render; no stale-closure risk here
+  const { data, isLoading, error, mutate } = useSWR(
+    loadingOverride || errorOverride ? null : usersListKey(params),
+    () => actions.listUsers(params),
+  );
 
   const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
   const allUsers = data?.users ?? [];
   const displayedUsers =
@@ -229,8 +204,7 @@ export function UsersListContent({
 
   function handleRetry() {
     if (onRetry) { onRetry(); return; }
-    setFetchError(undefined);
-    setFetchKey((k) => k + 1);
+    void mutate();
   }
 
   async function handleCreateConfirm(formData: FormData) {
@@ -243,7 +217,7 @@ export function UsersListContent({
         password: password || undefined,
         role: String(formData.get("role") ?? "user"),
       });
-      setFetchKey((k) => k + 1);
+      await mutate();
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create user");

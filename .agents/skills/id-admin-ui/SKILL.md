@@ -39,14 +39,14 @@ Every new admin screen follows this order. Do not skip or reorder steps. Full ra
 3. **Actions** — create `workers/ui/src/app/admin/_actions/<domain>.ts` with one typed async function per API endpoint. Plain functions, no React.
 4. **Shell decorator** — create `stories/_decorators/shell.tsx` if it does not exist yet (once, shared by all stories).
 5. **Content component** — create `workers/ui/src/app/admin/_components/<section>/<name>-content.tsx`. It must:
-   - Own its data lifecycle: call action functions in `useEffect`, store results in internal state.
-   - Accept `loading?: boolean` and `error?: string` override props that skip the fetch and force the skeleton/error display.
+   - Own its data lifecycle with **`useSWR`**, not `useEffect`+`useState`. See the "Data Fetching With SWR" section below — this is mandatory for every new content component. Build the key with a builder from `_data/swr-keys.ts`, fetch through the injected `actions`, and wire `mutate` to retry/mutation flows.
+   - Accept `loading?: boolean` and `error?: string` override props that skip the fetch and force the skeleton/error display (pass `null` as the `useSWR` key when an override is set).
    - Accept optional state-override props for search, filter, sort, page (route file passes these from `useSearchParams`).
    - Manage internal `useState` for all UI state when overrides are not provided.
    - Fire navigation callbacks (`onRowClick`, `onBackClick`) — never call `router.push()` directly.
    - Own zero URL logic — no `useSearchParams`, no `usePathname`, no `useRouter`.
    - Render only `@id/ui` components.
-6. **Story** — create `stories/<section>/<name>.stories.tsx`. Minimum exports: `Populated`, `Empty`, `Loading`, `Error`. Use `vi.mock` on the `_actions/` module. Wrap every story in `<AdminShell activePath="...">`. **Always wrap the content component in `<PageBody>` inside `AdminShell`** — `AdminShell` puts children directly in `<MainContent>` with no padding; without `PageBody` the story has no content padding and looks different from the real app.
+6. **Story** — create `stories/<section>/<name>.stories.tsx`. Minimum exports: `Populated`, `Empty`, `Loading`, `Error`. Pass a fake `actions` object (the injection seam) or `vi.mock` the `_actions/` module. Wrap every story in `<AdminShell activePath="...">` — the decorator already provides a fresh per-story SWR cache, so one story never serves another's cached data. **Always wrap the content component in `<PageBody>` inside `AdminShell`** — `AdminShell` puts children directly in `<MainContent>` with no padding; without `PageBody` the story has no content padding and looks different from the real app.
 7. **Ladle verify** — run `pnpm dev:i` and confirm all four states render correctly. This gate must pass before the route file is created.
 8. **Route file** — create `workers/ui/src/app/admin/<path>/page.tsx` (≤ 40 lines). Read URL params via `useSearchParams`, pass as override props to the content component, pass navigation callbacks wired to `router.push()`. **Split the page into two components**: the outer component owns the `<Suspense fallback={<Content loading />}>` boundary; an inner component (`PageContent`) calls `useSearchParams()`. Never call `useSearchParams()` in the same component that owns the Suspense boundary — Next.js App Router de-opts the entire route to dynamic rendering and causes hydration flicker.
 
@@ -54,7 +54,7 @@ Every new admin screen follows this order. Do not skip or reorder steps. Full ra
 
 Use this pattern for admin detail areas where multiple child routes share the same fetched entity, header, tabs, and destructive header action.
 
-- Create `_components/<section>/<entity>-detail-context.tsx` with a provider that owns the entity fetch, `loading`/`error` story overrides, `set<Entity>`, and `refetch`.
+- Create `_components/<section>/<entity>-detail-context.tsx` with a provider that owns the entity fetch **via `useSWR`** (one keyed call per resource; a second `useSWR` for any side data like `getCurrentSession`), exposes `loading`/`error` story overrides, and maps `set<Entity>` to a local cache patch (`mutate(key, next, { revalidate: false })`) and `refetch` to the bound `mutate`. `set<Entity>` should also invalidate the matching list cache (see SWR section). Reference: `user-detail-context.tsx`, `org-detail-context.tsx`.
 - Create `<entity>-detail-header-content.tsx` for back link, title/badges, shared actions, and route tabs. It reads the provider and receives `activeTab` from the layout.
 - Create `<entity>-detail-overview-content.tsx` for overview-only fields and overview-only mutation dialogs.
 - Create `app/admin/<section>/<entityPlural>/[id]/layout.tsx` to render `PageBody > Provider > Stack(gap="md") > Header + children`. The layout may use `useParams`, `usePathname`, and `useRouter` because URL logic belongs at the route boundary.
@@ -76,23 +76,28 @@ Use this pattern for admin detail areas where multiple child routes share the sa
 `stories/_decorators/shell.tsx` mirrors `workers/ui/src/app/admin/layout.tsx` and uses the real nav components:
 
 ```tsx
+import { SWRConfig } from "swr";
 import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
 import { AdminTopbar, AdminSidebarNav, AdminMobileNav, AdminMobileRouteTabs } from "../../workers/ui/src/app/admin/_components/admin-nav";
+import { ADMIN_SWR_CONFIG } from "../../workers/ui/src/shared/swr-config";
 import { setMockPathname } from "../../.ladle/mocks/next-navigation";
 
 export function AdminShell({ activePath, children }: { activePath: string; children: ReactNode }) {
   setMockPathname(activePath);
   if (typeof window !== "undefined") window.history.replaceState({}, "", activePath);
+  // Fresh SWR cache per story so mocked actions re-fetch and stories don't bleed.
   return (
-    <AppShell>
-      <Topbar><AdminTopbar /></Topbar>
-      <AdminMobileRouteTabs />
-      <SidebarLayout>
-        <Sidebar><AdminSidebarNav /></Sidebar>
-        <MainContent>{children}</MainContent>
-      </SidebarLayout>
-      <MobileDock><AdminMobileNav /></MobileDock>
-    </AppShell>
+    <SWRConfig value={{ ...ADMIN_SWR_CONFIG, provider: () => new Map() }}>
+      <AppShell>
+        <Topbar><AdminTopbar /></Topbar>
+        <AdminMobileRouteTabs />
+        <SidebarLayout>
+          <Sidebar><AdminSidebarNav /></Sidebar>
+          <MainContent>{children}</MainContent>
+        </SidebarLayout>
+        <MobileDock><AdminMobileNav /></MobileDock>
+      </AppShell>
+    </SWRConfig>
   );
 }
 ```
@@ -117,6 +122,55 @@ export const Populated: Story = () => (
 );
 ```
 
+## Data Fetching With SWR
+
+All admin content components and detail providers fetch through **SWR** (`swr@2.x`). Full rationale and the philosophy behind every config flag live in `docs/025_admin-ui-swr-caching-strategy.md` — read it before changing the foundation. The day-to-day rules:
+
+### Foundation files (do not re-invent)
+
+| File | What it is |
+|---|---|
+| `workers/ui/src/shared/swr-config.ts` | `ADMIN_SWR_CONFIG` — the site-wide manual-revalidation policy. **Never add `revalidateOnMount: true`** (it defeats cross-navigation caching). |
+| `workers/ui/src/shared/swr-endpoints.ts` | `UPPER_CASE` endpoint-path constants. New endpoints go here (screaming constants must live in `src/shared/` per the lint gate). |
+| `workers/ui/src/app/admin/_data/swr-keys.ts` | Typed key builders (`usersListKey`, `userDetailKey`, …) and invalidation predicates (`isUsersListKey`, …). Add a builder here for every new endpoint; never inline raw key tuples in components. |
+| `workers/ui/src/app/admin/_data/use-users-by-ids.ts` | `useUsersByIds(ids, getUser)` — shared user-enrichment hook. Use it for any "look up user names by id" need (members, invitations, teams). |
+| `workers/ui/src/app/admin/_components/admin-swr-provider.tsx` | `<SWRConfig>` client wrapper mounted in the admin layout. Already wired — do not add another provider. |
+| `workers/ui/tests/_utils/swr-render.tsx` | `renderWithSwr` — test render with an isolated cache. |
+
+### The key contract (most important rule)
+
+A `useSWR` key is `[endpointPath, serverParams]` and defines cache identity. It must contain **exactly** the params that change the server response — **never client-side view state**. If changing a control does not call the action with different arguments, it does not belong in the key:
+
+- Debounced search → key on the **debounced** value, never the raw input.
+- A filter applied client-side over already-fetched rows (e.g. users `status`) → **not** in the key.
+- A list whose search/sort is client-side (e.g. organizations) → keyless (`orgsListKey()`).
+
+Build the key inside the component/provider; keep `_actions/*.ts` as pure fetch wrappers.
+
+### Reading data
+
+```tsx
+const params = useMemo(() => ({ /* server params only */ }), [/* server deps */]);
+const { data, isLoading, error, mutate } = useSWR(
+  loadingOverride || errorOverride ? null : usersListKey(params), // null key = bypass for stories
+  () => actions.listUsers(params),                                 // fetch through INJECTED actions
+);
+const showLoading = loadingOverride ?? isLoading;
+const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
+// retry: onRetry={() => void mutate()}
+```
+
+### Mutating data
+
+- **Pessimistic default:** `await actions.create/update/delete(...)` then `await mutate()` to revalidate the current key.
+- **Local patch (detail providers):** when the mutation response already carries the updated entity, patch the cache instead of refetching: `mutate(key, next, { revalidate: false })`. This is what `set<Entity>` does.
+- **Cross-surface invalidation:** when a detail mutation changes a list shown elsewhere, invalidate by predicate with the active-cache mutate: `const { mutate: globalMutate } = useSWRConfig(); globalMutate(isUsersListKey, undefined, { revalidate: false });`. Clearing (no eager refetch) is preferred — the list refetches on its next mount, respecting the rate budget. Provider setters already do this; delete flows must do it explicitly before navigating.
+
+### Stories and tests
+
+- Stories: wrap in `<AdminShell>` (provides a fresh per-story cache) and inject a fake `actions` prop. `Loading`/`Error` stories pass the override props, which set the key to `null`.
+- Tests: import `renderWithSwr as render` from `tests/_utils/swr-render` instead of `@testing-library/react`'s `render`, so each test gets an isolated cache and first-mount fetches fire against the test's mocks.
+
 ## Hard Rules
 
 - Do not put raw `div`, `main`, `section`, `header`, `nav`, `aside`, `footer` in route files.
@@ -132,6 +186,10 @@ export const Populated: Story = () => (
 - **Do not call `fetch()` directly inside content components or route files.** All API calls go through `_actions/<domain>.ts` functions.
 - **Do not use `useSearchParams`, `usePathname`, or `useRouter` inside content components.** URL logic belongs exclusively in the route file.
 - **Do not pass fetched data (`users`, `total`, `items`, etc.) as required props to content components.** Content components own their data lifecycle and populate data internally via action calls.
+- **Do not fetch with `useEffect` + `useState` in new content components or providers.** Use `useSWR` per the "Data Fetching With SWR" section. The old `fetchKey`/`cancelled` pattern is removed — do not reintroduce it.
+- **Do not put client-side view state (status filters, client-side search/sort) in a `useSWR` key.** The key carries server params only. Search keys use the debounced value.
+- **Do not inline raw key tuples in components.** Use a builder from `_data/swr-keys.ts`; add one there for new endpoints. Endpoint path strings live in `shared/swr-endpoints.ts`.
+- **Do not use `render` from `@testing-library/react` for content-component tests.** Use `renderWithSwr` from `tests/_utils/swr-render.tsx` so each test has an isolated SWR cache.
 - **Every new admin route must have a corresponding Ladle story.** The story (with all four states verified in Ladle) is a hard prerequisite for creating the route file.
 - **Do not mock `window.fetch` in stories.** Mock the `_actions/` module with `vi.mock` instead.
 - **Do not hardcode `sm` as a default size in any `packages/ui` component.** Default is always `md`. Expose size as a typed `"sm" | "md"` prop. Hardcoded `sm` on controls like `FilterDropdown`, `SearchInput`, or `DataTable` causes height mismatches with `Button` (which defaults to `md`) in the same toolbar row.

@@ -37,6 +37,8 @@ This implementation follows the planning and architecture documents:
 - [docs/022_admin-ui-system.md](docs/022_admin-ui-system.md) — admin UI design system architecture and token reference
 - [docs/023_admin-screen-story-strategy.md](docs/023_admin-screen-story-strategy.md) — admin screen spec format and story-writing strategy
 - [docs/024_admin-login-context-guard.md](docs/024_admin-login-context-guard.md) — admin login context guard (sign-in gate + admin MFA OTP)
+- [docs/025_admin-ui-swr-caching-strategy.md](docs/025_admin-ui-swr-caching-strategy.md) — SWR-based client-side caching strategy for admin UI (dedup, cross-navigation cache, rate-limit-aware configuration)
+- [docs/026_admin-oauth-security-screens-and-api-contracts.md](docs/026_admin-oauth-security-screens-and-api-contracts.md) — OAuth/security admin screens, verified API contracts, and the BA-plugin/adapter approach for the missing aggregate endpoints
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
@@ -63,6 +65,7 @@ Last security check date: **2026-05-27**. See [docs/security/](docs/security/) f
 - `wrangler`
 - `vinext` (ui-id only)
 - `react` / `react-dom` (ui-id only)
+- `swr` (ui-id only — admin client-side data cache; see [docs/025](docs/025_admin-ui-swr-caching-strategy.md))
 - `jose`
 - `vitest`
 

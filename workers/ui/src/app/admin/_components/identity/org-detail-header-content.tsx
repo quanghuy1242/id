@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSWRConfig } from "swr";
 import {
   Badge,
   Button,
@@ -17,6 +18,7 @@ import {
   deleteOrganization as deleteOrganizationAction,
 } from "../../_actions/organizations";
 import { useOrgDetail } from "./org-detail-context";
+import { isOrgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   deleteOrganization: deleteOrganizationAction,
@@ -43,6 +45,7 @@ export function OrgDetailHeaderContent({
   actions = defaultActions,
 }: OrgDetailHeaderContentProps) {
   const { orgId, org, isLoading, error, refetch } = useOrgDetail();
+  const { mutate: globalMutate } = useSWRConfig();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
@@ -52,6 +55,7 @@ export function OrgDetailHeaderContent({
     setDeleteError(undefined);
     try {
       await actions.deleteOrganization(orgId);
+      await globalMutate(isOrgsListKey, undefined, { revalidate: false });
       onNavigateToOrgs?.();
       return true;
     } catch (err: unknown) {

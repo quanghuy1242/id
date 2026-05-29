@@ -1,10 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import {
   getFullOrganization as getFullOrganizationAction,
   type Organization,
 } from "../../_actions/organizations";
+import { orgDetailKey, isOrgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultFetchActions = {
   getFullOrganization: getFullOrganizationAction,
@@ -36,47 +38,31 @@ export function OrgDetailProvider({
   actions = defaultFetchActions,
   children,
 }: OrgDetailProviderProps) {
-  const [org, setOrg] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(!loadingOverride && !errorOverride);
-  const [fetchError, setFetchError] = useState<string | undefined>();
-  const [fetchKey, setFetchKey] = useState(0);
+  const { mutate: globalMutate } = useSWRConfig();
+  const skip = Boolean(loadingOverride || errorOverride) || !orgId;
 
-  useEffect(() => {
-    if (loadingOverride || errorOverride || !orgId) return;
-    setIsLoading(true);
-    setFetchError(undefined);
-    setOrg(null);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const fetched = await actions.getFullOrganization(orgId);
-        if (!cancelled) {
-          setOrg(fetched);
-          setIsLoading(false);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setFetchError(err instanceof Error ? err.message : "Failed to load organization");
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [actions, orgId, loadingOverride, errorOverride, fetchKey]);
+  const { data: org, isLoading: orgLoading, error: orgError, mutate: mutateOrg } = useSWR(
+    skip ? null : orgDetailKey(orgId),
+    () => actions.getFullOrganization(orgId),
+  );
+
+  const setOrg = useCallback(
+    (next: Organization) => {
+      void mutateOrg(next, { revalidate: false });
+      void globalMutate(isOrgsListKey, undefined, { revalidate: false });
+    },
+    [mutateOrg, globalMutate],
+  );
 
   const refetch = useCallback(() => {
-    setFetchKey((k) => k + 1);
-  }, []);
+    void mutateOrg();
+  }, [mutateOrg]);
 
-  const showLoading = loadingOverride ?? isLoading;
-  const showError = errorOverride ?? fetchError;
+  const isLoading = loadingOverride ?? (errorOverride ? false : !orgId || orgLoading);
+  const error = errorOverride ?? (orgError instanceof Error ? orgError.message : orgError ? String(orgError) : undefined);
 
   return (
-    <OrgDetailContext.Provider
-      value={{ orgId, org, setOrg, isLoading: showLoading, error: showError, refetch }}
-    >
+    <OrgDetailContext.Provider value={{ orgId, org: org ?? null, setOrg, isLoading, error, refetch }}>
       {children}
     </OrgDetailContext.Provider>
   );
