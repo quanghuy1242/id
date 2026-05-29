@@ -63,8 +63,8 @@ describe("OrganizationsListContent", () => {
   it("opens create dialog and calls createOrganization", async () => {
     const actions = makeActions([]);
     render(<OrganizationsListContent actions={actions} />);
-    await waitFor(() => screen.getByRole("button", { name: /^create$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await waitFor(() => screen.getAllByRole("button", { name: /create organization/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /create organization/i })[0]);
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: "Test Corp" } });
     fireEvent.change(screen.getByLabelText(/^slug/i), { target: { value: "test-corp" } });

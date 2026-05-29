@@ -11,14 +11,15 @@ import {
   EmptyState,
   ErrorAlert,
   Inline,
+  PageIntro,
   Panel,
   RadioGroup,
   SearchInput,
   Skeleton,
   Stack,
-  Text,
   Textarea,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listResourceServers as listResourceServersAction,
@@ -146,13 +147,13 @@ export function ResourceApisContent({
       label: "Actions",
       render: (rs) => (
         <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${rs.name}`} onClick={() => { setEditError(undefined); setEditTarget(rs); }} />
+          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${rs.name}`} tooltip="Edit resource API" onClick={() => { setEditError(undefined); setEditTarget(rs); }} />
           {rs.enabled ? (
-            <Button size="sm" variant="secondary" ariaLabel={`Disable ${rs.name}`} onClick={() => { setDisableError(undefined); setDisableTarget(rs); }}>Disable</Button>
+            <Button size="sm" variant="secondary" ariaLabel={`Disable ${rs.name}`} tooltip="Reject new tokens for this audience" onClick={() => { setDisableError(undefined); setDisableTarget(rs); }}>Disable</Button>
           ) : (
-            <Button size="sm" variant="secondary" ariaLabel={`Activate ${rs.name}`} onClick={() => { setEnableError(undefined); setEnableTarget(rs); }}>Activate</Button>
+            <Button size="sm" variant="secondary" ariaLabel={`Activate ${rs.name}`} tooltip="Allow tokens for this audience again" onClick={() => { setEnableError(undefined); setEnableTarget(rs); }}>Activate</Button>
           )}
-          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${rs.name}`} onClick={() => { setDeleteError(undefined); setDeleteTarget(rs); }} />
+          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${rs.name}`} tooltip="Delete resource API" onClick={() => { setDeleteError(undefined); setDeleteTarget(rs); }} />
         </Inline>
       ),
     },
@@ -161,8 +162,9 @@ export function ResourceApisContent({
   async function handleCreate(formData: FormData) {
     setCreateError(undefined);
     try {
+      const name = String(formData.get("name") ?? "").trim();
       await actions.createResourceServer({
-        name: String(formData.get("name") ?? "").trim(),
+        name,
         slug: String(formData.get("slug") ?? "").trim(),
         audience: String(formData.get("audience") ?? "").trim(),
         description: String(formData.get("description") ?? "").trim() || undefined,
@@ -170,6 +172,7 @@ export function ResourceApisContent({
       });
       await mutate();
       setCreateOpen(false);
+      toast.success("Resource API registered", `Define scopes for ${name} in the Scope Catalog.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to register resource API");
@@ -189,6 +192,7 @@ export function ResourceApisContent({
       });
       await mutate();
       setEditTarget(null);
+      toast.success("Resource API updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update resource API");
@@ -200,9 +204,11 @@ export function ResourceApisContent({
     if (!disableTarget) return false;
     setDisableError(undefined);
     try {
+      const name = disableTarget.name;
       await actions.disableResourceServer(disableTarget.id);
       await mutate();
       setDisableTarget(null);
+      toast.success("Resource API disabled", `New tokens for ${name} will be rejected.`);
       return true;
     } catch (err: unknown) {
       setDisableError(err instanceof Error ? err.message : "Failed to disable resource API");
@@ -214,9 +220,11 @@ export function ResourceApisContent({
     if (!enableTarget) return false;
     setEnableError(undefined);
     try {
+      const name = enableTarget.name;
       await actions.enableResourceServer(enableTarget.id);
       await mutate();
       setEnableTarget(null);
+      toast.success("Resource API activated", `${name} can issue tokens again.`);
       return true;
     } catch (err: unknown) {
       setEnableError(err instanceof Error ? err.message : "Failed to activate resource API");
@@ -228,9 +236,11 @@ export function ResourceApisContent({
     if (!deleteTarget) return false;
     setDeleteError(undefined);
     try {
+      const name = deleteTarget.name;
       await actions.deleteResourceServer(deleteTarget.id);
       await mutate((cur) => (cur ?? []).filter((r) => r.id !== deleteTarget.id), { revalidate: false });
       setDeleteTarget(null);
+      toast.success("Resource API deleted", `${name}, its scopes, and issued tokens were removed.`);
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete resource API");
@@ -263,14 +273,16 @@ export function ResourceApisContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Resource APIs"
+        description="Protected APIs that accept access tokens from this provider. Each defines an audience that tokens are minted for."
+        info="A resource API (resource server) is something clients call with an access token — for example your backend API. The audience URL identifies it inside issued tokens, and the scopes you define here (in the Scope Catalog) gate what a token may do. Disabling an API rejects new tokens for its audience without deleting its configuration."
+        actions={
+          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateOrgId(""); setCreateOpen(true); }}>Register API</Button>
+        }
+      />
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">Resource APIs</Text>
-          <Inline gap="sm">
-            <SearchInput grow placeholder="Search resource APIs…" value={effectiveSearch} onChange={handleSearchChange} />
-            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateOrgId(""); setCreateOpen(true); }}>Register API</Button>
-          </Inline>
-        </Stack>
+        <SearchInput grow placeholder="Search resource APIs…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>

@@ -12,11 +12,14 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  InfoPopover,
   Panel,
   RadioGroup,
   Skeleton,
   Stack,
+  Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listInvitations as listInvsAction,
@@ -168,6 +171,7 @@ export function OrganizationInvitationsContent({
     try {
       await actions.inviteMember(orgId, resendTarget.email, resendTarget.role, true);
       await mutate();
+      toast.success("Invitation resent", `A fresh invite was sent to ${resendTarget.email}.`);
       return true;
     } catch (err: unknown) {
       setResendError(err instanceof Error ? err.message : "Failed to resend invitation");
@@ -181,6 +185,7 @@ export function OrganizationInvitationsContent({
     try {
       await actions.cancelInvitation(cancelTarget.id);
       await mutate();
+      toast.success("Invitation cancelled", `${cancelTarget.email} can no longer use this invite.`);
       return true;
     } catch (err: unknown) {
       setCancelError(err instanceof Error ? err.message : "Failed to cancel invitation");
@@ -195,6 +200,7 @@ export function OrganizationInvitationsContent({
       const role = String(formData.get("role") ?? inviteRole);
       await actions.inviteMember(orgId, email, role);
       await mutate();
+      toast.success("Invitation sent", `${email} was invited as ${role}.`);
       return true;
     } catch (err: unknown) {
       setInviteError(err instanceof Error ? err.message : "Failed to send invite");
@@ -224,6 +230,14 @@ export function OrganizationInvitationsContent({
 
   return (
     <Stack gap="md">
+      <Inline gap="xs" align="center">
+        <Text variant="caption">
+          Pending and past invitations to join this organization. Resend or cancel while they are still open.
+        </Text>
+        <InfoPopover title="Invitation statuses" label="About invitations">
+          Pending invitations are awaiting a response and can be resent or cancelled. Expired ones passed their deadline — resend to issue a fresh one. Accepted, rejected, and cancelled invitations are kept for history and need no action.
+        </InfoPopover>
+      </Inline>
       <Inline justify="between">
         <FilterDropdown
           label="Status"

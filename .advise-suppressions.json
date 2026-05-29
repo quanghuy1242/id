@@ -302,6 +302,12 @@
       "file": "workers/ui/src/app/login/login-form.tsx",
       "rule": "complexity/function-too-long",
       "reason": "Reviewed: pre-existing hosted login form owns the admin OTP flow state machine; unrelated to the OAuth/security admin screen redesign."
+    },
+    {
+      "tool": "aislop",
+      "file": "stories/oauth/oauth-config.stories.tsx",
+      "rule": "security/hardcoded-secret",
+      "reason": "Reviewed: Ladle story fixtures returning fake one-time client secrets (sk-demo-…, sk-rotated-…) from a mocked actions object; no real credentials and never shipped in the worker bundle."
     }
   ]
 }

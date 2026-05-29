@@ -13,11 +13,13 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  PageIntro,
   Panel,
   SearchInput,
   Skeleton,
   Stack,
   Text,
+  toast,
 } from "@id/ui";
 import {
   listBindings as listBindingsAction,
@@ -159,8 +161,8 @@ export function M2mBindingsContent({
       label: "Actions",
       render: (b) => (
         <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel="Edit binding" onClick={() => { setEditError(undefined); setEditScopes([...b.allowedScopes]); setEditEnabled(b.enabled); setEditTarget(b); }} />
-          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel="Delete binding" onClick={() => { setDeleteError(undefined); setDeleteTarget(b); }} />
+          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel="Edit binding" tooltip="Edit allowed scopes" onClick={() => { setEditError(undefined); setEditScopes([...b.allowedScopes]); setEditEnabled(b.enabled); setEditTarget(b); }} />
+          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel="Delete binding" tooltip="Delete binding" onClick={() => { setDeleteError(undefined); setDeleteTarget(b); }} />
         </Inline>
       ),
     },
@@ -174,6 +176,7 @@ export function M2mBindingsContent({
       await actions.createBinding({ clientId: createClientId, resourceServerId: createRsId, allowedScopes: createScopes });
       await mutate();
       setCreateOpen(false);
+      toast.success("Binding created", "The client can now request these scopes for this API.");
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create binding");
@@ -189,6 +192,7 @@ export function M2mBindingsContent({
       await actions.updateBinding(editTarget.id, { allowedScopes: editScopes, enabled: editEnabled });
       await mutate();
       setEditTarget(null);
+      toast.success("Binding updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update binding");
@@ -203,6 +207,7 @@ export function M2mBindingsContent({
       await actions.deleteBinding(deleteTarget.id);
       await mutate((cur) => (cur ?? []).filter((b) => b.id !== deleteTarget.id), { revalidate: false });
       setDeleteTarget(null);
+      toast.success("Binding deleted", "The client lost access to these scopes.");
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete binding");
@@ -228,14 +233,16 @@ export function M2mBindingsContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="M2M Bindings"
+        description="Grant machine-to-machine clients access to specific resource APIs and scopes via the client-credentials flow."
+        info="A binding links an M2M (client-credentials) application to a resource API and the exact scopes it may request — there is no user in this flow. When the client authenticates with its ID and secret, it can only obtain tokens for the scopes bound here. Disable a binding to cut off access without deleting it."
+        actions={
+          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateClientId(""); setCreateRsId(""); setCreateScopes([]); setCreateOpen(true); }}>New Binding</Button>
+        }
+      />
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">M2M Bindings</Text>
-          <Inline gap="sm">
-            <SearchInput grow placeholder="Search bindings…" value={effectiveSearch} onChange={handleSearchChange} />
-            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateClientId(""); setCreateRsId(""); setCreateScopes([]); setCreateOpen(true); }}>New Binding</Button>
-          </Inline>
-        </Stack>
+        <SearchInput grow placeholder="Search bindings…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>

@@ -279,6 +279,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | Component | Key props | Notes |
 |---|---|---|
 | `PageHeader` | `children` | `border-b bg-base-100 px-6 py-4`, flex between |
+| `PageIntro` | `title`, `description?`, `info?`, `infoTitle?`, `actions?` | Standard top-of-page header: h1 title + one-line helper `description` + optional ⓘ teaching popover (`info`) + right-aligned `actions`. Every list/detail screen should open with one. Render it as the first child of `PageBody > Stack`. |
 | `PageBody` | `children` | `flex-1 p-6` |
 | `PageSection` | `children`, `padding?: "none"\|"sm"\|"md"\|"lg"` | Wraps a `Container` |
 | `Container` | `children`, `width?: "narrow"\|"content"\|"wide"\|"full"` | `max-w` constraint, `mx-auto` |
@@ -300,8 +301,8 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Button` | `variant?: "primary"\|"secondary"\|"danger"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. |
-| `LinkButton` | `href`, `variant?`, `size?` | Navigation, renders Next `Link` with DaisyUI button classes. |
+| `Button` | `variant?: "primary"\|"secondary"\|"danger"\|"ghost"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `circle?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"`, `tooltip?`, `tooltipPlacement?: "top"\|"bottom"\|"left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. **Set `tooltip` on every icon-only button** — it wraps the button in a hover/focus `Tooltip`. |
+| `LinkButton` | `href`, `variant?`, `size?`, `iconName?`, `ariaLabel?`, `hideOnMobile?` | Navigation, renders Next `Link` with DaisyUI button classes. |
 
 ### Form
 
@@ -345,6 +346,15 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | Component | Key props | Notes |
 |---|---|---|
 | `ConfirmDialog` | `open`, `onOpenChange`, `title`, `description?`, `confirmLabel?`, `cancelLabel?`, `variant?`, `error?`, `onConfirm(formData)`, `confirmDisabled?`, `children?` | React Aria Modal + Dialog with an internal React Aria Form. Uses DaisyUI `modal modal-open modal-box modal-action` classes. Enter/exit animations via `data-[entering]`/`data-[exiting]`. Pass form fields as `children`; confirm is `type="submit"` and supplies `FormData`. Return `false` from `onConfirm` to keep the dialog open for API/server errors; pass `error` to show a dialog-local alert. |
+| `Tooltip` | `content?`, `placement?: "top"\|"bottom"\|"left"\|"right"`, `delay?`, `children` | React Aria `TooltipTrigger` + `Tooltip`. Wraps a single focusable child (usually a `Button`). Hover/focus only — never touch — so don't put load-bearing info here. Prefer the `Button` `tooltip` prop over wrapping manually. Empty `content` renders the child bare. |
+| `InfoPopover` | `children`, `title?`, `label?`, `placement?`, `icon?: "info"\|"help"`, `size?: "xs"\|"sm"` | Click-to-open teaching bubble behind an ⓘ (or ⊙ help) icon button. Works on touch and keeps guidance readable. Put one next to a label, control, or column header to explain what it is and when to use it. `children` is the teaching content. |
+
+### Notifications
+
+| Component | Key props | Notes |
+|---|---|---|
+| `ToastRegion` | — | Mount once near the app root (already in `app/admin/layout.tsx`). Renders the fixed bottom-end DaisyUI `toast` region; theme-aware via the document `data-theme` scope. Do not add a second one. |
+| `toast` | `toast.success(title, desc?)`, `toast.info(...)`, `toast.warning(...)`, `toast.error(title, desc?)`, `toast.dismiss(key)` | Imperative helper backed by a global queue — call from content components or action flows. Success/info/warning auto-dismiss after 5s; errors persist until dismissed. Use for copy-to-clipboard confirmations and create/update/delete/rotate outcomes. |
 
 ### Inputs
 

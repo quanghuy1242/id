@@ -9,7 +9,7 @@ import {
   type DataTableColumn,
   EmptyState,
   ErrorAlert,
-  Inline,
+  PageIntro,
   Panel,
   SearchInput,
   Skeleton,
@@ -17,6 +17,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listOrganizations as listOrgsAction,
@@ -123,6 +124,7 @@ export function OrganizationsListContent({
     try {
       const org = await actions.createOrganization({ name, slug, ...(logo ? { logo } : {}), ...(metadata ? { metadata } : {}) });
       await mutate();
+      toast.success("Organization created", `${name} is ready. Add members to get started.`);
       onRowClick?.(org.id);
       return true;
     } catch (err: unknown) {
@@ -167,21 +169,23 @@ export function OrganizationsListContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Organizations"
+        description="Tenants that group members, teams, and invitations. Members sign in and pick an active organization."
+        info="An organization is a workspace or tenant. Each has a unique slug that integrations and the active-organization session context rely on, so keep it stable. Open an organization to manage its members, teams, and pending invitations."
+        actions={
+          <Button variant="primary" iconName="Plus" onClick={() => setCreateOpen(true)}>
+            Create Organization
+          </Button>
+        }
+      />
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">Organizations</Text>
-          <Inline gap="sm">
-            <SearchInput
-              grow
-              placeholder="Search organizations…"
-              value={effectiveSearch}
-              onChange={handleSearchChange}
-            />
-            <Button variant="primary" iconName="Plus" onClick={() => setCreateOpen(true)}>
-              Create
-            </Button>
-          </Inline>
-        </Stack>
+        <SearchInput
+          grow
+          placeholder="Search organizations…"
+          value={effectiveSearch}
+          onChange={handleSearchChange}
+        />
       </Panel>
 
       <Panel padding={displayedOrgs.length > 0 && !showLoading && !showError ? "none" : "md"}>

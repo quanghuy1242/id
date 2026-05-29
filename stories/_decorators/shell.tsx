@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { SWRConfig } from "swr";
-import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock, ToastRegion } from "@id/ui";
 import {
   AdminTopbar,
   AdminSidebarNav,
@@ -38,6 +38,8 @@ export function AdminShell({ activePath, children }: AdminShellProps) {
         <AdminMobileNav />
       </MobileDock>
     </AppShell>
+    {/* Mirrors app/admin/layout.tsx so toasts fired from content stories are visible. */}
+    <ToastRegion />
     </SWRConfig>
   );
 }

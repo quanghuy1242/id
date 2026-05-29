@@ -13,6 +13,7 @@ import {
   Tabs,
   Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   deleteOrganization as deleteOrganizationAction,
@@ -56,6 +57,7 @@ export function OrgDetailHeaderContent({
     try {
       await actions.deleteOrganization(orgId);
       await globalMutate(isOrgsListKey, undefined, { revalidate: false });
+      toast.success("Organization deleted", `${org?.name ?? "The organization"} and its memberships were removed.`);
       onNavigateToOrgs?.();
       return true;
     } catch (err: unknown) {
@@ -72,7 +74,7 @@ export function OrgDetailHeaderContent({
     <>
       <Inline justify="between">
         <Inline gap="sm">
-          <LinkButton href="/admin/identity/organizations" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Organizations" />
+          <LinkButton href="/admin/identity/organizations" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Organizations" tooltip="Back to Organizations" />
           {org && (
             <>
               <Text variant="h1">{org.name}</Text>

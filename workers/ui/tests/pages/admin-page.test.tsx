@@ -5,29 +5,26 @@ import { describe, expect, it } from "vitest";
 import AdminPage from "@/app/admin/page";
 
 describe("AdminPage", () => {
-  it("renders dashboard content without an in-page title row", () => {
+  it("renders the dashboard title as a level-1 heading", () => {
     render(<AdminPage />);
-    expect(screen.queryByRole("heading", { level: 2, name: /dashboard/i })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: /admin console/i })).toBeInTheDocument();
   });
 
-  it("renders scaffold content without shell chrome", () => {
-    render(<AdminPage />);
-    expect(document.querySelector("header")).toBeNull();
-    expect(screen.getByText(/scaffold/i)).toBeInTheDocument();
-  });
-
-  it("does not render a page header", () => {
+  it("does not render shell chrome (header) — the layout owns that", () => {
     render(<AdminPage />);
     expect(document.querySelector("header")).toBeNull();
   });
 
-  it("renders a page body", () => {
+  it("renders quick-link section cards", () => {
     render(<AdminPage />);
-    expect(screen.getByText(/scaffold/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "OAuth Applications" })).toBeInTheDocument();
   });
 
-  it("shows deferred message", () => {
+  it("links each section to its admin route", () => {
     render(<AdminPage />);
-    expect(screen.getByText(/full admin ui deferred to later batch/i)).toBeInTheDocument();
+    const links = screen.getAllByRole("link", { name: /open/i });
+    expect(links.length).toBeGreaterThanOrEqual(6);
+    expect(links.some((l) => l.getAttribute("href") === "/admin/identity/users")).toBe(true);
   });
 });

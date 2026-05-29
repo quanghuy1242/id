@@ -13,6 +13,7 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  PageIntro,
   Panel,
   SearchInput,
   Skeleton,
@@ -20,6 +21,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listScopes as listScopesAction,
@@ -141,7 +143,7 @@ export function ScopeCatalogContent({
       label: "Actions",
       render: (s) => (
         <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${s.scope}`} onClick={() => { setEditError(undefined); setEditEnabled(s.enabled); setEditTarget(s); }} />
+          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${s.scope}`} tooltip="Edit scope" onClick={() => { setEditError(undefined); setEditEnabled(s.enabled); setEditTarget(s); }} />
         </Inline>
       ),
     },
@@ -163,6 +165,7 @@ export function ScopeCatalogContent({
       });
       await mutate();
       setCreateOpen(false);
+      toast.success("Scope created", `"${scope}" can now be requested by clients.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create scope");
@@ -180,6 +183,7 @@ export function ScopeCatalogContent({
       });
       await mutate();
       setEditTarget(null);
+      toast.success("Scope updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update scope");
@@ -212,14 +216,16 @@ export function ScopeCatalogContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Scope Catalog"
+        description="Permissions that clients can request and resource APIs enforce. Each scope belongs to one resource API."
+        info="A scope is a named permission (for example invoices:read) attached to a resource API. Clients request scopes during authorization; the resulting access token carries the granted scopes, and your resource server checks them. Scope strings are lowercase and match ^[a-z][a-z0-9:_-]*$. Disable a scope to stop granting it without deleting its history."
+        actions={
+          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateRsId(""); setCreateOpen(true); }}>New Scope</Button>
+        }
+      />
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">Scope Catalog</Text>
-          <Inline gap="sm">
-            <SearchInput grow placeholder="Search scopes…" value={effectiveSearch} onChange={handleSearchChange} />
-            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateRsId(""); setCreateOpen(true); }}>New Scope</Button>
-          </Inline>
-        </Stack>
+        <SearchInput grow placeholder="Search scopes…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>

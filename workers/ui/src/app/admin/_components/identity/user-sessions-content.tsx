@@ -11,8 +11,12 @@ import {
   EmptyState,
   ErrorAlert,
   Inline,
+  InfoPopover,
   Panel,
   Skeleton,
+  Stack,
+  Text,
+  toast,
 } from "@id/ui";
 import {
   listUserSessions as listUserSessionsAction,
@@ -93,6 +97,7 @@ export function UserSessionsContent({
     try {
       await actions.revokeUserSession(revokeTarget.token);
       await mutate((cur) => (cur ?? []).filter((s) => s.id !== revokeTarget.id), { revalidate: false });
+      toast.success("Session revoked", "That device has been signed out.");
       return true;
     } catch (err: unknown) {
       setRevokeError(err instanceof Error ? err.message : "Failed to revoke session");
@@ -105,6 +110,7 @@ export function UserSessionsContent({
     try {
       await actions.revokeUserSessions(userId);
       await mutate([], { revalidate: false });
+      toast.success("All sessions revoked", `${userName ?? "The user"} has been signed out everywhere.`);
       return true;
     } catch (err: unknown) {
       setRevokeAllError(err instanceof Error ? err.message : "Failed to revoke all sessions");
@@ -116,7 +122,16 @@ export function UserSessionsContent({
   if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
 
   return (
-    <>
+    <Stack gap="md">
+      <Inline gap="xs" align="center">
+        <Text variant="caption">
+          Active sign-ins for this user. Revoke a single device or sign the user out everywhere.
+        </Text>
+        <InfoPopover title="Sessions" label="About sessions">
+          Each row is a browser or device session. Revoking a session signs that device out immediately; the user must sign in again. &quot;Revoke All&quot; ends every session at once — including this admin session if you are currently impersonating the user.
+        </InfoPopover>
+      </Inline>
+
       <Panel padding={sessions.length > 0 ? "none" : "md"}>
         {sessions.length === 0
           ? <EmptyState message="No active sessions" />
@@ -158,6 +173,6 @@ export function UserSessionsContent({
         error={revokeAllError}
         onConfirm={handleRevokeAll}
       />
-    </>
+    </Stack>
   );
 }

@@ -220,7 +220,7 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
         <ResponsiveBreadcrumb items={["Admin", currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
-        <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" />
+        <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" tooltip="Notifications" tooltipPlacement="bottom" />
         <TopbarAvatarMenu
           initials="AD"
           items={[

@@ -15,6 +15,7 @@ import {
   Skeleton,
   Tabs,
   Text,
+  toast,
 } from "@id/ui";
 import {
   impersonateUser as impersonateUserAction,
@@ -72,6 +73,7 @@ export function UserDetailHeaderContent({
       await actions.stopImpersonating();
       setCurrentSession(null);
       refetch();
+      toast.success("Returned to your admin session");
     } catch (err: unknown) {
       setStopError(err instanceof Error ? err.message : "Failed to stop impersonating");
     }
@@ -85,7 +87,7 @@ export function UserDetailHeaderContent({
     <>
       <Inline justify="between">
         <Inline gap="sm">
-          <LinkButton href="/admin/identity/users" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Users" />
+          <LinkButton href="/admin/identity/users" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Users" tooltip="Back to Users" />
           {user && (
             <>
               <Text variant="h1">{user.name}</Text>
@@ -106,7 +108,7 @@ export function UserDetailHeaderContent({
               </Button>
             )}
             <MenuTrigger>
-              <Button variant="ghost" size="sm" hideOnDesktop iconName="Ellipsis" ariaLabel="Actions" />
+              <Button variant="ghost" size="sm" hideOnDesktop iconName="Ellipsis" ariaLabel="Actions" tooltip="More actions" />
               <Menu onAction={(key) => {
                 if (key === "impersonate") setImpersonateOpen(true);
                 if (key === "stop-impersonating") handleStopImpersonating();

@@ -12,11 +12,12 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  PageIntro,
   Panel,
   SearchInput,
   Skeleton,
   Stack,
-  Text,
+  toast,
 } from "@id/ui";
 import {
   listAdminConsents as listAdminConsentsAction,
@@ -86,9 +87,12 @@ export function ConsentsContent({ loading, error, actions = defaultActions }: Co
     }
     setRevokeError(undefined);
     try {
+      const who = revokeTarget.userEmail ?? "the user";
+      const what = revokeTarget.clientName ?? "the client";
       await actions.revokeConsent(revokeTarget.clientId, revokeTarget.userId);
       await mutate();
       setRevokeTarget(null);
+      toast.success("Consent revoked", `${who} will be asked to re-approve ${what}.`);
       return true;
     } catch (err: unknown) {
       setRevokeError(err instanceof Error ? err.message : "Failed to revoke consent");
@@ -131,14 +135,16 @@ export function ConsentsContent({ loading, error, actions = defaultActions }: Co
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Consents"
+        description="A record of which applications each user has authorized, and the scopes they approved."
+        info="When a user approves an OAuth application's request, a consent is stored so they aren't prompted again. Revoking a consent forces that user to re-approve the application on their next authorization request — useful if scopes changed or access should be withdrawn. It does not immediately revoke already-issued tokens; manage those under Sessions & Tokens."
+      />
       <Panel>
-        <Stack gap="sm">
-          <Inline justify="between">
-            <Text variant="h2">Consents</Text>
-            <FilterDropdown label="Client" options={clientOptions} value={clientFilter} onChange={(v) => { setClientFilter(v); setOffset(0); }} />
-          </Inline>
+        <Inline gap="sm" justify="between" wrap>
           <SearchInput grow placeholder="Search by email…" value={search} onChange={setSearch} />
-        </Stack>
+          <FilterDropdown label="Client" options={clientOptions} value={clientFilter} onChange={(v) => { setClientFilter(v); setOffset(0); }} />
+        </Inline>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
 

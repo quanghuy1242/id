@@ -12,11 +12,13 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  InfoPopover,
   Panel,
   Skeleton,
   Stack,
   Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listTeams as listTeamsAction,
@@ -125,6 +127,7 @@ export function OrganizationTeamsContent({
       await actions.addTeamMember(teamId, userId, orgId);
       setExpandedMembers(await actions.listTeamMembers(teamId));
       await mutate();
+      toast.success("Added to team", `${userName(userId)} now belongs to this team.`);
     } catch (err: unknown) {
       setAddMemberError(err instanceof Error ? err.message : "Failed to add team member");
     }
@@ -133,8 +136,10 @@ export function OrganizationTeamsContent({
   async function handleCreate(formData: FormData) {
     setCreateError(undefined);
     try {
-      await actions.createTeam(String(formData.get("name") ?? "").trim(), orgId);
+      const name = String(formData.get("name") ?? "").trim();
+      await actions.createTeam(name, orgId);
       await mutate();
+      toast.success("Team created", `Add members to ${name || "the team"} from its row.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create team");
@@ -148,6 +153,7 @@ export function OrganizationTeamsContent({
     try {
       await actions.updateTeam(renameTarget.id, String(formData.get("name") ?? "").trim());
       await mutate();
+      toast.success("Team renamed");
       return true;
     } catch (err: unknown) {
       setRenameError(err instanceof Error ? err.message : "Failed to rename team");
@@ -159,9 +165,11 @@ export function OrganizationTeamsContent({
     if (!deleteTarget) return false;
     setDeleteError(undefined);
     try {
+      const removedName = deleteTarget.name;
       await actions.removeTeam(deleteTarget.id);
       if (expandedTeamId === deleteTarget.id) setExpandedTeamId(null);
       await mutate();
+      toast.success("Team deleted", `${removedName} was removed. Members keep their organization membership.`);
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete team");
@@ -173,9 +181,11 @@ export function OrganizationTeamsContent({
     if (!removeMemberTarget || !expandedTeamId) return false;
     setRemoveMemberError(undefined);
     try {
+      const removedName = userName(removeMemberTarget.userId);
       await actions.removeTeamMember(expandedTeamId, removeMemberTarget.userId, orgId);
       setExpandedMembers(await actions.listTeamMembers(expandedTeamId));
       await mutate();
+      toast.success("Removed from team", `${removedName} still belongs to the organization.`);
       return true;
     } catch (err: unknown) {
       setRemoveMemberError(err instanceof Error ? err.message : "Failed to remove member");
@@ -212,6 +222,7 @@ export function OrganizationTeamsContent({
             variant="secondary"
             iconName={expandedTeamId === t.id ? "ChevronDown" : "ChevronRight"}
             ariaLabel={expandedTeamId === t.id ? "Collapse" : "Expand"}
+            tooltip={expandedTeamId === t.id ? "Hide members" : "View & manage members"}
             onClick={() => handleExpandTeam(t)}
           />
           <Button
@@ -219,6 +230,7 @@ export function OrganizationTeamsContent({
             variant="secondary"
             iconName="Pencil"
             ariaLabel="Rename team"
+            tooltip="Rename team"
             onClick={() => { setRenameError(undefined); setRenameTarget(t); }}
           />
           <Button
@@ -226,6 +238,7 @@ export function OrganizationTeamsContent({
             size="sm"
             iconName="Trash2"
             ariaLabel="Delete team"
+            tooltip="Delete team"
             onClick={() => { setDeleteError(undefined); setDeleteTarget(t); }}
           />
         </Inline>
@@ -236,7 +249,12 @@ export function OrganizationTeamsContent({
   return (
     <Stack gap="md">
       <Inline justify="between">
-        <Text variant="h3">Teams ({teams.length})</Text>
+        <Inline gap="xs" align="center">
+          <Text variant="h3">Teams ({teams.length})</Text>
+          <InfoPopover title="Teams" label="About teams">
+            Teams are sub-groups within the organization for grouping members — for example by department or project. A team only contains people who are already organization members, and removing someone from a team does not remove them from the organization.
+          </InfoPopover>
+        </Inline>
         <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateOpen(true); }}>
           Create Team
         </Button>

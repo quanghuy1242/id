@@ -12,6 +12,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   updateOrganization as updateOrganizationAction,
@@ -66,6 +67,7 @@ export function OrgDetailOverviewContent({
         metadata,
       });
       setOrg(updated);
+      toast.success("Organization updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update organization");

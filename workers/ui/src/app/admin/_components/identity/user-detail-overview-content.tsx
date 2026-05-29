@@ -18,6 +18,7 @@ import {
   Stack,
   Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   updateUser as updateUserAction,
@@ -101,6 +102,7 @@ export function UserDetailOverviewContent({
       if (image !== (user?.image ?? "")) data.image = image || "";
       const { user: updated } = await actions.updateUser(userId, data);
       setUser(updated);
+      toast.success("Profile updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update user");
@@ -114,6 +116,7 @@ export function UserDetailOverviewContent({
       const role = String(formData.get("role") ?? selectedRole);
       const { user: updated } = await actions.setRole(userId, role);
       setUser(updated);
+      toast.success("Role updated", `${updated.name ?? "User"} is now ${role}.`);
       return true;
     } catch (err: unknown) {
       setRoleError(err instanceof Error ? err.message : "Failed to set role");
@@ -127,6 +130,7 @@ export function UserDetailOverviewContent({
       const password = String(formData.get("password") ?? "");
       if (!password) { setPasswordError("Password is required"); return false; }
       await actions.setUserPassword(userId, password);
+      toast.success("Password set", "Share it through a secure channel. Existing sessions stay active.");
       return true;
     } catch (err: unknown) {
       setPasswordError(err instanceof Error ? err.message : "Failed to set password");
@@ -146,6 +150,7 @@ export function UserDetailOverviewContent({
       }
       const { user: updated } = await actions.banUser(userId, banReason, banExpiresIn);
       setUser(updated);
+      toast.success("User banned", "New sessions are blocked. Review active sessions in the Sessions tab.");
       return true;
     } catch (err: unknown) {
       setBanError(err instanceof Error ? err.message : "Failed to ban user");
@@ -158,6 +163,7 @@ export function UserDetailOverviewContent({
     try {
       const { user: updated } = await actions.unbanUser(userId);
       setUser(updated);
+      toast.success("User unbanned", "Access has been restored.");
       return true;
     } catch (err: unknown) {
       setUnbanError(err instanceof Error ? err.message : "Failed to unban user");
@@ -170,6 +176,7 @@ export function UserDetailOverviewContent({
     try {
       await actions.removeUser(userId);
       await globalMutate(isUsersListKey, undefined, { revalidate: false });
+      toast.success("User deleted");
       onNavigateToUsers?.();
       return true;
     } catch (err: unknown) {

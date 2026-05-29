@@ -12,12 +12,14 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  PageIntro,
   Panel,
   SearchInput,
   Skeleton,
   Stack,
   Tabs,
   Text,
+  toast,
 } from "@id/ui";
 import {
   listAdminSessions as listAdminSessionsAction,
@@ -52,6 +54,11 @@ export function SessionsTokensContent({ loading, error, actions = defaultActions
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Sessions & Tokens"
+        description="Live audit of who is signed in and which OAuth tokens are active across the whole identity provider."
+        info="Browser Sessions are interactive sign-ins (cookies) — revoke one to sign that person out immediately. OAuth Tokens are access and refresh tokens issued to applications; they are listed for visibility and only ever show an 8-character prefix, never the full token. Use this page to spot unexpected activity and cut off compromised sessions."
+      />
       <Tabs
         ariaLabel="Sessions and tokens"
         selectedKey={tab}
@@ -91,9 +98,11 @@ function SessionsPanel({ loading, error, actions }: { loading?: boolean; error?:
     if (!revokeTarget) return false;
     setRevokeError(undefined);
     try {
+      const who = revokeTarget.userEmail ?? "the user";
       await actions.revokeUserSession(revokeTarget.token);
       await mutate();
       setRevokeTarget(null);
+      toast.success("Session revoked", `${who} was signed out.`);
       return true;
     } catch (err: unknown) {
       setRevokeError(err instanceof Error ? err.message : "Failed to revoke session");
@@ -138,10 +147,7 @@ function SessionsPanel({ loading, error, actions }: { loading?: boolean; error?:
   return (
     <Stack gap="md">
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">Browser Sessions</Text>
-          <SearchInput grow placeholder="Search by email or IP…" value={search} onChange={setSearch} />
-        </Stack>
+        <SearchInput grow placeholder="Search by email or IP…" value={search} onChange={setSearch} />
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
 
@@ -208,18 +214,15 @@ function TokensPanel({ loading, error, actions }: { loading?: boolean; error?: s
   return (
     <Stack gap="md">
       <Panel>
-        <Stack gap="sm">
-          <Inline justify="between">
-            <Text variant="h2">OAuth Tokens</Text>
-            <FilterDropdown
-              label="Type"
-              options={[{ value: "access", label: "Access" }, { value: "refresh", label: "Refresh" }]}
-              value={type}
-              onChange={(v) => { setType(v === "refresh" ? "refresh" : "access"); setOffset(0); }}
-            />
-          </Inline>
+        <Inline gap="sm" justify="between" wrap>
           <SearchInput grow placeholder="Search by client or user…" value={search} onChange={setSearch} />
-        </Stack>
+          <FilterDropdown
+            label="Type"
+            options={[{ value: "access", label: "Access" }, { value: "refresh", label: "Refresh" }]}
+            value={type}
+            onChange={(v) => { setType(v === "refresh" ? "refresh" : "access"); setOffset(0); }}
+          />
+        </Inline>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
       <Text variant="caption">Token values are never exposed — only an 8-character prefix is shown.</Text>

@@ -12,11 +12,14 @@ import {
   ErrorAlert,
   FilterDropdown,
   Inline,
+  InfoPopover,
   Panel,
   RadioGroup,
   Skeleton,
   Stack,
+  Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listMembers as listMembersAction,
@@ -152,6 +155,7 @@ export function OrganizationMembersContent({
               variant="secondary"
               iconName="Pencil"
               ariaLabel="Change role"
+              tooltip="Change role"
               onClick={() => { setChangeRoleError(undefined); setSelectedRole(m.role); setChangeRoleTarget(m); }}
             />
             <Button
@@ -159,6 +163,7 @@ export function OrganizationMembersContent({
               size="sm"
               iconName="Trash2"
               ariaLabel="Remove member"
+              tooltip={isLastOwner ? "Add another owner first" : "Remove from organization"}
               disabled={isLastOwner}
               onClick={() => { setRemoveError(undefined); setRemoveTarget(m); }}
             />
@@ -179,6 +184,7 @@ export function OrganizationMembersContent({
       }
       await actions.updateMemberRole(changeRoleTarget.id, role);
       await mutate();
+      toast.success("Role updated", `${changeRoleTarget.user?.name ?? "Member"} is now ${role}.`);
       return true;
     } catch (err: unknown) {
       setChangeRoleError(err instanceof Error ? err.message : "Failed to change role");
@@ -192,6 +198,7 @@ export function OrganizationMembersContent({
     try {
       await actions.removeMember(removeTarget.id, orgId);
       await mutate();
+      toast.success("Member removed", `${removeTarget.user?.name ?? "The member"} was removed from ${orgName ?? "the organization"}.`);
       return true;
     } catch (err: unknown) {
       setRemoveError(err instanceof Error ? err.message : "Failed to remove member");
@@ -206,6 +213,7 @@ export function OrganizationMembersContent({
       const role = String(formData.get("role") ?? inviteRole);
       await actions.inviteMember(orgId, email, role);
       await mutate();
+      toast.success("Invitation sent", `${email} was invited as ${role}.`);
       return true;
     } catch (err: unknown) {
       setInviteError(err instanceof Error ? err.message : "Failed to send invite");
@@ -232,6 +240,14 @@ export function OrganizationMembersContent({
 
   return (
     <Stack gap="md">
+      <Inline gap="xs" align="center">
+        <Text variant="caption">
+          People who belong to this organization. Invite by email and assign a role.
+        </Text>
+        <InfoPopover title="Roles" label="About member roles">
+          Owner can manage billing, members, and delete the organization; Admin manages members and teams; Member has standard access. Keep at least one Owner — the last owner cannot be removed or demoted until another owner is added.
+        </InfoPopover>
+      </Inline>
       <Inline justify="between">
         <FilterDropdown
           label="Role"

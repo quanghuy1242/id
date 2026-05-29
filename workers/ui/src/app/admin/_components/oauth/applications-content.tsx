@@ -12,6 +12,7 @@ import {
   EmptyState,
   ErrorAlert,
   Inline,
+  PageIntro,
   Panel,
   RadioGroup,
   SearchInput,
@@ -21,6 +22,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   listClients as listClientsAction,
@@ -234,6 +236,7 @@ export function ApplicationsContent({
       await mutate();
       setCreateOpen(false);
       if (created.client_secret) setRevealSecret(created.client_secret);
+      toast.success("Application created", `${payload.client_name} is registered and ready to use.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create application");
@@ -263,6 +266,7 @@ export function ApplicationsContent({
       });
       await mutate();
       setEditTarget(null);
+      toast.success("Application updated");
       return true;
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to update application");
@@ -277,6 +281,7 @@ export function ApplicationsContent({
       const { client_secret } = await actions.rotateClientSecret(rotateTarget.client_id);
       setRotateTarget(null);
       setRevealSecret(client_secret);
+      toast.success("Secret rotated", "The previous secret is now invalid. Update your app config.");
       return true;
     } catch (err: unknown) {
       setRotateError(err instanceof Error ? err.message : "Failed to rotate secret");
@@ -288,9 +293,11 @@ export function ApplicationsContent({
     if (!deleteTarget) return false;
     setDeleteError(undefined);
     try {
+      const removedName = deleteTarget.client_name;
       await actions.deleteClient(deleteTarget.client_id);
       await mutate((cur) => (cur ?? []).filter((c) => c.client_id !== deleteTarget.client_id), { revalidate: false });
       setDeleteTarget(null);
+      toast.success("Application deleted", `${removedName} and its tokens were revoked.`);
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete application");
@@ -363,11 +370,11 @@ export function ApplicationsContent({
           const type = clientType(client);
           return (
             <Inline gap="xs">
-              <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${client.client_name}`} onClick={() => { setEditError(undefined); setEditTarget(client); }} />
+              <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${client.client_name}`} tooltip="Edit application" onClick={() => { setEditError(undefined); setEditTarget(client); }} />
               {type !== "public" ? (
-                <Button size="sm" variant="secondary" iconName="RefreshCw" ariaLabel={`Rotate secret for ${client.client_name}`} onClick={() => { setRotateError(undefined); setRotateTarget(client); }} />
+                <Button size="sm" variant="secondary" iconName="RefreshCw" ariaLabel={`Rotate secret for ${client.client_name}`} tooltip="Rotate client secret" onClick={() => { setRotateError(undefined); setRotateTarget(client); }} />
               ) : null}
-              <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${client.client_name}`} onClick={() => { setDeleteError(undefined); setDeleteTarget(client); }} />
+              <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${client.client_name}`} tooltip="Delete application" onClick={() => { setDeleteError(undefined); setDeleteTarget(client); }} />
             </Inline>
           );
         },
@@ -387,14 +394,16 @@ export function ApplicationsContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="OAuth Applications"
+        description="Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."
+        info="Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."
+        actions={
+          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateType("confidential"); setCreateOpen(true); }}>New App</Button>
+        }
+      />
       <Panel>
-        <Stack gap="sm">
-          <Text variant="h2">OAuth Applications</Text>
-          <Inline gap="sm">
-            <SearchInput grow placeholder="Search applications…" value={effectiveSearch} onChange={handleSearchChange} />
-            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateType("confidential"); setCreateOpen(true); }}>New App</Button>
-          </Inline>
-        </Stack>
+        <SearchInput grow placeholder="Search applications…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderList()}</Panel>
@@ -537,7 +546,14 @@ export function ApplicationsContent({
           value={revealSecret ?? ""}
           maxHeight="sm"
           action={
-            <Button size="sm" variant="secondary" iconName="Copy" onClick={() => { if (revealSecret) void copyToClipboard(revealSecret); }}>
+            <Button size="sm" variant="secondary" iconName="Copy" tooltip="Copy to clipboard" onClick={() => {
+              if (!revealSecret) return;
+              void (async () => {
+                const ok = await copyToClipboard(revealSecret);
+                if (ok) toast.success("Secret copied", "Store it securely — it won't be shown again.");
+                else toast.error("Couldn't copy", "Copy the secret manually before closing.");
+              })();
+            }}>
               Copy
             </Button>
           }

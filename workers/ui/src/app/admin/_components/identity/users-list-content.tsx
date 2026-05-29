@@ -13,13 +13,14 @@ import {
   FilterDropdown,
   Inline,
   MobileFilterMenu,
+  PageIntro,
   Panel,
   RadioGroup,
   SearchInput,
   Skeleton,
   Stack,
-  Text,
   TextInput,
+  toast,
 } from "@id/ui";
 import {
   createUser as createUserAction,
@@ -212,13 +213,15 @@ export function UsersListContent({
     setCreateError(undefined);
     try {
       const password = String(formData.get("password") ?? "");
+      const name = String(formData.get("name") ?? "");
       await actions.createUser({
-        name: String(formData.get("name") ?? ""),
+        name,
         email: String(formData.get("email") ?? ""),
         password: password || undefined,
         role: String(formData.get("role") ?? "user"),
       });
       await mutate();
+      toast.success("User created", `${name || "The account"} can now sign in.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create user");
@@ -283,10 +286,25 @@ export function UsersListContent({
 
   return (
     <Stack gap="md">
+      <PageIntro
+        title="Users"
+        description="People who can sign in. Create accounts, assign roles, verify emails, and ban access."
+        info="Each user is a local account in this identity provider. The Role column controls admin access to this console; Status shows whether an account is active or banned, and banning revokes active sessions immediately. Search by name or email, then open a row to manage that user's sessions and details."
+        actions={
+          <Button variant="primary" onClick={() => setCreateOpen(true)} iconName="Plus">
+            New User
+          </Button>
+        }
+      />
       <Panel>
         <Stack gap="sm">
-          <Inline justify="between">
-            <Text variant="h2">Users</Text>
+          <Inline gap="sm" justify="between" wrap>
+            <SearchInput
+              grow
+              placeholder="Search name or email…"
+              value={effectiveSearch}
+              onChange={handleSearchChange}
+            />
             <Inline gap="sm">
               <FilterDropdown
                 label="Role"
@@ -321,17 +339,6 @@ export function UsersListContent({
                 ]}
               />
             </Inline>
-          </Inline>
-          <Inline gap="sm">
-            <SearchInput
-              grow
-              placeholder="Search name or email…"
-              value={effectiveSearch}
-              onChange={handleSearchChange}
-            />
-            <Button variant="primary" onClick={() => setCreateOpen(true)} iconName="Plus">
-              New
-            </Button>
           </Inline>
         </Stack>
       </Panel>
