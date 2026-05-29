@@ -4,10 +4,11 @@ import type { SWRConfiguration } from "swr";
  * Site-wide SWR defaults for the admin UI, tuned for the core-id rate limit
  * (~10 requests / 10 seconds per IP). See `docs/025_admin-ui-swr-caching-strategy.md`.
  *
- * The intent is a *manual-revalidation* cache: SWR deduplicates and serves
- * cache across navigation, and the only automatic network call is the first
- * fetch for a key that has no cached data. Every other fetch is explicit —
- * a user action or a mutation.
+ * The intent is a *manual-revalidation* cache with focus-window refresh: SWR
+ * deduplicates and serves cache across navigation, and re-fetches when the
+ * user returns to the tab. The only automatic network call is the first fetch
+ * for a key that has no cached data. Every other fetch is explicit — a user
+ * action, a mutation, or a window focus event.
  *
  * Do NOT add `revalidateOnMount: true`. With SWR's documented precedence an
  * explicit `revalidateOnMount: true` always refetches on mount even when the
@@ -17,7 +18,7 @@ import type { SWRConfiguration } from "swr";
  */
 export const ADMIN_SWR_CONFIG: SWRConfiguration = {
   revalidateIfStale: false,
-  revalidateOnFocus: false,
+  revalidateOnFocus: true,
   revalidateOnReconnect: false,
   keepPreviousData: true,
   dedupingInterval: 5_000,

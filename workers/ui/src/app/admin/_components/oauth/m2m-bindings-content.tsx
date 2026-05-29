@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -83,6 +83,9 @@ export function M2mBindingsContent({
   const [editError, setEditError] = useState<string | undefined>();
   const [editScopes, setEditScopes] = useState<string[]>([]);
   const [editEnabled, setEditEnabled] = useState(true);
+  const lastEditRef = useRef<ClientResourceScope | null>(null);
+  if (editTarget) lastEditRef.current = editTarget;
+  const editDisplay = editTarget ?? lastEditRef.current;
 
   const [deleteTarget, setDeleteTarget] = useState<ClientResourceScope | null>(null);
   const [deleteError, setDeleteError] = useState<string | undefined>();
@@ -221,7 +224,7 @@ export function M2mBindingsContent({
 
   const hasRows = displayed.length > 0 && !showLoading && !showError;
   const createScopeOptions = scopeOptionsFor(createRsId);
-  const editScopeOptions = editTarget ? scopeOptionsFor(editTarget.resourceServerId) : [];
+  const editScopeOptions = editDisplay ? scopeOptionsFor(editDisplay.resourceServerId) : [];
 
   return (
     <Stack gap="md">
@@ -267,15 +270,15 @@ export function M2mBindingsContent({
         error={editError}
         onConfirm={handleEdit}
       >
-        {editTarget ? (
+        {editDisplay ? (
           <Stack gap="xs">
             <Inline gap="sm" align="center">
               <Text variant="caption">Client:</Text>
-              <Text variant="body">{clientById.get(editTarget.clientId)?.client_name ?? editTarget.clientId}</Text>
+              <Text variant="body">{clientById.get(editDisplay.clientId)?.client_name ?? editDisplay.clientId}</Text>
             </Inline>
             <Inline gap="sm" align="center">
               <Text variant="caption">Resource API:</Text>
-              <Text variant="body">{serverById.get(editTarget.resourceServerId)?.name ?? editTarget.resourceServerId}</Text>
+              <Text variant="body">{serverById.get(editDisplay.resourceServerId)?.name ?? editDisplay.resourceServerId}</Text>
             </Inline>
             <Text variant="caption">Allowed Scopes</Text>
             {editScopeOptions.length === 0

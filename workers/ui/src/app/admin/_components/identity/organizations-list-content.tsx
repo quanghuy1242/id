@@ -169,7 +169,7 @@ export function OrganizationsListContent({
     <Stack gap="md">
       <Panel>
         <Stack gap="sm">
-          <Text variant="h1">Organizations</Text>
+          <Text variant="h2">Organizations</Text>
           <Inline gap="sm">
             <SearchInput
               grow

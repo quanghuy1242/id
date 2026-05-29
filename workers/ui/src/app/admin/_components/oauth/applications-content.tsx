@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -159,6 +159,9 @@ export function ApplicationsContent({
 
   const [editTarget, setEditTarget] = useState<OAuthClient | null>(null);
   const [editError, setEditError] = useState<string | undefined>();
+  const lastEditRef = useRef<OAuthClient | null>(null);
+  if (editTarget) lastEditRef.current = editTarget;
+  const editDisplay = editTarget ?? lastEditRef.current;
 
   const [rotateTarget, setRotateTarget] = useState<OAuthClient | null>(null);
   const [rotateError, setRotateError] = useState<string | undefined>();
@@ -372,15 +375,15 @@ export function ApplicationsContent({
     ];
 
     return (
-      <Panel padding="none">
-        <DataTable<OAuthClient>
-          columns={columns}
-          rows={displayed}
-          getRowKey={(client) => client.client_id}
-        />
-      </Panel>
+      <DataTable<OAuthClient>
+        columns={columns}
+        rows={displayed}
+        getRowKey={(client) => client.client_id}
+      />
     );
   }
+
+  const hasRows = displayed.length > 0 && !showLoading && !showError;
 
   return (
     <Stack gap="md">
@@ -394,7 +397,7 @@ export function ApplicationsContent({
         </Stack>
       </Panel>
 
-      {renderList()}
+      <Panel padding={hasRows ? "none" : "md"}>{renderList()}</Panel>
 
       <ConfirmDialog
         open={createOpen}
@@ -461,13 +464,13 @@ export function ApplicationsContent({
         error={editError}
         onConfirm={handleEdit}
       >
-        {editTarget ? (
+        {editDisplay ? (
           <Stack gap="sm">
             <Inline gap="sm" wrap>
-              <Badge tone={typeBadgeTone[clientType(editTarget)]} size="sm">{typeLabel[clientType(editTarget)]}</Badge>
-              <Text variant="caption" mono>{editTarget.client_id}</Text>
+              <Badge tone={typeBadgeTone[clientType(editDisplay)]} size="sm">{typeLabel[clientType(editDisplay)]}</Badge>
+              <Text variant="caption" mono>{editDisplay.client_id}</Text>
             </Inline>
-            <TextInput label="Name" name="client_name" defaultValue={editTarget.client_name} required />
+            <TextInput label="Name" name="client_name" defaultValue={editDisplay.client_name} required />
             <Tabs
               ariaLabel="Application settings"
               size="sm"
@@ -477,11 +480,11 @@ export function ApplicationsContent({
                   label: "Access",
                   content: (
                     <Stack gap="sm">
-                      <Textarea label="Scopes" name="scope" rows={2} defaultValue={editTarget.scope} />
-                      {clientType(editTarget) !== "M2M" ? (
+                      <Textarea label="Scopes" name="scope" rows={2} defaultValue={editDisplay.scope} />
+                      {clientType(editDisplay) !== "M2M" ? (
                         <RedirectUriFields
-                          redirectUris={editTarget.redirect_uris}
-                          postLogoutRedirectUris={editTarget.post_logout_redirect_uris}
+                          redirectUris={editDisplay.redirect_uris}
+                          postLogoutRedirectUris={editDisplay.post_logout_redirect_uris}
                         />
                       ) : null}
                     </Stack>
@@ -490,7 +493,7 @@ export function ApplicationsContent({
                 {
                   id: "metadata",
                   label: "Metadata",
-                  content: <ClientMetadataFields client={editTarget} />,
+                  content: <ClientMetadataFields client={editDisplay} />,
                 },
               ]}
             />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -83,6 +83,9 @@ export function ScopeCatalogContent({
   const [editTarget, setEditTarget] = useState<OAuthResourceScope | null>(null);
   const [editError, setEditError] = useState<string | undefined>();
   const [editEnabled, setEditEnabled] = useState(true);
+  const lastEditRef = useRef<OAuthResourceScope | null>(null);
+  if (editTarget) lastEditRef.current = editTarget;
+  const editDisplay = editTarget ?? lastEditRef.current;
 
   const { data: allScopes, isLoading, error, mutate } = useSWR(
     loadingOverride || errorOverride ? null : oauthScopesKey(),
@@ -242,13 +245,13 @@ export function ScopeCatalogContent({
         error={editError}
         onConfirm={handleEdit}
       >
-        {editTarget ? (
+        {editDisplay ? (
           <>
             <Inline gap="sm" align="center">
               <Text variant="caption">Scope:</Text>
-              <Text variant="body" mono>{editTarget.scope}</Text>
+              <Text variant="body" mono>{editDisplay.scope}</Text>
             </Inline>
-            <Textarea label="Description" name="description" defaultValue={editTarget.description ?? ""} />
+            <Textarea label="Description" name="description" defaultValue={editDisplay.description ?? ""} />
             <Checkbox label="Enabled" name="enabled" selected={editEnabled} onChange={setEditEnabled} />
           </>
         ) : null}

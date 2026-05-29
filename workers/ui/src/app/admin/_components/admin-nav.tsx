@@ -28,12 +28,34 @@ type SidebarGroup = {
 };
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
-  return exact ? pathname === href : pathname.startsWith(href);
+  return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getBestActiveItem<TItem extends SidebarItem>(
+  pathname: string,
+  items: readonly TItem[],
+): TItem | undefined {
+  let bestItem: TItem | undefined;
+  let bestScore = -1;
+
+  for (const item of items) {
+    if (!isActive(pathname, item.href, item.exact)) continue;
+
+    const score = item.href.length;
+    if (score > bestScore) {
+      bestItem = item;
+      bestScore = score;
+    }
+  }
+
+  return bestItem;
 }
 
 function getCurrentPageLabel(pathname: string): string {
-  const activeEntry = SIDEBAR_NAV.find(
-    (entry) => entry.type === "item" && isActive(pathname, entry.href, entry.exact),
+  const { groups, topLevelItems } = getSidebarNavGroups();
+  const activeEntry = getBestActiveItem(
+    pathname,
+    [...topLevelItems, ...groups.flatMap((group) => group.items)],
   );
   return activeEntry?.label ?? "Dashboard";
 }
@@ -74,8 +96,7 @@ function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKe
 
   if (!activeGroup || activeGroup.items.length < 2) return null;
 
-  const selectedItem =
-    activeGroup.items.find((item) => isActive(pathname, item.href, item.exact)) ?? activeGroup.items[0];
+  const selectedItem = getBestActiveItem(pathname, activeGroup.items) ?? activeGroup.items[0];
 
   return { group: activeGroup, selectedKey: selectedItem.href };
 }
@@ -83,11 +104,15 @@ function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKe
 export function AdminSidebarNav() {
   const pathname = usePathname();
   const { groups, topLevelItems } = getSidebarNavGroups();
+  const activeItem = getBestActiveItem(
+    pathname,
+    [...topLevelItems, ...groups.flatMap((group) => group.items)],
+  );
 
   return (
     <NavMenu label="Admin sidebar navigation">
       {topLevelItems.map((entry) => {
-        const active = isActive(pathname, entry.href, entry.exact);
+        const active = activeItem?.href === entry.href;
         return (
           <NavLink
             key={entry.href}
@@ -107,7 +132,7 @@ export function AdminSidebarNav() {
           collapsible
         >
           {group.items.map((entry) => {
-            const active = isActive(pathname, entry.href, entry.exact);
+            const active = activeItem?.href === entry.href;
             return (
               <NavLink
                 key={entry.href}

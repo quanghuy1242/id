@@ -132,13 +132,13 @@ export function ConsentsContent({ loading, error, actions = defaultActions }: Co
   return (
     <Stack gap="md">
       <Panel>
-        <Inline justify="between" align="center">
-          <Text variant="h1">Consents</Text>
-          <Inline gap="sm">
+        <Stack gap="sm">
+          <Inline justify="between">
+            <Text variant="h2">Consents</Text>
             <FilterDropdown label="Client" options={clientOptions} value={clientFilter} onChange={(v) => { setClientFilter(v); setOffset(0); }} />
-            <SearchInput grow placeholder="Search by email…" value={search} onChange={setSearch} />
           </Inline>
-        </Inline>
+          <SearchInput grow placeholder="Search by email…" value={search} onChange={setSearch} />
+        </Stack>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
 

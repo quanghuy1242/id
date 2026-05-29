@@ -138,10 +138,10 @@ function SessionsPanel({ loading, error, actions }: { loading?: boolean; error?:
   return (
     <Stack gap="md">
       <Panel>
-        <Inline justify="between" align="center">
+        <Stack gap="sm">
           <Text variant="h2">Browser Sessions</Text>
           <SearchInput grow placeholder="Search by email or IP…" value={search} onChange={setSearch} />
-        </Inline>
+        </Stack>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
 
@@ -208,18 +208,18 @@ function TokensPanel({ loading, error, actions }: { loading?: boolean; error?: s
   return (
     <Stack gap="md">
       <Panel>
-        <Inline justify="between" align="center">
-          <Text variant="h2">OAuth Tokens</Text>
-          <Inline gap="sm">
+        <Stack gap="sm">
+          <Inline justify="between">
+            <Text variant="h2">OAuth Tokens</Text>
             <FilterDropdown
               label="Type"
               options={[{ value: "access", label: "Access" }, { value: "refresh", label: "Refresh" }]}
               value={type}
               onChange={(v) => { setType(v === "refresh" ? "refresh" : "access"); setOffset(0); }}
             />
-            <SearchInput grow placeholder="Search by client or user…" value={search} onChange={setSearch} />
           </Inline>
-        </Inline>
+          <SearchInput grow placeholder="Search by client or user…" value={search} onChange={setSearch} />
+        </Stack>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
       <Text variant="caption">Token values are never exposed — only an 8-character prefix is shown.</Text>

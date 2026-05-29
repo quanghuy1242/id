@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -81,6 +81,9 @@ export function ResourceApisContent({
 
   const [editTarget, setEditTarget] = useState<ResourceServer | null>(null);
   const [editError, setEditError] = useState<string | undefined>();
+  const lastEditRef = useRef<ResourceServer | null>(null);
+  if (editTarget) lastEditRef.current = editTarget;
+  const editDisplay = editTarget ?? lastEditRef.current;
 
   const [disableTarget, setDisableTarget] = useState<ResourceServer | null>(null);
   const [disableError, setDisableError] = useState<string | undefined>();
@@ -295,12 +298,12 @@ export function ResourceApisContent({
         error={editError}
         onConfirm={handleEdit}
       >
-        {editTarget ? (
+        {editDisplay ? (
           <>
-            <TextInput label="Name" name="name" defaultValue={editTarget.name} required />
-            <TextInput label="Slug" name="slug" defaultValue={editTarget.slug} required />
-            <TextInput label="Audience URL" name="audience" defaultValue={editTarget.audience} required />
-            <Textarea label="Description" name="description" defaultValue={editTarget.description ?? ""} />
+            <TextInput label="Name" name="name" defaultValue={editDisplay.name} required />
+            <TextInput label="Slug" name="slug" defaultValue={editDisplay.slug} required />
+            <TextInput label="Audience URL" name="audience" defaultValue={editDisplay.audience} required />
+            <Textarea label="Description" name="description" defaultValue={editDisplay.description ?? ""} />
           </>
         ) : null}
       </ConfirmDialog>
