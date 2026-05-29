@@ -16,6 +16,21 @@ export const JWKS_ROTATION_INTERVAL_SECONDS = 86_400;
 /** JWKS retired-key grace period, in seconds. */
 export const JWKS_GRACE_PERIOD_SECONDS = 1_209_600;
 
+/** Milliseconds per second, for second→ms conversions of named time policies. */
+export const MS_PER_SECOND = 1_000;
+
+/** JWKS retired-key grace period, in milliseconds (admin-audit key status derivation). */
+export const JWKS_GRACE_PERIOD_MS = JWKS_GRACE_PERIOD_SECONDS * MS_PER_SECOND;
+
+/** Default page size for the admin-audit aggregate list endpoints. */
+export const ADMIN_AUDIT_DEFAULT_PAGE_LIMIT = 25;
+
+/** Maximum page size the admin-audit list endpoints will honor. */
+export const ADMIN_AUDIT_MAX_PAGE_LIMIT = 100;
+
+/** Number of leading characters shown for a token in admin-audit listings. */
+export const ADMIN_AUDIT_TOKEN_PREFIX_LENGTH = 8;
+
 /** Maximum team IDs allowed in an issued access-token claim. */
 export const MAX_TOKEN_TEAM_IDS = 128;
 
@@ -87,6 +102,7 @@ export type AuthPluginConfig = {
   readonly jwksPath: string;
   readonly jwksRotationIntervalSeconds: number;
   readonly jwksGracePeriodSeconds: number;
+  readonly jwksGracePeriodMs: number;
   readonly oauthProtocolScopes: readonly string[];
   readonly bootstrapOAuthScopes: readonly string[];
   readonly oauthGrantTypes: readonly ("authorization_code" | "client_credentials" | "refresh_token")[];
@@ -141,6 +157,7 @@ export const authPluginConfig = {
   jwksPath: "/jwks",
   jwksRotationIntervalSeconds: JWKS_ROTATION_INTERVAL_SECONDS,
   jwksGracePeriodSeconds: JWKS_GRACE_PERIOD_SECONDS,
+  jwksGracePeriodMs: JWKS_GRACE_PERIOD_MS,
   oauthProtocolScopes: ["openid", "profile", "email", "offline_access"],
   bootstrapOAuthScopes: ["org:read", "org:write"],
   oauthGrantTypes: ["authorization_code", "client_credentials", "refresh_token"],

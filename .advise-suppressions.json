@@ -208,6 +208,100 @@
       "file": "workers/ui/src/app/layout.tsx",
       "rule": "security/dangerously-set-innerhtml",
       "reason": "Inline script content is a static theme-initialization string with no user-controlled input; same pattern as Next.js theme-flash-prevention examples."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_actions/oauth.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Section-separator comments group the clients/resource-servers/scopes/bindings action families; same house style as packages/lib/src/auth-fetch.ts."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/lib/src/auth-fetch.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Section-separator comments delimit the GET/POST/PATCH/DELETE helper families; pre-existing house style in this file."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_mocks/oauth.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Mock seed entities are explicit one-to-one literal fixtures covering all badge/status combinations (enabled/disabled, org-owned/system); a factory would obscure the realistic data the stories rely on."
+    },
+    {
+      "tool": "aislop",
+      "file": "stories/oauth/applications.stories.tsx",
+      "rule": "security/hardcoded-secret",
+      "reason": "Reviewed: fake client_secret strings in a Ladle story that demonstrates the one-time secret-reveal flow; no real credential."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/ui/src/app/admin/_components/identity/organizations-list-content.tsx|workers/ui/src/app/admin/_components/oauth/resource-apis-content.tsx",
+      "reason": "Admin list-content components intentionally share the same client-side search-filter + column-sort useMemo block; the identity list is the finalized reference and must not be altered to dedupe."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/admin-audit/index.ts",
+      "rule": "complexity/function-too-long",
+      "reason": "The plugin factory is endpoint-registration/composition wiring (five createAuthEndpoint declarations); splitting would scatter the BA contract surface."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/admin-audit/index.ts",
+      "rule": "ai-slop/double-type-assertion",
+      "reason": "Better Auth does not export a precise endpoint-context adapter type; the single centralized auditAdapter() cast mirrors the established oauth-m2m-bridge pattern."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/admin-audit/schema.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Section separators and the module doc block follow the resource-server/oauth-scope-catalog schema house style at this plugin boundary."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/admin-audit/types.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "JSDoc explaining the injected options/adapter surface is required at the plugin composition boundary."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_components/oauth/sessions-tokens-content.tsx",
+      "rule": "complexity/function-too-long",
+      "reason": "Admin content panel co-locates its SWR data lifecycle, table columns, pagination, and revoke dialog — the same shape as the finalized identity content components."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_components/security/consents-content.tsx",
+      "rule": "complexity/function-too-long",
+      "reason": "Admin content component co-locates its SWR data lifecycle, client filter, table columns, pagination, and revoke dialog — the same shape as the finalized identity content components."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/admin/_mocks/audit.ts",
+      "rule": "security/hardcoded-secret",
+      "reason": "Reviewed: fake session-token strings in mock fixtures used by stories/tests; no real credential."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/admin-audit/schema.ts|workers/ui/src/app/admin/_actions/audit.ts",
+      "reason": "Cross-worker contract shapes: core presents the admin-audit response types and the UI declares its binding types independently (workers never import each other), the same intentional duplication as resource-server/oauth entity types."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/button.tsx",
+      "rule": "complexity/too-many-params",
+      "reason": "Reviewed: public @id/ui button primitives expose typed props consumed across admin routes; refactoring the stable API is unrelated to this OAuth/security redesign."
+    },
+    {
+      "tool": "aislop",
+      "file": "packages/ui/src/filter-dropdown.tsx",
+      "rule": "complexity/too-many-params",
+      "reason": "Reviewed: public @id/ui select/filter primitive keeps a small typed prop surface matching the design-system registry; changing it would churn finalized identity screens."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/login/login-form.tsx",
+      "rule": "complexity/function-too-long",
+      "reason": "Reviewed: pre-existing hosted login form owns the admin OTP flow state machine; unrelated to the OAuth/security admin screen redesign."
     }
   ]
 }

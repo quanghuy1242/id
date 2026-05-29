@@ -1,5 +1,19 @@
 # Admin OAuth & Security Screens — API Contracts and Backend Approach
 
+> **Implementation status (done):** Phases 1–3 of §9 are implemented. All four
+> backend-ready OAuth screens and the JWKS view shipped, and the **`admin-audit`
+> Better Auth plugin** (`workers/core/src/auth/plugins/admin-audit/`) now serves
+> gaps 1–4 and 7 — `GET /api/auth/admin/{list-sessions,list-tokens,list-consents,jwks}`
+> and `POST /api/auth/admin/revoke-consent` — as adapter-only reads under
+> `/api/auth/admin/*` (no new Hono routes, no Rule 27 carve-out). Actor scoping is
+> in the query (platform-admin only for v1), pagination totals come from
+> `adapter.count`, display fields are enriched by batched `in` lookups, and the
+> presenters strip token values and the JWKS `privateKey` (asserted by tests).
+> The adapter-capability spike (§8) was validated by the plugin's integration
+> tests against the in-memory D1 adapter rather than left as a risk. The
+> `sessions-tokens`, `consents`, and enriched `jwks` screens are live; joined-field
+> (email) search remains deferred (§4.3). Gap 5 stays won't-build; gap 6 unbuilt.
+>
 > Status: implementation-grade research and proposal (pre-implementation; next step after the identity admin UI)
 >
 > Date: 2026-05-29
@@ -92,7 +106,7 @@ Every OAuth/security screen is a read or a small mutation over Better-Auth-owned
 Verified against `api-1.yaml` and the plugin sources. These back the four OAuth screens that can ship today:
 
 - **Clients** — `oauth-provider` plugin: `GET /oauth2/get-clients`, `POST /oauth2/create-client`, `POST /oauth2/update-client`, `POST /oauth2/client/rotate-secret`, `POST /oauth2/delete-client`.
-- **Resource servers** — `resource-server` plugin: `GET|POST /admin/resource-servers`, `GET|PATCH|DELETE /admin/resource-servers/{id}`, `POST /admin/resource-servers/{id}/disable`.
+- **Resource servers** — `resource-server` plugin: `GET|POST /admin/resource-servers`, `GET|PATCH|DELETE /admin/resource-servers/{id}`, `POST /admin/resource-servers/{id}/{disable,enable}`.
 - **Scopes & M2M bindings** — `oauth-scope-catalog` plugin: `GET|POST /admin/oauth-scopes`, `PATCH /admin/oauth-scopes/{id}`; `GET|POST /admin/oauth-client-resource-scopes`, `PATCH|DELETE /admin/oauth-client-resource-scopes/{id}`.
 - **JWKS (public)** — `jwt` plugin: `GET /jwks` (RFC 7517 public set).
 - **Per-user sessions** — admin plugin: `POST /admin/list-user-sessions`, `POST /admin/revoke-user-session`.
@@ -188,7 +202,8 @@ The corrected, implementation-ready contracts for the surfaces that exist today.
 | List resource servers | `GET /admin/resource-servers` | — | `{ resourceServers: ResourceServer[] }` |
 | Create resource server | `POST /admin/resource-servers` | `{ name, slug, audience, description?, organizationId? }` | `ResourceServer` |
 | Update resource server | `PATCH /admin/resource-servers/{id}` | `{ slug?, name?, audience?, description? }` (flat) | `ResourceServer` |
-| Disable resource server | `POST /admin/resource-servers/{id}/disable` | — | `ResourceServer` (no enable; one-way) |
+| Disable resource server | `POST /admin/resource-servers/{id}/disable` | — | `ResourceServer` |
+| Enable resource server | `POST /admin/resource-servers/{id}/enable` | — | `ResourceServer` |
 | Delete resource server | `DELETE /admin/resource-servers/{id}` | — | `{ deleted: true }` |
 | List scopes | `GET /admin/oauth-scopes` | — | `{ oauthScopes: OAuthResourceScope[] }` |
 | Create scope | `POST /admin/oauth-scopes` | `{ resourceServerId, scope, description? }` (strict; no `enabled`) | `OAuthResourceScope` |
@@ -222,7 +237,7 @@ The dashboard (`/admin/dashboard`, separate from these gaps) remains the one leg
 How each screen lands given the above. "Ships now" means every contract it needs exists today.
 
 - **`/admin/oauth/applications`** — Ships now. Client-side search over the full client list. The only subtlety is the snake_case boundary and derived `clientType` (§3.3); get those right and the screen is straightforward.
-- **`/admin/oauth/resource-apis`** — Ships now. Note disable is one-way (no enable endpoint) — render Disable only for enabled servers.
+- **`/admin/oauth/resource-apis`** — Ships now with reversible status actions through explicit disable/enable endpoints.
 - **`/admin/oauth/scope-catalog`** — Ships now. Delete renders disabled (gap 5); disable-via-PATCH is the supported action and the recommended permanent model.
 - **`/admin/oauth/m2m-bindings`** — Ships now. Four parallel reads (bindings, clients, resource servers, scopes), joined client-side for labels and scope checkboxes.
 - **`/admin/oauth/sessions-tokens`** — Needs gaps 1–2. Ships as a "Coming Soon" placeholder until the `admin-audit` plugin lands; then a paginated, same-table-filtered view with batched email/client enrichment. Email *search* deferred (§4.3). Revoke uses the existing `/admin/revoke-user-session`.

@@ -86,12 +86,33 @@ describe("idResourceServer plugin endpoint", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(
+    const created = await response.json() as { readonly id: string; readonly organizationId: string; readonly audience: string; readonly enabled: boolean };
+    expect(created).toEqual(
       expect.objectContaining({
         organizationId: "org_1",
         audience: "https://api.example.test",
         enabled: true,
       }),
+    );
+
+    const disable = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/resource-servers/${created.id}/disable`, {
+        method: "POST",
+        headers: { cookie },
+      }),
+    );
+    expect(disable.status).toBe(200);
+    await expect(disable.json()).resolves.toEqual(expect.objectContaining({ enabled: false }));
+
+    const enable = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/resource-servers/${created.id}/enable`, {
+        method: "POST",
+        headers: { cookie },
+      }),
+    );
+    expect(enable.status).toBe(200);
+    await expect(enable.json()).resolves.toEqual(
+      expect.objectContaining({ enabled: true, disabledAt: null, disabledBy: null }),
     );
   });
 

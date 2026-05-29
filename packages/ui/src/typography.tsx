@@ -6,6 +6,7 @@ type TextVariant = "h1" | "h2" | "h3" | "body" | "caption";
 type TextProps = {
   readonly variant?: TextVariant;
   readonly as?: ElementType;
+  readonly mono?: boolean;
   readonly children: ReactNode;
 };
 
@@ -25,9 +26,12 @@ const defaultElement: Record<TextVariant, ElementType> = {
   caption: "p",
 };
 
-export function Text({ variant = "body", as, children }: TextProps) {
+export function Text({ variant = "body", as, mono, children }: TextProps) {
   const Component = as ?? defaultElement[variant];
-  return <Component className={textClasses[variant]}>{children}</Component>;
+  const className = mono
+    ? `${textClasses[variant]} font-mono break-all`
+    : textClasses[variant];
+  return <Component className={className}>{children}</Component>;
 }
 
 type HeadingProps = {

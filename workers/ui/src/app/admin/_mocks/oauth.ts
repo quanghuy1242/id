@@ -1,0 +1,120 @@
+import type {
+  OAuthClient,
+  ResourceServer,
+  OAuthResourceScope,
+  ClientResourceScope,
+} from "../_actions/oauth";
+
+export const mockClients: OAuthClient[] = [
+  {
+    client_id: "cli_contentapi_a1b2c3d4e5f6",
+    client_name: "Content API",
+    redirect_uris: [],
+    grant_types: ["client_credentials"],
+    response_types: [],
+    token_endpoint_auth_method: "client_secret_post",
+    scope: "content:read content:write",
+    client_uri: "https://content.example.com",
+  },
+  {
+    client_id: "cli_adminapp_9z8y7x6w5v4u",
+    client_name: "Admin Client",
+    redirect_uris: ["https://admin.example.com/callback"],
+    post_logout_redirect_uris: ["https://admin.example.com/logged-out"],
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    scope: "openid profile email",
+    client_uri: "https://admin.example.com",
+  },
+  {
+    client_id: "cli_portal_5t4s3r2q1p0o",
+    client_name: "Vendor Portal",
+    redirect_uris: ["https://portal.example.com/callback"],
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "client_secret_post",
+    scope: "openid profile vendor:read",
+    client_uri: "https://portal.example.com",
+    logo_uri: "https://portal.example.com/logo.png",
+    contacts: ["admin@example.com"],
+  },
+];
+
+const seedTime = Date.UTC(2025, 0, 15);
+
+export const mockResourceServers: ResourceServer[] = [
+  {
+    id: "rs_001",
+    organizationId: "org_001",
+    slug: "content-api",
+    name: "Content API",
+    audience: "https://content-api.example.com",
+    description: "Main content API",
+    enabled: true,
+    createdBy: "user_001",
+    updatedBy: "user_001",
+    disabledAt: null,
+    disabledBy: null,
+    createdAt: seedTime,
+    updatedAt: seedTime,
+  },
+  {
+    id: "rs_002",
+    organizationId: "org_001",
+    slug: "vendor-api",
+    name: "Vendor API",
+    audience: "https://vendor-api.example.com",
+    description: null,
+    enabled: true,
+    createdBy: "user_001",
+    updatedBy: "user_001",
+    disabledAt: null,
+    disabledBy: null,
+    createdAt: seedTime,
+    updatedAt: seedTime,
+  },
+  {
+    id: "rs_003",
+    organizationId: "org_002",
+    slug: "analytics",
+    name: "Analytics API",
+    audience: "https://analytics.example.com",
+    description: "Usage analytics",
+    enabled: false,
+    createdBy: "user_002",
+    updatedBy: "user_002",
+    disabledAt: seedTime,
+    disabledBy: "user_002",
+    createdAt: seedTime,
+    updatedAt: seedTime,
+  },
+  {
+    id: "rs_system",
+    organizationId: null,
+    slug: "id-system",
+    name: "id System",
+    audience: "https://id.example.com",
+    description: "Platform-owned system audience",
+    enabled: true,
+    createdBy: "user_001",
+    updatedBy: "user_001",
+    disabledAt: null,
+    disabledBy: null,
+    createdAt: seedTime,
+    updatedAt: seedTime,
+  },
+];
+
+export const mockScopes: OAuthResourceScope[] = [
+  { id: "sc_001", resourceServerId: "rs_001", scope: "content:read", description: "Read access to content", enabled: true, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+  { id: "sc_002", resourceServerId: "rs_001", scope: "content:write", description: "Write access to content", enabled: true, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+  { id: "sc_003", resourceServerId: "rs_001", scope: "content:admin", description: "Admin access to content", enabled: false, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+  { id: "sc_004", resourceServerId: "rs_002", scope: "vendor:read", description: "Read access to vendor data", enabled: true, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+];
+
+export const mockBindings: ClientResourceScope[] = [
+  { id: "bind_001", clientId: "cli_contentapi_a1b2c3d4e5f6", resourceServerId: "rs_001", allowedScopes: ["content:read", "content:write"], enabled: true, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+  { id: "bind_002", clientId: "cli_portal_5t4s3r2q1p0o", resourceServerId: "rs_002", allowedScopes: ["vendor:read"], enabled: true, createdBy: "user_001", updatedBy: "user_001", createdAt: seedTime, updatedAt: seedTime },
+  { id: "bind_003", clientId: "cli_contentapi_a1b2c3d4e5f6", resourceServerId: "rs_002", allowedScopes: ["vendor:read"], enabled: false, createdBy: "user_002", updatedBy: "user_002", createdAt: seedTime, updatedAt: seedTime },
+];

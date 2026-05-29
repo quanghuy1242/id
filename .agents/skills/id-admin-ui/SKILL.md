@@ -221,7 +221,7 @@ These rules prevent re-learning the same mistakes:
 9. **ConfirmDialog DaisyUI classes:** Use `modal modal-open bg-black/40` on `ModalOverlay`, `modal-box` on `Modal`, `modal-action` on the button row. Always keep `bg-black/40` — `div.modal` has no backdrop color (`dialog::backdrop` is a pseudo-element only available on native `<dialog>` elements, not React Aria's div-based overlay). `modal-open` is required on div-based modals because DaisyUI hides `div.modal` by default. Do not put `data-theme` on the overlay itself; the global `[data-theme]` background rule can override the dimmed backdrop. Put the theme attribute on the `modal-box` panel instead.
 10. **Modal enter/exit animations:** React Aria sets `data-entering` and `data-exiting` on `ModalOverlay` and `Modal` during transitions, and holds elements in the DOM until the exit animation completes. Define `@keyframes` and `@theme` animation variables in `globals.css`. Apply as `data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out` etc. No plugin needed — this is native Tailwind v4 + React Aria.
 11. **Ladle portal theme scope:** React Aria portals (`ConfirmDialog`, `FilterDropdown` popover) render on `<body>`, which is outside the Ladle Provider's `<div data-theme="...">` wrapper. The `useEffect` in `.ladle/components.tsx` that stamps `data-theme` onto both `document.documentElement` and `document.body` is **essential** — without it, portals in stories get no theme tokens and show wrong colors. Do not remove or simplify this effect.
-12. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, etc.).
+12. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, `"RefreshCw"`, `"Copy"`, etc.).
 
 ## Token Reference
 
@@ -293,7 +293,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Text` | `variant?: "h1"\|"h2"\|"h3"\|"body"\|"caption"`, `as?` | Renders correct HTML element by default |
+| `Text` | `variant?: "h1"\|"h2"\|"h3"\|"body"\|"caption"`, `as?`, `mono?: boolean` | Renders correct HTML element by default. `mono` adds `font-mono break-all` for IDs, secrets, JWKs, token prefixes. |
 | `Heading` | `level?: "h1"\|"h2"\|"h3"` | Thin wrapper over `Text` |
 
 ### Interactive
@@ -322,6 +322,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `Skeleton` | `rows?: number`, `height?: "xs"\|"sm"\|"md"` | Loading placeholder rows |
 | `EmptyState` | `message`, `cta?`, `onCta?` | Centered empty message + optional primary CTA. `cta`/`onCta` must be passed as props, NOT as child Button components. |
 | `ErrorAlert` | `message?`, `onRetry?` | Error alert with inline retry button |
+| `CodeBlock` | `label?`, `value`, `action?`, `maxHeight?: "sm"\|"md"\|"lg"` | Preformatted, scrollable code surface for JSON, tokens, and generated secrets. Preserves whitespace with `pre > code`; use `action` for a copy button. |
 
 ### Data
 

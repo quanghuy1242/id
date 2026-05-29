@@ -14,6 +14,7 @@ export * from "./mobile-filter-menu";
 export * from "./responsive-breadcrumb";
 export * from "./tabs";
 export * from "./confirm-dialog";
+export * from "./code-block";
 export * from "./data-table";
 export * from "./nav-icons";
 export * from "./topbar-search-field";

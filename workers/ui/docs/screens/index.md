@@ -61,7 +61,7 @@ Actor-scoped. Platform admin sees all clients; org admin sees own org's clients 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/applications` | OAuth client list — name, type, org, status, expand for detail, edit, rotate secret, delete | [oauth.md](oauth.md#adminoauthapplications) | specced |
+| `/admin/oauth/applications` | OAuth client list — name, type, org, status, expand for detail, edit, rotate secret, delete | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 
 Note: Detail actions (redirect URIs, scopes, secrets) are inline modals on the list page rather than separate detail routes, following the pattern established by the OAuth Provider plugin's flat endpoint structure.
 
@@ -73,7 +73,7 @@ Actor-scoped. `resourceServer.organizationId` is nullable — null means platfor
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/resource-apis` | Resource server list — name, slug, audience, org, enabled status, create/edit/disable/delete modals | [oauth.md](oauth.md#adminoauthresource-apis) | specced |
+| `/admin/oauth/resource-apis` | Resource server list — name, slug, audience, org, enabled status, create/edit/activate/disable/delete modals | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
 
 Note: Edit and disable actions are handled via inline modals on the list page. No separate detail route needed since the resource-server schema has few fields.
 
@@ -85,7 +85,7 @@ Cross-cutting read surface. Shows all `oauthResourceScope` rows across all resou
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/scope-catalog` | All scopes across all resource servers — filterable by RS, scope, enabled status; create/edit/disable via modals | [oauth.md](oauth.md#adminoauthscope-catalog) | specced |
+| `/admin/oauth/scope-catalog` | All scopes across all resource servers — filterable by RS, scope, enabled status; create/edit/disable via modals | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
 
 Note: Scope delete is not yet available in the API. Disable toggle via PATCH is available.
 
@@ -95,8 +95,8 @@ Note: Scope delete is not yet available in the API. Disable toggle via PATCH is 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — client × resource server × allowed scopes × enabled; create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | specced |
-| `/admin/oauth/sessions-tokens` | Active browser sessions and OAuth tokens — deferred pending API support | [oauth.md](oauth.md#adminoauthsessions-tokens) | specced |
+| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — client × resource server × allowed scopes × enabled; create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
+| `/admin/oauth/sessions-tokens` | Active browser sessions and OAuth tokens — live, paginated (tabs, per-session revoke, token prefixes only) via the `admin-audit` plugin | [oauth.md](oauth.md#adminoauthsessions-tokens) | implemented |
 
 ---
 
@@ -121,8 +121,8 @@ Track B (SET/SSF async push) is **deferred** — docs 014/015/016 unimplemented.
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/security/jwks` | JWKS key list — active, rotated, expired keys; public JWK display; copy to clipboard | [security.md](security.md#adminsecurityjwks) | specced |
-| `/admin/security/consents` | Global consent audit — deferred pending API support; placeholder "Coming Soon" page | [security.md](security.md#adminsecurityconsents) | specced |
+| `/admin/security/jwks` | JWKS key list — enriched via `admin-audit` `GET /admin/jwks` (kid, alg, created/expires, active/rotated/expired status, public JWK, copy); private key never exposed | [security.md](security.md#adminsecurityjwks) | implemented |
+| `/admin/security/consents` | Global consent audit — live, paginated, filter by client, per-grant revoke via the `admin-audit` plugin | [security.md](security.md#adminsecurityconsents) | implemented |
 | `/admin/security/policies` | CEL policy list — create, test expression console | — | deferred |
 
 `/admin/security/policies` deferred pending `idCelPolicy` plugin (docs/003 §2).

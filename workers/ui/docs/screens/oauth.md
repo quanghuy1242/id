@@ -322,10 +322,10 @@ Components:
 
   Disable: ConfirmDialog(title="Disable API", confirmLabel="Disable", variant="danger", onConfirm)
       On confirm: POST /api/auth/admin/resource-servers/{id}/disable { }  (no body)
-    — There is NO enable endpoint, and PATCH does not accept `enabled` (the update body is
-      { slug?, name?, audience?, description? } only). Disabling is currently one-way via the API.
-      Show the Disable action only for enabled servers; do not render an Enable action until a
-      re-enable endpoint exists (track as an API gap if the product needs it).
+
+  Activate: ConfirmDialog(title="Activate API", confirmLabel="Activate", onConfirm)
+      On confirm: POST /api/auth/admin/resource-servers/{id}/enable { }  (no body)
+    — PATCH still does not accept `enabled`; status transitions use explicit status endpoints.
 
   Delete modal: ConfirmDialog(title="Delete Resource API", confirmLabel="Delete", variant="danger", onConfirm)
     On confirm: DELETE /api/auth/admin/resource-servers/{id}
@@ -338,6 +338,7 @@ Data: GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer
         body: { slug?, name?, audience?, description? }  (flat; description may be null to clear)
       DELETE /api/auth/admin/resource-servers/{id} → { deleted: true }
       POST /api/auth/admin/resource-servers/{id}/disable → ResourceServer
+      POST /api/auth/admin/resource-servers/{id}/enable → ResourceServer
 
 ResourceServer shape: { id, organizationId, slug, name, audience, description?, enabled, createdBy, updatedBy, disabledAt?, disabledBy?, createdAt, updatedAt }
   — Timestamps (createdAt, updatedAt, disabledAt) are **epoch milliseconds (numbers)**, not ISO strings —
@@ -347,6 +348,7 @@ ResourceServer shape: { id, organizationId, slug, name, audience, description?, 
 Behavior:
   - No server-side pagination; fetch full list once. Client-side search by name/slug.
   - Status column: enabled→"Enabled" Badge(tone="success"), disabled→"Disabled" Badge(tone="error")
+  - Status action: enabled rows show Disable; disabled rows show Activate.
   - System resource servers (organizationId IS NULL, slug = "id-system") show "System" badge.
   - Organization dropdown in create: fetch organization list, show "System (id-owned)" + org options.
   - Slug validation on blur: check uniqueness via check-slug if slug changed in edit.

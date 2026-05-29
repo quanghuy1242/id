@@ -47,10 +47,10 @@ export const resourceServerSchema = z.object({
   updatedBy: z.string().optional().meta({
     description: "User ID of the last updater",
   }),
-  disabledAt: z.number().optional().meta({
+  disabledAt: z.number().nullable().optional().meta({
     description: "Timestamp (ms) when the resource server was disabled",
   }),
-  disabledBy: z.string().optional().meta({
+  disabledBy: z.string().nullable().optional().meta({
     description: "User ID who disabled the resource server",
   }),
   createdAt: z.number().meta({

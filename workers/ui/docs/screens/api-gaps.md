@@ -4,6 +4,18 @@
 > Each gap blocks full implementation of the corresponding screen.
 > Ordered by priority: screens that can ship a partial implementation first go lower.
 
+> **Status (resolved):** Gaps 1–4 and 7 are now **implemented** in the
+> `admin-audit` Better Auth plugin (`workers/core/src/auth/plugins/admin-audit/`),
+> mounted under `/api/auth/admin/*` exactly as docs/026 prescribes — adapter-only
+> reads, in-`where` actor scoping (platform-admin v1), `count`-based pagination,
+> batched `in` enrichment, and secret-stripping presenters (token values and the
+> JWKS `privateKey` are never returned, asserted by tests). The adapter
+> capability "spike" (docs/026 §8) was validated empirically by the plugin's
+> integration tests against the in-memory D1 adapter. The `sessions-tokens`,
+> `consents`, and enriched `jwks` screens are now live. Gap 5 (scope hard-delete)
+> remains **won't-build** (disable is the correct primitive); gap 6 (single-scope
+> GET) stays low-priority/unbuilt.
+
 ---
 
 ## Blocking — screen cannot ship at all
@@ -137,6 +149,7 @@ These endpoints referenced in the specs already exist:
 | `PATCH /api/auth/admin/resource-servers/{id}` | ✅ api-1.yaml:11278 |
 | `DELETE /api/auth/admin/resource-servers/{id}` | ✅ api-1.yaml:11444 |
 | `POST /api/auth/admin/resource-servers/{id}/disable` | ✅ api-1.yaml:11531 |
+| `POST /api/auth/admin/resource-servers/{id}/enable` | ✅ resource-server plugin |
 | `GET /api/auth/admin/oauth-scopes` | ✅ api-1.yaml:11753 (implied by plugin) |
 | `POST /api/auth/admin/oauth-scopes` | ✅ api-1.yaml:11672 |
 | `PATCH /api/auth/admin/oauth-scopes/{id}` | ✅ api-1.yaml:11926 |

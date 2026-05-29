@@ -20,7 +20,7 @@ All endpoints require an authenticated admin session cookie or
 POST   /api/auth/admin/resource-servers          — create a resource server
 GET    /api/auth/admin/resource-servers          — list resource servers (by org)
 GET    /api/auth/admin/resource-servers/:id      — get a single resource server
-PUT    /api/auth/admin/resource-servers/:id      — update name or audience
+PATCH  /api/auth/admin/resource-servers/:id      — update name, slug, audience, or description
 POST   /api/auth/admin/resource-servers/:id/disable — disable (revokes associated tokens)
 POST   /api/auth/admin/resource-servers/:id/enable  — re-enable
 ```
@@ -50,7 +50,7 @@ a standalone Drizzle/domain entity.
 ### File responsibilities
 
 - `schema.ts` — canonical Zod row schema, request bodies, BA field map, OpenAPI fragments.
-- `index.ts` — plugin schema registration and six explicit CRUD endpoints.
+- `index.ts` — plugin schema registration and explicit CRUD/status endpoints.
 - `audiences.ts` — pre-auth OAuth audience runtime: per-isolate memory cache, KV cache, D1 fallback, invalidation.
 - `operations.ts` — authorization wrappers, uniqueness checks, payload builders.
 - `types.ts` — plugin options and runtime hooks injected from `get-auth.ts`.

@@ -8,6 +8,9 @@ export const MIN_PASSWORD_LENGTH = 12;
 /** Login target after an admin-initiated logout. */
 export const ADMIN_LOGIN_REDIRECT_URL = "/login?callbackURL=%2Fadmin";
 
+/** Page size for the server-paginated admin-audit list screens (sessions/tokens/consents). */
+export const ADMIN_AUDIT_PAGE_SIZE = 25;
+
 export type AdminNavEntry =
   | { readonly type: "item"; readonly label: string; readonly href: string; readonly exact?: boolean; readonly icon?: string }
   | { readonly type: "section"; readonly label: string };

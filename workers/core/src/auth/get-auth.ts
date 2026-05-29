@@ -12,6 +12,7 @@ import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
 import { idAdminSignInGuard } from "./plugins/admin-sign-in-guard";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
+import { idAdminAudit } from "./plugins/admin-audit";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -148,6 +149,10 @@ export function getAuthOptions(
             : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
       }),
       idOAuthClientPicker({ issuer }),
+      idAdminAudit({
+        authorize: (role) => isPlatformAdmin(role),
+        jwksGracePeriodMs: authPluginConfig.jwksGracePeriodMs,
+      }),
       idScimDirectory({
         issuer,
         audience: systemResourceServerAudience(env.BETTER_AUTH_URL),

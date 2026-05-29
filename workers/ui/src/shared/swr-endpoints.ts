@@ -20,3 +20,21 @@ export const ORG_MEMBERS = "/organization/list-members";
 export const ORG_TEAMS = "/organization/list-teams";
 /** Organization invitation list. */
 export const ORG_INVITATIONS = "/organization/list-invitations";
+/** OAuth2 client (application) list — snake_case OAuth2-formatted entities. */
+export const OAUTH_CLIENTS = "/oauth2/get-clients";
+/** OAuth resource server (audience) list. */
+export const RESOURCE_SERVERS = "/admin/resource-servers";
+/** OAuth resource scope catalog list. */
+export const OAUTH_SCOPES = "/admin/oauth-scopes";
+/** Per-client OAuth resource-scope (M2M) binding list. */
+export const OAUTH_CLIENT_RESOURCE_SCOPES = "/admin/oauth-client-resource-scopes";
+/** Public JWKS (RFC 7517) key set. */
+export const JWKS = "/jwks";
+/** Aggregate admin session listing (admin-audit plugin). */
+export const ADMIN_SESSIONS = "/admin/list-sessions";
+/** Aggregate admin OAuth token listing (admin-audit plugin). */
+export const ADMIN_TOKENS = "/admin/list-tokens";
+/** Aggregate admin OAuth consent listing (admin-audit plugin). */
+export const ADMIN_CONSENTS = "/admin/list-consents";
+/** Admin JWKS key metadata (admin-audit plugin; timestamps + status). */
+export const ADMIN_JWKS = "/admin/jwks";

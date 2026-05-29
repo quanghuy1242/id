@@ -50,6 +50,29 @@ async function apiPostFetch(path: string, body: unknown | undefined, init: Reque
   });
 }
 
+/**
+ * Internal: performs a request with an arbitrary JSON body method (PATCH/DELETE).
+ *
+ * Only the OAuth2 client-management and OAuth plugin admin endpoints
+ * (`/admin/resource-servers/*`, `/admin/oauth-scopes/*`,
+ * `/admin/oauth-client-resource-scopes/*`) use REST verbs; Better Auth's
+ * admin/organization endpoints are POST-only (see {@link authApiPostOrThrow}).
+ *
+ * @param method — `"PATCH"` or `"DELETE"`
+ * @param path   — path relative to `/api/auth` (e.g. `"/admin/resource-servers/abc"`)
+ * @param body   — optional JSON-serialisable request body
+ * @param init   — optional `RequestInit` overrides (headers are merged)
+ */
+async function apiBodyFetch(method: "PATCH" | "DELETE", path: string, body: unknown | undefined, init: RequestInit | undefined): Promise<Response> {
+  const { headers: initHeaders, ...restInit } = init ?? {};
+  return fetch(`/api/auth${path}`, {
+    ...restInit,
+    method,
+    headers: { "content-type": "application/json", accept: "application/json", ...initHeaders },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
 // ─── Public GET helpers ───────────────────────────────────────────
 
 /**
@@ -123,6 +146,42 @@ export async function authApiPost<T>(path: string, body?: unknown, init?: Reques
  */
 export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await apiPostFetch(path, body, init);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<T>;
+}
+
+// ─── Public PATCH / DELETE helpers (OAuth plugin endpoints only) ───
+
+/**
+ * PATCH a Better Auth OAuth-plugin endpoint and throw `new Error(body)` on !ok.
+ *
+ * Use only for the resource-server / scope-catalog plugin update endpoints,
+ * which take flat (non-`data:`-wrapped) bodies and respond with the updated
+ * entity. Do NOT use for admin/organization endpoints — those are POST-only
+ * (see {@link authApiPostOrThrow}).
+ *
+ * @param path  — path relative to `/api/auth` (e.g. `"/admin/resource-servers/abc"`)
+ * @param body  — flat JSON-serialisable request body
+ * @param init  — optional `RequestInit` overrides
+ */
+export async function authApiPatchOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
+  const res = await apiBodyFetch("PATCH", path, body, init);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<T>;
+}
+
+/**
+ * DELETE a Better Auth OAuth-plugin endpoint and throw `new Error(body)` on !ok.
+ *
+ * Use only for the resource-server / M2M-binding plugin delete endpoints.
+ * Do NOT use for admin/organization endpoints — those are POST-only
+ * (see {@link authApiPostOrThrow}).
+ *
+ * @param path  — path relative to `/api/auth` (e.g. `"/admin/resource-servers/abc"`)
+ * @param init  — optional `RequestInit` overrides
+ */
+export async function authApiDeleteOrThrow<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await apiBodyFetch("DELETE", path, undefined, init);
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<T>;
 }

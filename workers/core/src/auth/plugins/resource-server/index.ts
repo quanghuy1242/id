@@ -7,6 +7,7 @@ import {
   assertUniqueSlug,
   buildCreatePayload,
   buildDisablePayload,
+  buildEnablePayload,
   buildUpdatePayload,
   canAccessResourceServer,
 } from "./operations";
@@ -65,6 +66,13 @@ const disableResourceServerMetadata = resourceServerEndpointMeta({
   hasIdParam: true,
   responseSchema: resourceServerOpenApiSchema,
   responseDescription: "Resource server disabled successfully",
+});
+
+const enableResourceServerMetadata = resourceServerEndpointMeta({
+  description: "Enable a resource server by ID",
+  hasIdParam: true,
+  responseSchema: resourceServerOpenApiSchema,
+  responseDescription: "Resource server enabled successfully",
 });
 
 /** Better Auth plugin that owns resource-server persistence and admin endpoints. */
@@ -265,6 +273,41 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           model: RESOURCE_SERVER_MODEL,
           where: [{ field: "id", value: ctx.params?.id }],
           update: buildDisablePayload(session.user.id),
+        });
+        await options.invalidateAudienceCache?.();
+        return ctx.json(row);
+      },
+    ),
+
+    enableResourceServer: createAuthEndpoint(
+      "/admin/resource-servers/:id/enable",
+      {
+        method: "POST",
+        use: [sessionMiddleware],
+        metadata: enableResourceServerMetadata,
+      },
+      async (ctx) => {
+        const session = ctx.context.session;
+        if (!session) throw new APIError("UNAUTHORIZED");
+
+        const existing = await ctx.context.adapter.findOne<ResourceServerRow>({
+          model: RESOURCE_SERVER_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+        });
+        if (!existing) throw new APIError("NOT_FOUND");
+
+        await assertResourceServerAccess(
+          options.authorize,
+          existing.organizationId,
+          session.user.id,
+          session.user.role,
+          ctx.context.adapter,
+        );
+
+        const row = await ctx.context.adapter.update<ResourceServerRow>({
+          model: RESOURCE_SERVER_MODEL,
+          where: [{ field: "id", value: ctx.params?.id }],
+          update: buildEnablePayload(session.user.id),
         });
         await options.invalidateAudienceCache?.();
         return ctx.json(row);

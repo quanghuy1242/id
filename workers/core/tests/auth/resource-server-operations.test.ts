@@ -4,6 +4,7 @@ import {
   assertResourceServerAccess,
   buildCreatePayload,
   buildDisablePayload,
+  buildEnablePayload,
   buildUpdatePayload,
   type AuthorizeFn,
 } from "../../src/auth/plugins/resource-server/operations";
@@ -145,5 +146,32 @@ describe("buildDisablePayload", () => {
     const payload = buildDisablePayload("user_3");
     expect(payload.updatedBy).toBe("user_3");
     expect(payload.updatedAt).toBe(payload.disabledAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildEnablePayload
+// ---------------------------------------------------------------------------
+
+describe("buildEnablePayload", () => {
+  it("sets enabled to true", () => {
+    const payload = buildEnablePayload("user_4");
+    expect(payload.enabled).toBe(true);
+  });
+
+  it("clears disabled metadata", () => {
+    const payload = buildEnablePayload("user_4") as { disabledBy: string | null; disabledAt: number | null };
+    expect(payload.disabledBy).toBeNull();
+    expect(payload.disabledAt).toBeNull();
+  });
+
+  it("stamps updatedBy and updatedAt", () => {
+    const before = Date.now();
+    const payload = buildEnablePayload("user_4");
+    const after = Date.now();
+
+    expect(payload.updatedBy).toBe("user_4");
+    expect(payload.updatedAt).toBeGreaterThanOrEqual(before);
+    expect(payload.updatedAt).toBeLessThanOrEqual(after);
   });
 });

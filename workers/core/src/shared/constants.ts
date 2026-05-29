@@ -22,6 +22,18 @@ export const OAUTH_CLIENT_RESOURCE_SCOPE_MODEL = "oauthClientResourceScope" as c
 /** BA model name for the OAuth client table maintained by `@better-auth/oauth-provider`. */
 export const OAUTH_CLIENT_MODEL = "oauthClient" as const;
 
+/** BA model name for the session table. */
+export const SESSION_MODEL = "session" as const;
+
+/** BA model name for the OAuth access-token table. */
+export const OAUTH_ACCESS_TOKEN_MODEL = "oauthAccessToken" as const;
+
+/** BA model name for the OAuth refresh-token table. */
+export const OAUTH_REFRESH_TOKEN_MODEL = "oauthRefreshToken" as const;
+
+/** BA model name for the OAuth consent table. */
+export const OAUTH_CONSENT_MODEL = "oauthConsent" as const;
+
 /** Warm-isolate TTL for the resource-server audience list before falling back to KV. */
 export const RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS = 60_000;
 

@@ -138,3 +138,17 @@ export function buildDisablePayload(actorId: string): Partial<ResourceServerRow>
     updatedAt: now,
   };
 }
+
+/**
+ * Builds the update payload for re-enabling a resource server.
+ * Clears disable metadata so the row describes its current active state.
+ */
+export function buildEnablePayload(actorId: string): Partial<ResourceServerRow> {
+  return {
+    enabled: true,
+    disabledBy: null,
+    disabledAt: null,
+    updatedBy: actorId,
+    updatedAt: Date.now(),
+  };
+}

@@ -41,6 +41,18 @@ describe("Text", () => {
     expect(element).toHaveClass("text-sm");
   });
 
+  it("applies monospace classes when mono is set", () => {
+    render(<Text mono>cli_abc123</Text>);
+    const element = screen.getByText(/cli_abc123/i);
+    expect(element).toHaveClass("font-mono", "break-all");
+  });
+
+  it("does not apply monospace classes by default", () => {
+    render(<Text>plain</Text>);
+    const element = screen.getByText(/plain/i);
+    expect(element).not.toHaveClass("font-mono");
+  });
+
   it("overrides element type with as prop", () => {
     render(<Text variant="h1" as="div">Custom</Text>);
     const element = screen.getByText(/custom/i);

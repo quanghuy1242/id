@@ -5,11 +5,11 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
-- `ui-id` Worker — admin UI scaffold under `/admin/*`, hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints (full admin pages deferred)
+- `ui-id` Worker — admin UI under `/admin/*` (identity, OAuth, and security sections, including live aggregate sessions/tokens, consents, and enriched JWKS views backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md)), hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
 
 ## Contracts
 
-This implementation follows the planning and architecture documents:   ffffffffdddddddddddddddfadfd
+This implementation follows the planning and architecture documents:
 
 - [docs/000_repo-architecture.md](docs/000_repo-architecture.md) — layer architecture, design patterns, enforcement rules, two-worker topology
 - [docs/001_first-batch-plan.md](docs/001_first-batch-plan.md) — domain plan, OAuth flows, data model, deployment, definition of done
@@ -45,7 +45,7 @@ This implementation follows the planning and architecture documents:   ffffffffd
 
 Intentionally deferred to later batches:
 
-- full admin UI pages (first batch has only minimal hosted login/consent pages; admin operations are API-first)
+- joined-field admin search (e.g. session/token/consent search by user email) — deferred from the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md) §4.3 pending a documented read side or denormalization
 - ReBAC (Zanzibar graph authorization)
 - ABAC / Lua policy engine
 - webhook delivery
