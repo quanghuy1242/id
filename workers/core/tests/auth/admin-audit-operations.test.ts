@@ -108,12 +108,16 @@ describe("admin-audit operations", () => {
       expect(out).not.toHaveProperty("privateKey");
     });
 
-    it("presentSession and presentConsent enrich email and leave unknown ids null", () => {
+    it("presentSession strips bearer tokens, enriches email, and leaves unknown ids null", () => {
       const session = presentSession(
-        { id: "s1", token: "tok", userId: "u9", ipAddress: null, userAgent: null, impersonatedBy: null, createdAt: 1, expiresAt: 2 },
-        new Map(),
+        { id: "s1", token: "supersecretsessiontoken", userId: "u9", ipAddress: null, userAgent: null, activeOrganizationId: "org_1", activeTeamId: null, impersonatedBy: null, createdAt: 1, expiresAt: 2 },
+        new Map([["u9", "u9@example.test"]]),
       );
-      expect(session.userEmail).toBeNull();
+      expect(session.userEmail).toBe("u9@example.test");
+      expect(session.activeOrganizationId).toBe("org_1");
+      expect(session.activeTeamId).toBeNull();
+      expect(JSON.stringify(session)).not.toContain("supersecretsessiontoken");
+      expect(session).not.toHaveProperty("token");
       const consent = presentConsent(
         { id: "c1", clientId: "cli_1", userId: "u1", scopes: ["openid"], createdAt: 1, updatedAt: 2 },
         new Map([["u1", "a@b.com"]]),

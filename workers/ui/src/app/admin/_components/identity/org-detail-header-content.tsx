@@ -47,6 +47,15 @@ function orgTabs(orgId: string) {
   ];
 }
 
+function isJsonObjectString(value: string): boolean {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
 export function OrgDetailHeaderContent({
   activeTab = "overview",
   onNavigateToOrgs,
@@ -75,13 +84,9 @@ export function OrgDetailHeaderContent({
     const slug = String(formData.get("slug") ?? "").trim();
     const logo = String(formData.get("logo") ?? "").trim();
     const metadata = String(formData.get("metadata") ?? "").trim();
-    if (metadata) {
-      try {
-        JSON.parse(metadata);
-      } catch {
-        setEditError("Metadata must be valid JSON");
-        return false;
-      }
+    if (metadata && !isJsonObjectString(metadata)) {
+      setEditError("Metadata must be a JSON object");
+      return false;
     }
     try {
       const updated = await actions.updateOrganization(orgId, {
@@ -161,7 +166,7 @@ export function OrgDetailHeaderContent({
         open={editOpen}
         onOpenChange={(o) => { setEditOpen(o); if (!o) { setEditError(undefined); setEditMetaError(undefined); setEditMetadata(""); } }}
         title="Edit Organization"
-        description="Changing the slug can affect organization links and integrations that store it. Metadata must be valid JSON."
+        description="Changing the slug can affect organization links and integrations that store it. Metadata must be a JSON object."
         confirmLabel="Save"
         error={editError}
         onConfirm={handleEdit}
@@ -178,8 +183,7 @@ export function OrgDetailHeaderContent({
           onChange={(v) => {
             setEditMetadata(v);
             if (!v) { setEditMetaError(undefined); return; }
-            try { JSON.parse(v); setEditMetaError(undefined); }
-            catch { setEditMetaError("Must be valid JSON"); }
+            setEditMetaError(isJsonObjectString(v) ? undefined : "Must be a JSON object");
           }}
         />
       </ConfirmDialog>

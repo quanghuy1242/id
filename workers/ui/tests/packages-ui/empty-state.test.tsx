@@ -25,4 +25,12 @@ describe("EmptyState", () => {
     expect(screen.getByText("Nothing here")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("renders a primary CTA link when an href is provided", () => {
+    render(<EmptyState message="No apps" cta="Create Application" ctaHref="/admin/oauth/applications/new" />);
+
+    const link = screen.getByRole("link", { name: /create application/i });
+    expect(link).toHaveAttribute("href", "/admin/oauth/applications/new");
+    expect(link).toHaveClass("btn", "btn-primary");
+  });
 });

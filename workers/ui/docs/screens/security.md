@@ -52,14 +52,15 @@ Components:
     StatGroup(columns=3): Stat(Total sessions) Stat(Impersonated, warning if >0) Stat(Unique users)
     Panel > SearchInput(grow, "Search by email or IP…")
     Panel(padding=none) > DataTable<AdminSession>(columns=[userEmail, ipAddress, userAgent, created, expires, actions], pagination)
-    Revoke: ConfirmDialog(variant="danger") → revokeUserSession(token) → mutate()
+    Revoke: ConfirmDialog(variant="danger") → revokeAdminSession(session.id) → mutate()
 
 Data: GET /api/auth/admin/list-sessions → { sessions, total, limit, offset }
-      POST /api/auth/admin/revoke-session  body: { sessionToken }
+      POST /api/auth/admin/revoke-session  body: { sessionId }
 
 Behavior:
   - Server-paginated (limit/offset in the SWR key). Search filters the loaded page client-side by email/IP.
   - Impersonated sessions show a warning Badge; revoke signs the user out immediately.
+  - Session rows never include Better Auth session tokens; the auth worker resolves the token from `sessionId` before deleting it.
 
 States: loading → Skeleton | empty → EmptyState("No active browser sessions") | error → ErrorAlert(onRetry=mutate)
 

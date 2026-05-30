@@ -27,6 +27,8 @@ export type SessionRow = {
   userId: string;
   ipAddress?: string | null;
   userAgent?: string | null;
+  activeOrganizationId?: string | null;
+  activeTeamId?: string | null;
   impersonatedBy?: string | null;
   createdAt?: unknown;
   expiresAt?: unknown;
@@ -64,11 +66,12 @@ export type PageParams = { limit: number; offset: number };
 
 export type PresentedSession = {
   id: string;
-  token: string;
   userId: string;
   userEmail: string | null;
   ipAddress: string | null;
   userAgent: string | null;
+  activeOrganizationId: string | null;
+  activeTeamId: string | null;
   impersonatedBy: string | null;
   createdAt: number | null;
   expiresAt: number | null;
@@ -113,11 +116,12 @@ export type RotateJwksResponse = PresentedJwk & { reason: string };
 
 const sessionSchema = z.object({
   id: z.string(),
-  token: z.string(),
   userId: z.string(),
   userEmail: z.string().nullable(),
   ipAddress: z.string().nullable(),
   userAgent: z.string().nullable(),
+  activeOrganizationId: z.string().nullable(),
+  activeTeamId: z.string().nullable(),
   impersonatedBy: z.string().nullable(),
   createdAt: z.number().nullable(),
   expiresAt: z.number().nullable(),
@@ -168,6 +172,13 @@ export const revokeConsentBody = z
   })
   .strict();
 
+/** Validated body for session revocation; callers pass the DB id, never the bearer token. */
+export const revokeSessionBody = z
+  .object({
+    sessionId: z.string().min(1),
+  })
+  .strict();
+
 /** Validated body for the emergency-rotate endpoint. */
 export const rotateJwksBody = z
   .object({
@@ -176,6 +187,7 @@ export const rotateJwksBody = z
   .strict();
 
 export type RevokeConsentBody = z.infer<typeof revokeConsentBody>;
+export type RevokeSessionBody = z.infer<typeof revokeSessionBody>;
 export type RotateJwksBody = z.infer<typeof rotateJwksBody>;
 
 // ─── Precomputed OpenAPI fragments ────────────────────────────────
@@ -189,8 +201,9 @@ export const listTokensOpenApiSchema = zodSchemaToOpenApi(
 export const listConsentsOpenApiSchema = zodSchemaToOpenApi(
   z.object({ consents: z.array(consentSchema), total: z.number(), limit: z.number(), offset: z.number() }),
 );
-export const revokeConsentOpenApiSchema = zodSchemaToOpenApi(z.object({ success: z.boolean() }));
+export const successOpenApiSchema = zodSchemaToOpenApi(z.object({ success: z.boolean() }));
 export const revokeConsentOpenApiRequestBody = openApiJsonRequestBody(revokeConsentBody);
+export const revokeSessionOpenApiRequestBody = openApiJsonRequestBody(revokeSessionBody);
 export const jwksOpenApiSchema = zodSchemaToOpenApi(z.object({ keys: z.array(jwkSchema) }));
 export const rotateJwksOpenApiSchema = zodSchemaToOpenApi(rotateJwksSchema);
 export const rotateJwksOpenApiRequestBody = openApiJsonRequestBody(rotateJwksBody);

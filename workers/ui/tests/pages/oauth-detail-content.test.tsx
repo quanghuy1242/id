@@ -52,6 +52,41 @@ describe("OAuth detail content", () => {
     expect(await screen.findByText("sk-rotated-secret")).toBeInTheDocument();
   });
 
+  it("omits empty optional arrays from update-client payloads", async () => {
+    const actions = makeOauthActions();
+    render(<ApplicationDetailContent clientId="cli_adminapp_9z8y7x6w5v4u" actions={actions} />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /edit application/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /edit application/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Post-Logout Redirect URIs"), { target: { value: "https://admin.example.com/signed-out" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(actions.updateClient).toHaveBeenCalledWith(
+      "cli_adminapp_9z8y7x6w5v4u",
+      expect.objectContaining({
+        redirect_uris: ["https://admin.example.com/callback"],
+        post_logout_redirect_uris: ["https://admin.example.com/signed-out"],
+      }),
+    ));
+    expect(actions.updateClient.mock.calls[0]?.[1]).not.toHaveProperty("contacts");
+    expect(actions.updateClient.mock.calls[0]?.[1]).not.toHaveProperty("token_endpoint_auth_method");
+  });
+
+  it("does not send hidden empty redirect URIs when editing M2M clients", async () => {
+    const actions = makeOauthActions();
+    render(<ApplicationDetailContent clientId="cli_contentapi_a1b2c3d4e5f6" actions={actions} />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /edit application/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /edit application/i }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(actions.updateClient).toHaveBeenCalledWith(
+      "cli_contentapi_a1b2c3d4e5f6",
+      expect.not.objectContaining({ redirect_uris: expect.any(Array) }),
+    ));
+  });
+
   it("disables a resource API from the detail header", async () => {
     const actions = makeOauthActions();
     render(<ResourceApiDetailContent resourceServerId="rs_001" actions={actions} />);

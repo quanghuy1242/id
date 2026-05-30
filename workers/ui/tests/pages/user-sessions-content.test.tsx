@@ -9,10 +9,10 @@ import type { Session, User } from "@/app/admin/_actions/users";
 
 function makeActions(user: User, sessions: Session[]) {
   return {
-    getUser: vi.fn<() => Promise<{ user: User }>>().mockResolvedValue({ user }),
-    listUserSessions: vi.fn<() => Promise<{ sessions: Session[] }>>().mockResolvedValue({ sessions }),
-    revokeUserSession: vi.fn<() => Promise<{ success: boolean }>>().mockResolvedValue({ success: true }),
-    revokeUserSessions: vi.fn<() => Promise<{ success: boolean }>>().mockResolvedValue({ success: true }),
+    getUser: vi.fn<(userId: string) => Promise<{ user: User }>>().mockResolvedValue({ user }),
+    listUserSessions: vi.fn<(userId: string) => Promise<{ sessions: Session[] }>>().mockResolvedValue({ sessions }),
+    revokeUserSession: vi.fn<(sessionId: string) => Promise<{ success: boolean }>>().mockResolvedValue({ success: true }),
+    revokeUserSessions: vi.fn<(userId: string) => Promise<{ success: boolean }>>().mockResolvedValue({ success: true }),
   };
 }
 
@@ -62,14 +62,14 @@ describe("UserSessionsContent", () => {
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
   });
 
-  it("calls revokeUserSession with session token", async () => {
+  it("calls revokeUserSession with session id", async () => {
     const actions = makeActions(mockUsers[0], mockSessions);
     render(<UserSessionsContent userId="user_001" actions={actions} />);
     await waitFor(() => screen.getAllByRole("button", { name: /^revoke$/i }));
     fireEvent.click(screen.getAllByRole("button", { name: /^revoke$/i })[0]);
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(screen.getByRole("button", { name: /^revoke$/i, hidden: false }));
-    await waitFor(() => expect(actions.revokeUserSession).toHaveBeenCalledWith(mockSessions[0].token));
+    await waitFor(() => expect(actions.revokeUserSession).toHaveBeenCalledWith(mockSessions[0].id));
   });
 
   it("shows Revoke All button when sessions exist", async () => {

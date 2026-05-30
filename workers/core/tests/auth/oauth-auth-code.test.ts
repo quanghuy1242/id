@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
 import { describe, expect, it } from "vitest";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -10,11 +9,7 @@ import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-stor
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
-
-type RawSqlite = {
-  readonly exec: (sql: string) => void;
-  readonly prepare: (sql: string) => { readonly get: () => unknown };
-};
+import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 
 type TokenResponse = {
   readonly access_token: string;
@@ -49,8 +44,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
     readonly default: new (path: string) => RawSqlite;
   };
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
+  applyAuthMigrations(raw);
   return raw;
 }
 

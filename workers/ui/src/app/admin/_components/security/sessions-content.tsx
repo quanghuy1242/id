@@ -22,15 +22,15 @@ import {
 } from "@id/ui";
 import {
   listAdminSessions as listAdminSessionsAction,
+  revokeAdminSession as revokeAdminSessionAction,
   type AdminSession,
 } from "../../_actions/audit";
-import { revokeUserSession as revokeUserSessionAction } from "../../_actions/users";
 import { adminSessionsKey } from "@/app/admin/_data/swr-keys";
 import { ADMIN_AUDIT_PAGE_SIZE } from "@/shared/constants";
 
 const defaultActions = {
   listAdminSessions: listAdminSessionsAction,
-  revokeUserSession: revokeUserSessionAction,
+  revokeAdminSession: revokeAdminSessionAction,
 };
 
 type Actions = typeof defaultActions;
@@ -120,7 +120,7 @@ export function SessionsContent({ loading, error, actions = defaultActions }: Se
     setRevokeError(undefined);
     try {
       const who = revokeTarget.userEmail ?? "the user";
-      await actions.revokeUserSession(revokeTarget.token);
+      await actions.revokeAdminSession(revokeTarget.id);
       await mutate();
       setRevokeTarget(null);
       toast.success("Session revoked", `${who} was signed out.`);

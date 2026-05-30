@@ -22,6 +22,7 @@ export type AdminAuditPluginOptions = {
 /** Minimal adapter surface used by the read-only audit endpoints. */
 export type AuditAdapter = {
   create: <T>(params: { model: string; data: Record<string, unknown> }) => Promise<T>;
+  findOne: <T>(params: { model: string; where: Array<{ field: string; value: unknown }> }) => Promise<T | null>;
   findMany: <T>(params: {
     model: string;
     where?: Array<{ field: string; value: unknown; operator?: string }>;

@@ -17,6 +17,13 @@ export type Member = {
   createdAt: string;
 };
 
+type ListMembersEnvelope = { members: Member[]; total?: number };
+type OrganizationWire = Omit<Organization, "metadata"> & { metadata?: unknown };
+type MetadataObject = Record<string, unknown>;
+type CreateOrganizationInput = { name: string; slug: string; logo?: string; metadata?: string };
+type UpdateOrganizationInput = Partial<{ name: string; slug: string; logo: string; metadata: string }>;
+type InvitationWire = Omit<Invitation, "status"> & { status: string };
+
 export type Team = {
   id: string;
   name: string;
@@ -38,30 +45,92 @@ export type Invitation = {
   email: string;
   role: string;
   teamId: string | null;
-  status: "pending" | "accepted" | "rejected" | "expired" | "cancelled";
+  status: "pending" | "accepted" | "rejected" | "expired" | "canceled";
   expiresAt: string;
   createdAt: string;
   inviterId: string;
 };
 
-export async function listOrganizations(): Promise<Organization[]> {
-  return authApiGetOrThrow<Organization[]>("/organization/list");
+function isMetadataObject(data: unknown): data is MetadataObject {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
 }
 
-export async function createOrganization(data: { name: string; slug: string; logo?: string; metadata?: string }): Promise<Organization> {
-  return authApiPostOrThrow<Organization>("/organization/create", data);
+function parseMetadataInput(metadata: string | undefined): MetadataObject | undefined {
+  if (!metadata) return undefined;
+  const parsed = JSON.parse(metadata) as unknown;
+  if (!isMetadataObject(parsed)) throw new Error("Metadata must be a JSON object");
+  return parsed;
+}
+
+function normalizeMetadata(metadata: unknown): string | null {
+  if (metadata === null || metadata === undefined || metadata === "") return null;
+  if (typeof metadata === "string") return metadata;
+  return JSON.stringify(metadata, null, 2);
+}
+
+function normalizeOrganization(org: OrganizationWire): Organization {
+  return {
+    ...org,
+    metadata: normalizeMetadata(org.metadata),
+  };
+}
+
+function normalizeInvitation(invitation: InvitationWire): Invitation {
+  const expiresAt = Date.parse(invitation.expiresAt);
+  const status = invitation.status === "pending" && Number.isFinite(expiresAt) && expiresAt < Date.now()
+    ? "expired"
+    : invitation.status === "cancelled"
+      ? "canceled"
+      : invitation.status;
+  return {
+    ...invitation,
+    status: status as Invitation["status"],
+  };
+}
+
+export async function listOrganizations(): Promise<Organization[]> {
+  return (await authApiGetOrThrow<OrganizationWire[]>("/organization/list")).map(normalizeOrganization);
+}
+
+export async function createOrganization(data: CreateOrganizationInput): Promise<Organization> {
+  const metadata = parseMetadataInput(data.metadata);
+  return normalizeOrganization(await authApiPostOrThrow<OrganizationWire>("/organization/create", {
+    name: data.name,
+    slug: data.slug,
+    ...(data.logo ? { logo: data.logo } : {}),
+    ...(metadata ? { metadata } : {}),
+  }));
 }
 
 export async function checkSlug(slug: string): Promise<void> {
   await authApiPostOrThrow("/organization/check-slug", { slug });
 }
 
-export async function getFullOrganization(organizationId: string): Promise<Organization> {
-  return authApiGetOrThrow<Organization>("/organization/get-full-organization", { organizationId });
+export async function getFullOrganization(organizationId: string): Promise<Organization | null> {
+  const org = await authApiGetOrThrow<OrganizationWire | null>("/organization/get-full-organization", { organizationId });
+  return org ? normalizeOrganization(org) : null;
 }
 
-export async function updateOrganization(organizationId: string, data: Partial<{ name: string; slug: string; logo: string; metadata: string }>): Promise<Organization> {
-  return authApiPostOrThrow<Organization>("/organization/update", { organizationId, data });
+function isListMembersEnvelope(data: unknown): data is ListMembersEnvelope {
+  return typeof data === "object" && data !== null && Array.isArray((data as { members?: unknown }).members);
+}
+
+function unwrapListMembersResponse(data: unknown): Member[] {
+  if (Array.isArray(data)) return data as Member[];
+  if (isListMembersEnvelope(data)) return data.members;
+  throw new Error("Unexpected /organization/list-members response");
+}
+
+export async function updateOrganization(organizationId: string, data: UpdateOrganizationInput): Promise<Organization> {
+  const { metadata: metadataInput, ...rest } = data;
+  const metadata = parseMetadataInput(metadataInput);
+  return normalizeOrganization(await authApiPostOrThrow<OrganizationWire>("/organization/update", {
+    organizationId,
+    data: {
+      ...rest,
+      ...(metadata ? { metadata } : {}),
+    },
+  }));
 }
 
 export async function deleteOrganization(organizationId: string): Promise<void> {
@@ -69,7 +138,7 @@ export async function deleteOrganization(organizationId: string): Promise<void> 
 }
 
 export async function listMembers(organizationId: string): Promise<Member[]> {
-  return authApiGetOrThrow<Member[]>("/organization/list-members", { organizationId });
+  return unwrapListMembersResponse(await authApiGetOrThrow<unknown>("/organization/list-members", { organizationId }));
 }
 
 export async function updateMemberRole(memberId: string, role: string): Promise<void> {
@@ -89,7 +158,7 @@ export async function cancelInvitation(invitationId: string): Promise<void> {
 }
 
 export async function listInvitations(organizationId: string): Promise<Invitation[]> {
-  return authApiGetOrThrow<Invitation[]>("/organization/list-invitations", { organizationId });
+  return (await authApiGetOrThrow<InvitationWire[]>("/organization/list-invitations", { organizationId })).map(normalizeInvitation);
 }
 
 export async function listTeams(organizationId: string): Promise<Team[]> {
@@ -104,12 +173,18 @@ export async function createTeam(name: string, organizationId: string): Promise<
   return authApiPostOrThrow<Team>("/organization/create-team", { name, organizationId });
 }
 
-export async function updateTeam(teamId: string, name: string): Promise<Team> {
-  return authApiPostOrThrow<Team>("/organization/update-team", { teamId, data: { name } });
+export async function updateTeam(teamId: string, name: string, organizationId?: string): Promise<Team> {
+  return authApiPostOrThrow<Team>("/organization/update-team", {
+    teamId,
+    data: {
+      name,
+      ...(organizationId ? { organizationId } : {}),
+    },
+  });
 }
 
-export async function removeTeam(teamId: string): Promise<void> {
-  await authApiPostOrThrow("/organization/remove-team", { teamId });
+export async function removeTeam(teamId: string, organizationId?: string): Promise<void> {
+  await authApiPostOrThrow("/organization/remove-team", { teamId, ...(organizationId ? { organizationId } : {}) });
 }
 
 export async function addTeamMember(teamId: string, userId: string, organizationId: string): Promise<void> {

@@ -14,6 +14,24 @@ const capturedEmailSender = createCapturedAuthEmailSender();
 type RawSqlite = { readonly exec: (sql: string) => void };
 type TestAuth = ReturnType<typeof betterAuth>;
 const BASE = "https://id.example.test";
+type OpenApiObjectSchema = {
+  readonly $defs?: Record<string, OpenApiObjectSchema>;
+  readonly $ref?: string;
+  readonly items?: OpenApiObjectSchema;
+  readonly properties?: Record<string, OpenApiObjectSchema>;
+};
+type OpenApiMedia = { readonly "application/json"?: { readonly schema?: OpenApiObjectSchema } };
+type OpenApiOperation = {
+  readonly parameters?: Array<{ readonly name?: string; readonly in?: string }>;
+  readonly requestBody?: { readonly content?: OpenApiMedia };
+  readonly responses?: Record<string, { readonly content?: OpenApiMedia }>;
+};
+type OpenApiSchema = {
+  readonly paths: Record<string, {
+    readonly get?: OpenApiOperation;
+    readonly post?: OpenApiOperation;
+  }>;
+};
 
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
@@ -75,6 +93,30 @@ function seedAuditData(raw: RawSqlite): void {
 }
 
 describe("admin-audit plugin", () => {
+  it("exports the safe session contract in OpenAPI", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+
+    const r = await auth.handler(new Request(`${BASE}/api/auth/open-api/generate-schema`, { method: "GET" }));
+    expect(r.status).toBe(200);
+    const schema = await r.json() as OpenApiSchema;
+    const listSessions = schema.paths["/admin/list-sessions"]?.get;
+    const responseSchema = listSessions?.responses?.["200"]?.content?.["application/json"]?.schema;
+    const sessionItem = responseSchema?.properties?.sessions?.items;
+    const sessionSchema = sessionItem?.$ref === "#/$defs/AdminAuditSession"
+      ? responseSchema?.$defs?.AdminAuditSession
+      : sessionItem;
+    const sessionProps = sessionSchema?.properties ?? {};
+    expect(listSessions?.parameters).toContainEqual(expect.objectContaining({ name: "userId", in: "query" }));
+    expect(sessionProps).toHaveProperty("id");
+    expect(sessionProps).toHaveProperty("activeOrganizationId");
+    expect(sessionProps).not.toHaveProperty("token");
+
+    const revokeSessionProps = schema.paths["/admin/revoke-session"]?.post?.requestBody?.content?.["application/json"]?.schema?.properties ?? {};
+    expect(revokeSessionProps).toHaveProperty("sessionId");
+    expect(revokeSessionProps).not.toHaveProperty("sessionToken");
+  });
+
   it("rejects unauthenticated and non-admin callers", async () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
@@ -93,14 +135,38 @@ describe("admin-audit plugin", () => {
     const cookie = await signInSuperadmin(auth);
     seedAuditData(raw);
 
-    const r = await auth.handler(new Request(`${BASE}/api/auth/admin/list-sessions?limit=10&offset=0`, { method: "GET", headers: { cookie } }));
+    const r = await auth.handler(new Request(`${BASE}/api/auth/admin/list-sessions?limit=10&offset=0&userId=u_seed`, { method: "GET", headers: { cookie } }));
     expect(r.status).toBe(200);
-    const body = await r.json() as { sessions: Array<{ userId: string; userEmail: string | null }>; total: number; limit: number; offset: number };
+    const text = await r.text();
+    expect(text).not.toContain("tok_session_secret");
+    const body = JSON.parse(text) as { sessions: Array<{ userId: string; userEmail: string | null; activeOrganizationId: string | null; activeTeamId: string | null }>; total: number; limit: number; offset: number };
     expect(body.limit).toBe(10);
     expect(typeof body.total).toBe("number");
     // The seeded session resolves its user email via the batched `in` lookup.
     const seeded = body.sessions.find((s) => s.userId === "u_seed");
     expect(seeded?.userEmail).toBe("seed@example.test");
+    expect(seeded).not.toHaveProperty("token");
+  });
+
+  it("revokes a browser session by id without accepting the token from the caller", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+    seedAuditData(raw);
+
+    const revoke = await auth.handler(new Request(`${BASE}/api/auth/admin/revoke-session`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ sessionId: "sess_seed" }),
+    }));
+    expect(revoke.status).toBe(200);
+    expect(await revoke.json()).toEqual({ success: true });
+
+    const after = await auth.handler(new Request(`${BASE}/api/auth/admin/list-sessions?limit=10&offset=0&userId=u_seed`, { method: "GET", headers: { cookie } }));
+    expect(after.status).toBe(200);
+    const afterBody = await after.json() as { sessions: unknown[]; total: number };
+    expect(afterBody.sessions).toEqual([]);
+    expect(afterBody.total).toBe(0);
   });
 
   it("lists tokens without ever returning the token value", async () => {

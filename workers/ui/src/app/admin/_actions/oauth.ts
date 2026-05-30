@@ -12,6 +12,7 @@ import {
 export type OAuthClient = {
   client_id: string;
   client_secret?: string;
+  client_secret_expires_at?: number;
   client_name: string;
   redirect_uris: string[];
   post_logout_redirect_uris?: string[];
@@ -19,6 +20,8 @@ export type OAuthClient = {
   response_types: string[];
   token_endpoint_auth_method: string;
   scope: string;
+  user_id?: string;
+  client_id_issued_at?: number;
   client_uri?: string;
   logo_uri?: string;
   contacts?: string[];
@@ -27,42 +30,54 @@ export type OAuthClient = {
   software_id?: string;
   software_version?: string;
   software_statement?: string;
+  public?: boolean;
+  type?: "web" | "native" | "user-agent-based";
   disabled?: boolean;
+  skip_consent?: boolean;
+  enable_end_session?: boolean;
+  require_pkce?: boolean;
+  subject_type?: "public" | "pairwise";
+  reference_id?: string;
 };
+
+export type NonEmptyStringArray = [string, ...string[]];
 
 export type CreateClientInput = {
   client_name?: string;
   token_endpoint_auth_method?: string;
   scope?: string;
-  redirect_uris: string[];
+  redirect_uris: NonEmptyStringArray;
   grant_types?: string[];
   response_types?: string[];
-  post_logout_redirect_uris?: string[];
+  post_logout_redirect_uris?: NonEmptyStringArray;
   client_uri?: string;
   logo_uri?: string;
   tos_uri?: string;
   policy_uri?: string;
-  contacts?: string[];
-  public?: boolean;
+  contacts?: NonEmptyStringArray;
+  type?: "web" | "native" | "user-agent-based";
 };
 
 export type UpdateClientInput = Partial<{
   client_name: string;
   scope: string;
-  redirect_uris: string[];
-  post_logout_redirect_uris: string[];
-  token_endpoint_auth_method: string;
+  redirect_uris: NonEmptyStringArray;
+  post_logout_redirect_uris: NonEmptyStringArray;
   grant_types: string[];
   response_types: string[];
   client_uri: string;
   logo_uri: string;
   tos_uri: string;
   policy_uri: string;
-  contacts: string[];
+  contacts: NonEmptyStringArray;
+  software_id: string;
+  software_version: string;
+  software_statement: string;
+  type: "web" | "native" | "user-agent-based";
 }>;
 
 export async function listClients(): Promise<OAuthClient[]> {
-  return authApiGetOrThrow<OAuthClient[]>("/oauth2/get-clients");
+  return (await authApiGetOrThrow<OAuthClient[] | null>("/oauth2/get-clients")) ?? [];
 }
 
 export async function createClient(data: CreateClientInput): Promise<OAuthClient> {
@@ -117,7 +132,7 @@ export type UpdateResourceServerInput = Partial<{
 
 export async function listResourceServers(): Promise<ResourceServer[]> {
   const res = await authApiGetOrThrow<{ resourceServers: ResourceServer[] }>("/admin/resource-servers");
-  return res.resourceServers;
+  return res.resourceServers ?? [];
 }
 
 export async function createResourceServer(data: CreateResourceServerInput): Promise<ResourceServer> {
@@ -168,7 +183,7 @@ export type UpdateScopeInput = Partial<{
 
 export async function listScopes(): Promise<OAuthResourceScope[]> {
   const res = await authApiGetOrThrow<{ oauthScopes: OAuthResourceScope[] }>("/admin/oauth-scopes");
-  return res.oauthScopes;
+  return res.oauthScopes ?? [];
 }
 
 export async function createScope(data: CreateScopeInput): Promise<OAuthResourceScope> {
@@ -208,7 +223,7 @@ export async function listBindings(): Promise<ClientResourceScope[]> {
   const res = await authApiGetOrThrow<{ oauthClientResourceScopes: ClientResourceScope[] }>(
     "/admin/oauth-client-resource-scopes",
   );
-  return res.oauthClientResourceScopes;
+  return res.oauthClientResourceScopes ?? [];
 }
 
 export async function createBinding(data: CreateBindingInput): Promise<ClientResourceScope> {

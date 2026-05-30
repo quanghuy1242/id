@@ -44,7 +44,7 @@ const statusFilterOptions = [
   { value: "expired", label: "Expired" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "canceled", label: "Cancelled" },
 ];
 
 const inviteRoleOptions = [
@@ -59,6 +59,8 @@ const statusBadgeTone = (status: Invitation["status"]): "warning" | "success" | 
   if (status === "rejected") return "error";
   return "neutral";
 };
+
+const statusLabel = (status: Invitation["status"]): string => status === "canceled" ? "cancelled" : status;
 
 type OrgInvsContentProps = {
   orgId: string;
@@ -143,7 +145,7 @@ export function OrganizationInvitationsContent({
     {
       key: "status",
       label: "Status",
-      render: (inv) => <Badge tone={statusBadgeTone(inv.status)} size="sm">{inv.status}</Badge>,
+      render: (inv) => <Badge tone={statusBadgeTone(inv.status)} size="sm">{statusLabel(inv.status)}</Badge>,
     },
     {
       key: "actions",

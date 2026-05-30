@@ -285,7 +285,7 @@ Components:
       TextInput(label="Name", name="name", defaultValue=user.name)
       TextInput(label="Email", name="email", type="email", defaultValue=user.email)
       TextInput(label="Avatar URL", name="image", defaultValue=user.image||"")
-      On confirm: POST /api/auth/admin/update-user { userId, data: JSON.stringify({ name, email, image }) }
+      On confirm: POST /api/auth/admin/update-user { userId, data: { name, email, image } }
 
     Set Role: ConfirmDialog(title="Set Role", confirmLabel="Save", onConfirm)
       RadioGroup(title="Role", name="role",
@@ -320,7 +320,7 @@ Components:
       On confirm: POST /api/auth/admin/remove-user { userId }, then navigate to /admin/identity/users
 
 Data: GET /api/auth/admin/get-user?id=:userId → { user: User }
-      POST /api/auth/admin/update-user → { user: User }     body: { userId, data: JSON-stringified { name?, email?, image? } }
+      POST /api/auth/admin/update-user → raw User; admin action normalizes to { user: User }     body: { userId, data: { name?, email?, image? } }
       POST /api/auth/admin/set-role → { user: User }         body: { userId, role }
       POST /api/auth/admin/set-user-password → { status: boolean }  body: { newPassword, userId }
       POST /api/auth/admin/ban-user → { user: User }         body: { userId, banReason?, banExpiresIn? }
@@ -331,7 +331,7 @@ Data: GET /api/auth/admin/get-user?id=:userId → { user: User }
 
 Notes:
   - banExpiresIn is seconds (number), not a date. Compute display from user.banExpires (timestamp_ms).
-  - update-user `data` is a JSON string. Send only changed fields.
+  - update-user `data` is an object. Send only changed fields. Better Auth 1.6.11 OpenAPI documents an envelope, but runtime returns the raw user.
   - Delete modal: compare typedEmail against user.email; disable Confirm until match.
   - Impersonate opens new session; redirect admin to /. On re-entering this page while impersonating,
     show "Stop Impersonating" button (detect via current session.impersonatedBy field).
@@ -402,19 +402,18 @@ Components:
   Loading: Skeleton(rows=4)
   Empty: EmptyState(message="No active sessions")
 
-Data: POST /api/auth/admin/list-user-sessions → { sessions: Session[] }
-        body: { userId }
-      POST /api/auth/admin/revoke-user-session → { success: boolean }
-        body: { sessionToken: string }   ← uses Session.token NOT Session.id
+Data: GET /api/auth/admin/list-sessions?userId=:userId&limit=100&offset=:offset → { sessions: Session[], total, limit, offset }
+      POST /api/auth/admin/revoke-session → { success: boolean }
+        body: { sessionId: string }
       POST /api/auth/admin/revoke-user-sessions → { success: boolean }
         body: { userId }
 
-Session shape: { id, token, userId, ipAddress, userAgent, createdAt, expiresAt,
+Session shape: { id, userId, userEmail, ipAddress, userAgent, createdAt, expiresAt,
                  activeOrganizationId, activeTeamId, impersonatedBy }
 
 Notes:
-  - revoke-user-session uses `sessionToken` (the `token` field), not `id`. Fetch from the row's `session.token`.
-  - No pagination; render all sessions returned by the API.
+  - Single-session revoke uses the repo-owned revoke-by-id route. Do not route this screen through Better Auth's `revoke-user-session`, because that contract requires exposing a live session token to the browser.
+  - `_actions/users.ts` pages through the safe aggregate endpoint and returns all matching rows to the component.
   - Organization column: show org name from a lookup or show `activeOrganizationId` truncated. If no lookup: "—".
   - Impersonation badge: show per row when `session.impersonatedBy` is truthy.
 
@@ -510,14 +509,14 @@ Components:
     TextInput(label="Name", name="name", required)
     TextInput(label="Slug", name="slug", required)
     TextInput(label="Logo URL", name="logo")
-    Textarea(label="Metadata (JSON)", name="metadata", placeholder='{"plan":"enterprise"}', error=metadataError)
-      — Validate parseable on change; show inline error via Textarea error prop.
-      — Use Textarea (not TextInput) for all JSON/multiline fields.
-    On confirm: POST /api/auth/organization/create { name, slug, logo?, metadata? }
+    CodeEditor(label="Metadata (JSON)", name="metadata", placeholder='{"plan":"enterprise"}', error=metadataError)
+      — Validate as a JSON object on change; show inline error via CodeEditor error prop.
+      — Use CodeEditor for all JSON/multiline fields.
+    On confirm: POST /api/auth/organization/create { name, slug, logo?, metadata? } where metadata is parsed from editor text and sent as a JSON object
     On success: navigate to /admin/identity/organizations/${id}
 
-Data: GET /api/auth/organization/list → Organization[]   (no pagination)
-      POST /api/auth/organization/create → Organization    body: { name, slug, logo?, metadata? }
+Data: GET /api/auth/organization/list → Organization[]   (no pagination; metadata may be object or string on the wire and the action normalizes it to formatted JSON text)
+      POST /api/auth/organization/create → Organization    body: { name, slug, logo?, metadata?: object }
       POST /api/auth/organization/check-slug → 200 if unique, error if taken  body: { slug }
 
 Behavior:
@@ -527,7 +526,7 @@ Behavior:
   - Slug validation: on blur of slug input, call check-slug. Show error message under slug field.
     If editing existing org, skip validation if slug unchanged.
   - Logo: text input for URL. No file upload. Show preview in the detail page only.
-  - Metadata: free-text JSON. On blur, try JSON.parse; if fails, set error prop on TextInput.
+  - Metadata: free-text JSON object. On change, try JSON.parse and require a non-array object; if it fails, set error prop on CodeEditor.
 
 ---
 
@@ -618,9 +617,9 @@ Components:
     TextInput(label="Name", name="name", defaultValue=org.name)
     TextInput(label="Slug", name="slug", defaultValue=org.slug)
     TextInput(label="Logo URL", name="logo", defaultValue=org.logo||"")
-    Textarea(label="Metadata (JSON)", name="metadata", defaultValue=org.metadata||"", placeholder='{"plan":"enterprise"}', error=editMetaError)
-      — Validate parseable on change. Use Textarea for JSON fields.
-    On confirm: POST /api/auth/organization/update { data: { name, slug, logo, metadata } }
+    CodeEditor(label="Metadata (JSON)", name="metadata", defaultValue=org.metadata||"", placeholder='{"plan":"enterprise"}', error=editMetaError)
+      — Validate as a JSON object on change. Use CodeEditor for JSON fields.
+    On confirm: POST /api/auth/organization/update { organizationId, data: { name, slug, logo, metadata } } where metadata is parsed from editor text and sent as a JSON object
 
   Delete modal: ConfirmDialog(title="Delete Organization", confirmLabel="Delete Org", variant="danger",
     confirmDisabled=typedSlug !== org.slug, onConfirm)
@@ -628,15 +627,15 @@ Components:
     TextInput(label="Type the slug to confirm", name="confirmSlug")
     On confirm: POST /api/auth/organization/delete { organizationId }, then navigate to /admin/identity/organizations
 
-Data: GET /api/auth/organization/get-full-organization → Organization (with metadata)
-      POST /api/auth/organization/update   body: { organizationId?, data: { name?, slug?, logo?, metadata? } }
+Data: GET /api/auth/organization/get-full-organization → Organization | null (with metadata normalized by the action)
+      POST /api/auth/organization/update   body: { organizationId, data: { name?, slug?, logo?, metadata?: object } }
       POST /api/auth/organization/delete   body: { organizationId }
 
 Notes:
   - Slug validation on blur in edit modal (same as create, skip if unchanged).
   - Metadata displayed as a `<pre>` block with `JSON.stringify(JSON.parse(...), null, 2)` formatting for readability.
     Use CSS vars `var(--color-base-200)` for background and `var(--radius-box)` for border-radius.
-  - Metadata edited as raw JSON string via `Textarea` component (monospace, multiline).
+  - Metadata edited as raw JSON object text via `CodeEditor` component (monospace, multiline).
 
 ---
 
@@ -736,11 +735,11 @@ Modals:
       value=selectedRole, onChange=setSelectedRole)
     On confirm: POST /api/auth/organization/invite-member { email, role, organizationId }
 
-Data: GET /api/auth/organization/list-members → Member[]
-        Member shape: { id, organizationId, userId, role, createdAt }
-        CAVEAT: Member has no user.name/email. If API does NOT join user data, do:
-          GET /api/auth/admin/get-user?id={userId} per member.
-          Batch these (Promise.all) and cache per userId to avoid refetching same user for teams tab.
+Data: GET /api/auth/organization/list-members → { members: Member[], total: number }; admin action unwraps to Member[] for the content component.
+        Member shape: { id, organizationId, userId, role, createdAt, user? }
+        User display data resolves through the shared get-user cache:
+          GET /api/auth/admin/get-user?id={userId} per member when needed.
+          Batch these (Promise.all) and cache per userId to avoid refetching the same user for the teams tab.
       POST /api/auth/organization/update-member-role  body: { memberId, role }
       POST /api/auth/organization/remove-member        body: { memberIdOrEmail, organizationId? }
       POST /api/auth/organization/invite-member        body: { email, role, organizationId }
@@ -852,11 +851,11 @@ Modals:
 
   Rename: ConfirmDialog(title="Rename Team", confirmLabel="Save", onConfirm)
     TextInput(label="Team Name", name="name", defaultValue=team.name)
-    On confirm: POST /api/auth/organization/update-team { teamId, data: { name } }
+    On confirm: POST /api/auth/organization/update-team { teamId, data: { name, organizationId } }
 
   Delete: ConfirmDialog(title="Delete Team", confirmLabel="Delete", variant="danger", onConfirm)
     description: "{n} team members will be removed from the team (org membership is preserved)."
-    On confirm: POST /api/auth/organization/remove-team { teamId }, then collapse member panel, refresh list
+    On confirm: POST /api/auth/organization/remove-team { teamId, organizationId }, then collapse member panel, refresh list
 
   Remove Member: ConfirmDialog(title="Remove Member", confirmLabel="Remove", variant="danger", onConfirm)
     description: "Remove {userName} from {teamName}?"
@@ -864,10 +863,10 @@ Modals:
 
 Data: GET /api/auth/organization/list-teams → Team[]
         Team: { id, name, organizationId, createdAt, updatedAt }
-      GET/POST /api/auth/organization/list-team-members → TeamMember[]
+      GET /api/auth/organization/list-team-members → TeamMember[]
         TeamMember: { id, teamId, userId, createdAt }
       POST /api/auth/organization/create-team      body: { name, organizationId? }
-      POST /api/auth/organization/update-team      body: { teamId, data: { name } }
+      POST /api/auth/organization/update-team      body: { teamId, data: { name, organizationId? } }
       POST /api/auth/organization/remove-team      body: { teamId, organizationId? }
       POST /api/auth/organization/add-team-member   body: { teamId, userId, organizationId? }
       POST /api/auth/organization/remove-team-member body: { teamId, userId, organizationId? }
@@ -953,7 +952,7 @@ Components:
         {value:"expired",label:"Expired"},
         {value:"accepted",label:"Accepted"},
         {value:"rejected",label:"Rejected"},
-        {value:"cancelled",label:"Cancelled"}
+        {value:"canceled",label:"Cancelled"}
       ],
       value=statusFilter, onChange=setStatusFilter)
     Button(variant="primary", iconName="Plus", onClick=openInviteModal, "Invite Member")
@@ -991,11 +990,12 @@ Modals:
 
 Data: GET /api/auth/organization/list-invitations → Invitation[]
         Invitation: { id, organizationId, email, role, teamId, status, expiresAt, createdAt, inviterId }
+        Better Auth wire statuses are "pending" | "accepted" | "rejected" | "canceled"; the admin action derives "expired" from pending invitations whose expiresAt is in the past.
       POST /api/auth/organization/invite-member  body: { email, role, organizationId?, teamId?, resend? }
       POST /api/auth/organization/cancel-invitation  body: { invitationId }
 
 Behavior:
-  - Status filter: client-side filter by invitation.status.
+  - Status filter: client-side filter by normalized invitation.status.
   - Resend: uses `resend: true` on the invite-member endpoint. Pass same email, role, organizationId.
     Do NOT use cancel+re-invite; the API natively supports resend.
   - Inviter name: Invitation has inviterId but no name. Fetch via GET /api/auth/admin/get-user?id={inviterId}.
@@ -1004,7 +1004,7 @@ Behavior:
     If teamId is set, resolve team name from the teams list fetched on the Overview tab.
     For initial implementation, skip team name resolution (show "—") and note it will be wired when lookup is available.
   - Expired rows: only Cancel action available (to clean up). No Resend on expired; admin must create a new invite.
-  - Status badge: pending→tone="warning", accepted→tone="success", rejected→tone="error", expired→tone="neutral"
+  - Status badge: pending→tone="warning", accepted→tone="success", rejected→tone="error", expired/canceled→tone="neutral"
 
 ---
 

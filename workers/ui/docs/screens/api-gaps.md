@@ -29,7 +29,7 @@
 **What's missing:** A global admin endpoint that lists all active browser sessions across all users, with optional filters (email, IP, status) and pagination.
 
 **Request:** `GET /api/auth/admin/list-sessions?limit=25&offset=0`
-**Response:** `{ sessions: Array<{ id, token, userId, userEmail, ipAddress, userAgent, createdAt, expiresAt, impersonatedBy }>, total: number, limit: number, offset: number }`
+**Response:** `{ sessions: Array<{ id, userId, userEmail, ipAddress, userAgent, activeOrganizationId, activeTeamId, createdAt, expiresAt, impersonatedBy }>, total: number, limit: number, offset: number }`. Session tokens are not returned; single-session revoke uses `/admin/revoke-session` with `{ sessionId }`.
 
 **Fallback:** Show a "Coming Soon" placeholder page until implemented.
 

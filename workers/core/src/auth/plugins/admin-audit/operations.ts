@@ -94,13 +94,15 @@ export function uniqueIds<T>(rows: readonly T[], pick: (row: T) => string | null
 }
 
 export function presentSession(row: SessionRow, emailByUserId: Map<string, string>): PresentedSession {
+  // Do not return row.token here. Session tokens are bearer material; callers revoke by session id and the plugin resolves the token server-side.
   return {
     id: row.id,
-    token: row.token,
     userId: row.userId,
     userEmail: emailByUserId.get(row.userId) ?? null,
     ipAddress: row.ipAddress ?? null,
     userAgent: row.userAgent ?? null,
+    activeOrganizationId: row.activeOrganizationId ?? null,
+    activeTeamId: row.activeTeamId ?? null,
     impersonatedBy: row.impersonatedBy ?? null,
     createdAt: toMs(row.createdAt),
     expiresAt: toMs(row.expiresAt),

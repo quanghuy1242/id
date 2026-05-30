@@ -113,4 +113,32 @@ describe("admin-activity-log plugin", () => {
     expect(text).not.toContain("\"client_secret\"");
     expect(text).toContain("oauth_client.create");
   });
+
+  it("logs organization creation through the Better Auth organization route", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+
+    const create = await auth.handler(new Request(`${BASE}/api/auth/organization/create`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", origin: BASE },
+      body: JSON.stringify({ name: "Created Org", slug: "created-org" }),
+    }));
+    expect(create.status).toBe(200);
+    const created = await create.json() as { id: string };
+
+    const list = await auth.handler(new Request(`${BASE}/api/auth/admin/activity-log?targetType=organization&targetId=${created.id}`, {
+      method: "GET",
+      headers: { cookie },
+    }));
+    expect(list.status).toBe(200);
+    const body = await list.json() as { entries: Array<{ action: string; targetId: string; actorId: string }> };
+    expect(body.entries).toEqual([
+      expect.objectContaining({
+        action: "organization.create",
+        targetId: created.id,
+        actorId: expect.any(String),
+      }),
+    ]);
+  });
 });

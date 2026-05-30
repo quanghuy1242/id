@@ -1,4 +1,4 @@
-import { APIError, createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware, getSessionFromCtx, sessionMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import {
   ADMIN_ACTIVITY_LOG_MODEL,
@@ -23,6 +23,7 @@ import type { ActivityAdapter, ActivityRecordDraft, AdminActivityLogPluginOption
 export type { AdminActivityLogPluginOptions } from "./types";
 
 type UserRow = { id: string; email?: string | null };
+type SessionUser = { id: string; role?: string | null };
 
 function activityAdapter(ctx: { context: Record<string, unknown> }): ActivityAdapter {
   return ctx.context.adapter as ActivityAdapter;
@@ -63,9 +64,16 @@ type HookContext = {
   };
 };
 
-function sessionUser(ctx: HookContext): { id: string; role?: string | null } | null {
-  const user = ctx.context.session?.user as { id?: unknown; role?: string | null } | undefined;
+function userFromSession(session: { readonly user?: unknown } | null | undefined): SessionUser | null {
+  const user = session?.user as { id?: unknown; role?: string | null } | undefined;
   return typeof user?.id === "string" ? { id: user.id, role: user.role } : null;
+}
+
+async function actorUser(ctx: HookContext): Promise<SessionUser | null> {
+  const existing = userFromSession(ctx.context.session);
+  if (existing) return existing;
+  const session = await getSessionFromCtx(ctx as Parameters<typeof getSessionFromCtx>[0], { disableRefresh: true }).catch(() => null);
+  return userFromSession(session);
 }
 
 function returnedRecord(ctx: HookContext): Record<string, unknown> | null {
@@ -208,7 +216,7 @@ export const idAdminActivityLog = (options: AdminActivityLogPluginOptions = {}):
         matcher: isLoggedMutation,
         handler: createAuthMiddleware(async (ctx) => {
           const hookCtx = ctx as HookContext;
-          const user = sessionUser(hookCtx);
+          const user = await actorUser(hookCtx);
           if (!user) return;
           const activity = activityFromHook(hookCtx);
           if (!activity) return;

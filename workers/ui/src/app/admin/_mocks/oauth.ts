@@ -9,7 +9,7 @@ export const mockClients: OAuthClient[] = [
   {
     client_id: "cli_contentapi_a1b2c3d4e5f6",
     client_name: "Content API",
-    redirect_uris: [],
+    redirect_uris: ["https://content.example.com/oauth/callback"],
     grant_types: ["client_credentials"],
     response_types: [],
     token_endpoint_auth_method: "client_secret_post",

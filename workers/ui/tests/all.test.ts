@@ -1,5 +1,7 @@
 await import("./lib/oauth-query.test");
 await import("./lib/auth-fetch.test");
+await import("./pages/organization-actions.test");
+await import("./pages/admin-action-contracts.test");
 await import("./middleware.test");
 await import("./packages-ui/alert.test");
 await import("./packages-ui/app-shell.test");

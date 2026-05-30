@@ -8,6 +8,7 @@
 
 - [Shell chrome (Topbar / Sidebar / MobileDock)](shell.md) — layout.tsx for all `/admin` routes
 - [API Gaps](api-gaps.md) — endpoints the admin UI needs but don't exist yet; ordered by priority
+- [Admin Action Contracts](action-contracts.md) — `_actions` request/response contracts and future audit checklist
 - [/admin — Dashboard](#admin--dashboard)
 - [/admin/identity — Users](#adminidentity--users)
 - [/admin/identity — Organizations](#adminidentity--organizations)

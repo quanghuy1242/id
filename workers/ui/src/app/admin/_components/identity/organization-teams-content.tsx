@@ -166,7 +166,7 @@ export function OrganizationTeamsContent({
     if (!renameTarget) return false;
     setRenameError(undefined);
     try {
-      await actions.updateTeam(renameTarget.id, String(formData.get("name") ?? "").trim());
+      await actions.updateTeam(renameTarget.id, String(formData.get("name") ?? "").trim(), orgId);
       await mutate();
       toast.success("Team renamed");
       return true;
@@ -181,7 +181,7 @@ export function OrganizationTeamsContent({
     setDeleteError(undefined);
     try {
       const removedName = deleteTarget.name;
-      await actions.removeTeam(deleteTarget.id);
+      await actions.removeTeam(deleteTarget.id, orgId);
       if (expandedTeamId === deleteTarget.id) setExpandedTeamId(null);
       await mutate();
       toast.success("Team deleted", `${removedName} was removed. Members keep their organization membership.`);

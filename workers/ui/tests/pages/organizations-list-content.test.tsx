@@ -75,6 +75,18 @@ describe("OrganizationsListContent", () => {
     ));
   });
 
+  it("rejects non-object metadata before creating an organization", async () => {
+    const actions = makeActions([]);
+    render(<OrganizationsListContent actions={actions} defaultCreateOpen />);
+    await waitFor(() => screen.getByRole("dialog"));
+    fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: "Test Corp" } });
+    fireEvent.change(screen.getByLabelText(/^slug/i), { target: { value: "test-corp" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /metadata/i }), { target: { value: "[]" } });
+    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await waitFor(() => expect(screen.getByText("Metadata must be a JSON object")).toBeInTheDocument());
+    expect(actions.createOrganization).not.toHaveBeenCalled();
+  });
+
   it("filters orgs client-side via search prop", async () => {
     const actions = makeActions(mockOrganizations);
     render(<OrganizationsListContent actions={actions} search="beta" />);

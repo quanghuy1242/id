@@ -23,6 +23,7 @@ import {
   createClient as createClientAction,
   listScopes as listScopesAction,
   type OAuthClient,
+  type NonEmptyStringArray,
 } from "../../_actions/oauth";
 import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { copyToClipboard } from "@/shared/clipboard";
@@ -44,6 +45,11 @@ function kindDescription(kind: ApplicationKind): string {
   if (kind === "M2M") return "Machine-to-machine client using the client credentials flow.";
   if (kind === "public") return "Public client using authorization code with PKCE and no client secret.";
   return "Server-side web application using authorization code with a client secret.";
+}
+
+function toNonEmptyArray(values: readonly string[]): NonEmptyStringArray | undefined {
+  const [first, ...rest] = values;
+  return first ? [first, ...rest] : undefined;
 }
 
 export function ApplicationCreateWizardContent({
@@ -71,7 +77,7 @@ export function ApplicationCreateWizardContent({
   const cleanedRedirects = redirectUris.map((uri) => uri.trim()).filter(Boolean);
   const cleanedPostLogout = postLogoutRedirectUris.map((uri) => uri.trim()).filter(Boolean);
   const nameValid = name.trim().length > 0;
-  const urisValid = kind === "M2M" || cleanedRedirects.length > 0;
+  const urisValid = cleanedRedirects.length > 0;
   const forcedAuthMethod = kind === "public" ? "none" : "client_secret_post";
   const effectiveAuthMethod = kind === "confidential" ? authMethod : forcedAuthMethod;
 
@@ -82,21 +88,22 @@ export function ApplicationCreateWizardContent({
       setActiveStep(0);
       return;
     }
-    if (!urisValid) {
-      setSubmitError("At least one redirect URI is required for non-M2M clients");
+    const redirectUriInput = toNonEmptyArray(cleanedRedirects);
+    if (!redirectUriInput) {
+      setSubmitError("At least one redirect URI is required");
       setActiveStep(2);
       return;
     }
     try {
       const isM2M = kind === "M2M";
+      const postLogoutUriInput = toNonEmptyArray(cleanedPostLogout);
       const result = await actions.createClient({
         client_name: name.trim(),
         token_endpoint_auth_method: effectiveAuthMethod,
         grant_types: isM2M ? ["client_credentials"] : ["authorization_code", "refresh_token"],
         response_types: isM2M ? [] : ["code"],
-        public: kind === "public",
-        redirect_uris: isM2M ? [] : cleanedRedirects,
-        post_logout_redirect_uris: cleanedPostLogout,
+        redirect_uris: redirectUriInput,
+        ...(postLogoutUriInput ? { post_logout_redirect_uris: postLogoutUriInput } : {}),
         scope: scopes.length > 0 ? scopes.join(" ") : undefined,
       });
       completedRef.current = false;
@@ -169,14 +176,15 @@ export function ApplicationCreateWizardContent({
       isValid: urisValid,
       content: (
         <Panel>
-          {kind === "M2M" ? (
-            <Text variant="body">Machine-to-machine clients do not use browser redirect URIs.</Text>
-          ) : (
-            <Stack gap="md">
-              <UrlListBuilder label="Redirect URIs" value={redirectUris} onChange={setRedirectUris} placeholder="https://app.example.com/callback" />
+          <Stack gap="md">
+            {kind === "M2M" ? (
+              <Text variant="body">Client registration requires one registered redirect URI; client credentials token requests do not use it.</Text>
+            ) : null}
+            <UrlListBuilder label="Redirect URIs" value={redirectUris} onChange={setRedirectUris} placeholder="https://app.example.com/callback" />
+            {kind === "M2M" ? null : (
               <UrlListBuilder label="Post-Logout Redirect URIs" value={postLogoutRedirectUris} onChange={setPostLogoutRedirectUris} placeholder="https://app.example.com/signed-out" minRows={0} />
-            </Stack>
-          )}
+            )}
+          </Stack>
         </Panel>
       ),
     },
@@ -201,7 +209,7 @@ export function ApplicationCreateWizardContent({
               { term: "Type", description: kindDescription(kind) },
               { term: "Token auth method", description: effectiveAuthMethod, mono: true },
               { term: "Grant types", description: kind === "M2M" ? "client_credentials" : "authorization_code, refresh_token" },
-              { term: "Redirect URIs", description: kind === "M2M" ? "None" : cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
+              { term: "Redirect URIs", description: cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
               { term: "Scopes", description: scopes.length > 0 ? scopes.join(" ") : "None", mono: scopes.length > 0 },
             ]}
           />

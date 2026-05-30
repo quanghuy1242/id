@@ -1,3 +1,6 @@
+import { AuthApiError } from "./shared/errors";
+export { AuthApiError } from "./shared/errors";
+
 /**
  * Internal: serialises a flat params record into a URL query string.
  * undefined / "" values are omitted.
@@ -89,6 +92,117 @@ async function apiBodyFetch(method: "PATCH" | "DELETE", path: string, body: unkn
   });
 }
 
+async function parseJsonOrUndefined<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
+}
+
+type ApiErrorDetails = {
+  readonly message: string;
+  readonly code?: string;
+};
+
+/** Error-body fields that must never be displayed verbatim in admin alerts. */
+const SENSITIVE_FIELD = "(?:client_secret|clientSecret|access_token|accessToken|refresh_token|refreshToken|id_token|idToken|session_token|sessionToken|password|newPassword|private_key|privateKey|api_key|apiKey|authorization|secret)";
+const SENSITIVE_JSON_FIELD_PATTERN = new RegExp(`("${SENSITIVE_FIELD}"\\s*:\\s*)"[^"]*"`, "gi");
+const SENSITIVE_QUERY_FIELD_PATTERN = new RegExp(`\\b(${SENSITIVE_FIELD})=([^\\s&]+)`, "gi");
+const AUTHORIZATION_HEADER_PATTERN = /\b(authorization:\s*)(?:bearer|basic)\s+[\w.+/~=-]+/gi;
+const AUTHORIZATION_VALUE_PATTERN = /\b(Bearer|Basic)\s+[\w.+/~=-]+/g;
+const OPENAI_SECRET_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{8,}\b/g;
+const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g;
+const PRIVATE_KEY_PATTERN = /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g;
+const STRUCTURED_ERROR_TEXT_PATTERN = /^(?:\{|\[)|<html|<!doctype/i;
+/** Maximum validation issue messages to display before summarising the rest. */
+const MAX_VALIDATION_ISSUES = 3;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(SENSITIVE_JSON_FIELD_PATTERN, "$1\"[redacted]\"")
+    .replace(SENSITIVE_QUERY_FIELD_PATTERN, "$1=[redacted]")
+    .replace(AUTHORIZATION_HEADER_PATTERN, "$1[redacted]")
+    .replace(AUTHORIZATION_VALUE_PATTERN, "$1 [redacted]")
+    .replace(OPENAI_SECRET_KEY_PATTERN, "[redacted]")
+    .replace(JWT_PATTERN, "[redacted]")
+    .replace(PRIVATE_KEY_PATTERN, "[redacted]");
+}
+
+function validationIssuePath(path: unknown): string | undefined {
+  if (typeof path === "string" && path.trim()) return path.trim();
+  if (!Array.isArray(path) || path.length === 0) return undefined;
+  const segments = path.map((segment) => typeof segment === "string" || typeof segment === "number" ? String(segment) : "").filter(Boolean);
+  return segments.length > 0 ? segments.join(".") : undefined;
+}
+
+function validationIssueMessage(issue: unknown): string | undefined {
+  if (typeof issue === "string" && issue.trim()) return sanitizeErrorMessage(issue.trim());
+  if (!isRecord(issue)) return undefined;
+  const message = readString(issue, "message") ?? readString(issue, "description") ?? readString(issue, "code");
+  if (!message) return undefined;
+  const path = validationIssuePath(issue.path);
+  return sanitizeErrorMessage(path ? `${path}: ${message}` : message);
+}
+
+function validationIssuesMessage(issues: unknown): string | undefined {
+  if (!Array.isArray(issues)) return undefined;
+  const messages = issues.map(validationIssueMessage).filter((message): message is string => Boolean(message)).slice(0, MAX_VALIDATION_ISSUES);
+  if (messages.length === 0) return undefined;
+  const remaining = issues.length - messages.length;
+  return remaining > 0 ? `${messages.join("; ")}; ${remaining} more issue${remaining === 1 ? "" : "s"}` : messages.join("; ");
+}
+
+function fallbackErrorMessage(res: Response): string {
+  return res.statusText ? `Request failed (${res.status} ${res.statusText})` : `Request failed (${res.status})`;
+}
+
+function safeTextMessage(text: string, res: Response): string {
+  const trimmed = text.trim();
+  if (!trimmed) return fallbackErrorMessage(res);
+  if (STRUCTURED_ERROR_TEXT_PATTERN.test(trimmed)) return fallbackErrorMessage(res);
+  return sanitizeErrorMessage(trimmed);
+}
+
+function errorDetailsFromRecord(record: Record<string, unknown>, res: Response): ApiErrorDetails {
+  const issueMessage = validationIssuesMessage(record.issues) ?? validationIssuesMessage(record.errors);
+  const primary = readString(record, "error_description")
+    ?? readString(record, "message")
+    ?? issueMessage
+    ?? readString(record, "error")
+    ?? readString(record, "code");
+  const message = primary && issueMessage && primary !== issueMessage ? `${primary}: ${issueMessage}` : primary;
+  const code = readString(record, "code") ?? readString(record, "error");
+  return { message: sanitizeErrorMessage(message ?? fallbackErrorMessage(res)), code };
+}
+
+function normalizeAuthApiError(bodyText: string, res: Response): ApiErrorDetails {
+  if (bodyText.trim()) {
+    try {
+      const parsed = JSON.parse(bodyText) as unknown;
+      if (isRecord(parsed)) return errorDetailsFromRecord(parsed, res);
+      if (typeof parsed === "string") return { message: safeTextMessage(parsed, res) };
+      const issueMessage = validationIssuesMessage(parsed);
+      if (issueMessage) return { message: issueMessage };
+    } catch {
+      return { message: safeTextMessage(bodyText, res) };
+    }
+  }
+  return { message: fallbackErrorMessage(res) };
+}
+
+async function throwApiError(res: Response): Promise<never> {
+  const details = normalizeAuthApiError(await res.text(), res);
+  throw new AuthApiError(details.message, { status: res.status, code: details.code });
+}
+
 // ─── Public GET helpers ───────────────────────────────────────────
 
 /**
@@ -110,7 +224,7 @@ export async function authApiGet<T>(path: string, params?: Record<string, string
 }
 
 /**
- * GET a Better Auth endpoint and throw `new Error(body)` on !ok.
+ * GET a Better Auth endpoint and throw a normalized {@link AuthApiError} on !ok.
  *
  * Use for admin / organisation data-fetching where every non-2xx is a
  * hard error that the caller should not need to inspect.
@@ -121,8 +235,8 @@ export async function authApiGet<T>(path: string, params?: Record<string, string
  */
 export async function authApiGetOrThrow<T>(path: string, params?: Record<string, string | number | undefined>, init?: RequestInit): Promise<T> {
   const res = await apiGetFetch(path, params, init);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
+  if (!res.ok) await throwApiError(res);
+  return parseJsonOrUndefined<T>(res);
 }
 
 // ─── Public POST helpers ──────────────────────────────────────────
@@ -146,7 +260,7 @@ export async function authApiPost<T>(path: string, body?: unknown, init?: Reques
 }
 
 /**
- * POST a Better Auth endpoint and throw `new Error(body)` on !ok.
+ * POST a Better Auth endpoint and throw a normalized {@link AuthApiError} on !ok.
  *
  * Use for **all admin UI mutations** (create, update, delete, set-role,
  * ban, revoke, impersonate, etc.).  Better Auth uses `POST` for every
@@ -162,13 +276,13 @@ export async function authApiPost<T>(path: string, body?: unknown, init?: Reques
  */
 export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await apiPostFetch(path, body, init);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
+  if (!res.ok) await throwApiError(res);
+  return parseJsonOrUndefined<T>(res);
 }
 
 /**
  * POST a Better Auth endpoint with an `application/x-www-form-urlencoded` body
- * and throw `new Error(body)` on !ok.
+ * and throw a normalized {@link AuthApiError} on !ok.
  *
  * Use for standards-defined OAuth endpoints that require form encoding and may
  * authenticate the client with headers. Do not use this for admin CRUD JSON
@@ -180,14 +294,14 @@ export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?:
  */
 export async function authApiFormPostOrThrow<T>(path: string, body: URLSearchParams, init?: RequestInit): Promise<T> {
   const res = await apiFormPostFetch(path, body, init);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
+  if (!res.ok) await throwApiError(res);
+  return parseJsonOrUndefined<T>(res);
 }
 
 // ─── Public PATCH / DELETE helpers (OAuth plugin endpoints only) ───
 
 /**
- * PATCH a Better Auth OAuth-plugin endpoint and throw `new Error(body)` on !ok.
+ * PATCH a Better Auth OAuth-plugin endpoint and throw a normalized {@link AuthApiError} on !ok.
  *
  * Use only for the resource-server / scope-catalog plugin update endpoints,
  * which take flat (non-`data:`-wrapped) bodies and respond with the updated
@@ -200,12 +314,12 @@ export async function authApiFormPostOrThrow<T>(path: string, body: URLSearchPar
  */
 export async function authApiPatchOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await apiBodyFetch("PATCH", path, body, init);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
+  if (!res.ok) await throwApiError(res);
+  return parseJsonOrUndefined<T>(res);
 }
 
 /**
- * DELETE a Better Auth OAuth-plugin endpoint and throw `new Error(body)` on !ok.
+ * DELETE a Better Auth OAuth-plugin endpoint and throw a normalized {@link AuthApiError} on !ok.
  *
  * Use only for the resource-server / M2M-binding plugin delete endpoints.
  * Do NOT use for admin/organization endpoints — those are POST-only
@@ -216,6 +330,6 @@ export async function authApiPatchOrThrow<T>(path: string, body?: unknown, init?
  */
 export async function authApiDeleteOrThrow<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await apiBodyFetch("DELETE", path, undefined, init);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
+  if (!res.ok) await throwApiError(res);
+  return parseJsonOrUndefined<T>(res);
 }

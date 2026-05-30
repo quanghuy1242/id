@@ -246,8 +246,8 @@ function createSessionsActions(user: User, sessions: Session[]) {
     impersonateUser: async (_id: string) => ({ session: {}, user }),
     stopImpersonating: async () => undefined,
     listUserSessions: async (_id: string) => ({ sessions: current }),
-    revokeUserSession: async (token: string) => {
-      current = current.filter((s) => s.token !== token);
+    revokeUserSession: async (sessionId: string) => {
+      current = current.filter((s) => s.id !== sessionId);
       return { success: true };
     },
     revokeUserSessions: async (_id: string) => {

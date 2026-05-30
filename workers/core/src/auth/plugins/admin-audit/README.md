@@ -7,8 +7,9 @@
 > Sessions & Tokens, Consents, and the dated/status JWKS views read from here;
 > without it those screens can only show a "Coming Soon" placeholder. It also
 > lets an admin revoke a single consent grant so a user is re-prompted on the
-> next authorization request, and emergency-rotate JWKS through Better Auth's
-> JWT key-generation path.
+> next authorization request, revoke one browser session by id without exposing
+> the session token to browser UI, and emergency-rotate JWKS through Better
+> Auth's JWT key-generation path.
 
 This plugin owns **no tables**. It reads tables owned by Better Auth core
 (`session`), the OAuth provider (`oauthAccessToken`, `oauthRefreshToken`,
@@ -27,15 +28,30 @@ platform-admin-only; org-scoped variants are deferred — `docs/026` §8).
 All paths are under the `/api/auth` base. Authenticate with a platform-admin
 session cookie.
 
-List sessions (paginated; `userEmail` enriched by batched lookup):
+List sessions (paginated; optionally filter with `userId`; `userEmail` enriched
+by batched lookup; session tokens are never returned):
 
 ```
-GET /api/auth/admin/list-sessions?limit=25&offset=0
-→ { "sessions": [ { "id": "...", "token": "...", "userId": "user_1",
+GET /api/auth/admin/list-sessions?limit=25&offset=0&userId=user_1
+→ { "sessions": [ { "id": "...", "userId": "user_1",
       "userEmail": "a@b.com", "ipAddress": "1.2.3.4", "userAgent": "...",
+      "activeOrganizationId": "org_1", "activeTeamId": null,
       "impersonatedBy": null, "createdAt": 1736900000000,
       "expiresAt": 1736986400000 } ], "total": 47, "limit": 25, "offset": 0 }
 ```
+
+Revoke one browser session:
+
+```
+POST /api/auth/admin/revoke-session
+Content-Type: application/json
+{ "sessionId": "sess_123" }
+→ { "success": true }
+```
+
+Never route browser UI through Better Auth's `/admin/revoke-user-session` for
+single-row revocation. That route accepts a live session token; this plugin
+resolves the token inside the auth worker from the row id and then deletes it.
 
 List tokens (token **values are never returned** — only an 8-char prefix):
 
@@ -101,7 +117,8 @@ Content-Type: application/json
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/admin/list-sessions` | Paginated; `limit` (≤100, default 25), `offset` |
+| `GET` | `/admin/list-sessions` | Paginated; `limit` (≤100, default 25), `offset`, optional `userId`; strips session token |
+| `POST` | `/admin/revoke-session` | Body `{ sessionId }`; resolves token server-side |
 | `GET` | `/admin/list-tokens` | Paginated; `type=access\|refresh`; strips token value |
 | `GET` | `/admin/list-consents` | Paginated; optional `clientId` filter |
 | `POST` | `/admin/revoke-consent` | Body `{ clientId, userId }` |
@@ -128,9 +145,11 @@ All return `401` without a session and `403` for non-admin roles.
   batched `findMany({ where:[{ field, operator:"in", value: ids }] })` per
   referenced model and zipped in memory. Joined-field *search* (e.g. by email)
   is intentionally deferred (`docs/026` §4.3).
-- **Present and strip.** `presentToken` returns only `tokenPrefix`, never the
-  token; `presentJwk` never reads or returns `privateKey`. Both are asserted by
-  tests.
+- **Present and strip.** `presentSession` returns the row id but never the
+  Better Auth session token; `presentToken` returns only `tokenPrefix`, never the
+  token; `presentJwk` never reads or returns `privateKey`. The revoke-session
+  endpoint resolves the session token server-side at delete time. These
+  constraints are asserted by tests.
 - **Config.** Page sizes, the token-prefix length, and the JWKS grace window are
   named constants in `auth/config.ts`; the grace window is injected from
   `get-auth.ts` so key-status thresholds are never hard-coded in the plugin.

@@ -1,4 +1,5 @@
 import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import { listAdminSessions, revokeAdminSession } from "./audit";
 
 export type User = {
   id: string;
@@ -43,23 +44,42 @@ export type CreateUserBody = {
 
 export type Session = {
   id: string;
-  token: string;
   userId: string;
+  userEmail: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   activeOrganizationId: string | null;
   activeTeamId: string | null;
   impersonatedBy: string | null;
-  createdAt: string;
-  expiresAt: string;
+  createdAt: number | null;
+  expiresAt: number | null;
 };
 
 export type CurrentSession = {
+  session?: unknown;
   user?: {
     id?: string;
     impersonatedBy?: string | null;
   };
 } | null;
+
+type UserEnvelope = {
+  user: User;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isUserEnvelope(value: unknown): value is UserEnvelope {
+  return isRecord(value) && isRecord(value.user);
+}
+
+function normalizeUserEnvelope(value: unknown): UserEnvelope {
+  if (isUserEnvelope(value)) return value;
+  if (isRecord(value)) return { user: value as User };
+  throw new TypeError("Expected user response from Better Auth");
+}
 
 export async function listUsers(params: ListUsersParams): Promise<ListUsersResponse> {
   return authApiGetOrThrow<ListUsersResponse>("/admin/list-users", params as Record<string, string | number | undefined>);
@@ -75,7 +95,7 @@ export async function getUser(userId: string): Promise<{ user: User }> {
 }
 
 export async function updateUser(userId: string, data: Partial<{ name: string; email: string; image: string }>): Promise<{ user: User }> {
-  return authApiPostOrThrow<{ user: User }>("/admin/update-user", { userId, data: JSON.stringify(data) });
+  return normalizeUserEnvelope(await authApiPostOrThrow<unknown>("/admin/update-user", { userId, data }));
 }
 
 export async function setRole(userId: string, role: string): Promise<{ user: User }> {
@@ -107,11 +127,19 @@ export async function removeUser(userId: string): Promise<{ success: boolean }> 
 }
 
 export async function listUserSessions(userId: string): Promise<{ sessions: Session[] }> {
-  return authApiPostOrThrow<{ sessions: Session[] }>("/admin/list-user-sessions", { userId });
+  const pageLimit = 100;
+  const firstPage = await listAdminSessions({ limit: pageLimit, offset: 0, userId });
+  const stride = firstPage.limit > 0 ? firstPage.limit : pageLimit;
+  const offsets: number[] = [];
+  for (let offset = stride; offset < firstPage.total; offset += stride) offsets.push(offset);
+
+  const rest = await Promise.all(offsets.map((offset) => listAdminSessions({ limit: pageLimit, offset, userId })));
+  return { sessions: [firstPage, ...rest].flatMap((page) => page.sessions) };
 }
 
-export async function revokeUserSession(sessionToken: string): Promise<{ success: boolean }> {
-  return authApiPostOrThrow<{ success: boolean }>("/admin/revoke-user-session", { sessionToken });
+export async function revokeUserSession(sessionId: string): Promise<{ success: boolean }> {
+  await revokeAdminSession(sessionId);
+  return { success: true };
 }
 
 export async function revokeUserSessions(userId: string): Promise<{ success: boolean }> {

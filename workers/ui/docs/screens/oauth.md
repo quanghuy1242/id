@@ -120,11 +120,7 @@ Components:
     Stack(gap="md")
       PageIntro(title="OAuth Applications", actions=LinkButton(href="/admin/oauth/applications/new", iconName="Plus", "New App"))
       StatGroup(columns=4): Stat(Total) Stat(Confidential) Stat(Public) Stat(M2M)
-      Panel > Inline(justify="between")
-        Text(variant="h2", "OAuth Applications")
-        Inline(gap="sm")
-          SearchInput(placeholder="Search applications...", value=search, onChange, grow)
-          Button(variant="primary", iconName="Plus", onClick=openCreateModal, "New App")
+      Panel > SearchInput(placeholder="Search applications...", value=search, onChange, grow)
 
       Stack(gap="sm") — one Panel per client, each expandable:
         Panel(tone="muted", padding="sm")
@@ -158,36 +154,9 @@ Components:
       M2M if `grant_types` includes `"client_credentials"`; else Public if
       `token_endpoint_auth_method === "none"`; else Confidential.
 
-      Empty: EmptyState(message="No OAuth applications", cta="Create Application", onCta=openCreateModal)
+      Empty: EmptyState(message="No OAuth applications", cta="Create Application", ctaHref="/admin/oauth/applications/new")
 
-  Create modal: ConfirmDialog(title="Create OAuth Application", confirmLabel="Create", onConfirm)
-    — Tab layout or sectioned fields:
-    TextInput(label="Name", name="client_name", required)
-    RadioGroup(title="Type", name="type", options=[
-      {value:"confidential", label:"Confidential"}, {value:"public", label:"Public"}, {value:"M2M", label:"M2M"}
-    ], defaultValue="confidential")
-    — "Type" is a UI convenience only; the API has no type enum. On submit, translate it into real
-      registration params:
-        Confidential → grant_types ["authorization_code","refresh_token"], public:false, token_endpoint_auth_method per the auth-method field
-        Public       → grant_types ["authorization_code","refresh_token"], public:true,  token_endpoint_auth_method:"none"
-        M2M          → grant_types ["client_credentials"], public:false, token_endpoint_auth_method:"client_secret_post"
-    — When type="M2M": hide redirect_uris in the form, but still send redirect_uris (required by the API — send []).
-      token_endpoint_auth_method locked to "client_secret_post".
-    RadioGroup(title="Token Auth Method", name="token_endpoint_auth_method", options=[
-      {value:"client_secret_post", label:"client_secret_post"},
-      {value:"client_secret_basic", label:"client_secret_basic"}
-    ], defaultValue="client_secret_post")
-    TextInput(label="Scopes (space-separated)", name="scope", placeholder="openid profile content:read")
-    TextInput(label="Redirect URIs (comma-separated)", name="redirect_uris")
-    TextInput(label="Post-Logout Redirect URIs", name="post_logout_redirect_uris")
-    TextInput(label="Client URI", name="client_uri")
-    TextInput(label="Logo URI", name="logo_uri")
-    TextInput(label="TOS URI", name="tos_uri")
-    TextInput(label="Policy URI", name="policy_uri")
-    TextInput(label="Contacts (comma-separated)", name="contacts")
-    On confirm: POST /api/auth/oauth2/create-client → { client_id, client_secret, ... }
-    — On success show the secret once: set a "showSecret" state, render a Panel with the client_secret and a Copy button.
-      Close modal closes both the create dialog and the secret reveal.
+  Create: route to `/admin/oauth/applications/new`. The list surface must not open the legacy create modal.
 
   Edit modal: ConfirmDialog(title="Edit Application", confirmLabel="Save", onConfirm)
     — Same fields as create, pre-filled. client_id and client_secret NOT editable.
@@ -197,21 +166,23 @@ Components:
   Rotate Secret modal: ConfirmDialog(title="Rotate Client Secret", confirmLabel="Rotate", variant="danger", onConfirm)
     — After confirm, show the new secret in a monospace Panel with copy button.
     On confirm: POST /api/auth/oauth2/client/rotate-secret { client_id }
-    — On success: render new `client_secret` in a `<Text variant="body">` with monospace font.
+    — On success: Better Auth returns the OAuth client object with a one-time `client_secret`; render that value in a `<Text variant="body">` with monospace font.
       Add Button(variant="primary", onClick=copy, "Copy") — copy to clipboard via navigator.clipboard.writeText.
 
   Delete modal: ConfirmDialog(title="Delete Application", confirmLabel="Delete", variant="danger", onConfirm)
     On confirm: POST /api/auth/oauth2/delete-client { client_id }
 
-Data: GET /api/auth/oauth2/get-clients → OAuthClient[]  (OAuth2-formatted, snake_case; see shape below)
+Data: GET /api/auth/oauth2/get-clients → OAuthClient[] | null  (OAuth2-formatted, snake_case; UI action normalizes null to [])
       POST /api/auth/oauth2/create-client → { client_id, client_secret, ... }  (snake_case)
-        body (flat snake_case; redirect_uris REQUIRED): { client_name?, token_endpoint_auth_method?, scope?, redirect_uris[], grant_types?[], response_types?[], post_logout_redirect_uris?[], client_uri?, logo_uri?, tos_uri?, policy_uri?, contacts?[], ... }
-        — There is no `type` field; see clientType derivation above. To create an M2M client send grant_types: ["client_credentials"].
+        body (flat snake_case; redirect_uris REQUIRED and non-empty): { client_name?, token_endpoint_auth_method?, scope?, redirect_uris[], grant_types?[], response_types?[], post_logout_redirect_uris?[], client_uri?, logo_uri?, tos_uri?, policy_uri?, contacts?[], type? }
+        — There is no accepted `public` field on this public Better Auth route. Public is derived by Better Auth from `token_endpoint_auth_method: "none"`; see clientType derivation above. To create an M2M client send grant_types: ["client_credentials"] and still send one registered redirect URI because the route schema requires it.
+        — Optional array fields with Better Auth `min(1)` schemas (`post_logout_redirect_uris`, `contacts`) are omitted when empty; do not send `[]`.
       POST /api/auth/oauth2/update-client → OAuthClient
         body: { client_id, update: { client_name?, scope?, redirect_uris?, ... } }  (mutable fields under `update:`, NOT `data:`)
-      POST /api/auth/oauth2/client/rotate-secret → { client_secret: string }
+        — `redirect_uris`, `post_logout_redirect_uris`, and `contacts` are optional but non-empty when present. The public update route does not accept `token_endpoint_auth_method`.
+      POST /api/auth/oauth2/client/rotate-secret → OAuthClient with `client_secret`
         body: { client_id }
-      POST /api/auth/oauth2/delete-client → { }
+      POST /api/auth/oauth2/delete-client → empty success body
         body: { client_id }
 
 OAuthClient shape (the OAuth2-formatted response from get-clients/create/update — **snake_case**):
@@ -272,12 +243,13 @@ Components:
     Quickstart: CodeBlock snippets derived from `client_id`
     Audit: ActivityLogContent(targetType="oauth_client", targetId=clientId)
 
-Data: GET /api/auth/oauth2/get-clients → OAuthClient[]; GET /api/auth/admin/oauth-client-resource-scopes → ClientResourceScope[]; GET /api/auth/admin/resource-servers → ResourceServer[]; GET /api/auth/admin/activity-log?targetType=oauth_client&targetId=:clientId.
+Data: GET /api/auth/oauth2/get-clients → OAuthClient[] | null (UI action normalizes null to []); GET /api/auth/admin/oauth-client-resource-scopes → { oauthClientResourceScopes: ClientResourceScope[] }; GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer[] }; GET /api/auth/admin/activity-log?targetType=oauth_client&targetId=:clientId → { entries, total, limit, offset }.
 
 Behavior:
   - Missing `clientId` shows ErrorAlert("Application not found").
   - Secret value is never displayed except the existing one-time create/rotate modal; credentials tab only states whether a secret exists.
   - The Connections tab composes the client's default `scope` with active M2M bindings' `allowedScopes` so admins can see effective resource access without issuing a test token.
+  - Edit uses POST `/api/auth/oauth2/update-client` with `{ client_id, update }`. Optional array fields are sent only when non-empty because Better Auth rejects `[]` for fields with `min(1)`; clearing existing `post_logout_redirect_uris` or `contacts` is not supported through this public update route.
 
 ---
 
@@ -301,7 +273,7 @@ Components:
     Stepper(steps=[Type, Auth, URIs, Scopes, Review])
     Type: RadioGroup(type: confidential | public | M2M) + TextInput(name)
     Auth: RadioGroup(token_endpoint_auth_method) for confidential; read-only labels for public PKCE and M2M client_credentials
-    URIs: UrlListBuilder(redirect_uris) + UrlListBuilder(post_logout_redirect_uris), hidden for M2M
+    URIs: UrlListBuilder(redirect_uris) for every client type + UrlListBuilder(post_logout_redirect_uris) for non-M2M
     Scopes: ScopeBuilder(suggestions=scope catalog, allowCustom)
     Review: DescriptionList summary
     Secret reveal: existing one-shot ConfirmDialog after create
@@ -309,7 +281,7 @@ Components:
 Data: GET /api/auth/admin/oauth-scopes → suggestions; POST /api/auth/oauth2/create-client → OAuthClient.
 
 Behavior:
-  - Redirect URIs are required for non-M2M clients; M2M sends `redirect_uris: []`.
+  - Redirect URIs are required by Better Auth's `/oauth2/create-client` schema for every client registration. M2M clients still collect one registered redirect URI even though the `client_credentials` token flow does not use browser redirects.
   - Public clients force `token_endpoint_auth_method: "none"`; M2M forces `client_credentials`; confidential clients select `client_secret_post` or `client_secret_basic`.
 
 ---

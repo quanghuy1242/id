@@ -12,7 +12,7 @@ function makeActions(sessions: AdminSession[]) {
   return {
     listAdminSessions: async (p: { limit: number; offset: number }): Promise<Paginated<"sessions", AdminSession>> =>
       ({ sessions, total: sessions.length, limit: p.limit, offset: p.offset }),
-    revokeUserSession: async (_token: string) => undefined,
+    revokeAdminSession: async (_sessionId: string) => undefined,
   };
 }
 

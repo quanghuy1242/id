@@ -10,11 +10,12 @@ import { authApiFormPostOrThrow, authApiGetOrThrow, authApiPostOrThrow } from "@
 
 export type AdminSession = {
   id: string;
-  token: string;
   userId: string;
   userEmail: string | null;
   ipAddress: string | null;
   userAgent: string | null;
+  activeOrganizationId: string | null;
+  activeTeamId: string | null;
   impersonatedBy: string | null;
   createdAt: number | null;
   expiresAt: number | null;
@@ -92,6 +93,7 @@ export type TokenIntrospectionResult = {
 export type Paginated<K extends string, T> = { total: number; limit: number; offset: number } & Record<K, T[]>;
 
 export type PageParams = { limit: number; offset: number };
+export type SessionListParams = PageParams & { userId?: string };
 export type ActivityLogParams = PageParams & {
   targetType: string;
   targetId: string;
@@ -99,8 +101,13 @@ export type ActivityLogParams = PageParams & {
   actorId?: string;
 };
 
-export async function listAdminSessions(params: PageParams): Promise<Paginated<"sessions", AdminSession>> {
+export async function listAdminSessions(params: SessionListParams): Promise<Paginated<"sessions", AdminSession>> {
   return authApiGetOrThrow<Paginated<"sessions", AdminSession>>("/admin/list-sessions", params);
+}
+
+// Browser UI revokes by row id; Better Auth's revoke-user-session requires a live session token.
+export async function revokeAdminSession(sessionId: string): Promise<void> {
+  await authApiPostOrThrow("/admin/revoke-session", { sessionId });
 }
 
 export async function listAdminTokens(params: PageParams & { type: "access" | "refresh" }): Promise<Paginated<"tokens", AdminToken>> {

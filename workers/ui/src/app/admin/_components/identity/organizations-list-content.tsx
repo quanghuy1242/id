@@ -56,6 +56,15 @@ const columns: DataTableColumn<Organization>[] = [
   },
 ];
 
+function isJsonObjectString(value: string): boolean {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
 type OrgsListContentProps = {
   search?: string;
   onSearchChange?: (v: string) => void;
@@ -140,11 +149,9 @@ export function OrganizationsListContent({
     const slug = String(formData.get("slug") ?? "").trim();
     const logo = String(formData.get("logo") ?? "").trim() || undefined;
     const metaRaw = String(formData.get("metadata") ?? "").trim();
-    if (metaRaw) {
-      try { JSON.parse(metaRaw); } catch {
-        setCreateError("Metadata must be valid JSON");
-        return false;
-      }
+    if (metaRaw && !isJsonObjectString(metaRaw)) {
+      setCreateError("Metadata must be a JSON object");
+      return false;
     }
     const metadata = metaRaw || undefined;
     try {
@@ -245,11 +252,10 @@ export function OrganizationsListContent({
           onChange={(v) => {
             setMetadataValue(v);
             if (!v) { setMetadataError(undefined); return; }
-            try { JSON.parse(v); setMetadataError(undefined); }
-            catch { setMetadataError("Must be valid JSON"); }
+            setMetadataError(isJsonObjectString(v) ? undefined : "Must be a JSON object");
           }}
         />
-        <Text variant="caption">Metadata is optional and must be a JSON object or valid JSON value.</Text>
+        <Text variant="caption">Metadata is optional and must be a JSON object.</Text>
       </ConfirmDialog>
     </Stack>
   );

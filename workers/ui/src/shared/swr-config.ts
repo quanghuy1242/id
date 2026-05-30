@@ -1,4 +1,5 @@
 import type { SWRConfiguration } from "swr";
+import { AuthApiError } from "@id/lib";
 
 /**
  * Site-wide SWR defaults for the admin UI, tuned for the core-id rate limit
@@ -32,11 +33,11 @@ export const ADMIN_SWR_CONFIG: SWRConfiguration = {
 };
 
 /**
- * The auth-fetch helpers throw `new Error(body)` on a non-2xx response, so the
- * status is not directly available. Better Auth's rate-limit body carries a
- * recognizable marker; match defensively on both the marker and a literal 429.
+ * The auth-fetch helpers normalize Better Auth error bodies into AuthApiError.
+ * Keep the textual fallback for legacy callers and non-auth failures.
  */
 function isRateLimited(error: unknown): boolean {
+  if (error instanceof AuthApiError && error.status === 429) return true;
   const message = error instanceof Error ? error.message : String(error);
   return /\b429\b/.test(message) || /too many requests|rate limit/i.test(message);
 }

@@ -36,8 +36,10 @@ import {
   rotateClientSecret as rotateClientSecretAction,
   deleteClient as deleteClientAction,
   type ClientResourceScope,
+  type NonEmptyStringArray,
   type OAuthClient,
   type ResourceServer,
+  type UpdateClientInput,
 } from "../../_actions/oauth";
 import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { ActivityLogContent } from "../activity-log-content";
@@ -109,6 +111,11 @@ function scopeString(raw: FormDataEntryValue | null): string {
 
 function optionalString(raw: FormDataEntryValue | null): string | undefined {
   return String(raw ?? "").trim() || undefined;
+}
+
+function toNonEmptyArray(values: readonly string[]): NonEmptyStringArray | undefined {
+  const [first, ...rest] = values;
+  return first ? [first, ...rest] : undefined;
 }
 
 function formatList(values: readonly string[] | undefined): string {
@@ -389,22 +396,37 @@ export function ApplicationDetailContent({
     if (!client) return false;
     setEditError(undefined);
     try {
+      const type = clientType(client);
       const redirectUris = splitDelimited(formData.get("redirect_uris"));
-      if (clientType(client) !== "M2M" && redirectUris.length === 0) {
+      const redirectUriInput = toNonEmptyArray(redirectUris);
+      if (type !== "M2M" && !redirectUriInput) {
         setEditError("At least one redirect URI is required");
         return false;
       }
-      const updated = await actions.updateClient(client.client_id, {
+      const postLogoutRaw = String(formData.get("post_logout_redirect_uris") ?? "").trim();
+      const contactsRaw = String(formData.get("contacts") ?? "").trim();
+      if (client.post_logout_redirect_uris?.length && !postLogoutRaw) {
+        setEditError("This update route cannot clear post-logout redirect URIs.");
+        return false;
+      }
+      if (client.contacts?.length && !contactsRaw) {
+        setEditError("This update route cannot clear contacts.");
+        return false;
+      }
+      const postLogoutUriInput = toNonEmptyArray(splitDelimited(formData.get("post_logout_redirect_uris")));
+      const contactsInput = toNonEmptyArray(splitDelimited(formData.get("contacts")));
+      const update: UpdateClientInput = {
         client_name: String(formData.get("client_name") ?? "").trim(),
         scope: scopeString(formData.get("scope")),
-        redirect_uris: redirectUris,
-        post_logout_redirect_uris: splitDelimited(formData.get("post_logout_redirect_uris")),
         client_uri: optionalString(formData.get("client_uri")),
         logo_uri: optionalString(formData.get("logo_uri")),
         tos_uri: optionalString(formData.get("tos_uri")),
         policy_uri: optionalString(formData.get("policy_uri")),
-        contacts: splitDelimited(formData.get("contacts")),
-      });
+      };
+      if (redirectUriInput) update.redirect_uris = redirectUriInput;
+      if (postLogoutUriInput) update.post_logout_redirect_uris = postLogoutUriInput;
+      if (contactsInput) update.contacts = contactsInput;
+      const updated = await actions.updateClient(client.client_id, update);
       await mutate((current) => (current ?? []).map((item) => item.client_id === updated.client_id ? updated : item), { revalidate: false });
       setEditOpen(false);
       toast.success("Application updated");

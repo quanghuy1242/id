@@ -33,7 +33,11 @@ const defaultActions = {
 };
 
 function isExpired(session: Session): boolean {
-  return new Date(session.expiresAt) < new Date();
+  return session.expiresAt !== null && new Date(session.expiresAt) < new Date();
+}
+
+function formatDate(ms: number | null): string {
+  return ms === null ? "—" : new Date(ms).toLocaleDateString();
 }
 
 type UserSessionsContentProps = {
@@ -73,8 +77,8 @@ export function UserSessionsContent({
       label: "Organization",
       render: (s) => s.activeOrganizationId ? s.activeOrganizationId.slice(0, 12) + "…" : "—",
     },
-    { key: "createdAt", label: "Created", render: (s) => new Date(s.createdAt).toLocaleDateString() },
-    { key: "expiresAt", label: "Expires", render: (s) => new Date(s.expiresAt).toLocaleDateString() },
+    { key: "createdAt", label: "Created", render: (s) => formatDate(s.createdAt) },
+    { key: "expiresAt", label: "Expires", render: (s) => formatDate(s.expiresAt) },
     {
       key: "impersonatedBy",
       label: "Flags",
@@ -95,7 +99,7 @@ export function UserSessionsContent({
     if (!revokeTarget) return false;
     setRevokeError(undefined);
     try {
-      await actions.revokeUserSession(revokeTarget.token);
+      await actions.revokeUserSession(revokeTarget.id);
       await mutate((cur) => (cur ?? []).filter((s) => s.id !== revokeTarget.id), { revalidate: false });
       toast.success("Session revoked", "That device has been signed out.");
       return true;

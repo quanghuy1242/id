@@ -15,21 +15,16 @@ import {
   LinkButton,
   PageIntro,
   Panel,
-  RadioGroup,
   SearchInput,
   Skeleton,
   Stack,
   Stat,
   StatGroup,
-  Tabs,
   Text,
-  Textarea,
-  TextInput,
   toast,
 } from "@id/ui";
 import {
   listClients as listClientsAction,
-  createClient as createClientAction,
   rotateClientSecret as rotateClientSecretAction,
   deleteClient as deleteClientAction,
   clientType,
@@ -41,10 +36,11 @@ import { copyToClipboard } from "@/shared/clipboard";
 
 const defaultActions = {
   listClients: listClientsAction,
-  createClient: createClientAction,
   rotateClientSecret: rotateClientSecretAction,
   deleteClient: deleteClientAction,
 };
+
+const defaultCreateHref = "/admin/oauth/applications/new";
 
 const typeBadgeTone: Record<ClientType, "neutral" | "info" | "accent"> = {
   confidential: "neutral",
@@ -58,81 +54,8 @@ const typeLabel: Record<ClientType, string> = {
   M2M: "M2M",
 };
 
-function splitDelimited(raw: FormDataEntryValue | null): string[] {
-  return String(raw ?? "")
-    .split(/[\n,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function scopeString(raw: FormDataEntryValue | null): string | undefined {
-  const scopes = String(raw ?? "")
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return scopes.length > 0 ? scopes.join(" ") : undefined;
-}
-
 function scopeList(scope: string | undefined): string[] {
   return (scope ?? "").split(/\s+/).filter(Boolean);
-}
-
-function optionalString(raw: FormDataEntryValue | null): string | undefined {
-  return String(raw ?? "").trim() || undefined;
-}
-
-function typeDescription(type: string): string {
-  if (type === "M2M") return "Client credentials for service-to-service access.";
-  if (type === "public") return "Authorization code without a client secret.";
-  return "Authorization code with a client secret.";
-}
-
-function RedirectUriFields({
-  redirectUris,
-  postLogoutRedirectUris,
-  withPlaceholders,
-}: {
-  readonly redirectUris?: readonly string[];
-  readonly postLogoutRedirectUris?: readonly string[];
-  readonly withPlaceholders?: boolean;
-}) {
-  return (
-    <>
-      <Textarea
-        label="Redirect URIs"
-        name="redirect_uris"
-        rows={3}
-        defaultValue={redirectUris?.join("\n")}
-        required
-        placeholder={withPlaceholders ? "https://app.example.com/callback" : undefined}
-      />
-      <Textarea
-        label="Post-Logout Redirect URIs"
-        name="post_logout_redirect_uris"
-        rows={2}
-        defaultValue={postLogoutRedirectUris?.join("\n")}
-        placeholder={withPlaceholders ? "https://app.example.com/signed-out" : undefined}
-      />
-    </>
-  );
-}
-
-function ClientMetadataFields({ client }: { readonly client?: OAuthClient }) {
-  return (
-    <Stack gap="sm">
-      <TextInput label="Client URI" name="client_uri" defaultValue={client?.client_uri ?? ""} />
-      <TextInput label="Logo URI" name="logo_uri" defaultValue={client?.logo_uri ?? ""} />
-      <TextInput label="Terms URI" name="tos_uri" defaultValue={client?.tos_uri ?? ""} />
-      <TextInput label="Policy URI" name="policy_uri" defaultValue={client?.policy_uri ?? ""} />
-      <Textarea
-        label="Contacts"
-        name="contacts"
-        rows={2}
-        defaultValue={client?.contacts?.join("\n")}
-        placeholder={client ? undefined : "admin@example.com"}
-      />
-    </Stack>
-  );
 }
 
 type ApplicationsContentProps = {
@@ -142,7 +65,6 @@ type ApplicationsContentProps = {
   createHref?: string;
   loading?: boolean;
   error?: string;
-  defaultCreateOpen?: boolean;
   actions?: typeof defaultActions;
 };
 
@@ -150,19 +72,14 @@ export function ApplicationsContent({
   search: searchProp,
   onSearchChange,
   onClientClick,
-  createHref,
+  createHref = defaultCreateHref,
   loading: loadingOverride,
   error: errorOverride,
-  defaultCreateOpen = false,
   actions = defaultActions,
 }: ApplicationsContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
   const effectiveSearch = searchProp ?? internalSearch;
   const handleSearchChange = onSearchChange ?? setInternalSearch;
-
-  const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
-  const [createError, setCreateError] = useState<string | undefined>();
-  const [createType, setCreateType] = useState<string>("confidential");
 
   const [rotateTarget, setRotateTarget] = useState<OAuthClient | null>(null);
   const [rotateError, setRotateError] = useState<string | undefined>();
@@ -199,60 +116,6 @@ export function ApplicationsContent({
       { total: 0, confidential: 0, public: 0, M2M: 0 } as Record<ClientType | "total", number>,
     );
   }, [allClients]);
-
-  function buildClientPayload(formData: FormData) {
-    const type = String(formData.get("type") ?? "confidential");
-    const authMethod = String(formData.get("token_endpoint_auth_method") ?? "client_secret_post");
-    const isM2M = type === "M2M";
-    const isPublic = type === "public";
-    const grant_types = isM2M
-      ? ["client_credentials"]
-      : ["authorization_code", "refresh_token"];
-    const token_endpoint_auth_method = isM2M
-      ? "client_secret_post"
-      : isPublic
-        ? "none"
-        : authMethod;
-    return {
-      client_name: String(formData.get("client_name") ?? "").trim(),
-      token_endpoint_auth_method,
-      grant_types,
-      response_types: isM2M ? [] : ["code"],
-      public: isPublic,
-      scope: scopeString(formData.get("scope")),
-      redirect_uris: isM2M ? [] : splitDelimited(formData.get("redirect_uris")),
-      post_logout_redirect_uris: splitDelimited(formData.get("post_logout_redirect_uris")),
-      client_uri: optionalString(formData.get("client_uri")),
-      logo_uri: optionalString(formData.get("logo_uri")),
-      tos_uri: optionalString(formData.get("tos_uri")),
-      policy_uri: optionalString(formData.get("policy_uri")),
-      contacts: splitDelimited(formData.get("contacts")),
-    };
-  }
-
-  async function handleCreate(formData: FormData) {
-    setCreateError(undefined);
-    try {
-      const payload = buildClientPayload(formData);
-      if (!payload.client_name) {
-        setCreateError("Name is required");
-        return false;
-      }
-      if (!payload.grant_types?.includes("client_credentials") && payload.redirect_uris.length === 0) {
-        setCreateError("At least one redirect URI is required");
-        return false;
-      }
-      const created = await actions.createClient(payload);
-      await mutate();
-      setCreateOpen(false);
-      if (created.client_secret) setRevealSecret(created.client_secret);
-      toast.success("Application created", `${payload.client_name} is registered and ready to use.`);
-      return true;
-    } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create application");
-      return false;
-    }
-  }
 
   async function handleRotate() {
     if (!rotateTarget) return false;
@@ -370,7 +233,7 @@ export function ApplicationsContent({
       if (effectiveSearch) {
         return <EmptyState message="No applications match your search" cta="Clear search" onCta={() => handleSearchChange("")} />;
       }
-      return <EmptyState message="No OAuth applications" cta="Create Application" onCta={() => setCreateOpen(true)} />;
+      return <EmptyState message="No OAuth applications" cta="Create Application" ctaHref={createHref} />;
     }
     return (
       <DataTable<OAuthClient>
@@ -391,11 +254,7 @@ export function ApplicationsContent({
         description="Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."
         info="Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."
         actions={
-          createHref ? (
-            <LinkButton href={createHref} iconName="Plus">New App</LinkButton>
-          ) : (
-            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateType("confidential"); setCreateOpen(true); }}>New App</Button>
-          )
+          <LinkButton href={createHref} iconName="Plus">New App</LinkButton>
         }
       />
       <StatGroup columns={4}>
@@ -409,63 +268,6 @@ export function ApplicationsContent({
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderList()}</Panel>
-
-      <ConfirmDialog
-        open={createOpen}
-        onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreateError(undefined); }}
-        title="Create OAuth Application"
-        description={typeDescription(createType)}
-        confirmLabel="Create"
-        error={createError}
-        onConfirm={handleCreate}
-      >
-        <RadioGroup
-          title="Application Type"
-          name="type"
-          value={createType}
-          onChange={setCreateType}
-          options={[
-            { value: "confidential", label: "Web server" },
-            { value: "public", label: "SPA / native" },
-            { value: "M2M", label: "Machine-to-machine" },
-          ]}
-        />
-        <TextInput label="Name" name="client_name" required />
-        {createType === "confidential" ? (
-          <RadioGroup
-            title="Token Auth Method"
-            name="token_endpoint_auth_method"
-            defaultValue="client_secret_post"
-            options={[
-              { value: "client_secret_post", label: "client_secret_post" },
-              { value: "client_secret_basic", label: "client_secret_basic" },
-            ]}
-          />
-        ) : null}
-        <Tabs
-          ariaLabel="New application settings"
-          size="sm"
-          items={[
-            {
-              id: "access",
-              label: "Access",
-              content: (
-                <Stack gap="sm">
-                  <Textarea label="Scopes" name="scope" rows={2} placeholder="openid profile email" />
-                  {createType !== "M2M" ? (
-                    <RedirectUriFields withPlaceholders />
-                  ) : null}
-                </Stack>
-              ),
-            },
-            {
-              id: "metadata",
-              label: "Metadata",
-              content: <ClientMetadataFields />,
-            },
-          ]}
-        />
-      </ConfirmDialog>
 
       <ConfirmDialog
         open={Boolean(rotateTarget)}

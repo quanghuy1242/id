@@ -255,12 +255,12 @@ function createTeamsActions(teams: Team[]) {
       currentTeams = [...currentTeams, t];
       return t;
     },
-    updateTeam: async (teamId: string, name: string): Promise<Team> => {
+    updateTeam: async (teamId: string, name: string, _orgId?: string): Promise<Team> => {
       const found = currentTeams.find((team) => team.id === teamId)!;
       currentTeams = currentTeams.map((team) => team.id === teamId ? { ...team, name } : team);
       return Object.assign({}, found, { name });
     },
-    removeTeam: async (teamId: string) => {
+    removeTeam: async (teamId: string, _orgId?: string) => {
       currentTeams = currentTeams.filter((t) => t.id !== teamId);
     },
     addTeamMember: async (_teamId: string, _userId: string, _orgId: string) => undefined,

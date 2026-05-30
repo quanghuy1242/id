@@ -4,9 +4,9 @@ const seedTime = Date.UTC(2025, 0, 15);
 const day = 86_400_000;
 
 export const mockSessions: AdminSession[] = [
-  { id: "sess_001", token: "tok_session_001_secret", userId: "user_001", userEmail: "john@acme.com", ipAddress: "192.168.1.10", userAgent: "Mozilla/5.0 (Macintosh)", impersonatedBy: null, createdAt: seedTime, expiresAt: seedTime + 7 * day },
-  { id: "sess_002", token: "tok_session_002_secret", userId: "user_002", userEmail: "jane@beta.com", ipAddress: "10.0.0.5", userAgent: "Mozilla/5.0 (Windows)", impersonatedBy: null, createdAt: seedTime - 2 * day, expiresAt: seedTime + 5 * day },
-  { id: "sess_003", token: "tok_session_003_secret", userId: "user_003", userEmail: "bob@corp.com", ipAddress: "172.16.0.3", userAgent: "Mozilla/5.0 (Linux)", impersonatedBy: "user_001", createdAt: seedTime - 30 * day, expiresAt: seedTime - day },
+  { id: "sess_001", userId: "user_001", userEmail: "john@acme.com", ipAddress: "192.168.1.10", userAgent: "Mozilla/5.0 (Macintosh)", activeOrganizationId: "org_001", activeTeamId: null, impersonatedBy: null, createdAt: seedTime, expiresAt: seedTime + 7 * day },
+  { id: "sess_002", userId: "user_002", userEmail: "jane@beta.com", ipAddress: "10.0.0.5", userAgent: "Mozilla/5.0 (Windows)", activeOrganizationId: null, activeTeamId: null, impersonatedBy: null, createdAt: seedTime - 2 * day, expiresAt: seedTime + 5 * day },
+  { id: "sess_003", userId: "user_003", userEmail: "bob@corp.com", ipAddress: "172.16.0.3", userAgent: "Mozilla/5.0 (Linux)", activeOrganizationId: null, activeTeamId: null, impersonatedBy: "user_001", createdAt: seedTime - 30 * day, expiresAt: seedTime - day },
 ];
 
 export const mockTokens: AdminToken[] = [

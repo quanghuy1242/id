@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -8,17 +7,9 @@ import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-stor
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import { adminOtpSignIn } from "./admin-otp-sign-in";
 import * as authSchema from "../../src/db/auth-schema";
+import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 
 const capturedEmailSender = createCapturedAuthEmailSender();
-
-type RawStatement = {
-  readonly all: () => Array<Record<string, unknown>>;
-};
-
-type RawSqlite = {
-  readonly exec: (sql: string) => void;
-  readonly prepare: (sql: string) => RawStatement;
-};
 
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
@@ -35,8 +26,7 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
     readonly default: new (path: string) => RawSqlite;
   };
   const raw = new Database(":memory:");
-  raw.exec(readFileSync("migrations/0000_brown_puppet_master.sql", "utf8"));
-  raw.exec(readFileSync("migrations/0002_teams_oauth_scope_catalog.sql", "utf8"));
+  applyAuthMigrations(raw);
   return raw;
 }
 

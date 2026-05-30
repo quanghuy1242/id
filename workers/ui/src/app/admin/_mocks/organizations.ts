@@ -33,6 +33,16 @@ export const mockMembers: Member[] = [
   { id: "mem_003", organizationId: "org_001", userId: "user_003", role: "member", createdAt: "2024-03-10T00:00:00.000Z" },
 ];
 
+export const mockListMembersResponse = {
+  members: mockMembers,
+  total: mockMembers.length,
+};
+
+export const mockOrganizationWireWithObjectMetadata = {
+  ...mockOrganizations[0],
+  metadata: { plan: "enterprise" },
+};
+
 export const mockTeams: Team[] = [
   { id: "team_001", name: "Frontend", organizationId: "org_001", createdAt: "2024-01-15T00:00:00.000Z", updatedAt: "2024-01-15T00:00:00.000Z" },
   { id: "team_002", name: "Backend", organizationId: "org_001", createdAt: "2025-02-01T00:00:00.000Z", updatedAt: "2025-02-01T00:00:00.000Z" },
@@ -84,5 +94,16 @@ export const mockInvitations: Invitation[] = [
     expiresAt: "2024-11-01T00:00:00.000Z",
     createdAt: "2024-10-01T00:00:00.000Z",
     inviterId: "user_002",
+  },
+  {
+    id: "inv_004",
+    organizationId: "org_001",
+    email: "cancelled@example.com",
+    role: "member",
+    teamId: null,
+    status: "canceled",
+    expiresAt: "2025-03-01T00:00:00.000Z",
+    createdAt: "2025-01-15T00:00:00.000Z",
+    inviterId: "user_001",
   },
 ];

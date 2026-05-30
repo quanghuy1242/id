@@ -10,7 +10,7 @@ const createdClient: OAuthClient = {
   client_id: "cli_content",
   client_name: "Content API",
   client_secret: "secret_once",
-  redirect_uris: [],
+  redirect_uris: ["https://service.example.com/callback"],
   grant_types: ["client_credentials"],
   response_types: [],
   token_endpoint_auth_method: "client_secret_post",
@@ -31,11 +31,20 @@ describe("ApplicationCreateWizardContent", () => {
     fireEvent.click(screen.getByLabelText("Machine-to-machine"));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.change(screen.getByLabelText("Redirect URIs 1"), { target: { value: "https://service.example.com/callback" } });
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.click(screen.getByRole("button", { name: /create application/i }));
 
     await waitFor(() => expect(actions.createClient).toHaveBeenCalledTimes(1));
+    expect(actions.createClient).toHaveBeenCalledWith(expect.objectContaining({
+      grant_types: ["client_credentials"],
+      redirect_uris: ["https://service.example.com/callback"],
+      response_types: [],
+      token_endpoint_auth_method: "client_secret_post",
+    }));
+    expect(actions.createClient.mock.calls[0]?.[0]).not.toHaveProperty("public");
+    expect(actions.createClient.mock.calls[0]?.[0]).not.toHaveProperty("post_logout_redirect_uris");
     expect(await screen.findByText("secret_once")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /done/i }));

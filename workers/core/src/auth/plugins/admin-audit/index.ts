@@ -27,10 +27,12 @@ import {
   jwksOpenApiSchema,
   revokeConsentBody,
   revokeConsentOpenApiRequestBody,
-  revokeConsentOpenApiSchema,
+  revokeSessionBody,
+  revokeSessionOpenApiRequestBody,
   rotateJwksBody,
   rotateJwksOpenApiRequestBody,
   rotateJwksOpenApiSchema,
+  successOpenApiSchema,
   type ConsentRow,
   type JwksRow,
   type RotateJwksResponse,
@@ -44,6 +46,7 @@ export type { AdminAuditPluginOptions } from "./types";
 
 type UserRow = { id: string; email?: string | null };
 type ClientRow = { clientId: string; name?: string | null };
+type InternalSessionAdapter = { readonly deleteSession: (sessionToken: string) => Promise<unknown> };
 
 /**
  * Narrows `ctx.context.adapter` to the minimal read surface this plugin needs.
@@ -53,6 +56,10 @@ type ClientRow = { clientId: string; name?: string | null };
  */
 function auditAdapter(ctx: { context: { adapter: unknown } }): AuditAdapter {
   return ctx.context.adapter as unknown as AuditAdapter;
+}
+
+function internalSessionAdapter(ctx: { context: { internalAdapter: unknown } }): InternalSessionAdapter {
+  return ctx.context.internalAdapter as InternalSessionAdapter;
 }
 
 /** Asserts an authenticated platform-admin session. */
@@ -90,10 +97,13 @@ async function clientNameMap(adapter: AuditAdapter, clientIds: string[]): Promis
 }
 
 const listSessionsMeta = adminAuditEndpointMeta({
-  description: "List all active browser sessions across all users (platform admin only)",
+  description: "List browser sessions without session tokens (platform admin only)",
   pagination: true,
+  extraParameters: [
+    { name: "userId", in: "query", required: false, schema: { type: "string" }, description: "Filter to one user" },
+  ],
   responseSchema: listSessionsOpenApiSchema,
-  responseDescription: "Paginated session list with batched user-email enrichment",
+  responseDescription: "Paginated session list with batched user-email enrichment; session tokens are never returned",
 });
 
 const listTokensMeta = adminAuditEndpointMeta({
@@ -119,8 +129,15 @@ const listConsentsMeta = adminAuditEndpointMeta({
 const revokeConsentMeta = adminAuditEndpointMeta({
   description: "Revoke a single OAuth consent grant, forcing re-consent (platform admin only)",
   requestBody: revokeConsentOpenApiRequestBody,
-  responseSchema: revokeConsentOpenApiSchema,
+  responseSchema: successOpenApiSchema,
   responseDescription: "Consent revoked",
+});
+
+const revokeSessionMeta = adminAuditEndpointMeta({
+  description: "Revoke one browser session by id without exposing the session token to the caller (platform admin only)",
+  requestBody: revokeSessionOpenApiRequestBody,
+  responseSchema: successOpenApiSchema,
+  responseDescription: "Session revoked",
 });
 
 const jwksMeta = adminAuditEndpointMeta({
@@ -157,6 +174,11 @@ async function createSigningJwk(
  * predicate; display fields are enriched by batched `in` lookups, never joins.
  * Presenters strip every secret: token values and the JWKS private key are
  * never serialized. See docs/026.
+ *
+ * Do not switch session revocation back to Better Auth's public
+ * `/admin/revoke-user-session` contract from UI code: that route requires the
+ * session token. This plugin intentionally accepts `sessionId`, resolves the
+ * token inside the auth worker, and deletes it server-side.
  */
 export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthPlugin => {
   const graceMs = options.jwksGracePeriodMs ?? JWKS_GRACE_PERIOD_MS;
@@ -171,16 +193,36 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
           requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
           const { limit, offset } = parsePageParams(ctx.query);
+          const userId = typeof ctx.query?.userId === "string" && ctx.query.userId ? ctx.query.userId : undefined;
+          const where = userId ? [{ field: "userId", value: userId }] : undefined;
 
-          const total = Number(await adapter.count({ model: SESSION_MODEL }));
+          const total = Number(await adapter.count({ model: SESSION_MODEL, where }));
           const rows = await adapter.findMany<SessionRow>({
             model: SESSION_MODEL,
+            where,
             limit,
             offset,
             sortBy: { field: "createdAt", direction: "desc" },
           });
           const emails = await emailMap(adapter, uniqueIds(rows, (r) => r.userId));
           return ctx.json({ sessions: rows.map((r) => presentSession(r, emails)), total, limit, offset });
+        },
+      ),
+
+      revokeAdminSession: createAuthEndpoint(
+        "/admin/revoke-session",
+        { method: "POST", use: [sessionMiddleware], body: revokeSessionBody, metadata: revokeSessionMeta },
+        async (ctx) => {
+          requireAdmin(options.authorize, ctx.context.session);
+          const adapter = auditAdapter(ctx);
+          const row = await adapter.findOne<SessionRow>({
+            model: SESSION_MODEL,
+            where: [{ field: "id", value: ctx.body.sessionId }],
+          });
+          if (!row) throw new APIError("NOT_FOUND");
+
+          await internalSessionAdapter(ctx).deleteSession(row.token);
+          return ctx.json({ success: true });
         },
       ),
 
