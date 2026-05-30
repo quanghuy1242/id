@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ThemeInit } from "./_components/theme-init";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
   return (
-    <html lang="en" data-theme="lumina-light">
+    <html lang="en" data-theme="lumina-light" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -32,7 +33,10 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeInit />
+        {children}
+      </body>
     </html>
   );
 }

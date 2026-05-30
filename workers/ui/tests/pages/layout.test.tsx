@@ -10,7 +10,8 @@ function LayoutWrapper({ children }: { readonly children: ReactNode }) {
 }
 
 describe("RootLayout", () => {
-  it("renders the html element with data-theme lumina-light", () => {
+  it("renders the html element with data-theme lumina-light when stored theme is light", () => {
+    localStorage.setItem("lumina-theme", "light");
     render(
       <LayoutWrapper>
         <div>child</div>
