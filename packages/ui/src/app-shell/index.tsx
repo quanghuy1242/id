@@ -190,11 +190,11 @@ export function Topbar({ children }: SurfaceProps) {
 }
 
 export function TopbarStart({ children }: SurfaceProps) {
-  return <div className="navbar-start gap-2">{children}</div>;
+  return <div className="navbar-start flex-1 w-auto gap-2">{children}</div>;
 }
 
 export function TopbarEnd({ children }: SurfaceProps) {
-  return <div className="navbar-end gap-2">{children}</div>;
+  return <div className="navbar-end w-auto gap-2">{children}</div>;
 }
 
 export function Sidebar({ children }: SurfaceProps) {
@@ -287,7 +287,12 @@ type NavLinkProps = {
 export function NavLink({ href, active = false, current, iconName, children }: NavLinkProps) {
   return (
     <li>
-      <Link href={href} aria-current={current} className={active ? "menu-active" : undefined}>
+      <Link
+        href={href}
+        aria-current={current}
+        className={active ? "menu-active" : undefined}
+        style={active ? { backgroundColor: "var(--color-primary)", color: "var(--color-primary-content)" } : undefined}
+      >
         {iconName ? <NavIcon name={iconName} variant="sidebar" /> : null}
         {children}
       </Link>

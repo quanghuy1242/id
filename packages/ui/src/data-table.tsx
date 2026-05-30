@@ -109,7 +109,7 @@ export function DataTable<T extends object>({
   }
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-x-auto sm:overflow-x-visible data-table-responsive">
       <AriaTable
         aria-label="Data table"
         className="table w-full"
@@ -126,7 +126,7 @@ export function DataTable<T extends object>({
       >
         <AriaTableHeader>
           {columns.map((col) => (
-            <AriaColumn
+             <AriaColumn
               key={col.key}
               id={col.key}
               isRowHeader={col.key === columns[0]?.key}
@@ -152,7 +152,7 @@ export function DataTable<T extends object>({
               className={onRowClick ? "cursor-pointer hover:bg-base-200/60" : ""}
             >
               {columns.map((col) => (
-                <AriaCell key={col.key} className="text-sm text-base-content">
+                <AriaCell key={col.key} className="text-sm text-base-content" data-label={col.label}>
                   {col.render
                     ? col.render(row)
                     : String((row as Record<string, unknown>)[col.key] ?? "")}

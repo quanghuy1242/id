@@ -12,7 +12,7 @@ import {
   type MenuItemProps,
 } from "react-aria-components";
 
-export function MenuTrigger({ children, ...props }: { children: ReactNode; isOpen?: boolean; onOpenChange?: (isOpen: boolean) => void }) {
+export function MenuTrigger({ children, placement = "bottom end", ...props }: { children: ReactNode; isOpen?: boolean; onOpenChange?: (isOpen: boolean) => void; placement?: "top" | "bottom" | "left" | "right" | "top start" | "top end" | "bottom start" | "bottom end" | "left top" | "left bottom" | "right top" | "right bottom" }) {
   const [trigger, menu] = Children.toArray(children) as [React.ReactElement, React.ReactElement];
 
   return (
@@ -20,7 +20,7 @@ export function MenuTrigger({ children, ...props }: { children: ReactNode; isOpe
       {trigger}
       <Popover
         className="z-50 data-[entering]:animate-popover-in data-[exiting]:animate-popover-out"
-        placement="bottom end"
+        placement={placement}
         offset={4}
         crossOffset={0}
       >

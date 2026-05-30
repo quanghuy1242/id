@@ -2,7 +2,7 @@
 // React Aria: https://react-spectrum.adobe.com/react-aria/Dialog.html
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { Dialog, Heading as DialogHeading, Modal, ModalOverlay } from "react-aria-components";
 import { Button } from "./button";
 import { getActiveThemeName } from "./theme";
@@ -27,7 +27,7 @@ const widthClass: Record<NonNullable<DrawerProps["width"]>, string> = {
 export function Drawer({ open, onOpenChange, title, side = "right", width = "md", children }: DrawerProps) {
   const [themeName, setThemeName] = useState("lumina-light");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setThemeName(getActiveThemeName());
   }, [open]);
 

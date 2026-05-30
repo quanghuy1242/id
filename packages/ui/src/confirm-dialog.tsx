@@ -2,7 +2,7 @@
 
 // DaisyUI 5: https://daisyui.com/components/modal/
 // React Aria: https://react-spectrum.adobe.com/react-aria/Dialog.html
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useLayoutEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Dialog,
   Modal,
@@ -43,7 +43,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [themeName, setThemeName] = useState("lumina-light");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setThemeName(getActiveThemeName());
   }, [open]);
 

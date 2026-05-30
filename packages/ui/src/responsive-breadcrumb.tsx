@@ -4,8 +4,8 @@
 // React Aria: https://react-spectrum.adobe.com/react-aria/Menu.html
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Ellipsis } from "lucide-react";
 import { MenuTrigger, Menu, MenuItem } from "./menu";
+import { Button } from "./button";
 
 type ResponsiveBreadcrumbProps = {
   readonly items: readonly string[];
@@ -14,17 +14,16 @@ type ResponsiveBreadcrumbProps = {
 export function ResponsiveBreadcrumb({ items }: ResponsiveBreadcrumbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
-  const [collapseIndex, setCollapseIndex] = useState(0);
+  const [collapseCount, setCollapseCount] = useState(0);
   const measuring = useRef(false);
 
-  const measureRef = useRef<(() => void) | undefined>(undefined);
-
-  measureRef.current = useCallback(() => {
+  const measure = useCallback(() => {
     if (measuring.current) return;
     measuring.current = true;
 
     const list = listRef.current;
-    if (!list) {
+    const container = containerRef.current;
+    if (!list || !container) {
       measuring.current = false;
       return;
     }
@@ -35,84 +34,77 @@ export function ResponsiveBreadcrumb({ items }: ResponsiveBreadcrumbProps) {
       return;
     }
 
-    const original: string[] = [];
-    lis.forEach((li) => {
-      original.push(li.style.display);
-      li.style.display = "";
-    });
+    // Reset all items to visible for measurement
+    lis.forEach((li) => { li.style.display = ""; });
     void list.offsetHeight;
 
-    if (list.scrollWidth > list.clientWidth) {
-      let idx = 0;
-      for (; idx < lis.length - 1; idx++) {
-        lis[idx].style.display = "none";
+    const available = container.clientWidth;
+    const full = list.scrollWidth;
+
+    if (full > available) {
+      let hidden = 0;
+      for (let i = 0; i < lis.length - 1; i++) {
+        lis[i].style.display = "none";
+        hidden++;
         void list.offsetHeight;
-        if (list.scrollWidth <= list.clientWidth) break;
+        if (list.scrollWidth <= available) break;
       }
-      setCollapseIndex((prev) => Math.max(prev, idx));
+      setCollapseCount(hidden);
     } else {
-      let newIdx = collapseIndex;
-      for (; newIdx > 0; newIdx--) {
-        lis[newIdx - 1].style.display = "";
-        void list.offsetHeight;
-        if (list.scrollWidth > list.clientWidth) {
-          lis[newIdx - 1].style.display = "none";
-          break;
-        }
-      }
-      if (newIdx < collapseIndex) setCollapseIndex(newIdx);
+      setCollapseCount(0);
     }
 
-    lis.forEach((li, i) => {
-      li.style.display = original[i];
-    });
-
     measuring.current = false;
-  }, [collapseIndex]);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || typeof ResizeObserver === "undefined") return;
 
-    const observer = new ResizeObserver(() => {
-      measureRef.current?.();
-    });
+    const observer = new ResizeObserver(() => measure());
     observer.observe(container);
-    requestAnimationFrame(() => measureRef.current?.());
+    requestAnimationFrame(() => measure());
 
     return () => observer.disconnect();
-  }, []);
+  }, [measure]);
 
-  const collapsedItems = items.slice(0, collapseIndex);
+  const collapsedItems = items.slice(0, collapseCount);
+  const hasCollapsed = collapsedItems.length > 0;
 
   return (
-    <div ref={containerRef} className="breadcrumbs text-sm text-base-content/60 min-w-0 flex items-center overflow-hidden">
-      {collapsedItems.length > 0 && (
-        <MenuTrigger>
-          <button
-            type="button"
-            aria-label="More breadcrumbs"
-            className="btn btn-ghost btn-xs px-1 min-h-0 h-auto"
-          >
-            <Ellipsis className="size-3" aria-hidden="true" />
-          </button>
-          <Menu
-            aria-label="Collapsed breadcrumbs"
-            className="menu menu-sm dropdown-content bg-base-100 rounded-box shadow w-40"
-          >
-            {collapsedItems.map((item) => (
-              <MenuItem key={item} id={item}>{item}</MenuItem>
-            ))}
-          </Menu>
-        </MenuTrigger>
-      )}
-      <ol ref={listRef}>
-        {items.map((item, i) => (
-          <li key={item} style={{ display: i < collapseIndex ? "none" : undefined }}>
-            {item}
-          </li>
-        ))}
-      </ol>
-    </div>
+    <nav ref={containerRef} aria-label="Breadcrumb" className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex items-center text-sm text-base-content/60">
+        {hasCollapsed ? (
+          <MenuTrigger placement="bottom start">
+            <Button
+              variant="ghost"
+              size="sm"
+              ariaLabel="Show more breadcrumbs"
+              iconName="Ellipsis"
+            />
+            <Menu aria-label="Collapsed breadcrumbs">
+              {collapsedItems.map((item) => (
+                <MenuItem key={item} id={item}>{item}</MenuItem>
+              ))}
+            </Menu>
+          </MenuTrigger>
+        ) : null}
+        {hasCollapsed ? <span className="opacity-40 mx-1 select-none" aria-hidden="true">/</span> : null}
+        <ol ref={listRef} className="flex items-center gap-1 min-w-0">
+          {items.map((item, i) => (
+            <li
+              key={item}
+              className="flex items-center shrink-0"
+              style={{ display: i < collapseCount ? "none" : undefined }}
+            >
+              {i > Math.max(0, collapseCount) ? (
+                <span className="opacity-40 mx-1 select-none" aria-hidden="true">/</span>
+              ) : null}
+              <span className="whitespace-nowrap">{item}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </nav>
   );
 }

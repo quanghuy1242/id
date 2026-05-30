@@ -2,7 +2,7 @@
 
 // DaisyUI 5: https://daisyui.com/components/modal/
 // React Aria: https://react-spectrum.adobe.com/react-aria/Dialog.html
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   Dialog,
   Modal,
@@ -22,7 +22,7 @@ export function ThemeDialog({ open, onOpenChange }: ThemeDialogProps) {
   const [themeName, setThemeName] = useState("lumina-light");
   const [selected, setSelected] = useState<ThemeMode>("system");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open) {
       setThemeName(getActiveThemeName());
       setSelected(getStoredTheme());

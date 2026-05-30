@@ -36,9 +36,8 @@
   --noise: 0;
 }
 
-@keyframes modal-overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.menu li > *.menu-active {
+  color: oklch(var(--p));
 }
 @keyframes modal-overlay-out {
   from { opacity: 1; }
@@ -124,4 +123,28 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+}
+
+@media (max-width: 639px) {
+  .data-table-responsive table,
+  .data-table-responsive thead,
+  .data-table-responsive tbody,
+  .data-table-responsive th,
+  .data-table-responsive td,
+  .data-table-responsive tr {
+    @apply block;
+  }
+  .data-table-responsive thead {
+    @apply hidden;
+  }
+  .data-table-responsive tr {
+    @apply border-b border-base-300 py-2;
+  }
+  .data-table-responsive td {
+    @apply flex flex-col px-4 py-1.5 border-none;
+  }
+  .data-table-responsive td::before {
+    content: attr(data-label);
+    @apply text-xs font-semibold text-base-content/60 mb-0.5;
+  }
 }
