@@ -39,6 +39,7 @@ This implementation follows the planning and architecture documents:
 - [docs/024_admin-login-context-guard.md](docs/024_admin-login-context-guard.md) — admin login context guard (sign-in gate + admin MFA OTP)
 - [docs/025_admin-ui-swr-caching-strategy.md](docs/025_admin-ui-swr-caching-strategy.md) — SWR-based client-side caching strategy for admin UI (dedup, cross-navigation cache, rate-limit-aware configuration)
 - [docs/026_admin-oauth-security-screens-and-api-contracts.md](docs/026_admin-oauth-security-screens-and-api-contracts.md) — OAuth/security admin screens, verified API contracts, and the BA-plugin/adapter approach for the missing aggregate endpoints
+- [docs/027_admin-ui-enrichment.md](docs/027_admin-ui-enrichment.md) — admin UI enrichment & redesign (redesign-first): detailed component toolkit, grants-section IA unification, the `admin-activity-log` audit plugin, and JWKS/Applications/Scope-catalog detail-route redesigns with ASCII layouts, component trees, and standards classification
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
