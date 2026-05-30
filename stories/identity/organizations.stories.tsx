@@ -8,6 +8,7 @@ import { OrgDetailOverviewContent } from "../../workers/ui/src/app/admin/_compon
 import { OrganizationMembersContent } from "../../workers/ui/src/app/admin/_components/identity/organization-members-content";
 import { OrganizationTeamsContent } from "../../workers/ui/src/app/admin/_components/identity/organization-teams-content";
 import { OrganizationInvitationsContent } from "../../workers/ui/src/app/admin/_components/identity/organization-invitations-content";
+import { ActivityLogContent } from "../../workers/ui/src/app/admin/_components/activity-log-content";
 import type { Organization, Member, Team, TeamMember, Invitation } from "../../workers/ui/src/app/admin/_actions/organizations";
 import type { User } from "../../workers/ui/src/app/admin/_actions/users";
 import { AdminShell } from "../_decorators/shell";
@@ -19,6 +20,7 @@ import {
   mockInvitations,
 } from "../../workers/ui/src/app/admin/_mocks/organizations";
 import { mockUsers } from "../../workers/ui/src/app/admin/_mocks/users";
+import { mockActivities } from "../../workers/ui/src/app/admin/_mocks/audit";
 
 export default { title: "Identity / Organizations" } satisfies StoryDefault;
 
@@ -122,7 +124,7 @@ function OrgDetailFrame({
 }: {
   activePath: string;
   orgId: string;
-  activeTab: "overview" | "members" | "teams" | "invitations";
+  activeTab: "overview" | "members" | "teams" | "invitations" | "audit";
   actions?: OrgDetailFrameActions;
   loading?: boolean;
   error?: string;
@@ -366,3 +368,52 @@ export const OrgInvitations_Error: Story = () => (
   </OrgDetailFrame>
 );
 OrgInvitations_Error.storyName = "Org Invitations / Error";
+
+function createActivityActions(entries = mockActivities) {
+  const orgEntries = entries.filter((entry) => entry.targetType === "organization");
+  return {
+    listActivityLog: async () => ({
+      entries: orgEntries,
+      total: orgEntries.length,
+      limit: 25,
+      offset: 0,
+    }),
+  };
+}
+
+export const OrgAudit_Populated: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  return (
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/audit" orgId="org_001" activeTab="audit" actions={detail}>
+      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions()} />
+    </OrgDetailFrame>
+  );
+};
+OrgAudit_Populated.storyName = "Org Audit / Populated";
+
+export const OrgAudit_Empty: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  return (
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/audit" orgId="org_001" activeTab="audit" actions={detail}>
+      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions([])} />
+    </OrgDetailFrame>
+  );
+};
+OrgAudit_Empty.storyName = "Org Audit / Empty";
+
+export const OrgAudit_Loading: Story = () => (
+  <OrgDetailFrame activePath="/admin/identity/organizations/org_001/audit" orgId="org_001" activeTab="audit" loading>
+    <ActivityLogContent targetType="organization" targetId="org_001" loading />
+  </OrgDetailFrame>
+);
+OrgAudit_Loading.storyName = "Org Audit / Loading";
+
+export const OrgAudit_Error: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  return (
+    <OrgDetailFrame activePath="/admin/identity/organizations/org_001/audit" orgId="org_001" activeTab="audit" actions={detail}>
+      <ActivityLogContent targetType="organization" targetId="org_001" error="Failed to load activity" />
+    </OrgDetailFrame>
+  );
+};
+OrgAudit_Error.storyName = "Org Audit / Error";

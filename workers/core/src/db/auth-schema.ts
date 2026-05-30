@@ -380,6 +380,29 @@ export const oauthClientResourceScope = sqliteTable(
   ],
 );
 
+export const adminActivityLog = sqliteTable(
+  "adminActivityLog",
+  {
+    id: text("id").primaryKey(),
+    actorId: text("actorId").notNull(),
+    actorType: text("actorType").notNull(),
+    action: text("action").notNull(),
+    targetType: text("targetType").notNull(),
+    targetId: text("targetId").notNull(),
+    before: text("before"),
+    after: text("after"),
+    metadata: text("metadata"),
+    createdAt: integer("createdAt").notNull(),
+  },
+  (table) => [
+    index("adminActivityLog_actorId_idx").on(table.actorId),
+    index("adminActivityLog_action_idx").on(table.action),
+    index("adminActivityLog_targetType_idx").on(table.targetType),
+    index("adminActivityLog_targetId_idx").on(table.targetId),
+    index("adminActivityLog_createdAt_idx").on(table.createdAt),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),

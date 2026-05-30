@@ -13,6 +13,7 @@ import { idAdminSignInGuard } from "./plugins/admin-sign-in-guard";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { idAdminAudit } from "./plugins/admin-audit";
+import { idAdminActivityLog } from "./plugins/admin-activity-log";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -152,6 +153,9 @@ export function getAuthOptions(
       idAdminAudit({
         authorize: (role) => isPlatformAdmin(role),
         jwksGracePeriodMs: authPluginConfig.jwksGracePeriodMs,
+      }),
+      idAdminActivityLog({
+        authorize: (role) => isPlatformAdmin(role),
       }),
       idScimDirectory({
         issuer,

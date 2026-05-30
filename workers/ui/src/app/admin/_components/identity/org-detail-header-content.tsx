@@ -26,7 +26,7 @@ const defaultActions = {
 };
 
 type OrgDetailHeaderContentProps = {
-  activeTab?: "overview" | "members" | "teams" | "invitations";
+  activeTab?: "overview" | "members" | "teams" | "invitations" | "audit";
   onNavigateToOrgs?: () => void;
   actions?: typeof defaultActions;
 };
@@ -37,6 +37,7 @@ function orgTabs(orgId: string) {
     { id: "members", href: `/admin/identity/organizations/${orgId}/members`, label: "Members" },
     { id: "teams", href: `/admin/identity/organizations/${orgId}/teams`, label: "Teams" },
     { id: "invitations", href: `/admin/identity/organizations/${orgId}/invitations`, label: "Invitations" },
+    { id: "audit", href: `/admin/identity/organizations/${orgId}/audit`, label: "Audit" },
   ];
 }
 

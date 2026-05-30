@@ -15,7 +15,7 @@ export default function UserDetailLayout({ children }: UserDetailLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const userId = String(params.userId ?? "");
-  const activeTab = pathname?.endsWith("/sessions") ? "sessions" : "overview";
+  const activeTab = pathname?.endsWith("/sessions") ? "sessions" : pathname?.endsWith("/audit") ? "audit" : "overview";
 
   return (
     <PageBody>

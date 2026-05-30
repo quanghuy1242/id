@@ -2,9 +2,13 @@ import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
 import { PageBody, Stack, Tabs } from "@id/ui";
 import { ApplicationsContent } from "../../workers/ui/src/app/admin/_components/oauth/applications-content";
+import { ApplicationCreateWizardContent } from "../../workers/ui/src/app/admin/_components/oauth/application-create-wizard-content";
+import { ApplicationDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/application-detail-content";
 import { ResourceApisContent } from "../../workers/ui/src/app/admin/_components/oauth/resource-apis-content";
+import { ResourceApiDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/resource-api-detail-content";
 import { ScopeCatalogContent } from "../../workers/ui/src/app/admin/_components/oauth/scope-catalog-content";
 import { M2mBindingsContent } from "../../workers/ui/src/app/admin/_components/oauth/m2m-bindings-content";
+import { M2mBindingDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/m2m-binding-detail-content";
 import type {
   OAuthClient,
   ResourceServer,
@@ -83,7 +87,31 @@ function appsActions(clients: OAuthClient[]) {
 
 export const Applications: Story = () => (
   <OAuthShell activePath="/admin/oauth/applications">
-    <ApplicationsContent actions={appsActions(mockClients)} />
+    <ApplicationsContent createHref="/admin/oauth/applications/new" actions={appsActions(mockClients)} />
+  </OAuthShell>
+);
+
+export const ApplicationDetail: Story = () => (
+  <OAuthShell activePath="/admin/oauth/applications/cli_contentapi_a1b2c3d4e5f6">
+    <ApplicationDetailContent
+      clientId="cli_contentapi_a1b2c3d4e5f6"
+      actions={{
+        listClients: async () => mockClients,
+        listBindings: async () => mockBindings,
+        listResourceServers: async () => mockResourceServers,
+      }}
+    />
+  </OAuthShell>
+);
+
+export const ApplicationNewWizard: Story = () => (
+  <OAuthShell activePath="/admin/oauth/applications/new">
+    <ApplicationCreateWizardContent
+      actions={{
+        createClient: appsActions(mockClients).createClient,
+        listScopes: async () => mockScopes,
+      }}
+    />
   </OAuthShell>
 );
 
@@ -132,6 +160,12 @@ function rsActions(servers: ResourceServer[]) {
 export const ResourceAPIs: Story = () => (
   <OAuthShell activePath="/admin/oauth/resource-apis">
     <ResourceApisContent actions={rsActions(mockResourceServers)} />
+  </OAuthShell>
+);
+
+export const ResourceApiDetail: Story = () => (
+  <OAuthShell activePath="/admin/oauth/resource-apis/rs_001">
+    <ResourceApiDetailContent resourceServerId="rs_001" actions={{ listResourceServers: async () => mockResourceServers }} />
   </OAuthShell>
 );
 
@@ -205,6 +239,16 @@ function bindingsActions(bindings: ClientResourceScope[]) {
 export const M2mBindings: Story = () => (
   <OAuthShell activePath="/admin/oauth/m2m-bindings">
     <M2mBindingsContent actions={bindingsActions(mockBindings)} />
+  </OAuthShell>
+);
+
+export const M2mBindingDetail: Story = () => (
+  <OAuthShell activePath="/admin/oauth/m2m-bindings/bind_001">
+    <M2mBindingDetailContent bindingId="bind_001" actions={{
+      listBindings: async () => mockBindings,
+      listClients: async () => mockClients,
+      listResourceServers: async () => mockResourceServers,
+    }} />
   </OAuthShell>
 );
 

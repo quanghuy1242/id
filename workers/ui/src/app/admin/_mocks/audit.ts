@@ -1,4 +1,4 @@
-import type { AdminSession, AdminToken } from "../_actions/audit";
+import type { AdminActivity, AdminSession, AdminToken } from "../_actions/audit";
 
 const seedTime = Date.UTC(2025, 0, 15);
 const day = 86_400_000;
@@ -16,4 +16,33 @@ export const mockTokens: AdminToken[] = [
 
 export const mockRefreshTokens: AdminToken[] = [
   { id: "rt_001", tokenPrefix: "r1r2r3r4…", type: "refresh", clientId: "cli_portal_5t4s3r2q1p0o", clientName: "Vendor Portal", userId: "user_002", userEmail: "jane@beta.com", scopes: ["vendor:read"], expiresAt: seedTime + 30 * day, createdAt: seedTime - day },
+];
+
+export const mockActivities: AdminActivity[] = [
+  {
+    id: "act_001",
+    actorId: "user_001",
+    actorType: "user",
+    actorEmail: "admin@example.test",
+    action: "user.update",
+    targetType: "user",
+    targetId: "user_001",
+    before: { name: "John" },
+    after: { name: "John Doe" },
+    metadata: { path: "/admin/update-user" },
+    createdAt: seedTime,
+  },
+  {
+    id: "act_002",
+    actorId: "user_001",
+    actorType: "user",
+    actorEmail: "admin@example.test",
+    action: "team.add_member",
+    targetType: "organization",
+    targetId: "org_001",
+    before: null,
+    after: { userId: "user_003" },
+    metadata: { path: "/organization/add-team-member" },
+    createdAt: seedTime - day,
+  },
 ];

@@ -263,7 +263,8 @@ Components:
       selectedKey="overview",
       items=[
         {id:"overview", href:`/admin/identity/users/${userId}`, label:"Overview"},
-        {id:"sessions", href:`/admin/identity/users/${userId}/sessions`, label:"Sessions"}
+        {id:"sessions", href:`/admin/identity/users/${userId}/sessions`, label:"Sessions"},
+        {id:"audit", href:`/admin/identity/users/${userId}/audit`, label:"Audit"}
       ]
     )
 
@@ -427,6 +428,38 @@ Notes:
 
 ---
 
+## /admin/identity/users/:userId/audit
+
+Inherits parent shell + shared `UserDetailProvider` header. Audit tab active. This route is powered by the append-only `admin-activity-log` plugin from docs/027 §12.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ◈ ...   ▸ ... ▸ John Doe                        [Impersonate]  │
+├──────────────────┬───────────────────────────────────────────────┤
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
+│                  │ │ Overview   Sessions   ▸ Audit             │ │
+│                  │ └───────────────────────────────────────────┘ │
+│                  │ ┌── Audit ──────────────────────────────────┐ │
+│                  │ │ ● User Update                             │ │
+│                  │ │   admin@example.test · 1/15/2025, 12:00   │ │
+│                  │ │   /admin/update-user                      │ │
+│                  │ └───────────────────────────────────────────┘ │
+└──────────────────┴───────────────────────────────────────────────┘
+```
+
+Components:
+  users/:userId/audit/page.tsx
+    ActivityLogContent(targetType="user", targetId=userId)
+  ActivityLogContent:
+    Panel > Stack(gap="md") > Text(variant="h2", "Audit") + Timeline(items)
+    Loading: Skeleton(rows=5)
+    Empty: EmptyState(message="No activity recorded for this resource")
+    Error: ErrorAlert(message, onRetry)
+
+Data: GET /api/auth/admin/activity-log?targetType=user&targetId=:userId&limit=25&offset=0 → { entries, total, limit, offset }
+
+---
+
 ## /admin/identity/organizations
 
 Platform admin only. Org admins redirected to their own org detail.
@@ -568,12 +601,13 @@ Components:
 
     Tabs(
       ariaLabel="Organization detail tabs",
-      selectedKey=activeTab,   — "overview" | "members" | "teams" | "invitations"; default "overview"
+      selectedKey=activeTab,   — "overview" | "members" | "teams" | "invitations" | "audit"; default "overview"
       items=[
         {id:"overview", href:`/admin/identity/organizations/${orgId}`, label:"Overview"},
         {id:"members", href:`/admin/identity/organizations/${orgId}/members`, label:"Members"},
         {id:"teams", href:`/admin/identity/organizations/${orgId}/teams`, label:"Teams"},
-        {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"}
+        {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"},
+        {id:"audit", href:`/admin/identity/organizations/${orgId}/audit`, label:"Audit"}
       ]
     )
     — NOTE: the layout derives activeTab from pathname and renders the shared header once.
@@ -811,9 +845,7 @@ Components:
     Panel(tone="muted")
       Inline(justify="between")
         Text(variant="h4", `${team.name} · ${teamMembers.length} members`)
-        FilterDropdown(label="Add Member",
-          options=eligibleMembers,  — org members NOT in this team
-          value="", onChange=addMemberToTeam)
+        ResourceSelector(kind="member", source={ mode:"sync", items:eligibleMembers }, excludeIds=currentTeamMemberIds, value=selectedMemberId, onChange=addMemberToTeam)
       Stack(gap="xs") — one row per team member:
         Inline(justify="between")
           Inline(gap="sm")
@@ -854,8 +886,8 @@ Behavior:
     Loading: show "…" in memberCount column until resolved.
   - Clicking "▶" on a team row: fetch list-team-members for that team, show expanded panel below the table row.
     Clicking again collapses it. Only one team expanded at a time.
-  - Add Member: filter org members (from list-members) minus already-assigned teamMembers.
-    Selecting from FilterDropdown calls add-team-member, re-fetches team members, updates memberCount.
+  - Add Member: ResourceSelector filters org members (from list-members) minus already-assigned teamMembers, renders name/email/role, and returns the selected userId for add-team-member.
+    Selecting from ResourceSelector calls add-team-member, clears the selected value, re-fetches team members, and updates memberCount. No raw userId entry is exposed.
   - User names: same cache as members page — fetch get-user per userId if API doesn't join names.
   - Deleting a team cascade-deletes team members (FK: ON DELETE CASCADE). Warn in dialog.
 
@@ -981,3 +1013,35 @@ Behavior:
     For initial implementation, skip team name resolution (show "—") and note it will be wired when lookup is available.
   - Expired rows: only Cancel action available (to clean up). No Resend on expired; admin must create a new invite.
   - Status badge: pending→tone="warning", accepted→tone="success", rejected→tone="error", expired→tone="neutral"
+
+---
+
+## /admin/identity/organizations/:orgId/audit
+
+Inherits parent shell + shared `OrgDetailProvider` header. Audit tab active. This route is powered by the append-only `admin-activity-log` plugin from docs/027 §12.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ◈ ...   ▸ Organizations ▸ Acme Corp                 [Delete]   │
+├──────────────────┬───────────────────────────────────────────────┤
+│   (sidebar)      │ ┌─ Tabs ────────────────────────────────────┐ │
+│                  │ │ Overview Members Teams Invitations ▸Audit │ │
+│                  │ └───────────────────────────────────────────┘ │
+│                  │ ┌── Audit ──────────────────────────────────┐ │
+│                  │ │ ● Team Add Member                         │ │
+│                  │ │   admin@example.test · 1/14/2025, 12:00   │ │
+│                  │ │   /organization/add-team-member           │ │
+│                  │ └───────────────────────────────────────────┘ │
+└──────────────────┴───────────────────────────────────────────────┘
+```
+
+Components:
+  organizations/:orgId/audit/page.tsx
+    ActivityLogContent(targetType="organization", targetId=orgId)
+  ActivityLogContent:
+    Panel > Stack(gap="md") > Text(variant="h2", "Audit") + Timeline(items)
+    Loading: Skeleton(rows=5)
+    Empty: EmptyState(message="No activity recorded for this resource")
+    Error: ErrorAlert(message, onRetry)
+
+Data: GET /api/auth/admin/activity-log?targetType=organization&targetId=:orgId&limit=25&offset=0 → { entries, total, limit, offset }

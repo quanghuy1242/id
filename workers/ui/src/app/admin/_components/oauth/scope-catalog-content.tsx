@@ -11,13 +11,18 @@ import {
   type DataTableColumn,
   EmptyState,
   ErrorAlert,
+  FileDropzone,
   FilterDropdown,
   Inline,
   PageIntro,
   Panel,
+  ScopeBuilder,
+  type ScopeSuggestion,
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
   Text,
   Textarea,
   TextInput,
@@ -32,6 +37,7 @@ import {
   type ResourceServer,
 } from "../../_actions/oauth";
 import { oauthScopesKey, resourceServersKey } from "@/app/admin/_data/swr-keys";
+import { ADMIN_RECENT_WINDOW_MS } from "@/shared/constants";
 
 const defaultActions = {
   listScopes: listScopesAction,
@@ -44,6 +50,13 @@ const defaultActions = {
 function isValidScope(scope: string): boolean {
   return /^[a-z][a-z0-9:_-]*$/.test(scope);
 }
+
+type BulkScopeRow = {
+  readonly scope: string;
+  readonly resourceServerId: string | null;
+  readonly description?: string;
+  readonly error?: string;
+};
 
 type ScopeCatalogContentProps = {
   search?: string;
@@ -81,6 +94,10 @@ export function ScopeCatalogContent({
   const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
   const [createRsId, setCreateRsId] = useState<string>("");
+  const [scopeFilters, setScopeFilters] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkError, setBulkError] = useState<string | undefined>();
+  const [bulkRows, setBulkRows] = useState<BulkScopeRow[]>([]);
 
   const [editTarget, setEditTarget] = useState<OAuthResourceScope | null>(null);
   const [editError, setEditError] = useState<string | undefined>();
@@ -108,12 +125,34 @@ export function ScopeCatalogContent({
     () => (servers ?? []).map((s) => ({ value: s.id, label: `${s.name} (${s.slug})` })),
     [servers],
   );
+  const scopeSuggestions: ScopeSuggestion[] = useMemo(
+    () => (allScopes ?? []).map((s) => ({ value: s.scope, description: s.description ?? undefined, group: serverById.get(s.resourceServerId)?.name })),
+    [allScopes, serverById],
+  );
+  const stats = useMemo(() => {
+    const rows = allScopes ?? [];
+    const resourceIds = new Set(rows.map((s) => s.resourceServerId));
+    const recentThreshold = Date.now() - ADMIN_RECENT_WINDOW_MS;
+    return {
+      total: rows.length,
+      disabled: rows.filter((s) => !s.enabled).length,
+      resources: resourceIds.size,
+      recent: rows.filter((s) => s.updatedAt >= recentThreshold).length,
+    };
+  }, [allScopes]);
 
   const displayed = useMemo(() => {
     let rows = allScopes ?? [];
     if (effectiveSearch) {
       const q = effectiveSearch.toLowerCase();
       rows = rows.filter((s) => s.scope.toLowerCase().includes(q) || (s.description ?? "").toLowerCase().includes(q));
+    }
+    if (scopeFilters.length > 0) {
+      rows = rows.filter((s) => scopeFilters.some((filter) => {
+        const trimmed = filter.trim();
+        if (trimmed.endsWith("*")) return s.scope.startsWith(trimmed.slice(0, -1));
+        return s.scope === trimmed;
+      }));
     }
     if (effectiveSortBy) {
       rows = [...rows].sort((a, b) => {
@@ -124,7 +163,7 @@ export function ScopeCatalogContent({
       });
     }
     return rows;
-  }, [allScopes, effectiveSearch, effectiveSortBy, effectiveSortDir]);
+  }, [allScopes, effectiveSearch, scopeFilters, effectiveSortBy, effectiveSortDir]);
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
@@ -191,12 +230,65 @@ export function ScopeCatalogContent({
     }
   }
 
+  function parseBulkCsv(text: string): BulkScopeRow[] {
+    const existing = new Set((allScopes ?? []).map((scope) => scope.scope));
+    const serverLookup = new Map<string, ResourceServer>();
+    for (const server of servers ?? []) {
+      serverLookup.set(server.id, server);
+      serverLookup.set(server.slug, server);
+      serverLookup.set(server.name.toLowerCase(), server);
+    }
+    return text
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line, index) => !(index === 0 && line.toLowerCase().startsWith("scope,")))
+      .map((line) => {
+        const [rawScope, rawServer, ...descriptionParts] = line.split(",");
+        const scope = (rawScope ?? "").trim();
+        const serverKey = (rawServer ?? "").trim();
+        const server = serverLookup.get(serverKey) ?? serverLookup.get(serverKey.toLowerCase());
+        const description = descriptionParts.join(",").trim() || undefined;
+        if (!isValidScope(scope)) return { scope, resourceServerId: null, description, error: "Invalid scope" };
+        if (existing.has(scope)) return { scope, resourceServerId: null, description, error: "Already exists" };
+        if (!server) return { scope, resourceServerId: null, description, error: "Unknown resource API" };
+        return { scope, resourceServerId: server.id, description };
+      });
+  }
+
+  async function handleBulkFiles(files: File[]) {
+    setBulkError(undefined);
+    const file = files[0];
+    if (!file) return;
+    setBulkRows(parseBulkCsv(await file.text()));
+  }
+
+  async function handleBulkImport() {
+    setBulkError(undefined);
+    const validRows = bulkRows.filter((row): row is BulkScopeRow & { resourceServerId: string } => Boolean(row.resourceServerId) && !row.error);
+    if (validRows.length === 0) {
+      setBulkError("No valid scopes to import");
+      return false;
+    }
+    try {
+      await Promise.all(validRows.map((row) => actions.createScope({ resourceServerId: row.resourceServerId, scope: row.scope, description: row.description })));
+      await mutate();
+      setBulkOpen(false);
+      setBulkRows([]);
+      toast.success("Scopes imported", `${validRows.length} scopes were created.`);
+      return true;
+    } catch (err: unknown) {
+      setBulkError(err instanceof Error ? err.message : "Failed to import scopes");
+      return false;
+    }
+  }
+
   function renderContent() {
     if (showLoading) return <Skeleton rows={4} />;
     if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (displayed.length === 0) {
-      if (effectiveSearch) {
-        return <EmptyState message="No scopes match your search" cta="Clear search" onCta={() => handleSearchChange("")} />;
+      if (effectiveSearch || scopeFilters.length > 0) {
+        return <EmptyState message="No scopes match your filters" cta="Clear filters" onCta={() => { handleSearchChange(""); setScopeFilters([]); }} />;
       }
       return <EmptyState message="No OAuth scopes defined" cta="Create Scope" onCta={() => setCreateOpen(true)} />;
     }
@@ -221,11 +313,23 @@ export function ScopeCatalogContent({
         description="Permissions that clients can request and resource APIs enforce. Each scope belongs to one resource API."
         info="A scope is a named permission (for example invoices:read) attached to a resource API. Clients request scopes during authorization; the resulting access token carries the granted scopes, and your resource server checks them. Scope strings are lowercase and match ^[a-z][a-z0-9:_-]*$. Disable a scope to stop granting it without deleting its history."
         actions={
-          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateRsId(""); setCreateOpen(true); }}>New Scope</Button>
+          <Inline>
+            <Button variant="secondary" iconName="Upload" onClick={() => { setBulkError(undefined); setBulkRows([]); setBulkOpen(true); }}>Bulk Import</Button>
+            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateRsId(""); setCreateOpen(true); }}>New Scope</Button>
+          </Inline>
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Total" value={stats.total} description="scopes" tone="primary" />
+        <Stat title="Disabled" value={stats.disabled} description="not grantable" tone={stats.disabled > 0 ? "warning" : "neutral"} />
+        <Stat title="Resources" value={stats.resources} description="with scopes" />
+        <Stat title="Updated 7d" value={stats.recent} description="recent changes" tone="info" />
+      </StatGroup>
       <Panel>
-        <SearchInput grow placeholder="Search scopes…" value={effectiveSearch} onChange={handleSearchChange} />
+        <Stack gap="sm">
+          <SearchInput grow placeholder="Search scopes…" value={effectiveSearch} onChange={handleSearchChange} />
+          <ScopeBuilder label="Scope filters" value={scopeFilters} onChange={setScopeFilters} suggestions={scopeSuggestions} allowCustom size="sm" />
+        </Stack>
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>
@@ -241,6 +345,29 @@ export function ScopeCatalogContent({
         <FilterDropdown label="Resource API" options={rsOptions} value={createRsId} onChange={setCreateRsId} showLabel />
         <TextInput label="Scope" name="scope" required />
         <Textarea label="Description" name="description" />
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={bulkOpen}
+        onOpenChange={(o) => { setBulkOpen(o); if (!o) { setBulkError(undefined); setBulkRows([]); } }}
+        title="Bulk Import Scopes"
+        description="Upload CSV rows as scope,resourceServer,description. The resource server may be an id, slug, or name."
+        confirmLabel="Import valid scopes"
+        error={bulkError}
+        onConfirm={handleBulkImport}
+      >
+        <FileDropzone label="CSV file" accept={[".csv", "text/csv"]} onFiles={(files) => void handleBulkFiles(files)} hint="Header row is optional." />
+        {bulkRows.length > 0 ? (
+          <Stack gap="xs">
+            <Text variant="caption">{bulkRows.filter((row) => !row.error).length} valid, {bulkRows.filter((row) => row.error).length} skipped</Text>
+            {bulkRows.slice(0, 5).map((row, index) => (
+              <Inline key={`${row.scope}:${row.resourceServerId ?? row.error}:${index}`} gap="sm">
+                <Text variant="body" mono>{row.scope || "(blank)"}</Text>
+                <Badge tone={row.error ? "error" : "success"} size="sm">{row.error ?? "Valid"}</Badge>
+              </Inline>
+            ))}
+          </Stack>
+        ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog

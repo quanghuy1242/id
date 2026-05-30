@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import {
   Badge,
+  Avatar,
   Button,
   ConfirmDialog,
   DataTable,
@@ -19,6 +20,9 @@ import {
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
+  Text,
   TextInput,
   toast,
 } from "@id/ui";
@@ -57,7 +61,17 @@ const roleOptions = [
 ];
 
 const columns: DataTableColumn<User>[] = [
-  { key: "name", label: "Name", sortable: true },
+  {
+    key: "name",
+    label: "User",
+    sortable: true,
+    render: (u) => (
+      <Inline gap="sm" align="center">
+        <Avatar initials={u.name?.slice(0, 2).toUpperCase()} image={u.image ?? undefined} alt={u.name} size="sm" />
+        <Text variant="body">{u.name}</Text>
+      </Inline>
+    ),
+  },
   { key: "email", label: "Email", sortable: true },
   {
     key: "role",
@@ -197,6 +211,12 @@ export function UsersListContent({
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
 
   const allUsers = data?.users ?? [];
+  const stats = useMemo(() => ({
+    total: data?.total ?? 0,
+    adminsInPage: allUsers.filter((u) => u.role === "admin").length,
+    bannedInPage: allUsers.filter((u) => u.banned).length,
+    unverifiedInPage: allUsers.filter((u) => !u.emailVerified).length,
+  }), [allUsers, data?.total]);
   const displayedUsers =
     effectiveStatus === "all"
       ? allUsers
@@ -296,6 +316,12 @@ export function UsersListContent({
           </Button>
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Total" value={showLoading ? "…" : stats.total} description="matching users" tone="primary" />
+        <Stat title="Admins" value={showLoading ? "…" : stats.adminsInPage} description="in loaded page" />
+        <Stat title="Banned" value={showLoading ? "…" : stats.bannedInPage} description="in loaded page" tone={stats.bannedInPage > 0 ? "error" : "success"} />
+        <Stat title="Unverified" value={showLoading ? "…" : stats.unverifiedInPage} description="in loaded page" tone={stats.unverifiedInPage > 0 ? "warning" : "success"} />
+      </StatGroup>
       <Panel>
         <Stack gap="sm">
           <Inline gap="sm" justify="between" wrap>

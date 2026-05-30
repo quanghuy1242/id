@@ -10,12 +10,13 @@ type OrgDetailLayoutProps = {
   readonly children: ReactNode;
 };
 
-type OrgDetailTab = "overview" | "members" | "teams" | "invitations";
+type OrgDetailTab = "overview" | "members" | "teams" | "invitations" | "audit";
 
 function activeTabFromPath(pathname: string | null): OrgDetailTab {
   if (pathname?.endsWith("/members")) return "members";
   if (pathname?.endsWith("/teams")) return "teams";
   if (pathname?.endsWith("/invitations")) return "invitations";
+  if (pathname?.endsWith("/audit")) return "audit";
   return "overview";
 }
 

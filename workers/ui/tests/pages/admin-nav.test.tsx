@@ -19,12 +19,20 @@ vi.mock("next/navigation", () => ({
 
 describe("Admin sidebar navigation", () => {
   it("activates only the most specific sidebar item", () => {
-    navigationMock.pathname = "/admin/oauth/sessions-tokens";
+    navigationMock.pathname = "/admin/security/sessions";
 
     render(<AdminSidebarNav />);
 
     expect(screen.getByRole("link", { name: "OAuth" })).not.toHaveClass("menu-active");
-    expect(screen.getByRole("link", { name: "Sessions & Tokens" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveClass("menu-active");
+  });
+
+  it("keeps the security section item active across grants sub-routes", () => {
+    navigationMock.pathname = "/admin/security/jwks";
+
+    render(<AdminSidebarNav />);
+
+    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveClass("menu-active");
   });
 
   it("keeps the OAuth section item active for nested configuration routes", () => {
@@ -33,7 +41,7 @@ describe("Admin sidebar navigation", () => {
     render(<AdminSidebarNav />);
 
     expect(screen.getByRole("link", { name: "OAuth" })).toHaveClass("menu-active");
-    expect(screen.getByRole("link", { name: "Sessions & Tokens" })).not.toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Grants & Keys" })).not.toHaveClass("menu-active");
   });
 });
 
@@ -74,12 +82,12 @@ describe("Admin mobile navigation", () => {
   });
 
   it("selects the most specific mobile section tab", () => {
-    navigationMock.pathname = "/admin/oauth/sessions-tokens";
+    navigationMock.pathname = "/admin/identity/organizations";
 
     render(<AdminMobileRouteTabs />);
 
-    expect(screen.getByRole("tab", { name: "OAuth" })).not.toHaveClass("tab-active");
-    expect(screen.getByRole("tab", { name: "Sessions & Tokens" })).toHaveClass("tab-active");
+    expect(screen.getByRole("tab", { name: "Users" })).not.toHaveClass("tab-active");
+    expect(screen.getByRole("tab", { name: "Organizations" })).toHaveClass("tab-active");
   });
 
   it("does not render mobile section tabs on dashboard", () => {
@@ -101,13 +109,13 @@ describe("OAuth layout", () => {
     expect(screen.getByRole("tab", { name: "Resource APIs" })).toHaveClass("tab-active");
   });
 
-  it("does not stack configuration tabs above the sessions and tokens tabs", () => {
-    navigationMock.pathname = "/admin/oauth/sessions-tokens";
+  it("does not render configuration tabs outside OAuth configuration routes", () => {
+    navigationMock.pathname = "/admin/security/sessions";
 
-    render(<OAuthLayout><div>Sessions and tokens content</div></OAuthLayout>);
+    render(<OAuthLayout><div>Some other content</div></OAuthLayout>);
 
     expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
-    expect(screen.getByText("Sessions and tokens content")).toBeInTheDocument();
+    expect(screen.getByText("Some other content")).toBeInTheDocument();
   });
 });
 

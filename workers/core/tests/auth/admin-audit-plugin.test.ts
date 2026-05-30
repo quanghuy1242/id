@@ -159,4 +159,33 @@ describe("admin-audit plugin", () => {
     expect(body.keys[0].status).toBe("active");
     expect(body.keys[0].publicJwk).not.toHaveProperty("d"); // Ed25519 private scalar
   });
+
+  it("emergency-rotates JWKS and records public-only activity", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+
+    const rotate = await auth.handler(new Request(`${BASE}/api/auth/admin/jwks/rotate`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ reason: "compromise drill" }),
+    }));
+    expect(rotate.status).toBe(200);
+    const rotatedText = await rotate.text();
+    expect(rotatedText).not.toContain("privateKey");
+    expect(rotatedText).not.toContain("\"d\"");
+    const rotated = JSON.parse(rotatedText) as { id: string; publicJwk: Record<string, unknown>; reason: string };
+    expect(rotated.reason).toBe("compromise drill");
+    expect(rotated.publicJwk).not.toHaveProperty("d");
+
+    const list = await auth.handler(new Request(`${BASE}/api/auth/admin/activity-log?targetType=jwks&targetId=${rotated.id}`, {
+      method: "GET",
+      headers: { cookie },
+    }));
+    expect(list.status).toBe(200);
+    const activityText = await list.text();
+    expect(activityText).toContain("jwks.rotate");
+    expect(activityText).not.toContain("privateKey");
+    expect(activityText).not.toContain("\"d\"");
+  });
 });

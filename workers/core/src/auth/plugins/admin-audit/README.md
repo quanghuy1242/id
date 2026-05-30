@@ -7,7 +7,8 @@
 > Sessions & Tokens, Consents, and the dated/status JWKS views read from here;
 > without it those screens can only show a "Coming Soon" placeholder. It also
 > lets an admin revoke a single consent grant so a user is re-prompted on the
-> next authorization request.
+> next authorization request, and emergency-rotate JWKS through Better Auth's
+> JWT key-generation path.
 
 This plugin owns **no tables**. It reads tables owned by Better Auth core
 (`session`), the OAuth provider (`oauthAccessToken`, `oauthRefreshToken`,
@@ -82,6 +83,20 @@ GET /api/auth/admin/jwks
 `active` (not expired), `rotated` (expired but inside the grace window), or
 `expired`.
 
+Emergency rotate signing keys (reason is required; prior keys remain published
+for the configured grace window and `admin-activity-log` records the operator
+action):
+
+```
+POST /api/auth/admin/jwks/rotate
+Content-Type: application/json
+{ "reason": "compromise response drill" }
+→ { "id": "newkid", "alg": "EdDSA", "createdAt": 1736900000000,
+    "expiresAt": 1739492000000, "status": "active",
+    "publicJwk": { "kty": "OKP", "crv": "Ed25519", "x": "…", "kid": "newkid" },
+    "reason": "compromise response drill" }
+```
+
 ## Routes
 
 | Method | Path | Notes |
@@ -91,15 +106,17 @@ GET /api/auth/admin/jwks
 | `GET` | `/admin/list-consents` | Paginated; optional `clientId` filter |
 | `POST` | `/admin/revoke-consent` | Body `{ clientId, userId }` |
 | `GET` | `/admin/jwks` | Strips `privateKey`; derives status |
+| `POST` | `/admin/jwks/rotate` | Emergency rotate via Better Auth JWT key generation; public material only |
 
 All return `401` without a session and `403` for non-admin roles.
 
 ## Technical detail
 
 - **File roles.** `index.ts` is the Better Auth contract surface (endpoint
-  declarations + adapter reads + batched enrichment). `schema.ts` holds the raw
-  row reads, the presented response shapes, the revoke-consent body, and
-  precomputed OpenAPI fragments. `operations.ts` holds the pure, unit-testable
+  declarations + adapter reads + batched enrichment + guarded emergency rotate).
+  `schema.ts` holds the raw row reads, the presented response shapes, the
+  revoke-consent and rotate bodies, and precomputed OpenAPI fragments.
+  `operations.ts` holds the pure, unit-testable
   transforms (timestamp normalization, page-param clamping, token-prefixing,
   JWK status derivation, secret-stripping presenters). `types.ts` holds the
   injected options and the minimal adapter surface.

@@ -10,6 +10,7 @@ import { AdminShell } from "../_decorators/shell";
 export default { title: "Security / Consents" } satisfies StoryDefault;
 
 const ACTIVE = "/admin/security/consents";
+// NOTE: consents now live in the unified grants section (docs/027 §6).
 
 function makeActions(consents: AdminConsent[]) {
   let current = [...consents];

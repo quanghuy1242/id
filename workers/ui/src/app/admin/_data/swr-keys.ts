@@ -19,6 +19,7 @@ import {
   ADMIN_TOKENS,
   ADMIN_CONSENTS,
   ADMIN_JWKS,
+  ADMIN_ACTIVITY_LOG,
 } from "@/shared/swr-endpoints";
 
 /**
@@ -60,6 +61,7 @@ export const adminSessionsKey = (params: { limit: number; offset: number }) => [
 export const adminTokensKey = (params: { limit: number; offset: number; type: string }) => [ADMIN_TOKENS, params] as const;
 export const adminConsentsKey = (params: { limit: number; offset: number; clientId?: string }) => [ADMIN_CONSENTS, params] as const;
 export const adminJwksKey = () => [ADMIN_JWKS] as const;
+export const activityLogKey = (params: { targetType: string; targetId: string; action?: string; actorId?: string; limit: number; offset: number }) => [ADMIN_ACTIVITY_LOG, params] as const;
 
 /** Matches every users-list cache slot regardless of filter/sort/page params. */
 export const isUsersListKey = (key: Arguments) => Array.isArray(key) && key[0] === USERS_LIST;
@@ -73,3 +75,5 @@ export const isResourceServersKey = (key: Arguments) => Array.isArray(key) && ke
 export const isOauthScopesKey = (key: Arguments) => Array.isArray(key) && key[0] === OAUTH_SCOPES;
 /** Matches the M2M bindings list cache slot. */
 export const isM2mBindingsKey = (key: Arguments) => Array.isArray(key) && key[0] === OAUTH_CLIENT_RESOURCE_SCOPES;
+/** Matches every activity-log cache slot regardless of target/filter/page params. */
+export const isActivityLogKey = (key: Arguments) => Array.isArray(key) && key[0] === ADMIN_ACTIVITY_LOG;

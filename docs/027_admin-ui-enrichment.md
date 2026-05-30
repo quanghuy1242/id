@@ -1,6 +1,6 @@
 # 027 — Admin UI Enrichment & Redesign
 
-> Status: implementation-grade research and proposal (redesign-focused)
+> Status: implemented through Phase 4e; Phase 5 scoped surfaces started (dashboard stats, token decoder/introspection, application effective-access summary)
 >
 > Date: 2026-05-30
 >

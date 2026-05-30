@@ -5,13 +5,27 @@ import { renderWithSwr as render } from "../_utils/swr-render";
 import { describe, expect, it, vi } from "vitest";
 import { ScopeCatalogContent } from "@/app/admin/_components/oauth/scope-catalog-content";
 import { mockScopes, mockResourceServers } from "@/app/admin/_mocks/oauth";
-import type { OAuthResourceScope, ResourceServer, UpdateScopeInput } from "@/app/admin/_actions/oauth";
+import type { CreateScopeInput, OAuthResourceScope, ResourceServer, UpdateScopeInput } from "@/app/admin/_actions/oauth";
 
 function makeActions(scopes: OAuthResourceScope[]) {
   let current = [...scopes];
   return {
     listScopes: vi.fn<() => Promise<OAuthResourceScope[]>>().mockImplementation(async () => current),
-    createScope: vi.fn<() => Promise<OAuthResourceScope>>().mockImplementation(async () => current[0]),
+    createScope: vi.fn<(d: CreateScopeInput) => Promise<OAuthResourceScope>>().mockImplementation(async (d) => {
+      const created: OAuthResourceScope = {
+        id: `sc_${current.length + 1}`,
+        resourceServerId: d.resourceServerId,
+        scope: d.scope,
+        description: d.description ?? null,
+        enabled: true,
+        createdBy: "user_001",
+        updatedBy: "user_001",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      current = [created, ...current];
+      return created;
+    }),
     updateScope: vi.fn<(id: string, d: UpdateScopeInput) => Promise<OAuthResourceScope>>().mockImplementation(async (id) => current.find((s) => s.id === id)!),
     listResourceServers: vi.fn<() => Promise<ResourceServer[]>>().mockResolvedValue(mockResourceServers),
   };
@@ -35,13 +49,15 @@ describe("ScopeCatalogContent", () => {
 
   it("renders scope rows joined to resource server names", async () => {
     render(<ScopeCatalogContent actions={makeActions(mockScopes)} />);
-    await waitFor(() => expect(screen.getByText("content:read")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
     expect(screen.getAllByText("Content API").length).toBeGreaterThan(0);
+    expect(screen.getByText("Updated 7d")).toBeInTheDocument();
+    expect(screen.getAllByText("Scope filters").length).toBeGreaterThan(0);
   });
 
   it("omits unsupported delete actions", async () => {
     render(<ScopeCatalogContent actions={makeActions(mockScopes)} />);
-    await waitFor(() => screen.getByText("content:read"));
+    await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
     expect(screen.queryByRole("button", { name: /scope deletion via api pending/i })).toBeNull();
   });
 
@@ -62,7 +78,7 @@ describe("ScopeCatalogContent", () => {
   it("updates a scope (description + enabled) via edit", async () => {
     const actions = makeActions(mockScopes);
     render(<ScopeCatalogContent actions={actions} />);
-    await waitFor(() => screen.getByText("content:read"));
+    await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByRole("button", { name: /edit content:read/i })[0]);
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");

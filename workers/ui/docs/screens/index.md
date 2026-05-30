@@ -25,7 +25,7 @@
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin` | Dashboard — token volume, active sessions, client/org counts | — | planned |
+| `/admin` | Dashboard — live users/orgs/apps/grants/JWKS stats plus workflow shortcuts | [shell.md](shell.md) | implemented |
 
 ---
 
@@ -38,6 +38,7 @@ Actor-scoped. Platform admin sees all users; org admin has no access to this sec
 | `/admin/identity/users` | User list — search by name/email, sort, filter by role/ban status | [identity.md](identity.md#adminidentityusers) | specced |
 | `/admin/identity/users/:userId` | User detail — profile, ban/unban, set role, reset password, delete, impersonate | [identity.md](identity.md#adminidentityusersuserid) | specced |
 | `/admin/identity/users/:userId/sessions` | User sessions — active sessions, per-session revoke, revoke all | [identity.md](identity.md#adminidentityusersuseridssessions) | specced |
+| `/admin/identity/users/:userId/audit` | User audit timeline backed by `admin-activity-log` | [identity.md](identity.md#adminidentityusersuseridaudit) | implemented |
 
 ---
 
@@ -52,6 +53,7 @@ Platform admin: full list + manage any org. Org admin: own org detail only (dire
 | `/admin/identity/organizations/:orgId/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminidentityorganizationsorgidmembers) | specced |
 | `/admin/identity/organizations/:orgId/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminidentityorganizationsorgidteams) | specced |
 | `/admin/identity/organizations/:orgId/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminidentityorganizationsorgidinvitations) | specced |
+| `/admin/identity/organizations/:orgId/audit` | Organization audit timeline backed by `admin-activity-log` | [identity.md](identity.md#adminidentityorganizationsorgidaudit) | implemented |
 
 ---
 
@@ -61,9 +63,11 @@ Actor-scoped. Platform admin sees all clients; org admin sees own org's clients 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/applications` | OAuth client list — name, type, org, status, expand for detail, edit, rotate secret, delete | [oauth.md](oauth.md#adminoauthapplications) | implemented |
+| `/admin/oauth/applications` | OAuth client list — stats, type badges, row navigation, create wizard entry | [oauth.md](oauth.md#adminoauthapplications) | implemented |
+| `/admin/oauth/applications/new` | OAuth client creation wizard — type, basics, URIs, scopes, review, one-time secret reveal | [oauth.md](oauth.md#adminoauthapplicationsnew) | implemented |
+| `/admin/oauth/applications/:clientId` | OAuth client detail — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 
-Note: Detail actions (redirect URIs, scopes, secrets) are inline modals on the list page rather than separate detail routes, following the pattern established by the OAuth Provider plugin's flat endpoint structure.
+Note: Detail actions moved to a route-backed detail surface per docs/027; destructive and one-shot secret actions still use guarded dialogs.
 
 ---
 
@@ -73,9 +77,10 @@ Actor-scoped. `resourceServer.organizationId` is nullable — null means platfor
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/resource-apis` | Resource server list — name, slug, audience, org, enabled status, create/edit/activate/disable/delete modals | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
+| `/admin/oauth/resource-apis` | Resource server list — stats, updated/by columns, row navigation, create/edit/activate/disable/delete modals | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
+| `/admin/oauth/resource-apis/:resourceServerId` | Resource server detail — overview and audit | [oauth.md](oauth.md#adminoauthresource-apisresourceserverid) | implemented |
 
-Note: Edit and disable actions are handled via inline modals on the list page. No separate detail route needed since the resource-server schema has few fields.
+Note: Edit and disable actions stay inline on the list page; overview and audit are deep-linkable.
 
 ---
 
@@ -85,7 +90,7 @@ Cross-cutting read surface. Shows all `oauthResourceScope` rows across all resou
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/scope-catalog` | All scopes across all resource servers — filterable by RS, scope, enabled status; create/edit/disable via modals | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
+| `/admin/oauth/scope-catalog` | All scopes across all resource servers — stats, ScopeBuilder filtering, CSV bulk import, create/edit/disable via modals | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
 
 Note: Scope delete is not yet available in the API. Disable toggle via PATCH is available.
 
@@ -95,8 +100,9 @@ Note: Scope delete is not yet available in the API. Disable toggle via PATCH is 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — client × resource server × allowed scopes × enabled; create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
-| `/admin/oauth/sessions-tokens` | Active browser sessions and OAuth tokens — live, paginated (tabs, per-session revoke, token prefixes only) via the `admin-audit` plugin | [oauth.md](oauth.md#adminoauthsessions-tokens) | implemented |
+| `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — stats, client × resource server × allowed scopes × enabled, created/updated by, create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
+| `/admin/oauth/m2m-bindings/:bindingId` | M2M binding detail — overview and audit | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
+| `/admin/oauth/sessions-tokens` | Legacy redirect to `/admin/security/sessions` after grants IA unification | [oauth.md](oauth.md#adminoauthsessions-tokens-moved--adminsecurity) | implemented |
 
 ---
 
@@ -121,8 +127,13 @@ Track B (SET/SSF async push) is **deferred** — docs 014/015/016 unimplemented.
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/security/jwks` | JWKS key list — enriched via `admin-audit` `GET /admin/jwks` (kid, alg, created/expires, active/rotated/expired status, public JWK, copy); private key never exposed | [security.md](security.md#adminsecurityjwks) | implemented |
+| `/admin/security/sessions` | Active browser sessions — stats, live page, per-session revoke | [security.md](security.md#adminsecuritysessions) | implemented |
+| `/admin/security/tokens?type=access` | Access token audit — prefixes only, no token bodies | [security.md](security.md#adminsecuritytokens) | implemented |
+| `/admin/security/tokens?type=refresh` | Refresh token audit — prefixes only, no token bodies | [security.md](security.md#adminsecuritytokens) | implemented |
+| `/admin/security/jwks` | JWKS key list — stats, table, emergency rotate, public JWK only; private key never exposed | [security.md](security.md#adminsecurityjwks) | implemented |
+| `/admin/security/jwks/:kid` | JWKS key detail — overview, public JWK, metrics stub, audit | [security.md](security.md#adminsecurityjwkskid) | implemented |
 | `/admin/security/consents` | Global consent audit — live, paginated, filter by client, per-grant revoke via the `admin-audit` plugin | [security.md](security.md#adminsecurityconsents) | implemented |
+| `/admin/security/introspect` | Token decoder and RFC 7662 introspection console | [security.md](security.md#adminsecurityintrospect) | implemented |
 | `/admin/security/policies` | CEL policy list — create, test expression console | — | deferred |
 
 `/admin/security/policies` deferred pending `idCelPolicy` plugin (docs/003 §2).

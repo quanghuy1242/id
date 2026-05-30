@@ -42,6 +42,15 @@ describe("M2mBindingsContent", () => {
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
     expect(screen.getByText("Disabled")).toBeInTheDocument();
     expect(screen.getAllByText("content:read").length).toBeGreaterThan(0);
+    expect(screen.getByText("Updated / By")).toBeInTheDocument();
+  });
+
+  it("calls onBindingClick for row navigation", async () => {
+    const onBindingClick = vi.fn<(id: string) => void>();
+    render(<M2mBindingsContent actions={makeActions(mockBindings)} onBindingClick={onBindingClick} />);
+    await waitFor(() => screen.getAllByText("Content API"));
+    fireEvent.click(screen.getAllByText("content:read")[0]);
+    await waitFor(() => expect(onBindingClick).toHaveBeenCalledWith("bind_001"));
   });
 
   it("deletes a binding", async () => {

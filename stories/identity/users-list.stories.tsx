@@ -6,9 +6,11 @@ import { UserDetailProvider } from "../../workers/ui/src/app/admin/_components/i
 import { UserDetailHeaderContent } from "../../workers/ui/src/app/admin/_components/identity/user-detail-header-content";
 import { UserDetailOverviewContent } from "../../workers/ui/src/app/admin/_components/identity/user-detail-overview-content";
 import { UserSessionsContent } from "../../workers/ui/src/app/admin/_components/identity/user-sessions-content";
+import { ActivityLogContent } from "../../workers/ui/src/app/admin/_components/activity-log-content";
 import type { CreateUserBody, ListUsersParams, User, Session, CurrentSession } from "../../workers/ui/src/app/admin/_actions/users";
 import { AdminShell } from "../_decorators/shell";
 import { mockUsers, mockSessions } from "../../workers/ui/src/app/admin/_mocks/users";
+import { mockActivities } from "../../workers/ui/src/app/admin/_mocks/audit";
 
 function createStoryActions(initialUsers: readonly User[]) {
   let users = [...initialUsers];
@@ -79,7 +81,7 @@ function UserDetailFrame({
 }: {
   activePath: string;
   userId: string;
-  activeTab: "overview" | "sessions";
+  activeTab: "overview" | "sessions" | "audit";
   actions?: UserDetailFrameActions;
   loading?: boolean;
   error?: string;
@@ -291,3 +293,52 @@ export const UserSessions_Error: Story = () => {
   );
 };
 UserSessions_Error.storyName = "User Sessions / Error";
+
+function createActivityActions(entries = mockActivities) {
+  const userEntries = entries.filter((entry) => entry.targetType === "user");
+  return {
+    listActivityLog: async () => ({
+      entries: userEntries,
+      total: userEntries.length,
+      limit: 25,
+      offset: 0,
+    }),
+  };
+}
+
+export const UserAudit_Populated: Story = () => {
+  const actions = createDetailActions(mockUsers[0]);
+  return (
+    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+      <ActivityLogContent targetType="user" targetId="user_001" actions={createActivityActions()} />
+    </UserDetailFrame>
+  );
+};
+UserAudit_Populated.storyName = "User Audit / Populated";
+
+export const UserAudit_Empty: Story = () => {
+  const actions = createDetailActions(mockUsers[0]);
+  return (
+    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+      <ActivityLogContent targetType="user" targetId="user_001" actions={createActivityActions([])} />
+    </UserDetailFrame>
+  );
+};
+UserAudit_Empty.storyName = "User Audit / Empty";
+
+export const UserAudit_Loading: Story = () => (
+  <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" loading>
+    <ActivityLogContent targetType="user" targetId="user_001" loading />
+  </UserDetailFrame>
+);
+UserAudit_Loading.storyName = "User Audit / Loading";
+
+export const UserAudit_Error: Story = () => {
+  const actions = createDetailActions(mockUsers[0]);
+  return (
+    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+      <ActivityLogContent targetType="user" targetId="user_001" error="Failed to load activity" />
+    </UserDetailFrame>
+  );
+};
+UserAudit_Error.storyName = "User Audit / Error";

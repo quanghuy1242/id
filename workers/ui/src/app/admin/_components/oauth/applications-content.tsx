@@ -12,12 +12,15 @@ import {
   EmptyState,
   ErrorAlert,
   Inline,
+  LinkButton,
   PageIntro,
   Panel,
   RadioGroup,
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
   Tabs,
   Text,
   Textarea,
@@ -137,6 +140,8 @@ function ClientMetadataFields({ client }: { readonly client?: OAuthClient }) {
 type ApplicationsContentProps = {
   search?: string;
   onSearchChange?: (v: string) => void;
+  onClientClick?: (clientId: string) => void;
+  createHref?: string;
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
@@ -146,6 +151,8 @@ type ApplicationsContentProps = {
 export function ApplicationsContent({
   search: searchProp,
   onSearchChange,
+  onClientClick,
+  createHref,
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
@@ -189,6 +196,17 @@ export function ApplicationsContent({
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
+  const stats = useMemo(() => {
+    const clients = allClients ?? [];
+    return clients.reduce(
+      (acc, client) => {
+        acc.total += 1;
+        acc[clientType(client)] += 1;
+        return acc;
+      },
+      { total: 0, confidential: 0, public: 0, M2M: 0 } as Record<ClientType | "total", number>,
+    );
+  }, [allClients]);
 
   function buildClientPayload(formData: FormData) {
     const type = String(formData.get("type") ?? "confidential");
@@ -386,6 +404,7 @@ export function ApplicationsContent({
         columns={columns}
         rows={displayed}
         getRowKey={(client) => client.client_id}
+        onRowClick={onClientClick ? (client) => onClientClick(client.client_id) : undefined}
       />
     );
   }
@@ -399,9 +418,19 @@ export function ApplicationsContent({
         description="Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."
         info="Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."
         actions={
-          <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateType("confidential"); setCreateOpen(true); }}>New App</Button>
+          createHref ? (
+            <LinkButton href={createHref} iconName="Plus">New App</LinkButton>
+          ) : (
+            <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateType("confidential"); setCreateOpen(true); }}>New App</Button>
+          )
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Total" value={stats.total} description="applications" tone="primary" />
+        <Stat title="Confidential" value={stats.confidential} description="server apps" />
+        <Stat title="Public" value={stats.public} description="PKCE clients" tone="info" />
+        <Stat title="M2M" value={stats.M2M} description="service clients" tone="warning" />
+      </StatGroup>
       <Panel>
         <SearchInput grow placeholder="Search applications…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>

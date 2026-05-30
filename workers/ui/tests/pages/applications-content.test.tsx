@@ -45,8 +45,17 @@ describe("ApplicationsContent", () => {
   it("renders client cards with type badges", async () => {
     render(<ApplicationsContent actions={makeActions(mockClients)} />);
     await waitFor(() => expect(screen.getByText("Content API")).toBeInTheDocument());
-    expect(screen.getByText("M2M")).toBeInTheDocument();
-    expect(screen.getByText("Public")).toBeInTheDocument();
+    expect(screen.getAllByText("M2M").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Public").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Confidential").length).toBeGreaterThan(0);
+  });
+
+  it("calls onClientClick for row navigation", async () => {
+    const onClientClick = vi.fn<(clientId: string) => void>();
+    render(<ApplicationsContent actions={makeActions(mockClients)} onClientClick={onClientClick} />);
+    await waitFor(() => screen.getByText("Content API"));
+    fireEvent.click(screen.getByText("cli_contentapi_a1b2c3d4e5f6"));
+    await waitFor(() => expect(onClientClick).toHaveBeenCalledWith("cli_contentapi_a1b2c3d4e5f6"));
   });
 
   it("filters clients via search prop", async () => {

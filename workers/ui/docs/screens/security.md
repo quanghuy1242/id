@@ -10,124 +10,177 @@ Covers routes under `/admin/security`. Platform admin only.
 
 Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no
 
+## Unified grants section (docs/027 §6)
+
+Sessions, access tokens, refresh tokens, and consents are facets of one concept (live grants), with Signing Keys (JWKS) and the standards-based Token Decoder as siblings. They share one URL-addressable route-tab bar owned by `app/admin/security/layout.tsx`:
+
+```
+Sessions · Access Tokens · Refresh Tokens · Consents · Signing Keys · Token Decoder
+```
+
+The two token tabs share `/admin/security/tokens` and are distinguished by the `?type=access|refresh` query param. The sidebar carries a single "Grants & Keys" entry pointing at `/admin/security` (an index redirect to `/admin/security/sessions`); the layout tabs own sub-navigation, mirroring the OAuth section. The legacy `/admin/oauth/sessions-tokens` route permanently redirects to `/admin/security/sessions`. All data comes from the read-only `admin-audit` aggregate endpoints — no token bodies or private keys are ever returned.
+
+---
+
+## /admin/security/sessions
+
+Live audit of interactive browser sign-ins, with a stats header and a server-paginated table.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Admin ▸ Grants & Keys                                 │
+│ [ Sessions | Access Tokens | Refresh Tokens | Consents | Signing Keys ]│
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌ Total: 24 ┬ Impersonated: 1 ┬ Unique users: 18 ┐ │
+│                  │ └───────────┴─────────────────┴──────────────────┘ │
+│                  │ [🔍 search by email or IP]                          │
+│                  │ ┌──────────────────────────────────────────────┐   │
+│                  │ │ User Email ↕   IP   User Agent  Created Exp ⋯ │   │
+│                  │ │ john@acme.com  1.2  Mozilla…    01/15  …  [Revoke]│
+│                  │ │ bob@corp.com   1.7  Mozilla…  [Impersonated][Revoke]│
+│                  │ └──────────────────────────────────────────────┘   │
+│                  │  ‹ Prev   Page 1 of 1   Next ›                       │
+│                  │ ┌ empty ─ No active browser sessions ─┐              │
+│                  │ ┌ error ─ ⚠ Failed to load   [Retry] ─┐             │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  SessionsContent (route tabs from security/layout.tsx)
+  Stack(gap="md")
+    PageIntro(title="Sessions", description, info)
+    StatGroup(columns=3): Stat(Total sessions) Stat(Impersonated, warning if >0) Stat(Unique users)
+    Panel > SearchInput(grow, "Search by email or IP…")
+    Panel(padding=none) > DataTable<AdminSession>(columns=[userEmail, ipAddress, userAgent, created, expires, actions], pagination)
+    Revoke: ConfirmDialog(variant="danger") → revokeUserSession(token) → mutate()
+
+Data: GET /api/auth/admin/list-sessions → { sessions, total, limit, offset }
+      POST /api/auth/admin/revoke-session  body: { sessionToken }
+
+Behavior:
+  - Server-paginated (limit/offset in the SWR key). Search filters the loaded page client-side by email/IP.
+  - Impersonated sessions show a warning Badge; revoke signs the user out immediately.
+
+States: loading → Skeleton | empty → EmptyState("No active browser sessions") | error → ErrorAlert(onRetry=mutate)
+
+---
+
+## /admin/security/tokens
+
+Live audit of OAuth tokens, with a type filter that is URL-addressable (`?type=access|refresh`).
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ [ Sessions | Access Tokens | Refresh Tokens | Consents | Signing Keys ]│
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ ┌ Access tokens: 12 ┬ Clients: 5 ┐                  │
+│                  │ └───────────────────┴────────────┘                  │
+│                  │ [Type ▾ Access]   [🔍 search by client or user]     │
+│                  │ ┌──────────────────────────────────────────────┐   │
+│                  │ │ Type   Client    User    Token   Scopes  Exp │   │
+│                  │ │ access Content   john@    a1b2…   [rd]    01/16│  │
+│                  │ └──────────────────────────────────────────────┘   │
+│                  │  Token values are never exposed — 8-char prefix only.│
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  TokensContent (route tabs from security/layout.tsx)
+  Stack(gap="md")
+    PageIntro(title="Access Tokens" | "Refresh Tokens", description, info)
+    StatGroup(columns=2): Stat(token count, primary) Stat(Clients)
+    Panel > Inline > FilterDropdown(Type: access|refresh) + SearchInput
+    Panel(padding=none) > DataTable<AdminToken>(columns=[type, client, user, tokenPrefix, scopes, expires], pagination)
+    Text(caption, "Token values are never exposed — only an 8-character prefix is shown.")
+
+Data: GET /api/auth/admin/list-tokens?type=access|refresh → { tokens, total, limit, offset }
+
+Behavior:
+  - The route owns `type` from the `?type` query param; changing the FilterDropdown pushes `/admin/security/tokens?type=…`. `type` + page window are in the SWR key. Search filters the loaded page by client/user.
+  - The two route tabs (Access Tokens, Refresh Tokens) both target this route with different `?type`.
+
+States: loading → Skeleton | empty → EmptyState("No active access/refresh tokens") | error → ErrorAlert(onRetry=mutate)
+
 ---
 
 ## /admin/security/jwks
 
-Read-only view of the JSON Web Key Set used for JWT signing. Public information, displayed for admin visibility.
+Signing-key list with lifecycle stats, a table, detail navigation, and a guarded emergency rotate action. Only public JWK material is displayed; private key material is never returned or logged.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│ ◈ id admin  ▸ Admin ▸ JWKS                                         │
+│ ◈ id admin  ▸ Admin ▸ Grants & Keys                                  │
+│ [ Sessions | Access Tokens | Refresh Tokens | Consents | Signing Keys ]│
 ├──────────────────┬────────────────────────────────────────────────────┤
-│   (sidebar)      │ ┌── loading ────────────────────────────────────┐ │
-│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎                │ │
-│                  │ │ ∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎∎                │ │
-│                  │ └─────────────────────────────────────────────────┘ │
-│                  │                                                    │
-│                  │ ┌── JWKS keys ───────────────────────────────────┐ │
-│                  │ │                                                │ │
-│                  │ │  ┌─ Active Key ───────────────────────────┐    │ │
-│                  │ │  │ kid:  abc123def456                      │    │ │
-│                  │ │  │ alg:  EdDSA                             │    │ │
-│                  │ │  │ createdAt:  2024-01-15 12:00 UTC        │    │ │
-│                  │ │  │ expiresAt:  2025-01-15 12:00 UTC        │    │ │
-│                  │ │  │                                        │    │ │
-│                  │ │  │ Public JWK:                            │    │ │
-│                  │ │  │ ┌──────────────────────────────────┐    │    │ │
-│                  │ │  │ │ {                                │    │    │ │
-│                  │ │  │ │   "kty": "OKP",                  │    │    │ │
-│                  │ │  │ │   "crv": "Ed25519",              │    │    │ │
-│                  │ │  │ │   "x": "abc123...",              │    │    │ │
-│                  │ │  │ │   "kid": "abc123def456",         │    │    │ │
-│                  │ │  │ │   "use": "sig",                  │    │    │ │
-│                  │ │  │ │   "alg": "EdDSA"                 │    │    │ │
-│                  │ │  │ │ }                                │    │    │ │
-│                  │ │  │ └──────────────────────────────────┘    │    │ │
-│                  │ │  │                                  [Copy] │    │ │
-│                  │ │  └──────────────────────────────────────────┘    │ │
-│                  │ │                                                │ │
-│                  │ │  ┌─ Rotated Key — expires 2024-02-15 ──────┐    │ │
-│                  │ │  │ kid:  xyz789ghi012                       │    │ │
-│                  │ │  │ alg:  EdDSA                              │    │ │
-│                  │ │  │ expiresAt:  2024-03-01 12:00 UTC (grace) │    │ │
-│                  │ │  │ Public JWK:   { "kty": "OKP", ... }     │    │ │
-│                  │ │  │                                  [Copy] │    │ │
-│                  │ │  └──────────────────────────────────────────┘    │ │
-│                  │ │                                                │ │
-│                  │ │  ┌─ Expired Key — expired 2024-01-15 ────────┐   │ │
-│                  │ │  │ kid:  old123key456                        │   │ │
-│                  │ │  │ alg:  EdDSA                              │   │ │
-│                  │ │  │ (dimmed panel)                            │   │ │
-│                  │ │  │ Public JWK:   { "kty": "OKP", ... }     │   │ │
-│                  │ │  │                                 [Copy] │   │ │
-│                  │ │  └───────────────────────────────────────────┘   │ │
-│                  │ │                                                │ │
-│                  │ │ Total: 3 keys (1 active, 1 rotated, 1 expired) │ │
-│                  │ └─────────────────────────────────────────────────┘ │
-│                  │                                                    │
-│                  │ ┌── empty ──────────────────────────────────────┐ │
-│                  │ │     📥  No JWKS keys available                │ │
-│                  │ └───────────────────────────────────────────────┘ │
-│                  │                                                    │
-│                  │ ┌── error ───────────────────────────────────────┐ │
-│                  │ │ ⚠ Failed to load JWKS                     Retry│ │
-│                  │ └─────────────────────────────────────────────────┘ │
+│   (sidebar)      │ Signing Keys                         [⟳ Rotate]    │
+│                  │ ┌ Total ┬ Active ┬ Rotated ┬ Expired ┐             │
+│                  │ │ 3     │ 1      │ 1       │ 1       │             │
+│                  │ └───────┴────────┴─────────┴─────────┘             │
+│                  │ ┌──────────────────────────────────────────────┐   │
+│                  │ │ Key ID ↕        Alg    Status    Created ↕   │   │
+│                  │ │ abc123def456    EdDSA  ● Active  01/15       │   │
+│                  │ │ xyz789ghi012    EdDSA  ◷ Rotated 12/16       │   │
+│                  │ │ old123key456    EdDSA  ○ Expired 12/12       │   │
+│                  │ └──────────────────────────────────────────────┘   │
+│                  │ ┌ rotate modal: reason required, danger confirm ┐  │
 └──────────────────┴────────────────────────────────────────────────────┘
 ```
 
 Components:
   PageBody > Suspense > JwksContent
   Stack(gap="md")
-    PageHeader
-      Inline(justify="between")
-        Inline(gap="sm")
-          Text(variant="h1", "JWKS")
-        Inline(gap="sm")
-          Badge(tone="info", children="Public")
-          Text(variant="caption", "These keys are public — safe to share with resource servers.")
-
-    Stack(gap="md") — one Panel per key
-      Active key:
-        Panel(tone="base")
-          Stack(gap="sm")
-            Grid(columns="two")
-              Text(variant="caption", "Key ID") + Text(variant="body", key.id, mono)
-              Text(variant="caption", "Algorithm") + Text(variant="body", key.alg || "EdDSA")
-              Text(variant="caption", "Created") + Text(variant="body", formatDate(key.createdAt))
-              Text(variant="caption", "Expires") + Text(variant="body", formatDate(key.expiresAt || "Never"))
-            CodeBlock(label="Public JWK", value=JSON.stringify(key.publicJwk, null, 2), action=Button(size="sm", variant="secondary", iconName="Copy", onClick=copyKey(key.id), "Copy"))
-        — If key is active (createdAt most recent, expiresAt in future): Badge(tone="success", "Active")
-        — If key is in grace period (expired but within grace window): Badge(tone="warning", "Rotated")
-        — If key is fully expired: Panel tone="muted", Badge(tone="neutral", "Expired")
-        — Expired keys: dimmed Panel with tone="muted"
-
-      Loading: Skeleton(rows=6, height="md")
-      Empty: EmptyState(message="No JWKS keys available")
-      Error: ErrorAlert(message, onRetry=refetch)
+    PageIntro(title="Signing Keys", description, info, actions=Button(variant="secondary", iconName="RefreshCw", "Emergency Rotate"))
+    StatGroup(columns=4): Stat(Total) Stat(Active, success) Stat(Rotated, warning) Stat(Expired)
+    Panel(padding=none) > DataTable<AdminJwk>(columns=[id, alg, status(Badge), createdAt, expiresAt], onRowClick=router.push(`/admin/security/jwks/${kid}`))
+    ConfirmDialog(variant="danger", title="Emergency rotate signing keys") > Textarea(label="Reason", required)
 
 Data: GET /api/auth/admin/jwks → { keys: AdminJwk[] }
+      POST /api/auth/admin/jwks/rotate body: { reason } → AdminJwk & { reason }
       AdminJwk shape: { id, alg, createdAt, expiresAt, status, publicJwk }
-      — `publicJwk` contains public material ONLY: { kid, kty, crv, x, use, alg } for EdDSA/Ed25519.
-      — The endpoint must never return `privateKey` or a private JWK `d` member.
+      `publicJwk` contains public material only; the endpoint must never return `privateKey` or a private JWK `d` member.
 
 Behavior:
-  - Fetch the admin JWKS metadata endpoint (`GET /api/auth/admin/jwks`) and parse the `keys` array.
-  - Copy button: `navigator.clipboard.writeText(JSON.stringify(key.publicJwk, null, 2))`.
-  - This is a read-only informational page. No mutations.
-  - The JWKS route returns `application/json` with `{ keys: [...] }` per RFC 7517.
+  - Fetch the admin JWKS metadata endpoint and sort active → rotated → expired, newest first within status.
+  - Row click navigates to the detail route; list data is reused by the detail route because no per-key GET exists.
+  - Emergency rotate calls Better Auth's JWT key creation path, creates a new signing key, keeps prior keys published for the grace window, appends `admin-activity-log` action `jwks.rotate`, then revalidates `adminJwksKey()`.
+  - Loading → Skeleton(rows=6); empty → EmptyState("No JWKS keys available"); error → ErrorAlert(onRetry=mutate).
 
-Badge mappings (per-key status — ENRICHED only, needs the admin endpoint above):
-  active → Badge(tone="success", "Active")
-  rotated (in grace period) → Badge(tone="warning", "Rotated")
-  expired → Badge(tone="neutral", "Expired")
+Badge mappings: active → Badge(tone="success", "Active"); rotated → Badge(tone="warning", "Rotated"); expired → Badge(tone="neutral", "Expired").
 
-Notes:
-  - Better Auth JWT plugin handles key rotation automatically (config in `auth/config.ts`).
-    Rotation interval: JWKS_ROTATION_INTERVAL_SECONDS (86400s = 24h).
-    Grace period: JWKS_GRACE_PERIOD_SECONDS (1209600s = 14d).
-  - The admin page does NOT rotate keys — that's automatic.
-  - No private keys are exposed. Only public JWK material is shown.
+---
+
+## /admin/security/jwks/:kid
+
+Deep-linkable public-key detail route. The detail route has its own tabs; the security layout hides the section route tabs on nested detail pages.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ‹ Signing Keys                                                        │
+│ abc123def456                                      [Active]            │
+│ [ Overview | Public JWK | Metrics | Audit ]                           │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ Overview: DescriptionList + [Download public JWK]  │
+│                  │ Public JWK: JsonViewer + [Copy] [Download]         │
+│                  │ Metrics: EmptyState(per-key usage not collected)   │
+│                  │ Audit: Timeline(targetType="jwks", targetId=kid)   │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  JwksDetailContent(kid, activeTab)
+    Header: Inline(LinkButton back, Text(h1 key.id), Badge(status))
+    Tabs(items=[Overview, Public JWK, Metrics, Audit])
+    Overview: Panel > DescriptionList(columns=2, items=[Key ID, Algorithm, Status, Created, Expires]) + Button(iconName="Download")
+    Public JWK: JsonViewer(value=key.publicJwk, action=Inline(Button(Copy), Button(Download)))
+    Metrics: EmptyState(message="Per-key usage metrics are not yet collected")
+    Audit: ActivityLogContent(targetType="jwks", targetId=kid)
+
+Data: GET /api/auth/admin/jwks → { keys: AdminJwk[] } selected client-side by `kid`.
+      GET /api/auth/admin/activity-log?targetType=jwks&targetId=:kid → Timeline entries.
+
+Behavior:
+  - Missing `kid` shows ErrorAlert("Signing key not found") with the back button still available.
+  - Copy/download serialize `key.publicJwk` only. Private JWK members must not render.
 
 ---
 
@@ -227,3 +280,41 @@ Notes:
       PageHeader > Text(variant="h1", "Consents")
       Panel > Text(variant="body", "Consent management is coming soon. The consent viewer will show all OAuth authorization grants across all users and clients.")
     ```
+
+---
+
+## /admin/security/introspect
+
+Standards-based token decoder and RFC 7662 introspection console. Decoding is local and does not prove token validity; introspection calls the existing OAuth2 provider endpoint.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ [ Sessions | Access Tokens | Refresh Tokens | Consents | Signing Keys | Token Decoder ] │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (sidebar)      │ Token Decoder                                      │
+│                  │ [ CodeEditor: paste JWT or opaque token ]           │
+│                  │ [Type ▾ Access] [Client ID] [Client Secret] [Resource] [Introspect] │
+│                  │ ┌ Format ┬ Signing kid ┬ Audience ┐                │
+│                  │ │ JWT    │ kid_123     │ content  │                │
+│                  │ └────────┴─────────────┴──────────┘                │
+│                  │ Decoded Header / Decoded Claims JsonViewer          │
+│                  │ Introspection Response JsonViewer + status fields    │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  TokenIntrospectContent
+    PageIntro(title="Token Decoder", description, info)
+    Panel > Form > CodeEditor(label="Token") + FilterDropdown(Token type hint) + TextInput(Client ID) + TextInput(Client Secret type=password) + TextInput(Resource) + Button(Introspect)
+    StatGroup(columns=3): Stat(Format) Stat(Signing kid) Stat(Audience)
+    JsonViewer(Decoded Header) + JsonViewer(Decoded Claims) when JWT decode succeeds
+    Panel > DescriptionList(Status, Client ID, Token type, Scopes, Expires, Username) + JsonViewer(Introspection Response) after submit
+
+Data: POST /api/auth/oauth2/introspect body: { token, token_type_hint?, client_id?, client_secret?, resource? } → RFC 7662 token introspection response
+
+Behavior:
+  - Local JWT decode only splits and base64url-decodes header/claims; it never treats decoded claims as proof of active access.
+  - Opaque tokens show Format=Opaque and can still be introspected.
+  - Client credentials are used only for the standard introspection request and are not stored in component state after navigation, not logged, and not sent to any repository-specific admin endpoint.
+
+States: empty → Waiting stat | malformed JWT → caption message | introspection error → ErrorAlert | success → DescriptionList + JsonViewer

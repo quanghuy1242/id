@@ -38,3 +38,4 @@ export const ADMIN_TOKENS = "/admin/list-tokens";
 export const ADMIN_CONSENTS = "/admin/list-consents";
 /** Admin JWKS key metadata (admin-audit plugin; timestamps + status). */
 export const ADMIN_JWKS = "/admin/jwks";
+export const ADMIN_ACTIVITY_LOG = "/admin/activity-log";

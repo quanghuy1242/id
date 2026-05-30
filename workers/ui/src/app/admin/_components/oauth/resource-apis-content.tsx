@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
+  DescriptionList,
   EmptyState,
   ErrorAlert,
   Inline,
@@ -17,6 +18,9 @@ import {
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
+  Text,
   Textarea,
   TextInput,
   toast,
@@ -43,12 +47,17 @@ const defaultActions = {
   listOrganizations: listOrganizationsAction,
 };
 
+function formatDate(ms: number | null | undefined): string {
+  return typeof ms === "number" ? new Date(ms).toLocaleString() : "Never";
+}
+
 type ResourceApisContentProps = {
   search?: string;
   onSearchChange?: (v: string) => void;
   sortBy?: string;
   sortDirection?: "asc" | "desc";
   onSort?: (key: string, dir: "asc" | "desc") => void;
+  onResourceClick?: (resourceServerId: string) => void;
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
@@ -61,6 +70,7 @@ export function ResourceApisContent({
   sortBy: sortByProp,
   sortDirection: sortDirProp,
   onSort,
+  onResourceClick,
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
@@ -126,6 +136,15 @@ export function ResourceApisContent({
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
+  const stats = useMemo(() => {
+    const rows = allServers ?? [];
+    return {
+      total: rows.length,
+      enabled: rows.filter((rs) => rs.enabled).length,
+      disabled: rows.filter((rs) => !rs.enabled).length,
+      system: rows.filter((rs) => rs.organizationId === null).length,
+    };
+  }, [allServers]);
 
   const columns: DataTableColumn<ResourceServer>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -139,6 +158,17 @@ export function ResourceApisContent({
           {rs.organizationId === null ? <Badge tone="accent" size="sm">System</Badge> : null}
           {rs.enabled ? <Badge tone="success" size="sm">Enabled</Badge> : <Badge tone="error" size="sm">Disabled</Badge>}
         </Inline>
+      ),
+    },
+    {
+      key: "updatedAt",
+      label: "Updated / By",
+      sortable: true,
+      render: (rs) => (
+        <Stack gap="xs">
+          <Text variant="body">{formatDate(rs.updatedAt)}</Text>
+          <Text variant="caption" mono>{rs.updatedBy}</Text>
+        </Stack>
       ),
     },
     { key: "description", label: "Description", render: (rs) => rs.description ?? "—" },
@@ -265,6 +295,7 @@ export function ResourceApisContent({
         sortBy={effectiveSortBy}
         sortDirection={effectiveSortDir}
         onSort={handleSort}
+        onRowClick={onResourceClick ? (rs) => onResourceClick(rs.id) : undefined}
       />
     );
   }
@@ -281,6 +312,12 @@ export function ResourceApisContent({
           <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateOrgId(""); setCreateOpen(true); }}>Register API</Button>
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Total" value={stats.total} description="resource APIs" tone="primary" />
+        <Stat title="Enabled" value={stats.enabled} description="grantable" tone="success" />
+        <Stat title="Disabled" value={stats.disabled} description="blocked" tone={stats.disabled > 0 ? "warning" : "neutral"} />
+        <Stat title="System" value={stats.system} description="id-owned" tone="info" />
+      </StatGroup>
       <Panel>
         <SearchInput grow placeholder="Search resource APIs…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
@@ -312,6 +349,13 @@ export function ResourceApisContent({
       >
         {editDisplay ? (
           <>
+            <DescriptionList
+              dense
+              items={[
+                { term: "Created", description: `${formatDate(editDisplay.createdAt)} by ${editDisplay.createdBy}` },
+                { term: "Updated", description: `${formatDate(editDisplay.updatedAt)} by ${editDisplay.updatedBy}` },
+              ]}
+            />
             <TextInput label="Name" name="name" defaultValue={editDisplay.name} required />
             <TextInput label="Slug" name="slug" defaultValue={editDisplay.slug} required />
             <TextInput label="Audience URL" name="audience" defaultValue={editDisplay.audience} required />

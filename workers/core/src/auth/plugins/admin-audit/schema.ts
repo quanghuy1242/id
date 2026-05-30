@@ -4,6 +4,10 @@ import {
   zodSchemaToOpenApi,
   type OpenApiRequestBody,
 } from "../../openapi";
+import {
+  ROTATE_JWKS_REASON_MAX_LENGTH,
+  ROTATE_JWKS_REASON_MIN_LENGTH,
+} from "../../config";
 
 /**
  * Schema surface for the admin-audit plugin.
@@ -103,6 +107,8 @@ export type PresentedJwk = {
   publicJwk: Record<string, unknown>;
 };
 
+export type RotateJwksResponse = PresentedJwk & { reason: string };
+
 // ─── Zod schemas (for OpenAPI generation only) ────────────────────
 
 const sessionSchema = z.object({
@@ -150,6 +156,10 @@ const jwkSchema = z.object({
   publicJwk: z.record(z.string(), z.unknown()),
 }).meta({ id: "AdminAuditJwk" });
 
+const rotateJwksSchema = jwkSchema.extend({
+  reason: z.string(),
+}).meta({ id: "AdminRotateJwksResponse" });
+
 /** Validated body for the revoke-consent endpoint. */
 export const revokeConsentBody = z
   .object({
@@ -158,7 +168,15 @@ export const revokeConsentBody = z
   })
   .strict();
 
+/** Validated body for the emergency-rotate endpoint. */
+export const rotateJwksBody = z
+  .object({
+    reason: z.string().min(ROTATE_JWKS_REASON_MIN_LENGTH).max(ROTATE_JWKS_REASON_MAX_LENGTH),
+  })
+  .strict();
+
 export type RevokeConsentBody = z.infer<typeof revokeConsentBody>;
+export type RotateJwksBody = z.infer<typeof rotateJwksBody>;
 
 // ─── Precomputed OpenAPI fragments ────────────────────────────────
 
@@ -174,6 +192,8 @@ export const listConsentsOpenApiSchema = zodSchemaToOpenApi(
 export const revokeConsentOpenApiSchema = zodSchemaToOpenApi(z.object({ success: z.boolean() }));
 export const revokeConsentOpenApiRequestBody = openApiJsonRequestBody(revokeConsentBody);
 export const jwksOpenApiSchema = zodSchemaToOpenApi(z.object({ keys: z.array(jwkSchema) }));
+export const rotateJwksOpenApiSchema = zodSchemaToOpenApi(rotateJwksSchema);
+export const rotateJwksOpenApiRequestBody = openApiJsonRequestBody(rotateJwksBody);
 
 type QueryParameter = {
   name: string;

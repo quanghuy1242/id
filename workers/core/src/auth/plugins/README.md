@@ -17,6 +17,7 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | `id-oauth-m2m-bridge` | `oauth-m2m-bridge/` | M2M OAuth client identity mirror and immutable client-reference boundary required by the BA token hook contract |
 | `id-oauth-client-picker` | `oauth-client-picker/` | Scoped system-M2M client metadata and advisory OAuth resource-eligibility lookup with tenant-context isolation |
 | `id-scim-directory` | `scim-directory/` | Read-only SCIM v2 directory (RFC 7644) for users, org users, teams/groups, and virtual org-admin group — doc 017 A3 |
+| `id-admin-activity-log` | `admin-activity-log/` | Append-only admin mutation history for entity Audit tabs, with recursive secret stripping |
 
 ## File structure
 

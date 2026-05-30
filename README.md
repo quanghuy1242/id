@@ -5,7 +5,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
-- `ui-id` Worker — admin UI under `/admin/*` (identity, OAuth, and security sections, including live aggregate sessions/tokens, consents, and enriched JWKS views backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md)), hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
+- `ui-id` Worker — admin UI under `/admin/*` (dashboard stats; identity, OAuth, and security sections; live aggregate sessions/tokens/consents/JWKS backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md); entity Audit tabs backed by `admin-activity-log`; and a standards-based token decoder/introspection console), hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
 
 ## Contracts
 

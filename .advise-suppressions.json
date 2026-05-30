@@ -314,6 +314,16 @@
       "file": ".ladle/components.tsx",
       "rule": "ai-slop/narrative-comment",
       "reason": "Architectural rationale for not writing data-theme to document.documentElement — Ladle's toolbar CSS depends on its own data-theme values."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/admin-activity-log/index.ts|workers/core/src/auth/plugins/admin-audit/index.ts",
+      "reason": "Better Auth plugin factories intentionally repeat endpoint metadata, admin authorization, and adapter-enrichment setup while keeping admin-audit and admin-activity-log as separate plugin boundaries."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/ui/src/app/admin/_components/oauth/application-detail-content.tsx|workers/ui/src/app/admin/_components/security/jwks-detail-content.tsx",
+      "reason": "Detail content components intentionally share route-tab loading/error/not-found structure while keeping OAuth application and JWKS data contracts separate."
     }
   ]
 }

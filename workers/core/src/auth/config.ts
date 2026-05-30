@@ -31,6 +31,12 @@ export const ADMIN_AUDIT_MAX_PAGE_LIMIT = 100;
 /** Number of leading characters shown for a token in admin-audit listings. */
 export const ADMIN_AUDIT_TOKEN_PREFIX_LENGTH = 8;
 
+/** Minimum operator reason length for emergency JWKS rotation. */
+export const ROTATE_JWKS_REASON_MIN_LENGTH = 3;
+
+/** Maximum operator reason length for emergency JWKS rotation. */
+export const ROTATE_JWKS_REASON_MAX_LENGTH = 500;
+
 /** Maximum team IDs allowed in an issued access-token claim. */
 export const MAX_TOKEN_TEAM_IDS = 128;
 

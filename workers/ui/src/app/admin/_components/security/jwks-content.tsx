@@ -1,27 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
   Button,
-  CodeBlock,
+  ConfirmDialog,
+  DataTable,
+  type DataTableColumn,
   EmptyState,
   ErrorAlert,
-  Grid,
-  Inline,
   PageIntro,
   Panel,
   Skeleton,
   Stack,
-  Text,
+  Stat,
+  StatGroup,
+  Textarea,
   toast,
 } from "@id/ui";
-import { listAdminJwks as listAdminJwksAction, type AdminJwk } from "../../_actions/audit";
+import {
+  listAdminJwks as listAdminJwksAction,
+  rotateAdminJwks as rotateAdminJwksAction,
+  type AdminJwk,
+} from "../../_actions/audit";
 import { adminJwksKey } from "@/app/admin/_data/swr-keys";
-import { copyToClipboard } from "@/shared/clipboard";
 
 const defaultActions = {
   listJwks: listAdminJwksAction,
+  rotateJwks: rotateAdminJwksAction,
 };
 
 const statusBadge: Record<AdminJwk["status"], { tone: "success" | "warning" | "neutral"; label: string }> = {
@@ -34,25 +41,22 @@ function formatDate(ms: number | null): string {
   return ms === null ? "Never" : new Date(ms).toLocaleString();
 }
 
-function copyJwk(jwk: string, keyId: string): void {
-  void (async () => {
-    const ok = await copyToClipboard(jwk);
-    if (ok) toast.success("JWK copied", `Public key ${keyId} is on your clipboard.`);
-    else toast.error("Couldn't copy", "Select the JWK and copy it manually.");
-  })();
-}
-
 type JwksContentProps = {
   loading?: boolean;
   error?: string;
+  onKeyClick?: (kid: string) => void;
   actions?: typeof defaultActions;
 };
 
 export function JwksContent({
   loading: loadingOverride,
   error: errorOverride,
+  onKeyClick,
   actions = defaultActions,
 }: JwksContentProps) {
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotateError, setRotateError] = useState<string | undefined>();
+
   const { data: keys, isLoading, error, mutate } = useSWR(
     loadingOverride || errorOverride ? null : adminJwksKey(),
     () => actions.listJwks(),
@@ -71,63 +75,59 @@ export function JwksContent({
     return statusOrder[a.status] - statusOrder[b.status] || (b.createdAt ?? 0) - (a.createdAt ?? 0);
   });
 
+  const columns: DataTableColumn<AdminJwk>[] = [
+    { key: "id", label: "Key ID", sortable: true },
+    { key: "alg", label: "Alg" },
+    {
+      key: "status",
+      label: "Status",
+      render: (key) => {
+        const badge = statusBadge[key.status];
+        return <Badge tone={badge.tone}>{badge.label}</Badge>;
+      },
+    },
+    { key: "createdAt", label: "Created", sortable: true, render: (key) => formatDate(key.createdAt) },
+    { key: "expiresAt", label: "Expires", render: (key) => formatDate(key.expiresAt) },
+  ];
+
+  async function handleRotate(formData: FormData) {
+    setRotateError(undefined);
+    const reason = String(formData.get("reason") ?? "").trim();
+    if (reason.length < 3) {
+      setRotateError("Reason is required");
+      return false;
+    }
+    try {
+      await actions.rotateJwks(reason);
+      await mutate();
+      toast.success("Signing key rotated", "A new public key is now available in JWKS.");
+      return true;
+    } catch (err: unknown) {
+      setRotateError(err instanceof Error ? err.message : "Failed to rotate signing key");
+      return false;
+    }
+  }
+
   function renderBody() {
     if (showLoading) return <Skeleton rows={6} height="md" />;
     if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (list.length === 0) return <EmptyState message="No JWKS keys available" />;
     return (
       <>
-        <Panel>
-          <Inline gap="sm" wrap align="center">
-            <Badge tone="info" size="sm">Public JWKS</Badge>
-            <Badge tone="success" size="sm">{counts.active} active</Badge>
-            <Badge tone="warning" size="sm">{counts.rotated} rotated</Badge>
-            <Badge tone="neutral" size="sm">{counts.expired} expired</Badge>
-          </Inline>
+        <StatGroup columns={4}>
+          <Stat title="Total" value={list.length} description="signing keys" tone="primary" />
+          <Stat title="Active" value={counts.active} description="signs new tokens" tone="success" />
+          <Stat title="Rotated" value={counts.rotated} description="in grace" tone="warning" />
+          <Stat title="Expired" value={counts.expired} description="audit only" />
+        </StatGroup>
+        <Panel padding="none">
+          <DataTable<AdminJwk>
+            columns={columns}
+            rows={ordered}
+            getRowKey={(key) => key.id}
+            onRowClick={onKeyClick ? (key) => onKeyClick(key.id) : undefined}
+          />
         </Panel>
-
-        {ordered.map((key) => {
-          const badge = statusBadge[key.status];
-          const jwk = JSON.stringify(key.publicJwk, null, 2);
-          return (
-            <Panel key={key.id} tone={key.status === "expired" ? "muted" : "base"}>
-              <Stack gap="sm">
-                <Inline justify="between" align="center">
-                  <Text variant="h3" mono>{key.id}</Text>
-                  <Badge tone={badge.tone} size="sm">{badge.label}</Badge>
-                </Inline>
-                <Grid columns="three">
-                  <Stack gap="xs">
-                    <Text variant="caption">Algorithm</Text>
-                    <Text variant="body">{key.alg}</Text>
-                  </Stack>
-                  <Stack gap="xs">
-                    <Text variant="caption">Created</Text>
-                    <Text variant="body">{formatDate(key.createdAt)}</Text>
-                  </Stack>
-                  <Stack gap="xs">
-                    <Text variant="caption">Expires</Text>
-                    <Text variant="body">{formatDate(key.expiresAt)}</Text>
-                  </Stack>
-                </Grid>
-                <CodeBlock
-                  label="Public JWK"
-                  value={jwk}
-                  maxHeight="lg"
-                  action={
-                    <Button size="sm" variant="secondary" iconName="Copy" tooltip="Copy public JWK" onClick={() => copyJwk(jwk, key.id)}>
-                      Copy
-                    </Button>
-                  }
-                />
-              </Stack>
-            </Panel>
-          );
-        })}
-
-        <Text variant="caption">
-          Total: {list.length} {list.length === 1 ? "key" : "keys"} ({counts.active} active, {counts.rotated} rotated, {counts.expired} expired)
-        </Text>
       </>
     );
   }
@@ -138,8 +138,25 @@ export function JwksContent({
         title="Signing Keys"
         description="The public keys that verify tokens this provider issues, published at the JWKS endpoint."
         info="These are the public halves of the keys used to sign ID tokens and JWT access tokens. Relying parties fetch them from the JWKS endpoint to verify signatures. Active keys sign new tokens; rotated keys still verify older tokens until they expire; expired keys are retained only for audit. Private keys are never shown."
+        actions={
+          <Button variant="secondary" iconName="RefreshCw" onClick={() => setRotateOpen(true)}>
+            Emergency Rotate
+          </Button>
+        }
       />
       {renderBody()}
+      <ConfirmDialog
+        open={rotateOpen}
+        onOpenChange={(open) => { setRotateOpen(open); if (!open) setRotateError(undefined); }}
+        title="Emergency rotate signing keys"
+        description="Create and promote a new signing key. Existing keys remain published through their grace window so currently issued tokens can still verify."
+        confirmLabel="Rotate key"
+        variant="danger"
+        error={rotateError}
+        onConfirm={handleRotate}
+      >
+        <Textarea label="Reason" name="reason" required rows={3} placeholder="Compromise response, key exposure drill, or operator request" />
+      </ConfirmDialog>
     </Stack>
   );
 }

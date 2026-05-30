@@ -34,6 +34,9 @@ export const OAUTH_REFRESH_TOKEN_MODEL = "oauthRefreshToken" as const;
 /** BA model name for the OAuth consent table. */
 export const OAUTH_CONSENT_MODEL = "oauthConsent" as const;
 
+/** BA model name for the admin activity-log plugin table. */
+export const ADMIN_ACTIVITY_LOG_MODEL = "adminActivityLog" as const;
+
 /** Warm-isolate TTL for the resource-server audience list before falling back to KV. */
 export const RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS = 60_000;
 

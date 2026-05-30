@@ -10,10 +10,11 @@ import {
   type DataTableColumn,
   EmptyState,
   ErrorAlert,
-  FilterDropdown,
   Inline,
   InfoPopover,
   Panel,
+  ResourceSelector,
+  type ResourceOption,
   Skeleton,
   Stack,
   Text,
@@ -94,6 +95,7 @@ export function OrganizationTeamsContent({
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | undefined>();
   const [addMemberError, setAddMemberError] = useState<string | undefined>();
+  const [addMemberValue, setAddMemberValue] = useState("");
 
   const [renameTarget, setRenameTarget] = useState<Team | null>(null);
   const [renameError, setRenameError] = useState<string | undefined>();
@@ -126,6 +128,7 @@ export function OrganizationTeamsContent({
     try {
       await actions.addTeamMember(teamId, userId, orgId);
       setExpandedMembers(await actions.listTeamMembers(teamId));
+      setAddMemberValue("");
       await mutate();
       toast.success("Added to team", `${userName(userId)} now belongs to this team.`);
     } catch (err: unknown) {
@@ -197,7 +200,13 @@ export function OrganizationTeamsContent({
   const eligibleForAdd = orgMembers.filter(
     (m) => !expandedMembers.some((em) => em.userId === m.userId),
   );
-  const addMemberOptions = eligibleForAdd.map((m) => ({ value: m.userId, label: userName(m.userId) }));
+  const addMemberOptions: ResourceOption[] = eligibleForAdd.map((m) => ({
+    id: m.userId,
+    label: userName(m.userId),
+    sublabel: usersById.get(m.userId)?.email ?? undefined,
+    image: usersById.get(m.userId)?.image ?? undefined,
+    badge: m.role,
+  }));
 
   const columns: DataTableColumn<Team>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -285,11 +294,15 @@ export function OrganizationTeamsContent({
                 <Inline justify="between">
                   <Text variant="h3">{expandedTeam.name} · {expandedMembers.length} members</Text>
                   {addMemberOptions.length > 0 && (
-                    <FilterDropdown
-                      label="Add Member"
-                      options={[{ value: "", label: "— select —" }, ...addMemberOptions]}
-                      value=""
-                      onChange={(userId) => {
+                    <ResourceSelector
+                      kind="member"
+                      value={addMemberValue}
+                      placeholder="Add member…"
+                      source={{ mode: "sync", items: addMemberOptions }}
+                      excludeIds={expandedMembers.map((member) => member.userId)}
+                      onChange={(next) => {
+                        const userId = Array.isArray(next) ? next[0] : next;
+                        setAddMemberValue(userId);
                         if (userId && expandedTeamId) void handleAddMember(expandedTeamId, userId);
                       }}
                     />

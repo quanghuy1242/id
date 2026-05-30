@@ -1,0 +1,263 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import {
+  Button,
+  CodeBlock,
+  ConfirmDialog,
+  DescriptionList,
+  ErrorAlert,
+  LinkButton,
+  Panel,
+  RadioGroup,
+  ScopeBuilder,
+  type ScopeSuggestion,
+  Stack,
+  Stepper,
+  Text,
+  TextInput,
+  UrlListBuilder,
+  toast,
+} from "@id/ui";
+import {
+  createClient as createClientAction,
+  listScopes as listScopesAction,
+  type OAuthClient,
+} from "../../_actions/oauth";
+import { copyToClipboard } from "@/shared/clipboard";
+import { oauthScopesKey } from "@/app/admin/_data/swr-keys";
+
+const defaultActions = {
+  createClient: createClientAction,
+  listScopes: listScopesAction,
+};
+
+type ApplicationKind = "confidential" | "public" | "M2M";
+
+type ApplicationCreateWizardContentProps = {
+  readonly onCreated?: (clientId: string) => void;
+  readonly actions?: typeof defaultActions;
+};
+
+function kindDescription(kind: ApplicationKind): string {
+  if (kind === "M2M") return "Machine-to-machine client using the client credentials flow.";
+  if (kind === "public") return "Public client using authorization code with PKCE and no client secret.";
+  return "Server-side web application using authorization code with a client secret.";
+}
+
+export function ApplicationCreateWizardContent({
+  onCreated,
+  actions = defaultActions,
+}: ApplicationCreateWizardContentProps) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [kind, setKind] = useState<ApplicationKind>("confidential");
+  const [name, setName] = useState("");
+  const [authMethod, setAuthMethod] = useState("client_secret_post");
+  const [redirectUris, setRedirectUris] = useState<string[]>([""]);
+  const [postLogoutRedirectUris, setPostLogoutRedirectUris] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState<string | undefined>();
+  const [created, setCreated] = useState<OAuthClient | null>(null);
+  const [revealSecret, setRevealSecret] = useState<string | undefined>();
+
+  const { data: catalog } = useSWR(oauthScopesKey(), () => actions.listScopes());
+  const suggestions: ScopeSuggestion[] = useMemo(
+    () => (catalog ?? []).map((scope) => ({ value: scope.scope, description: scope.description ?? undefined, group: scope.resourceServerId })),
+    [catalog],
+  );
+
+  const cleanedRedirects = redirectUris.map((uri) => uri.trim()).filter(Boolean);
+  const cleanedPostLogout = postLogoutRedirectUris.map((uri) => uri.trim()).filter(Boolean);
+  const nameValid = name.trim().length > 0;
+  const urisValid = kind === "M2M" || cleanedRedirects.length > 0;
+  const forcedAuthMethod = kind === "public" ? "none" : "client_secret_post";
+  const effectiveAuthMethod = kind === "confidential" ? authMethod : forcedAuthMethod;
+
+  async function handleCreate() {
+    setSubmitError(undefined);
+    if (!nameValid) {
+      setSubmitError("Name is required");
+      setActiveStep(0);
+      return;
+    }
+    if (!urisValid) {
+      setSubmitError("At least one redirect URI is required for non-M2M clients");
+      setActiveStep(2);
+      return;
+    }
+    try {
+      const isM2M = kind === "M2M";
+      const result = await actions.createClient({
+        client_name: name.trim(),
+        token_endpoint_auth_method: effectiveAuthMethod,
+        grant_types: isM2M ? ["client_credentials"] : ["authorization_code", "refresh_token"],
+        response_types: isM2M ? [] : ["code"],
+        public: kind === "public",
+        redirect_uris: isM2M ? [] : cleanedRedirects,
+        post_logout_redirect_uris: cleanedPostLogout,
+        scope: scopes.length > 0 ? scopes.join(" ") : undefined,
+      });
+      setCreated(result);
+      if (result.client_secret) setRevealSecret(result.client_secret);
+      else onCreated?.(result.client_id);
+      toast.success("Application created", `${result.client_name} is registered.`);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to create application");
+    }
+  }
+
+  const steps = [
+    {
+      id: "type",
+      label: "Type",
+      isValid: nameValid,
+      content: (
+        <Panel>
+          <Stack gap="md">
+            <TextInput label="Name" name="client_name" required defaultValue={name} onChange={setName} />
+            <RadioGroup
+              title="Application Type"
+              name="type"
+              value={kind}
+              onChange={(next) => setKind(next as ApplicationKind)}
+              options={[
+                { value: "confidential", label: "Web server" },
+                { value: "public", label: "SPA / native" },
+                { value: "M2M", label: "Machine-to-machine" },
+              ]}
+            />
+            <Text variant="caption">{kindDescription(kind)}</Text>
+          </Stack>
+        </Panel>
+      ),
+    },
+    {
+      id: "auth",
+      label: "Auth",
+      content: (
+        <Panel>
+          {kind === "confidential" ? (
+            <RadioGroup
+              title="Token Auth Method"
+              name="token_endpoint_auth_method"
+              value={authMethod}
+              onChange={setAuthMethod}
+              options={[
+                { value: "client_secret_post", label: "client_secret_post" },
+                { value: "client_secret_basic", label: "client_secret_basic" },
+              ]}
+            />
+          ) : (
+            <Text variant="body">{kind === "public" ? "Public clients use PKCE with no client secret." : "M2M clients use client_secret_post and the client credentials grant."}</Text>
+          )}
+        </Panel>
+      ),
+    },
+    {
+      id: "uris",
+      label: "URIs",
+      isValid: urisValid,
+      content: (
+        <Panel>
+          {kind === "M2M" ? (
+            <Text variant="body">Machine-to-machine clients do not use browser redirect URIs.</Text>
+          ) : (
+            <Stack gap="md">
+              <UrlListBuilder label="Redirect URIs" value={redirectUris} onChange={setRedirectUris} placeholder="https://app.example.com/callback" />
+              <UrlListBuilder label="Post-Logout Redirect URIs" value={postLogoutRedirectUris} onChange={setPostLogoutRedirectUris} placeholder="https://app.example.com/signed-out" minRows={0} />
+            </Stack>
+          )}
+        </Panel>
+      ),
+    },
+    {
+      id: "scopes",
+      label: "Scopes",
+      content: (
+        <Panel>
+          <ScopeBuilder label="Scopes" value={scopes} onChange={setScopes} suggestions={suggestions} allowCustom name="scope" />
+        </Panel>
+      ),
+    },
+    {
+      id: "review",
+      label: "Review",
+      content: (
+        <Panel>
+          <DescriptionList
+            columns={2}
+            items={[
+              { term: "Name", description: name || "Not set" },
+              { term: "Type", description: kindDescription(kind) },
+              { term: "Token auth method", description: effectiveAuthMethod, mono: true },
+              { term: "Grant types", description: kind === "M2M" ? "client_credentials" : "authorization_code, refresh_token" },
+              { term: "Redirect URIs", description: kind === "M2M" ? "None" : cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
+              { term: "Scopes", description: scopes.length > 0 ? scopes.join(" ") : "None", mono: scopes.length > 0 },
+            ]}
+          />
+        </Panel>
+      ),
+    },
+  ];
+
+  return (
+    <Stack gap="md">
+      <LinkButton href="/admin/oauth/applications" variant="secondary" iconName="ChevronLeft">OAuth Applications</LinkButton>
+      <Text variant="h1">New OAuth Application</Text>
+      {submitError ? <ErrorAlert message={submitError} /> : null}
+      <Stepper
+        steps={steps}
+        activeStep={activeStep}
+        onStepChange={setActiveStep}
+        onComplete={handleCreate}
+        completeLabel="Create application"
+      />
+      <ConfirmDialog
+        open={Boolean(revealSecret)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevealSecret(undefined);
+            if (created) onCreated?.(created.client_id);
+          }
+        }}
+        title="Client Secret"
+        description="Copy this secret now — it is shown only once and cannot be retrieved later."
+        confirmLabel="Done"
+        cancelLabel="Close"
+        onConfirm={() => {
+          if (created) onCreated?.(created.client_id);
+          return true;
+        }}
+      >
+        <CodeBlock
+          label="Secret"
+          value={revealSecret ?? ""}
+          maxHeight="sm"
+          action={
+            <ButtonCopySecret secret={revealSecret ?? ""} />
+          }
+        />
+      </ConfirmDialog>
+    </Stack>
+  );
+}
+
+function ButtonCopySecret({ secret }: { readonly secret: string }) {
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      iconName="Copy"
+      onClick={() => {
+        void (async () => {
+          const ok = await copyToClipboard(secret);
+          if (ok) toast.success("Secret copied", "Store it securely.");
+          else toast.error("Couldn't copy", "Copy the secret manually before closing.");
+        })();
+      }}
+    >
+      Copy
+    </Button>
+  );
+}

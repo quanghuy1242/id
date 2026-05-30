@@ -1,5 +1,6 @@
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
+import { createJwk } from "better-auth/plugins/jwt";
 import {
   SESSION_MODEL,
   USER_MODEL,
@@ -27,13 +28,17 @@ import {
   revokeConsentBody,
   revokeConsentOpenApiRequestBody,
   revokeConsentOpenApiSchema,
+  rotateJwksBody,
+  rotateJwksOpenApiRequestBody,
+  rotateJwksOpenApiSchema,
   type ConsentRow,
   type JwksRow,
+  type RotateJwksResponse,
   type SessionRow,
   type TokenRow,
 } from "./schema";
 
-import { JWKS_GRACE_PERIOD_MS } from "../../config";
+import { JWKS_GRACE_PERIOD_MS, JWKS_ROTATION_INTERVAL_SECONDS } from "../../config";
 
 export type { AdminAuditPluginOptions } from "./types";
 
@@ -123,6 +128,25 @@ const jwksMeta = adminAuditEndpointMeta({
   responseSchema: jwksOpenApiSchema,
   responseDescription: "Public JWK material plus createdAt/expiresAt/status per key",
 });
+
+const rotateJwksMeta = adminAuditEndpointMeta({
+  description: "Emergency-rotate signing keys by creating and promoting a new JWKS key (platform admin only)",
+  requestBody: rotateJwksOpenApiRequestBody,
+  responseSchema: rotateJwksOpenApiSchema,
+  responseDescription: "New public JWKS key metadata",
+});
+
+async function createSigningJwk(
+  ctx: Parameters<typeof createJwk>[0],
+): Promise<JwksRow> {
+  const row = await createJwk(ctx, {
+    jwks: {
+      rotationInterval: JWKS_ROTATION_INTERVAL_SECONDS,
+      keyPairConfig: { alg: "EdDSA", crv: "Ed25519" },
+    },
+  });
+  return row as JwksRow;
+}
 
 /**
  * Read-only admin reporting plugin over Better-Auth-owned tables.
@@ -240,6 +264,17 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
           });
           const now = Date.now();
           return ctx.json({ keys: rows.map((r) => presentJwk(r, now, graceMs)) });
+        },
+      ),
+
+      rotateAdminJwks: createAuthEndpoint(
+        "/admin/jwks/rotate",
+        { method: "POST", use: [sessionMiddleware], body: rotateJwksBody, metadata: rotateJwksMeta },
+        async (ctx) => {
+          requireAdmin(options.authorize, ctx.context.session);
+          const row = await createSigningJwk(ctx);
+          const response: RotateJwksResponse = { ...presentJwk(row, Date.now(), graceMs), reason: ctx.body.reason };
+          return ctx.json(response);
         },
       ),
     },

@@ -53,9 +53,51 @@ export type AdminJwk = {
   publicJwk: Record<string, unknown>;
 };
 
+export type RotateJwksResult = AdminJwk & {
+  reason: string;
+};
+
+export type AdminActivity = {
+  id: string;
+  actorId: string;
+  actorType: string;
+  actorEmail: string | null;
+  action: string;
+  targetType: string;
+  targetId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: number;
+};
+
+export type TokenIntrospectionInput = {
+  token: string;
+  token_type_hint?: "access_token" | "refresh_token";
+  client_id?: string;
+  client_secret?: string;
+  resource?: string;
+};
+
+export type TokenIntrospectionResult = {
+  active: boolean;
+  scope?: string;
+  client_id?: string;
+  username?: string;
+  token_type?: string;
+  exp?: number;
+  [claim: string]: unknown;
+};
+
 export type Paginated<K extends string, T> = { total: number; limit: number; offset: number } & Record<K, T[]>;
 
 export type PageParams = { limit: number; offset: number };
+export type ActivityLogParams = PageParams & {
+  targetType: string;
+  targetId: string;
+  action?: string;
+  actorId?: string;
+};
 
 export async function listAdminSessions(params: PageParams): Promise<Paginated<"sessions", AdminSession>> {
   return authApiGetOrThrow<Paginated<"sessions", AdminSession>>("/admin/list-sessions", params);
@@ -76,4 +118,16 @@ export async function revokeConsent(clientId: string, userId: string): Promise<v
 export async function listAdminJwks(): Promise<AdminJwk[]> {
   const res = await authApiGetOrThrow<{ keys: AdminJwk[] }>("/admin/jwks");
   return res.keys ?? [];
+}
+
+export async function rotateAdminJwks(reason: string): Promise<RotateJwksResult> {
+  return authApiPostOrThrow<RotateJwksResult>("/admin/jwks/rotate", { reason });
+}
+
+export async function listActivityLog(params: ActivityLogParams): Promise<Paginated<"entries", AdminActivity>> {
+  return authApiGetOrThrow<Paginated<"entries", AdminActivity>>("/admin/activity-log", params);
+}
+
+export async function introspectToken(input: TokenIntrospectionInput): Promise<TokenIntrospectionResult> {
+  return authApiPostOrThrow<TokenIntrospectionResult>("/oauth2/introspect", input);
 }

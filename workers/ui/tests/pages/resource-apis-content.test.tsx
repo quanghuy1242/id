@@ -49,9 +49,18 @@ describe("ResourceApisContent", () => {
   it("renders rows with status and system badges", async () => {
     render(<ResourceApisContent actions={makeActions(mockResourceServers)} />);
     await waitFor(() => expect(screen.getByText("Content API")).toBeInTheDocument());
-    expect(screen.getByText("System")).toBeInTheDocument();
+    expect(screen.getAllByText("System").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Enabled").length).toBeGreaterThan(0);
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
+    expect(screen.getByText("Updated / By")).toBeInTheDocument();
+  });
+
+  it("calls onResourceClick for row navigation", async () => {
+    const onResourceClick = vi.fn<(id: string) => void>();
+    render(<ResourceApisContent actions={makeActions(mockResourceServers)} onResourceClick={onResourceClick} />);
+    await waitFor(() => screen.getByText("Content API"));
+    fireEvent.click(screen.getByText("content-api"));
+    await waitFor(() => expect(onResourceClick).toHaveBeenCalledWith("rs_001"));
   });
 
   it("shows reversible status actions", async () => {

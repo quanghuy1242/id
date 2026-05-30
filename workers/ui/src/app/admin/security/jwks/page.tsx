@@ -1,12 +1,10 @@
 "use client";
 
-import { PageBody } from "@id/ui";
+import { useRouter } from "next/navigation";
 import { JwksContent } from "../../_components/security/jwks-content";
 
 export default function JwksPage() {
-  return (
-    <PageBody>
-      <JwksContent />
-    </PageBody>
-  );
+  const router = useRouter();
+
+  return <JwksContent onKeyClick={(kid) => router.push(`/admin/security/jwks/${kid}`)} />;
 }

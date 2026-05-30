@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
+  DescriptionList,
   EmptyState,
   ErrorAlert,
   FilterDropdown,
@@ -18,6 +19,8 @@ import {
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
   Text,
   toast,
 } from "@id/ui";
@@ -54,9 +57,14 @@ function toggleScope(list: string[], scope: string, on: boolean): string[] {
   return on ? [...new Set([...list, scope])] : list.filter((s) => s !== scope);
 }
 
+function formatDate(ms: number | null | undefined): string {
+  return typeof ms === "number" ? new Date(ms).toLocaleString() : "Never";
+}
+
 type M2mBindingsContentProps = {
   search?: string;
   onSearchChange?: (v: string) => void;
+  onBindingClick?: (bindingId: string) => void;
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
@@ -66,6 +74,7 @@ type M2mBindingsContentProps = {
 export function M2mBindingsContent({
   search: searchProp,
   onSearchChange,
+  onBindingClick,
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
@@ -138,6 +147,17 @@ export function M2mBindingsContent({
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
+  const stats = useMemo(() => {
+    const rows = bindings ?? [];
+    const uniqueClients = new Set(rows.map((binding) => binding.clientId));
+    const uniqueResources = new Set(rows.map((binding) => binding.resourceServerId));
+    return {
+      total: rows.length,
+      active: rows.filter((binding) => binding.enabled).length,
+      clients: uniqueClients.size,
+      resources: uniqueResources.size,
+    };
+  }, [bindings]);
 
   const columns: DataTableColumn<ClientResourceScope>[] = [
     { key: "clientId", label: "Client", render: (b) => clientById.get(b.clientId)?.client_name ?? b.clientId },
@@ -155,6 +175,16 @@ export function M2mBindingsContent({
       key: "enabled",
       label: "Status",
       render: (b) => (b.enabled ? <Badge tone="success" size="sm">Active</Badge> : <Badge tone="error" size="sm">Disabled</Badge>),
+    },
+    {
+      key: "updatedAt",
+      label: "Updated / By",
+      render: (b) => (
+        <Stack gap="xs">
+          <Text variant="body">{formatDate(b.updatedAt)}</Text>
+          <Text variant="caption" mono>{b.updatedBy}</Text>
+        </Stack>
+      ),
     },
     {
       key: "actions",
@@ -224,7 +254,7 @@ export function M2mBindingsContent({
       }
       return <EmptyState message="No M2M client bindings" cta="Create Binding" onCta={() => setCreateOpen(true)} />;
     }
-    return <DataTable<ClientResourceScope> columns={columns} rows={displayed} getRowKey={(b) => b.id} />;
+    return <DataTable<ClientResourceScope> columns={columns} rows={displayed} getRowKey={(b) => b.id} onRowClick={onBindingClick ? (b) => onBindingClick(b.id) : undefined} />;
   }
 
   const hasRows = displayed.length > 0 && !showLoading && !showError;
@@ -241,6 +271,12 @@ export function M2mBindingsContent({
           <Button variant="primary" iconName="Plus" onClick={() => { setCreateError(undefined); setCreateClientId(""); setCreateRsId(""); setCreateScopes([]); setCreateOpen(true); }}>New Binding</Button>
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Total" value={stats.total} description="bindings" tone="primary" />
+        <Stat title="Active" value={stats.active} description="enabled" tone="success" />
+        <Stat title="Clients" value={stats.clients} description="with access" />
+        <Stat title="Resources" value={stats.resources} description="covered APIs" tone="info" />
+      </StatGroup>
       <Panel>
         <SearchInput grow placeholder="Search bindings…" value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
@@ -279,6 +315,13 @@ export function M2mBindingsContent({
       >
         {editDisplay ? (
           <Stack gap="xs">
+            <DescriptionList
+              dense
+              items={[
+                { term: "Created", description: `${formatDate(editDisplay.createdAt)} by ${editDisplay.createdBy}` },
+                { term: "Updated", description: `${formatDate(editDisplay.updatedAt)} by ${editDisplay.updatedBy}` },
+              ]}
+            />
             <Inline gap="sm" align="center">
               <Text variant="caption">Client:</Text>
               <Text variant="body">{clientById.get(editDisplay.clientId)?.client_name ?? editDisplay.clientId}</Text>

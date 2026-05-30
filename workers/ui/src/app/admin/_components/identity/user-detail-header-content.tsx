@@ -29,7 +29,7 @@ const defaultActions = {
 };
 
 type UserDetailHeaderContentProps = {
-  activeTab?: "overview" | "sessions";
+  activeTab?: "overview" | "sessions" | "audit";
   onImpersonateRedirect?: () => void;
   actions?: typeof defaultActions;
 };
@@ -38,6 +38,7 @@ function userDetailTabs(userId: string) {
   return [
     { id: "overview", href: `/admin/identity/users/${userId}`, label: "Overview" },
     { id: "sessions", href: `/admin/identity/users/${userId}/sessions`, label: "Sessions" },
+    { id: "audit", href: `/admin/identity/users/${userId}/audit`, label: "Audit" },
   ];
 }
 

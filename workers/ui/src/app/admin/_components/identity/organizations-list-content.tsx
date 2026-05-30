@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import {
+  Avatar,
   Button,
   ConfirmDialog,
   DataTable,
@@ -14,6 +15,8 @@ import {
   SearchInput,
   Skeleton,
   Stack,
+  Stat,
+  StatGroup,
   Text,
   Textarea,
   TextInput,
@@ -32,7 +35,17 @@ const defaultActions = {
 };
 
 const columns: DataTableColumn<Organization>[] = [
-  { key: "name", label: "Name", sortable: true },
+  {
+    key: "name",
+    label: "Organization",
+    sortable: true,
+    render: (o) => (
+      <Stack gap="xs">
+        <Avatar initials={o.name.slice(0, 2).toUpperCase()} image={o.logo ?? undefined} alt={o.name} size="sm" />
+        <Text variant="body">{o.name}</Text>
+      </Stack>
+    ),
+  },
   { key: "slug", label: "Slug" },
   {
     key: "createdAt",
@@ -104,6 +117,17 @@ export function OrganizationsListContent({
     }
     return orgs;
   }, [allOrgs, effectiveSearch, effectiveSortBy, effectiveSortDir]);
+
+  const stats = useMemo(() => {
+    const orgs = allOrgs ?? [];
+    const recentCutoff = Date.now() - 90 * 86_400_000;
+    return {
+      total: orgs.length,
+      withMetadata: orgs.filter((org) => Boolean(org.metadata)).length,
+      withLogo: orgs.filter((org) => Boolean(org.logo)).length,
+      recent: orgs.filter((org) => Date.parse(org.createdAt) >= recentCutoff).length,
+    };
+  }, [allOrgs]);
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
@@ -179,6 +203,12 @@ export function OrganizationsListContent({
           </Button>
         }
       />
+      <StatGroup columns={4}>
+        <Stat title="Organizations" value={showLoading ? "…" : stats.total} description="total tenants" tone="primary" />
+        <Stat title="Metadata" value={showLoading ? "…" : stats.withMetadata} description="configured" />
+        <Stat title="Logos" value={showLoading ? "…" : stats.withLogo} description="configured" />
+        <Stat title="Recent" value={showLoading ? "…" : stats.recent} description="created in 90d" />
+      </StatGroup>
       <Panel>
         <SearchInput
           grow
