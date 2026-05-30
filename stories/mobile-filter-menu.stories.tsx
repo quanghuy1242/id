@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MobileFilterMenu, Stack, Text, Inline } from "@id/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
-export default { title: "MobileFilterMenu" } satisfies StoryDefault;
+export default { title: "Packages UI / Mobile Filter Menu" } satisfies StoryDefault;
 
 const roleOptions = [
   { value: "all", label: "All Roles" },

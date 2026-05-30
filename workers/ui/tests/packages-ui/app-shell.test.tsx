@@ -163,6 +163,11 @@ describe("Stack", () => {
     const { container } = render(<Stack align="start">Aligned</Stack>);
     expect(container.firstChild).toHaveClass("items-start");
   });
+
+  it("can fill height and distribute children", () => {
+    const { container } = render(<Stack fill justify="between">Aligned</Stack>);
+    expect(container.firstChild).toHaveClass("h-full", "justify-between");
+  });
 });
 
 describe("Grid", () => {

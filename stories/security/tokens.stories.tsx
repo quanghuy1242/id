@@ -1,11 +1,10 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
 import { TokensContent } from "../../workers/ui/src/app/admin/_components/security/tokens-content";
 import type { AdminToken, Paginated } from "../../workers/ui/src/app/admin/_actions/audit";
 import { mockTokens, mockRefreshTokens } from "../../workers/ui/src/app/admin/_mocks/audit";
-import { AdminShell } from "../_decorators/shell";
+import { SecurityShell } from "../_decorators/security-shell";
 
-export default { title: "Security / Tokens" } satisfies StoryDefault;
+export default { title: "Admin / Grants & Keys / Tokens" } satisfies StoryDefault;
 
 const ACTIVE = "/admin/security/tokens?type=access";
 
@@ -19,41 +18,31 @@ function makeActions(access: AdminToken[], refresh: AdminToken[]) {
 }
 
 export const Populated: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <TokensContent type="access" actions={makeActions(mockTokens, mockRefreshTokens)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <TokensContent type="access" actions={makeActions(mockTokens, mockRefreshTokens)} />
+  </SecurityShell>
 );
 
 export const Refresh: Story = () => (
-  <AdminShell activePath="/admin/security/tokens?type=refresh">
-    <PageBody>
-      <TokensContent type="refresh" actions={makeActions(mockTokens, mockRefreshTokens)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath="/admin/security/tokens?type=refresh">
+    <TokensContent type="refresh" actions={makeActions(mockTokens, mockRefreshTokens)} />
+  </SecurityShell>
 );
 
 export const Empty: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <TokensContent type="access" actions={makeActions([], [])} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <TokensContent type="access" actions={makeActions([], [])} />
+  </SecurityShell>
 );
 
 export const Loading: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <TokensContent type="access" loading />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <TokensContent type="access" loading />
+  </SecurityShell>
 );
 
 export const Error: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <TokensContent type="access" error="Failed to load tokens" />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <TokensContent type="access" error="Failed to load tokens" />
+  </SecurityShell>
 );

@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  DescriptionList,
   ErrorAlert,
   Inline,
   LinkButton,
@@ -110,6 +111,17 @@ export function OrgDetailHeaderContent({
         error={deleteError}
         onConfirm={handleDelete}
       >
+        {org ? (
+          <DescriptionList
+            columns={1}
+            dense
+            items={[
+              { term: "Organization ID", description: org.id, mono: true },
+              { term: "Slug", description: org.slug, mono: true },
+              { term: "Name", description: org.name },
+            ]}
+          />
+        ) : null}
         <TextInput
           label={`Type "${org?.slug ?? ""}" to confirm`}
           name="confirmSlug"

@@ -1,11 +1,10 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
 import { SessionsContent } from "../../workers/ui/src/app/admin/_components/security/sessions-content";
 import type { AdminSession, Paginated } from "../../workers/ui/src/app/admin/_actions/audit";
 import { mockSessions } from "../../workers/ui/src/app/admin/_mocks/audit";
-import { AdminShell } from "../_decorators/shell";
+import { SecurityShell } from "../_decorators/security-shell";
 
-export default { title: "Security / Sessions" } satisfies StoryDefault;
+export default { title: "Admin / Grants & Keys / Sessions" } satisfies StoryDefault;
 
 const ACTIVE = "/admin/security/sessions";
 
@@ -18,33 +17,25 @@ function makeActions(sessions: AdminSession[]) {
 }
 
 export const Populated: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <SessionsContent actions={makeActions(mockSessions)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <SessionsContent actions={makeActions(mockSessions)} />
+  </SecurityShell>
 );
 
 export const Empty: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <SessionsContent actions={makeActions([])} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <SessionsContent actions={makeActions([])} />
+  </SecurityShell>
 );
 
 export const Loading: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <SessionsContent loading />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <SessionsContent loading />
+  </SecurityShell>
 );
 
 export const Error: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <SessionsContent error="Failed to load sessions" />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <SessionsContent error="Failed to load sessions" />
+  </SecurityShell>
 );

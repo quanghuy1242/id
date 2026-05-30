@@ -68,6 +68,7 @@ describe("OrganizationsListContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: "Test Corp" } });
     fireEvent.change(screen.getByLabelText(/^slug/i), { target: { value: "test-corp" } });
+    expect(screen.getByRole("textbox", { name: /metadata/i })).toHaveAttribute("name", "metadata");
     fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
     await waitFor(() => expect(actions.createOrganization).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Test Corp", slug: "test-corp" }),

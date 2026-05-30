@@ -17,21 +17,19 @@ import {
   TopbarStart,
   ResponsiveBreadcrumb,
 } from "@id/ui";
-import { ADMIN_LOGIN_REDIRECT_URL, MOBILE_NAV, SIDEBAR_NAV } from "@/shared/constants";
+import { ADMIN_LOGIN_REDIRECT_URL, MOBILE_NAV, SIDEBAR_NAV, type AdminNavItem } from "@/shared/constants";
 import { signOut } from "../_actions/users";
-
-type SidebarItem = { label: string; href: string; exact?: boolean; icon?: string };
 
 type SidebarGroup = {
   title: string | null;
-  items: SidebarItem[];
+  items: AdminNavItem[];
 };
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getBestActiveItem<TItem extends SidebarItem>(
+function getBestActiveItem<TItem extends AdminNavItem>(
   pathname: string,
   items: readonly TItem[],
 ): TItem | undefined {
@@ -39,9 +37,9 @@ function getBestActiveItem<TItem extends SidebarItem>(
   let bestScore = -1;
 
   for (const item of items) {
-    if (!isActive(pathname, item.href, item.exact)) continue;
+    if (!isActive(pathname, item.activeHref ?? item.href, item.exact)) continue;
 
-    const score = item.href.length;
+    const score = (item.activeHref ?? item.href).length;
     if (score > bestScore) {
       bestItem = item;
       bestScore = score;
@@ -51,34 +49,20 @@ function getBestActiveItem<TItem extends SidebarItem>(
   return bestItem;
 }
 
+function getSidebarItems(): AdminNavItem[] {
+  return SIDEBAR_NAV.flatMap((entry) => entry.type === "group" ? entry.items : [entry]);
+}
+
 function getCurrentPageLabel(pathname: string): string {
-  const { groups, topLevelItems } = getSidebarNavGroups();
-  const activeEntry = getBestActiveItem(
-    pathname,
-    [...topLevelItems, ...groups.flatMap((group) => group.items)],
-  );
+  const activeEntry = getBestActiveItem(pathname, getSidebarItems());
   return activeEntry?.label ?? "Dashboard";
 }
 
-function getSidebarNavGroups(): { groups: SidebarGroup[]; topLevelItems: SidebarItem[] } {
-  const groups: SidebarGroup[] = [];
-  const topLevelItems: SidebarItem[] = [];
-
-  for (const entry of SIDEBAR_NAV) {
-    if (entry.type === "section") {
-      groups.push({ title: entry.label, items: [] });
-      continue;
-    }
-
-    if (groups.length === 0) {
-      topLevelItems.push(entry);
-      continue;
-    }
-
-    groups[groups.length - 1].items.push(entry);
-  }
-
-  return { groups, topLevelItems };
+function getSidebarNavGroups(): SidebarGroup[] {
+  return SIDEBAR_NAV.filter((entry) => entry.type === "group").map((entry) => ({
+    title: entry.label,
+    items: [...entry.items],
+  }));
 }
 
 function getSectionPrefix(href: string): string {
@@ -87,11 +71,11 @@ function getSectionPrefix(href: string): string {
 }
 
 function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKey: string } | null {
-  const { groups } = getSidebarNavGroups();
+  const groups = getSidebarNavGroups();
   const activeGroup = groups.find((group) => {
     const firstItem = group.items[0];
     if (!firstItem) return false;
-    return isActive(pathname, getSectionPrefix(firstItem.href));
+    return isActive(pathname, firstItem.activeHref ?? getSectionPrefix(firstItem.href));
   });
 
   if (!activeGroup || activeGroup.items.length < 2) return null;
@@ -103,15 +87,32 @@ function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKe
 
 export function AdminSidebarNav() {
   const pathname = usePathname();
-  const { groups, topLevelItems } = getSidebarNavGroups();
-  const activeItem = getBestActiveItem(
-    pathname,
-    [...topLevelItems, ...groups.flatMap((group) => group.items)],
-  );
+  const activeItem = getBestActiveItem(pathname, getSidebarItems());
 
   return (
     <NavMenu label="Admin sidebar navigation">
-      {topLevelItems.map((entry) => {
+      {SIDEBAR_NAV.map((entry) => {
+        if (entry.type === "group") {
+          return (
+            <NavSection key={entry.label} title={entry.label} collapsible>
+              {entry.items.map((item) => {
+                const active = activeItem?.href === item.href;
+                return (
+                  <NavLink
+                    key={item.href}
+                    href={item.href}
+                    active={active}
+                    current={active ? "page" : undefined}
+                    iconName={item.icon}
+                  >
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </NavSection>
+          );
+        }
+
         const active = activeItem?.href === entry.href;
         return (
           <NavLink
@@ -125,28 +126,6 @@ export function AdminSidebarNav() {
           </NavLink>
         );
       })}
-      {groups.map((group, groupIndex) => (
-        <NavSection
-          key={group.title ?? `root-${groupIndex}`}
-          title={group.title ?? undefined}
-          collapsible
-        >
-          {group.items.map((entry) => {
-            const active = activeItem?.href === entry.href;
-            return (
-              <NavLink
-                key={entry.href}
-                href={entry.href}
-                active={active}
-                current={active ? "page" : undefined}
-                iconName={entry.icon}
-              >
-                {entry.label}
-              </NavLink>
-            );
-          })}
-        </NavSection>
-      ))}
     </NavMenu>
   );
 }

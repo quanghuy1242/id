@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ScopeBuilder, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Scope Builder" } satisfies StoryDefault;
 
 const catalog = [
   { value: "openid", description: "OpenID Connect" },
@@ -26,6 +28,16 @@ export const Populated: Story = () => {
 export const Empty: Story = () => {
   const [value, setValue] = useState<string[]>([]);
   return <ScopeBuilder label="Scopes" value={value} onChange={setValue} suggestions={catalog} />;
+};
+
+export const MenuFilters: Story = () => {
+  const [value, setValue] = useState<string[]>(["content:read"]);
+  return (
+    <Stack gap="md">
+      <Text variant="h2">Scope catalog filters</Text>
+      <ScopeBuilder label="Scope filters" value={value} onChange={setValue} suggestions={catalog} allowCustom variant="menu" />
+    </Stack>
+  );
 };
 
 export const AllowCustom: Story = () => {

@@ -43,14 +43,36 @@ function tabs(id: string) {
   ];
 }
 
-function Header({ binding, title, id, activeTab }: { readonly binding: ClientResourceScope | undefined; readonly title: string; readonly id: string; readonly activeTab: M2mBindingDetailTab }) {
+function Header({
+  binding,
+  client,
+  resource,
+  id,
+  activeTab,
+}: {
+  readonly binding: ClientResourceScope | undefined;
+  readonly client: OAuthClient | undefined;
+  readonly resource: ResourceServer | undefined;
+  readonly id: string;
+  readonly activeTab: M2mBindingDetailTab;
+}) {
   return (
     <Stack gap="sm">
       <LinkButton href="/admin/oauth/m2m-bindings" variant="secondary" size="sm" iconName="ChevronLeft">M2M Bindings</LinkButton>
       <Inline gap="sm">
-        <Text variant="h1">{title}</Text>
+        <Text variant="h1">Resource Access Binding</Text>
         {binding ? (binding.enabled ? <Badge tone="success">Active</Badge> : <Badge tone="error">Disabled</Badge>) : null}
       </Inline>
+      {binding ? (
+        <DescriptionList
+          columns={2}
+          dense
+          items={[
+            { term: "Client", description: client?.client_name ?? binding.clientId },
+            { term: "Resource API", description: resource?.name ?? binding.resourceServerId },
+          ]}
+        />
+      ) : null}
       <Tabs ariaLabel="M2M binding detail tabs" selectedKey={activeTab} items={tabs(id)} />
     </Stack>
   );
@@ -110,14 +132,13 @@ export function M2mBindingDetailContent({
   const binding = bindings?.find((item) => item.id === bindingId);
   const client = binding ? clients?.find((item) => item.client_id === binding.clientId) : undefined;
   const resource = binding ? resources?.find((item) => item.id === binding.resourceServerId) : undefined;
-  const title = binding ? `${client?.client_name ?? binding.clientId} -> ${resource?.name ?? binding.resourceServerId}` : bindingId;
 
-  if (showLoading) return <Stack gap="md"><Header id={bindingId} binding={undefined} title={title} activeTab={activeTab} /><Skeleton rows={6} /></Stack>;
-  if (showError) return <Stack gap="md"><Header id={bindingId} binding={undefined} title={title} activeTab={activeTab} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
-  if (!binding) return <Stack gap="md"><Header id={bindingId} binding={undefined} title={title} activeTab={activeTab} /><ErrorAlert message="M2M binding not found" onRetry={() => void mutate()} /></Stack>;
+  if (showLoading) return <Stack gap="md"><Header id={bindingId} binding={undefined} client={undefined} resource={undefined} activeTab={activeTab} /><Skeleton rows={6} /></Stack>;
+  if (showError) return <Stack gap="md"><Header id={bindingId} binding={undefined} client={undefined} resource={undefined} activeTab={activeTab} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
+  if (!binding) return <Stack gap="md"><Header id={bindingId} binding={undefined} client={undefined} resource={undefined} activeTab={activeTab} /><ErrorAlert message="M2M binding not found" onRetry={() => void mutate()} /></Stack>;
   return (
     <Stack gap="md">
-      <Header id={bindingId} binding={binding} title={title} activeTab={activeTab} />
+      <Header id={bindingId} binding={binding} client={client} resource={resource} activeTab={activeTab} />
       {activeTab === "audit" ? <ActivityLogContent targetType="client_resource_scope" targetId={binding.id} /> : <Overview binding={binding} client={client} resource={resource} />}
     </Stack>
   );

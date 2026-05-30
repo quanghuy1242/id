@@ -131,11 +131,19 @@ export function Panel({ tone = "base", padding = "md", children }: PanelProps) {
 type StackProps = SurfaceProps & {
   readonly gap?: Gap;
   readonly align?: Align;
+  readonly justify?: "start" | "between" | "end";
+  readonly fill?: boolean;
 };
 
-export function Stack({ gap = "md", align = "stretch", children }: StackProps) {
+const justifyClass: Record<NonNullable<StackProps["justify"]>, string> = {
+  start: "justify-start",
+  between: "justify-between",
+  end: "justify-end",
+};
+
+export function Stack({ gap = "md", align = "stretch", justify = "start", fill, children }: StackProps) {
   return (
-    <div className={`flex flex-col ${alignClass[align]} ${gapClass[gap]} w-full`}>
+    <div className={`flex flex-col ${alignClass[align]} ${justifyClass[justify]} ${gapClass[gap]} w-full ${fill ? "h-full" : ""}`.trim()}>
       {children}
     </div>
   );

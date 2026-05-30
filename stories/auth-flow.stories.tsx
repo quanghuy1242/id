@@ -72,7 +72,7 @@ function installOrganizationFetchMock() {
 }
 
 export default {
-  title: "Auth Flow",
+  title: "Hosted UI / Auth Flow",
 } satisfies StoryDefault;
 
 export const Login: Story = () => {

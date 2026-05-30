@@ -1,13 +1,12 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
 import { ConsentsContent } from "../../workers/ui/src/app/admin/_components/security/consents-content";
 import type { AdminConsent, Paginated } from "../../workers/ui/src/app/admin/_actions/audit";
 import type { OAuthClient } from "../../workers/ui/src/app/admin/_actions/oauth";
 import { mockConsents } from "../../workers/ui/src/app/admin/_mocks/security";
 import { mockClients } from "../../workers/ui/src/app/admin/_mocks/oauth";
-import { AdminShell } from "../_decorators/shell";
+import { SecurityShell } from "../_decorators/security-shell";
 
-export default { title: "Security / Consents" } satisfies StoryDefault;
+export default { title: "Admin / Grants & Keys / Consents" } satisfies StoryDefault;
 
 const ACTIVE = "/admin/security/consents";
 // NOTE: consents now live in the unified grants section (docs/027 §6).
@@ -25,33 +24,25 @@ function makeActions(consents: AdminConsent[]) {
 }
 
 export const Populated: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <ConsentsContent actions={makeActions(mockConsents)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <ConsentsContent actions={makeActions(mockConsents)} />
+  </SecurityShell>
 );
 
 export const Empty: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <ConsentsContent actions={makeActions([])} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <ConsentsContent actions={makeActions([])} />
+  </SecurityShell>
 );
 
 export const Loading: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <ConsentsContent loading />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <ConsentsContent loading />
+  </SecurityShell>
 );
 
 export const Error: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <ConsentsContent error="Failed to load consents" />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <ConsentsContent error="Failed to load consents" />
+  </SecurityShell>
 );

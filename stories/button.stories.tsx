@@ -1,5 +1,7 @@
 import { Button, Form, LinkButton, Stack, Inline, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Button" } satisfies StoryDefault;
 
 export const Variants: Story = () => (
   <Stack>

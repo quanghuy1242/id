@@ -1,5 +1,7 @@
 import { Badge, DescriptionList, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Description List" } satisfies StoryDefault;
 
 export const TwoColumns: Story = () => (
   <Stack gap="md">

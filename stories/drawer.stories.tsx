@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Badge, Button, DescriptionList, Drawer, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Drawer" } satisfies StoryDefault;
 
 export const QuickPeek: Story = () => {
   const [open, setOpen] = useState(false);

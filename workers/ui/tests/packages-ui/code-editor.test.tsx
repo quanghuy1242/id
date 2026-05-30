@@ -27,4 +27,10 @@ describe("CodeEditor", () => {
     render(<CodeEditor value="{}" onChange={() => {}} label="Metadata" readOnly />);
     expect(screen.getByRole("textbox", { name: /metadata/i })).toHaveAttribute("readonly");
   });
+
+  it("passes a name through for form posts", () => {
+    render(<CodeEditor value="{}" onChange={() => {}} label="Metadata" name="metadata" placeholder='{"a":1}' />);
+    expect(screen.getByRole("textbox", { name: /metadata/i })).toHaveAttribute("name", "metadata");
+    expect(screen.getByRole("textbox", { name: /metadata/i })).toHaveAttribute("placeholder", '{"a":1}');
+  });
 });

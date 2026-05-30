@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Badge, Inline, Stack, Tabs, Text, type LinkTabItem, type PanelTabItem } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Tabs" } satisfies StoryDefault;
 
 const panelTabs: PanelTabItem[] = [
   {

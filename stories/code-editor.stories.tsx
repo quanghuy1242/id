@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { CodeEditor, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Code Editor" } satisfies StoryDefault;
 
 export const MetadataEditor: Story = () => {
   const [value, setValue] = useState('{\n  "logo_uri": "https://acme.com/logo.png",\n  "tos_uri": "https://acme.com/tos"\n}');

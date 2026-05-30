@@ -18,7 +18,7 @@ Sessions, access tokens, refresh tokens, and consents are facets of one concept 
 Sessions · Access Tokens · Refresh Tokens · Consents · Signing Keys · Token Decoder
 ```
 
-The two token tabs share `/admin/security/tokens` and are distinguished by the `?type=access|refresh` query param. The sidebar carries a single "Grants & Keys" entry pointing at `/admin/security` (an index redirect to `/admin/security/sessions`); the layout tabs own sub-navigation, mirroring the OAuth section. The legacy `/admin/oauth/sessions-tokens` route permanently redirects to `/admin/security/sessions`. All data comes from the read-only `admin-audit` aggregate endpoints — no token bodies or private keys are ever returned.
+The two token tabs share `/admin/security/tokens` and are distinguished by the `?type=access|refresh` query param. The sidebar carries a single flat "Grants & Keys" entry pointing at `/admin/security/sessions`; the layout tabs own sub-navigation, mirroring the OAuth section. The legacy `/admin/oauth/sessions-tokens` route permanently redirects to `/admin/security/sessions`. All data comes from the read-only `admin-audit` aggregate endpoints — no token bodies or private keys are ever returned.
 
 ---
 

@@ -1,5 +1,7 @@
-import { Stat, StatGroup, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import { Stat, StatGroup, StatSummaryGroup, Stack, Text } from "@id/ui";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Stat" } satisfies StoryDefault;
 
 export const SigningKeys: Story = () => (
   <Stack gap="md">
@@ -22,6 +24,26 @@ export const Users: Story = () => (
       <Stat title="Banned" value={3} tone="error" />
       <Stat title="Unverified" value={41} tone="warning" />
     </StatGroup>
+  </Stack>
+);
+
+export const DashboardSummary: Story = () => (
+  <Stack gap="md">
+    <Text variant="h2">Dashboard summary</Text>
+    <StatSummaryGroup>
+      <StatGroup columns={4} density="compact" frame="seamless">
+        <Stat title="Users" value="1,204" tone="primary" />
+        <Stat title="Organizations" value={42} />
+        <Stat title="OAuth Apps" value={18} tone="info" />
+        <Stat title="Active Sessions" value={321} tone="success" />
+      </StatGroup>
+      <StatGroup columns={4} density="compact" frame="seamless">
+        <Stat title="Access Tokens" value={88} />
+        <Stat title="Refresh Tokens" value={45} />
+        <Stat title="Consents" value={156} />
+        <Stat title="Signing Keys" value={4} />
+      </StatGroup>
+    </StatSummaryGroup>
   </Stack>
 );
 

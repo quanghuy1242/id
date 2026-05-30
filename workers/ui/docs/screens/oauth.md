@@ -22,6 +22,21 @@ Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ verti
 
 ---
 
+## /admin/oauth (moved → /admin/oauth/applications)
+
+The OAuth section root is a legacy entry URL. `/admin/oauth/applications` is the canonical application index so the list always gets the route-backed detail navigation and create wizard.
+
+Components:
+  /admin/oauth/page.tsx → permanentRedirect("/admin/oauth/applications")   [Next.js permanent server redirect]
+
+Data: none.
+
+Behavior:
+  - Old links and bookmarks to `/admin/oauth` permanently redirect to `/admin/oauth/applications`.
+  - Desktop and mobile navigation both link directly to `/admin/oauth/applications`.
+
+---
+
 ## /admin/oauth/applications
 
 Lists OAuth2 client applications registered through the OAuth Provider plugin. The enriched version uses a stats header, row navigation to a detail route, and a dedicated create-wizard route.
@@ -550,6 +565,7 @@ Components:
     Preview rows from CSV shape `scope,resourceServer,description`; resourceServer may be id, slug, or name.
 
 Behavior:
+  - Route owns `q`, `sortBy`, and `sortDir` from the URL query string and passes them to `ScopeCatalogContent`; search and sort updates push `/admin/oauth/scope-catalog?...`.
   - CSV import is a repository-specific operator convenience; it loops existing `POST /admin/oauth-scopes` for valid rows after preview. Invalid, duplicate, or unknown-resource rows are skipped and shown in preview.
 
 ---
@@ -583,7 +599,7 @@ The grants surfaces (sessions, tokens, consents) were unified under `/admin/secu
 
 ```
 PageBody is owned by /admin/security/layout.tsx (route tabs: Sessions · Access Tokens · Refresh Tokens · Consents · Signing Keys).
-/admin/oauth/sessions-tokens/page.tsx → redirect("/admin/security/sessions")   [Next.js server redirect]
+/admin/oauth/sessions-tokens/page.tsx → permanentRedirect("/admin/security/sessions")   [Next.js permanent server redirect]
 ```
 
 Notes:

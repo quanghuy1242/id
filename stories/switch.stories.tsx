@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Stack, Switch, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Switch" } satisfies StoryDefault;
 
 export const Interactive: Story = () => {
   const [on, setOn] = useState(true);

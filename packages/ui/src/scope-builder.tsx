@@ -9,6 +9,10 @@ import {
   Label,
   ListBox,
   ListBoxItem,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
   SearchField,
   Tag,
   TagGroup,
@@ -16,6 +20,7 @@ import {
   type Key,
 } from "react-aria-components";
 import { useFilter } from "react-aria";
+import { ChevronDown } from "lucide-react";
 
 export type ScopeSuggestion = {
   readonly value: string;
@@ -32,6 +37,10 @@ type ScopeBuilderProps = {
   readonly validate?: (scope: string) => string | undefined;
   readonly name?: string;
   readonly size?: "sm" | "md";
+  readonly variant?: "inline" | "menu";
+  readonly placeholder?: string;
+  readonly searchValue?: string;
+  readonly onSearchValueChange?: (next: string) => void;
 };
 
 const scopePattern = /^[a-z][a-z0-9:_-]*$/;
@@ -51,11 +60,17 @@ export function ScopeBuilder({
   validate = defaultScopeValidate,
   name,
   size = "md",
+  variant = "inline",
+  placeholder = "Filter scopes…",
+  searchValue,
+  onSearchValueChange,
 }: ScopeBuilderProps) {
   const { contains } = useFilter({ sensitivity: "base" });
-  const [inputValue, setInputValue] = useState("");
+  const [internalInputValue, setInternalInputValue] = useState("");
   const [error, setError] = useState<string | undefined>(undefined);
+  const [menuOpen, setMenuOpen] = useState(false);
 
+  const inputValue = searchValue ?? internalInputValue;
   const selected = new Set(value);
   const available = suggestions.filter((s) => !selected.has(s.value));
   const knownValues = new Set(suggestions.map((s) => s.value));
@@ -72,6 +87,11 @@ export function ScopeBuilder({
     !selected.has(trimmed) &&
     !available.some((s) => s.value === trimmed);
 
+  function setInputValue(next: string) {
+    if (searchValue === undefined) setInternalInputValue(next);
+    onSearchValueChange?.(next);
+  }
+
   function addScope(scope: string) {
     const next = scope.trim();
     if (next === "" || selected.has(next)) {
@@ -86,6 +106,7 @@ export function ScopeBuilder({
     onChange([...value, next]);
     setInputValue("");
     setError(undefined);
+    setMenuOpen(false);
   }
 
   function removeKeys(keys: Set<Key>) {
@@ -108,6 +129,45 @@ export function ScopeBuilder({
   }
 
   const inputSize = size === "sm" ? "input-sm" : "";
+  const triggerSize = size === "sm" ? "select-sm" : "";
+  const triggerLabel = value.length > 0 ? `${value.length} selected` : trimmed || placeholder;
+  const emptyState = <div className="px-3 py-2 text-sm text-base-content/50">No matching scopes</div>;
+
+  const searchField = (
+    <SearchField
+      aria-label={`Search ${label}`}
+      className="w-full"
+      onClear={() => setError(undefined)}
+    >
+      <Label className="sr-only">{label}</Label>
+      <Input
+        placeholder={placeholder}
+        onKeyDown={handleInputKeyDown}
+        className={`input input-bordered ${inputSize} w-full bg-base-100 text-base-content focus:input-primary`.trim()}
+      />
+    </SearchField>
+  );
+
+  const suggestionItems = (
+    <>
+      {showCustom ? (
+        <ListBoxItem id={trimmed} textValue={trimmed} className="rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200">
+          Add “<span className="font-mono">{trimmed}</span>”
+        </ListBoxItem>
+      ) : null}
+      {filteredAvailable.map((s) => (
+        <ListBoxItem
+          key={s.value}
+          id={s.value}
+          textValue={s.value}
+          className="flex flex-col rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200"
+        >
+          <span className="font-mono text-base-content">{s.value}</span>
+          {s.description ? <span className="text-xs text-base-content/50">{s.description}</span> : null}
+        </ListBoxItem>
+      ))}
+    </>
+  );
 
   return (
     <div className="form-control w-full">
@@ -139,53 +199,74 @@ export function ScopeBuilder({
         </TagGroup>
       ) : null}
 
-      <Autocomplete
-        inputValue={inputValue}
-        onInputChange={(next) => {
-          setInputValue(next);
-          if (error) setError(undefined);
-        }}
-        filter={contains}
-      >
-        <SearchField
-          aria-label={`Search ${label}`}
-          className="w-full"
-          onClear={() => setError(undefined)}
+      {variant === "menu" ? (
+        <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
+          <AriaButton
+            aria-label={label}
+            className={`select select-bordered ${triggerSize} flex w-full items-center justify-between gap-2 bg-none text-left`.trim()}
+          >
+            <span className="truncate">{triggerLabel}</span>
+            <ChevronDown className="h-3 w-3 shrink-0 text-base-content/50" aria-hidden="true" />
+          </AriaButton>
+          <Popover className="z-50 w-(--trigger-width) data-[entering]:animate-popover-in data-[exiting]:animate-popover-out">
+            <div className="popover-panel flex max-h-80 w-full flex-col gap-2 p-2">
+              <Autocomplete
+                inputValue={inputValue}
+                onInputChange={(next) => {
+                  setInputValue(next);
+                  if (error) setError(undefined);
+                }}
+                filter={contains}
+              >
+                {searchField}
+                <Menu
+                  aria-label={`${label} suggestions`}
+                  onAction={(key) => addScope(String(key))}
+                  renderEmptyState={() => emptyState}
+                  className="menu menu-sm max-h-56 w-full overflow-auto p-1"
+                >
+                  {showCustom ? (
+                    <MenuItem id={trimmed} textValue={trimmed} className="rounded-field px-3 py-2 text-sm outline-none data-[focused]:bg-base-200">
+                      Add “<span className="font-mono">{trimmed}</span>”
+                    </MenuItem>
+                  ) : null}
+                  {filteredAvailable.map((s) => (
+                    <MenuItem
+                      key={s.value}
+                      id={s.value}
+                      textValue={s.value}
+                      className="flex flex-col rounded-field px-3 py-2 text-sm outline-none data-[focused]:bg-base-200"
+                    >
+                      <span className="font-mono text-base-content">{s.value}</span>
+                      {s.description ? <span className="text-xs text-base-content/50">{s.description}</span> : null}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </Autocomplete>
+            </div>
+          </Popover>
+        </MenuTrigger>
+      ) : (
+        <Autocomplete
+          inputValue={inputValue}
+          onInputChange={(next) => {
+            setInputValue(next);
+            if (error) setError(undefined);
+          }}
+          filter={contains}
         >
-          <Label className="sr-only">{label}</Label>
-          <Input
-            placeholder="Filter scopes…"
-            onKeyDown={handleInputKeyDown}
-            className={`input input-bordered ${inputSize} w-full bg-base-100 text-base-content focus:input-primary`.trim()}
-          />
-        </SearchField>
-        <ListBox
-          aria-label={`${label} suggestions`}
-          selectionMode="none"
-          onAction={(key) => addScope(String(key))}
-          renderEmptyState={() => (
-            <div className="px-3 py-2 text-sm text-base-content/50">No matching scopes</div>
-          )}
-          className="menu mt-1 max-h-56 w-full overflow-auto rounded-box border border-base-300 bg-base-100 p-1"
-        >
-          {showCustom ? (
-            <ListBoxItem id={trimmed} textValue={trimmed} className="rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200">
-              Add “<span className="font-mono">{trimmed}</span>”
-            </ListBoxItem>
-          ) : null}
-          {filteredAvailable.map((s) => (
-            <ListBoxItem
-              key={s.value}
-              id={s.value}
-              textValue={s.value}
-              className="flex flex-col rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200"
-            >
-              <span className="font-mono text-base-content">{s.value}</span>
-              {s.description ? <span className="text-xs text-base-content/50">{s.description}</span> : null}
-            </ListBoxItem>
-          ))}
-        </ListBox>
-      </Autocomplete>
+          {searchField}
+          <ListBox
+            aria-label={`${label} suggestions`}
+            selectionMode="none"
+            onAction={(key) => addScope(String(key))}
+            renderEmptyState={() => emptyState}
+            className="menu mt-1 max-h-56 w-full overflow-auto rounded-box border border-base-300 bg-base-100 p-1"
+          >
+            {suggestionItems}
+          </ListBox>
+        </Autocomplete>
+      )}
 
       {error ? (
         <span role="alert" className="label-text-alt mt-1 text-error">

@@ -1,5 +1,7 @@
 import { Disclosure, DisclosureGroup, DescriptionList, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Disclosure" } satisfies StoryDefault;
 
 export const Single: Story = () => (
   <Stack gap="md">

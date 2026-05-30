@@ -1,4 +1,5 @@
 let mockPathname = "/admin";
+let mockSearchParams = new URLSearchParams();
 const mockRouter = {
   push(_href: string) {},
   replace(_href: string) {},
@@ -9,11 +10,17 @@ const mockRouter = {
 };
 
 export function setMockPathname(pathname: string) {
-  mockPathname = pathname;
+  const url = new URL(pathname, "https://id.example.test");
+  mockPathname = url.pathname;
+  mockSearchParams = url.searchParams;
 }
 
 export function usePathname() {
   return mockPathname;
+}
+
+export function useSearchParams() {
+  return mockSearchParams;
 }
 
 export function useRouter() {

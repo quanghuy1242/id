@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  DescriptionList,
   DurationInput,
   FilterDropdown,
   HiddenInput,
@@ -201,43 +202,24 @@ export function UserDetailOverviewContent({
 
       <Panel>
         <Stack gap="md">
-          <Inline gap="md">
+          <Inline gap="md" align="start">
             <Avatar
               initials={user.name?.slice(0, 2).toUpperCase()}
               image={user.image ?? undefined}
               alt={user.name}
               size="lg"
             />
-            <Stack gap="xs">
-              <Inline gap="sm">
-                <Text variant="caption">Name</Text>
-                <Text variant="body">{user.name}</Text>
-              </Inline>
-              <Inline gap="sm">
-                <Text variant="caption">Email</Text>
-                <Text variant="body">{user.email}</Text>
-              </Inline>
-              <Inline gap="sm">
-                <Text variant="caption">Role</Text>
-                <Badge tone={user.role === "admin" ? "primary" : "neutral"}>{user.role}</Badge>
-              </Inline>
-              <Inline gap="sm">
-                <Text variant="caption">Email Verified</Text>
-                {user.emailVerified
-                  ? <Badge tone="success">Verified</Badge>
-                  : <Badge tone="warning">Unverified</Badge>}
-              </Inline>
-              <Inline gap="sm">
-                <Text variant="caption">Banned</Text>
-                {user.banned
-                  ? <Badge tone="error">Banned</Badge>
-                  : <Badge tone="success">Active</Badge>}
-              </Inline>
-              <Inline gap="sm">
-                <Text variant="caption">Created</Text>
-                <Text variant="body">{new Date(user.createdAt).toLocaleDateString()}</Text>
-              </Inline>
-            </Stack>
+            <DescriptionList
+              columns={3}
+              items={[
+                { term: "Name", description: user.name },
+                { term: "Email", description: user.email, mono: true },
+                { term: "Role", description: <Badge tone={user.role === "admin" ? "primary" : "neutral"}>{user.role}</Badge> },
+                { term: "Email Verified", description: user.emailVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="warning">Unverified</Badge> },
+                { term: "Status", description: user.banned ? <Badge tone="error">Banned</Badge> : <Badge tone="success">Active</Badge> },
+                { term: "Created", description: new Date(user.createdAt).toLocaleDateString() },
+              ]}
+            />
           </Inline>
         </Stack>
       </Panel>
@@ -357,7 +339,18 @@ export function UserDetailOverviewContent({
         error={deleteError}
         onConfirm={handleDelete}
       >
-        <Text variant="body">This is irreversible. ALL user data, sessions, and accounts will be removed.</Text>
+        <Stack gap="sm">
+          <DescriptionList
+            columns={1}
+            dense
+            items={[
+              { term: "User ID", description: user.id, mono: true },
+              { term: "Email", description: user.email, mono: true },
+              { term: "Role", description: user.role },
+            ]}
+          />
+          <Text variant="body">This is irreversible. ALL user data, sessions, and accounts will be removed.</Text>
+        </Stack>
         <TextInput
           label="Type the user's email to confirm"
           name="confirmEmail"

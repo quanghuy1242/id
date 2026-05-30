@@ -1,5 +1,7 @@
 import { Button, PageIntro, Stack } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Page Intro" } satisfies StoryDefault;
 
 export const Full: Story = () => (
   <Stack gap="md">

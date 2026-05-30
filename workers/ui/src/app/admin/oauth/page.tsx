@@ -1,5 +1,5 @@
-import { ApplicationsContent } from "../_components/oauth/applications-content";
+import { permanentRedirect } from "next/navigation";
 
 export default function OAuthPage() {
-  return <ApplicationsContent />;
+  permanentRedirect("/admin/oauth/applications");
 }

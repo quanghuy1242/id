@@ -49,6 +49,45 @@ describe("ScopeBuilder", () => {
     expect(onChange).toHaveBeenCalledWith(["content:read"]);
   });
 
+  it("supports a menu variant with search and animated popover", async () => {
+    const onChange = vi.fn<(v: string[]) => void>();
+    render(<ScopeBuilder label="Scope filters" value={[]} onChange={onChange} suggestions={suggestions} variant="menu" />);
+
+    expect(screen.queryByText("content:read")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /scope filters/i }));
+
+    expect(await screen.findByRole("searchbox", { name: /search scope filters/i })).toBeInTheDocument();
+    const menu = await screen.findByRole("menu");
+    expect(menu.parentElement?.parentElement).toHaveClass(
+      "data-[entering]:animate-popover-in",
+      "data-[exiting]:animate-popover-out",
+    );
+    fireEvent.click(await screen.findByText("content:read"));
+    expect(onChange).toHaveBeenCalledWith(["content:read"]);
+  });
+
+  it("can route-control the menu search value", async () => {
+    const onSearchValueChange = vi.fn<(v: string) => void>();
+    render(
+      <ScopeBuilder
+        label="Scope filters"
+        value={[]}
+        onChange={() => {}}
+        suggestions={suggestions}
+        variant="menu"
+        searchValue="content"
+        onSearchValueChange={onSearchValueChange}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /scope filters/i })).toHaveTextContent("content");
+    fireEvent.click(screen.getByRole("button", { name: /scope filters/i }));
+    const input = await screen.findByRole("searchbox", { name: /search scope filters/i });
+    expect(input).toHaveValue("content");
+    fireEvent.change(input, { target: { value: "profile" } });
+    expect(onSearchValueChange).toHaveBeenCalledWith("profile");
+  });
+
   it("filters suggestions while typing", () => {
     render(<ScopeBuilder label="Scopes" value={[]} onChange={() => {}} suggestions={suggestions} />);
     fireEvent.change(screen.getByRole("searchbox", { name: /search scopes/i }), { target: { value: "content" } });

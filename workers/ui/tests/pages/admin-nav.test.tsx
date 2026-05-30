@@ -25,6 +25,10 @@ describe("Admin sidebar navigation", () => {
 
     expect(screen.getByRole("link", { name: "OAuth" })).not.toHaveClass("menu-active");
     expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveAttribute(
+      "href",
+      "/admin/security/sessions",
+    );
   });
 
   it("keeps the security section item active across grants sub-routes", () => {
@@ -41,6 +45,10 @@ describe("Admin sidebar navigation", () => {
     render(<AdminSidebarNav />);
 
     expect(screen.getByRole("link", { name: "OAuth" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "OAuth" })).toHaveAttribute(
+      "href",
+      "/admin/oauth/applications",
+    );
     expect(screen.getByRole("link", { name: "Grants & Keys" })).not.toHaveClass("menu-active");
   });
 });
@@ -116,6 +124,22 @@ describe("OAuth layout", () => {
 
     expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
     expect(screen.getByText("Some other content")).toBeInTheDocument();
+  });
+
+  it("hides configuration tabs on OAuth detail and create routes", () => {
+    navigationMock.pathname = "/admin/oauth/applications/cli_123";
+
+    const { unmount } = render(<OAuthLayout><div>Application detail</div></OAuthLayout>);
+
+    expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
+    expect(screen.getByText("Application detail")).toBeInTheDocument();
+
+    unmount();
+    navigationMock.pathname = "/admin/oauth/applications/new";
+    render(<OAuthLayout><div>Application create</div></OAuthLayout>);
+
+    expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
+    expect(screen.getByText("Application create")).toBeInTheDocument();
   });
 });
 

@@ -66,6 +66,8 @@ describe("Organization detail nested content", () => {
     renderOrgDetail({ actions });
     await waitFor(() => expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0));
     expect(screen.getByText("#acme")).toBeInTheDocument();
+    expect(screen.getByText("Metadata")).toBeInTheDocument();
+    expect(screen.getByText(/"plan":/)).toBeInTheDocument();
   });
 
   it("opens Edit Organization dialog", async () => {
@@ -74,6 +76,7 @@ describe("Organization detail nested content", () => {
     await waitFor(() => screen.getByRole("button", { name: /edit organization/i }));
     fireEvent.click(screen.getByRole("button", { name: /edit organization/i }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /metadata/i })).toHaveValue(baseOrg.metadata);
   });
 
   it("delete confirm button disabled until correct slug typed", async () => {

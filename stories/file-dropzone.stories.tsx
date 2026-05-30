@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { FileDropzone, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / File Dropzone" } satisfies StoryDefault;
 
 export const CsvImport: Story = () => {
   const [names, setNames] = useState<string[]>([]);

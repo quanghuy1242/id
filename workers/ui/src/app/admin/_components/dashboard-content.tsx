@@ -10,6 +10,7 @@ import {
   Stack,
   Stat,
   StatGroup,
+  StatSummaryGroup,
   Text,
 } from "@id/ui";
 import {
@@ -85,25 +86,29 @@ export function DashboardContent({ actions = defaultActions }: DashboardContentP
         description="Manage identities, organizations, OAuth clients, and the security surface of this identity provider."
         info="This console is the control plane for the identity provider. The dashboard summarizes the live admin read endpoints; use the shortcuts below for detailed workflows."
       />
-      <StatGroup columns={4}>
-        <Stat title="Users" value={statValue(users?.total)} description="registered accounts" tone="primary" />
-        <Stat title="Organizations" value={statValue(organizations?.length)} description="tenants" />
-        <Stat title="OAuth Apps" value={statValue(totalClients)} description={`${statValue(m2mClients)} M2M`} tone="info" />
-        <Stat title="Active Sessions" value={statValue(sessions?.total)} description="browser grants" tone="success" />
-      </StatGroup>
-      <StatGroup columns={4}>
-        <Stat title="Access Tokens" value={statValue(accessTokens?.total)} description="prefixes only" />
-        <Stat title="Refresh Tokens" value={statValue(refreshTokens?.total)} description="prefixes only" />
-        <Stat title="Consents" value={statValue(consents?.total)} description="active grants" />
-        <Stat title="Signing Keys" value={statValue(jwks?.length)} description={`${statValue(activeKeys)} active · ${statValue(rotatedKeys)} rotated · ${statValue(expiredKeys)} expired`} />
-      </StatGroup>
+      <StatSummaryGroup>
+        <StatGroup columns={4} density="compact" frame="seamless">
+          <Stat title="Users" value={statValue(users?.total)} description="registered accounts" tone="primary" />
+          <Stat title="Organizations" value={statValue(organizations?.length)} description="tenants" />
+          <Stat title="OAuth Apps" value={statValue(totalClients)} description={`${statValue(m2mClients)} M2M`} tone="info" />
+          <Stat title="Active Sessions" value={statValue(sessions?.total)} description="browser grants" tone="success" />
+        </StatGroup>
+        <StatGroup columns={4} density="compact" frame="seamless">
+          <Stat title="Access Tokens" value={statValue(accessTokens?.total)} description="prefixes only" />
+          <Stat title="Refresh Tokens" value={statValue(refreshTokens?.total)} description="prefixes only" />
+          <Stat title="Consents" value={statValue(consents?.total)} description="active grants" />
+          <Stat title="Signing Keys" value={statValue(jwks?.length)} description={`${statValue(activeKeys)} active · ${statValue(rotatedKeys)} rotated · ${statValue(expiredKeys)} expired`} />
+        </StatGroup>
+      </StatSummaryGroup>
       <Grid columns="three" gap="md">
         {sections.map((section) => (
           <Panel key={section.href}>
-            <Stack gap="sm">
-              <Text variant="h3">{section.title}</Text>
-              <Text variant="caption">{section.body}</Text>
-              {section.href.includes("/security/") ? <Badge tone="info" size="sm">Security</Badge> : null}
+            <Stack gap="md" justify="between" fill>
+              <Stack gap="sm">
+                <Text variant="h3">{section.title}</Text>
+                <Text variant="caption">{section.body}</Text>
+                {section.href.includes("/security/") ? <Badge tone="info" size="sm">Security</Badge> : null}
+              </Stack>
               <LinkButton href={section.href} variant="secondary" size="sm">Open</LinkButton>
             </Stack>
           </Panel>

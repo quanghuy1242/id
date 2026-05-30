@@ -2,7 +2,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Stat, StatGroup } from "@id/ui";
+import { Stat, StatGroup, StatSummaryGroup } from "@id/ui";
 
 describe("StatGroup / Stat", () => {
   it("renders title, value, and description", () => {
@@ -34,6 +34,24 @@ describe("StatGroup / Stat", () => {
       </StatGroup>,
     );
     expect(container.firstChild).toHaveClass("sm:grid-cols-3");
+  });
+
+  it("supports seamless rows inside a summary group", () => {
+    const { container } = render(
+      <StatSummaryGroup>
+        <StatGroup columns={4} density="compact" frame="seamless">
+          <Stat title="A" value={1} />
+          <Stat title="B" value={2} />
+        </StatGroup>
+        <StatGroup columns={4} density="compact" frame="seamless">
+          <Stat title="C" value={3} />
+          <Stat title="D" value={4} />
+        </StatGroup>
+      </StatSummaryGroup>,
+    );
+    expect(container.firstChild).toHaveClass("flex", "gap-px", "overflow-hidden", "rounded-box");
+    expect(container.querySelectorAll(".grid")).toHaveLength(2);
+    expect(container.querySelector(".grid")).not.toHaveClass("rounded-box");
   });
 
   it("supports an inline layout that does not force a full-width grid", () => {

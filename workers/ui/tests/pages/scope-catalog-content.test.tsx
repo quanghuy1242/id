@@ -52,13 +52,20 @@ describe("ScopeCatalogContent", () => {
     await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
     expect(screen.getAllByText("Content API").length).toBeGreaterThan(0);
     expect(screen.getByText("Updated 7d")).toBeInTheDocument();
-    expect(screen.getAllByText("Scope filters").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Search and filter scopes").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("searchbox", { name: /search scopes/i })).toBeNull();
   });
 
   it("omits unsupported delete actions", async () => {
     render(<ScopeCatalogContent actions={makeActions(mockScopes)} />);
     await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
     expect(screen.queryByRole("button", { name: /scope deletion via api pending/i })).toBeNull();
+  });
+
+  it("filters rows through the merged scope menu search", async () => {
+    render(<ScopeCatalogContent actions={makeActions(mockScopes)} search="content" />);
+    await waitFor(() => expect(screen.getAllByText("content:read").length).toBeGreaterThan(0));
+    expect(screen.queryByText("billing:write")).toBeNull();
   });
 
   it("rejects an invalid scope string", async () => {

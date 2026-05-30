@@ -152,7 +152,7 @@ function PublicJwk({ keyRecord }: { readonly keyRecord: AdminJwk }) {
 
 function renderTab(activeTab: JwksDetailTab, keyRecord: AdminJwk) {
   if (activeTab === "public-jwk") return <PublicJwk keyRecord={keyRecord} />;
-  if (activeTab === "metrics") return <EmptyState message="Per-key usage metrics are not yet collected" />;
+  if (activeTab === "metrics") return <Panel><EmptyState message="Per-key usage metrics are not yet collected" /></Panel>;
   if (activeTab === "audit") return <ActivityLogContent targetType="jwks" targetId={keyRecord.id} />;
   return <Overview keyRecord={keyRecord} />;
 }

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Stack, Text, UrlListBuilder } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / URL List Builder" } satisfies StoryDefault;
 
 export const RedirectUris: Story = () => {
   const [value, setValue] = useState<string[]>([

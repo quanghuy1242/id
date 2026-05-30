@@ -1,12 +1,11 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
 import { JwksContent } from "../../workers/ui/src/app/admin/_components/security/jwks-content";
 import { JwksDetailContent } from "../../workers/ui/src/app/admin/_components/security/jwks-detail-content";
 import type { AdminJwk } from "../../workers/ui/src/app/admin/_actions/audit";
 import { mockAdminJwks } from "../../workers/ui/src/app/admin/_mocks/security";
-import { AdminShell } from "../_decorators/shell";
+import { SecurityShell } from "../_decorators/security-shell";
 
-export default { title: "Security / JWKS" } satisfies StoryDefault;
+export default { title: "Admin / Grants & Keys / Signing Keys" } satisfies StoryDefault;
 
 const ACTIVE = "/admin/security/jwks";
 
@@ -18,65 +17,49 @@ function makeActions(keys: AdminJwk[]) {
 }
 
 export const Populated: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksContent actions={makeActions(mockAdminJwks)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <JwksContent actions={makeActions(mockAdminJwks)} />
+  </SecurityShell>
 );
 
 export const Empty: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksContent actions={makeActions([])} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <JwksContent actions={makeActions([])} />
+  </SecurityShell>
 );
 
 export const Loading: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksContent loading />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <JwksContent loading />
+  </SecurityShell>
 );
 
 export const Error: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksContent error="Failed to load JWKS" />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath={ACTIVE}>
+    <JwksContent error="Failed to load JWKS" />
+  </SecurityShell>
 );
 
 export const DetailOverview: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksDetailContent kid="abc123def456" actions={makeActions(mockAdminJwks)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath="/admin/security/jwks/abc123def456">
+    <JwksDetailContent kid="abc123def456" actions={makeActions(mockAdminJwks)} />
+  </SecurityShell>
 );
 
 export const DetailPublicJwk: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksDetailContent kid="abc123def456" activeTab="public-jwk" actions={makeActions(mockAdminJwks)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath="/admin/security/jwks/abc123def456/public-jwk">
+    <JwksDetailContent kid="abc123def456" activeTab="public-jwk" actions={makeActions(mockAdminJwks)} />
+  </SecurityShell>
 );
 
 export const DetailMetrics: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksDetailContent kid="abc123def456" activeTab="metrics" actions={makeActions(mockAdminJwks)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath="/admin/security/jwks/abc123def456/metrics">
+    <JwksDetailContent kid="abc123def456" activeTab="metrics" actions={makeActions(mockAdminJwks)} />
+  </SecurityShell>
 );
 
 export const DetailNotFound: Story = () => (
-  <AdminShell activePath={ACTIVE}>
-    <PageBody>
-      <JwksDetailContent kid="missing-key" actions={makeActions(mockAdminJwks)} />
-    </PageBody>
-  </AdminShell>
+  <SecurityShell activePath="/admin/security/jwks/missing-key">
+    <JwksDetailContent kid="missing-key" actions={makeActions(mockAdminJwks)} />
+  </SecurityShell>
 );

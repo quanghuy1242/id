@@ -1,5 +1,7 @@
 import { Stack, Text, Timeline } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Timeline" } satisfies StoryDefault;
 
 export const AuditLog: Story = () => (
   <Stack gap="md">

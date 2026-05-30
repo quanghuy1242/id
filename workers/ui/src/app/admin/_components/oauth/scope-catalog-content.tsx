@@ -18,7 +18,6 @@ import {
   Panel,
   ScopeBuilder,
   type ScopeSuggestion,
-  SearchInput,
   Skeleton,
   Stack,
   Stat,
@@ -326,10 +325,17 @@ export function ScopeCatalogContent({
         <Stat title="Updated 7d" value={stats.recent} description="recent changes" tone="info" />
       </StatGroup>
       <Panel>
-        <Stack gap="sm">
-          <SearchInput grow placeholder="Search scopes…" value={effectiveSearch} onChange={handleSearchChange} />
-          <ScopeBuilder label="Scope filters" value={scopeFilters} onChange={setScopeFilters} suggestions={scopeSuggestions} allowCustom size="sm" />
-        </Stack>
+        <ScopeBuilder
+          label="Search and filter scopes"
+          value={scopeFilters}
+          onChange={setScopeFilters}
+          suggestions={scopeSuggestions}
+          allowCustom
+          variant="menu"
+          placeholder="Search scopes or add filters…"
+          searchValue={effectiveSearch}
+          onSearchValueChange={handleSearchChange}
+        />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>

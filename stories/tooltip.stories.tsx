@@ -1,5 +1,7 @@
 import { Button, Inline, Stack, Text, Tooltip } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Tooltip" } satisfies StoryDefault;
 
 export const OnIconButtons: Story = () => (
   <Stack gap="md">

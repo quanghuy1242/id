@@ -1,5 +1,7 @@
 import { Checkbox, Form, RadioGroup, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Form" } satisfies StoryDefault;
 
 const radioOptions = [
   { value: "cat", label: "Cat" },

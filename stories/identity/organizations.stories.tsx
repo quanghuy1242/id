@@ -22,7 +22,7 @@ import {
 import { mockUsers } from "../../workers/ui/src/app/admin/_mocks/users";
 import { mockActivities } from "../../workers/ui/src/app/admin/_mocks/audit";
 
-export default { title: "Identity / Organizations" } satisfies StoryDefault;
+export default { title: "Admin / Identity / Organizations" } satisfies StoryDefault;
 
 function createListActions(orgs: Organization[]) {
   let current = [...orgs];

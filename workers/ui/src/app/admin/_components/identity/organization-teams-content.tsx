@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Alert,
@@ -91,6 +91,7 @@ export function OrganizationTeamsContent({
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [expandedMembers, setExpandedMembers] = useState<TeamMember[]>([]);
   const [expandLoading, setExpandLoading] = useState(false);
+  const expandRequestRef = useRef(0);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | undefined>();
@@ -112,14 +113,25 @@ export function OrganizationTeamsContent({
   const userName = (userId: string) => usersById.get(userId)?.name ?? userId.slice(0, 12);
 
   async function handleExpandTeam(team: Team) {
-    if (expandedTeamId === team.id) { setExpandedTeamId(null); return; }
+    expandRequestRef.current += 1;
+    const requestId = expandRequestRef.current;
+    if (expandedTeamId === team.id) {
+      setExpandedTeamId(null);
+      setExpandedMembers([]);
+      setAddMemberValue("");
+      setExpandLoading(false);
+      return;
+    }
     setExpandedTeamId(team.id);
+    setExpandedMembers([]);
     setAddMemberError(undefined);
+    setAddMemberValue("");
     setExpandLoading(true);
     try {
-      setExpandedMembers(await actions.listTeamMembers(team.id));
+      const members = await actions.listTeamMembers(team.id);
+      if (expandRequestRef.current === requestId) setExpandedMembers(members);
     } finally {
-      setExpandLoading(false);
+      if (expandRequestRef.current === requestId) setExpandLoading(false);
     }
   }
 
@@ -293,10 +305,13 @@ export function OrganizationTeamsContent({
               <Stack gap="md">
                 <Inline justify="between">
                   <Text variant="h3">{expandedTeam.name} · {expandedMembers.length} members</Text>
-                  {addMemberOptions.length > 0 && (
+                  {!expandLoading && addMemberOptions.length > 0 && (
                     <ResourceSelector
                       kind="member"
                       value={addMemberValue}
+                      variant="menu"
+                      width="compact"
+                      label={`Add member to ${expandedTeam.name}`}
                       placeholder="Add member…"
                       source={{ mode: "sync", items: addMemberOptions }}
                       excludeIds={expandedMembers.map((member) => member.userId)}

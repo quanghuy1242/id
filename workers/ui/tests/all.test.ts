@@ -58,6 +58,7 @@ await import("./pages/organization-members-content.test");
 await import("./pages/organization-invitations-content.test");
 await import("./pages/oauth-actions.test");
 await import("./pages/applications-content.test");
+await import("./pages/application-create-wizard-content.test");
 await import("./pages/oauth-detail-content.test");
 await import("./pages/resource-apis-content.test");
 await import("./pages/scope-catalog-content.test");

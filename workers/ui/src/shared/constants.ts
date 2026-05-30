@@ -14,9 +14,18 @@ export const DAY_MS = 86_400_000;
 export const ADMIN_RECENT_WINDOW_DAYS = 7;
 export const ADMIN_RECENT_WINDOW_MS = ADMIN_RECENT_WINDOW_DAYS * DAY_MS;
 
+export type AdminNavItem = {
+  readonly type: "item";
+  readonly label: string;
+  readonly href: string;
+  readonly activeHref?: string;
+  readonly exact?: boolean;
+  readonly icon?: string;
+};
+
 export type AdminNavEntry =
-  | { readonly type: "item"; readonly label: string; readonly href: string; readonly exact?: boolean; readonly icon?: string }
-  | { readonly type: "section"; readonly label: string };
+  | AdminNavItem
+  | { readonly type: "group"; readonly label: string; readonly items: readonly AdminNavItem[] };
 
 export type AdminMobileNavItem = {
   readonly label: string;
@@ -29,19 +38,27 @@ export type AdminMobileNavItem = {
 /** Admin sidebar navigation — section headers and links in render order. */
 export const SIDEBAR_NAV: readonly AdminNavEntry[] = [
   { type: "item", label: "Dashboard", href: "/admin", exact: true, icon: "LayoutDashboard" },
-  { type: "section", label: "Identity" },
-  { type: "item", label: "Users", href: "/admin/identity/users", icon: "Users" },
-  { type: "item", label: "Organizations", href: "/admin/identity/organizations", icon: "Building2" },
-  { type: "section", label: "OAuth" },
-  { type: "item", label: "OAuth", href: "/admin/oauth", icon: "KeyRound" },
-  { type: "section", label: "Security" },
-  { type: "item", label: "Grants & Keys", href: "/admin/security", icon: "ShieldCheck" },
-  { type: "section", label: "System" },
-  { type: "item", label: "Service Accounts", href: "/admin/system/service-accounts", icon: "Bot" },
-  { type: "item", label: "Issuer Metadata", href: "/admin/system/issuer-metadata", icon: "Globe" },
-  { type: "item", label: "SCIM Status", href: "/admin/system/scim-status", icon: "Activity" },
-  { type: "item", label: "Health", href: "/admin/system/health", icon: "HeartPulse" },
-  { type: "item", label: "Settings", href: "/admin/system/settings", icon: "Settings" },
+  {
+    type: "group",
+    label: "Identity",
+    items: [
+      { type: "item", label: "Users", href: "/admin/identity/users", icon: "Users" },
+      { type: "item", label: "Organizations", href: "/admin/identity/organizations", icon: "Building2" },
+    ],
+  },
+  { type: "item", label: "OAuth", href: "/admin/oauth/applications", activeHref: "/admin/oauth", icon: "KeyRound" },
+  { type: "item", label: "Grants & Keys", href: "/admin/security/sessions", activeHref: "/admin/security", icon: "ShieldCheck" },
+  {
+    type: "group",
+    label: "System",
+    items: [
+      { type: "item", label: "Service Accounts", href: "/admin/system/service-accounts", icon: "Bot" },
+      { type: "item", label: "Issuer Metadata", href: "/admin/system/issuer-metadata", icon: "Globe" },
+      { type: "item", label: "SCIM Status", href: "/admin/system/scim-status", icon: "Activity" },
+      { type: "item", label: "Health", href: "/admin/system/health", icon: "HeartPulse" },
+      { type: "item", label: "Settings", href: "/admin/system/settings", icon: "Settings" },
+    ],
+  },
 ];
 
 /** Admin mobile dock — top-level section entries only. */

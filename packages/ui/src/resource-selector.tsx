@@ -9,6 +9,10 @@ import {
   Label,
   ListBox,
   ListBoxItem,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Popover,
   SearchField,
   Tag,
   TagGroup,
@@ -17,6 +21,7 @@ import {
 } from "react-aria-components";
 import { useFilter } from "react-aria";
 import { useAsyncList } from "react-stately";
+import { ChevronDown } from "lucide-react";
 import { Avatar } from "./avatar";
 
 export type ResourceKind = "user" | "organization" | "team" | "member";
@@ -40,10 +45,14 @@ type ResourceSelectorProps = {
   readonly onChange: (next: string | string[]) => void;
   readonly source: ResourceSource;
   readonly placeholder?: string;
+  readonly label?: string;
+  readonly showLabel?: boolean;
   readonly name?: string;
   readonly excludeIds?: ReadonlyArray<string>;
   readonly renderOption?: (option: ResourceOption) => ReactNode;
   readonly size?: "sm" | "md";
+  readonly variant?: "inline" | "menu";
+  readonly width?: "full" | "compact";
 };
 
 function defaultRenderOption(kind: ResourceKind, option: ResourceOption): ReactNode {
@@ -67,13 +76,19 @@ export function ResourceSelector({
   onChange,
   source,
   placeholder = "Search…",
+  label,
+  showLabel,
   name,
   excludeIds = [],
   renderOption,
   size = "md",
+  variant = "inline",
+  width = "full",
 }: ResourceSelectorProps) {
   const { contains } = useFilter({ sensitivity: "base" });
   const [cache, setCache] = useState<Record<string, ResourceOption>>({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const fieldLabel = label ?? `Search ${kind}s`;
 
   const list = useAsyncList<ResourceOption>({
     async load({ signal, filterText }) {
@@ -122,6 +137,7 @@ export function ResourceSelector({
     } else {
       onChange(id);
       list.setFilterText("");
+      setMenuOpen(false);
     }
   }
 
@@ -130,12 +146,41 @@ export function ResourceSelector({
   }
 
   const inputSize = size === "sm" ? "input-sm" : "";
+  const triggerSize = size === "sm" ? "select-sm" : "";
+  const widthClass = width === "compact" ? "w-64 max-w-full" : "w-full";
   const labelFor = (id: string) => cache[id]?.label ?? id;
+  const triggerLabel =
+    selectionMode === "multiple"
+      ? selectedIds.length > 0 ? `${selectedIds.length} selected` : placeholder
+      : selectedIds[0] ? labelFor(selectedIds[0]) : placeholder;
+  const renderedEmptyState = (
+    <div className="px-3 py-2 text-sm text-base-content/50">
+      {list.loadingState === "loading" ? "Searching…" : "No results"}
+    </div>
+  );
+
+  const searchField = (
+    <SearchField
+      aria-label={fieldLabel}
+      className="w-full"
+    >
+      <Label className="sr-only">Search</Label>
+      <Input
+        placeholder={placeholder}
+        className={`input input-bordered ${inputSize} w-full bg-base-100 text-base-content focus:input-primary`.trim()}
+      />
+    </SearchField>
+  );
 
   return (
-    <div className="form-control w-full">
+    <div className={`form-control ${widthClass}`}>
+      {showLabel ? (
+        <label className="label">
+          <span className="label-text text-base font-medium text-base-content">{fieldLabel}</span>
+        </label>
+      ) : null}
       {selectionMode === "multiple" && selectedIds.length > 0 ? (
-        <TagGroup aria-label="Selected" onRemove={removeKeys} className="mb-2">
+        <TagGroup aria-label={`Selected ${fieldLabel}`} onRemove={removeKeys} className="mb-2">
           <TagList items={selectedIds.map((id) => ({ id }))} className="flex flex-wrap gap-2">
             {(item) => (
               <Tag id={item.id} textValue={labelFor(String(item.id))} className="badge badge-outline badge-primary gap-1">
@@ -153,43 +198,73 @@ export function ResourceSelector({
         </TagGroup>
       ) : null}
 
-      <Autocomplete
-        inputValue={list.filterText}
-        onInputChange={list.setFilterText}
-        filter={source.mode === "sync" ? contains : undefined}
-      >
-        <SearchField aria-label="Search resources" className="w-full">
-          <Label className="sr-only">Search</Label>
-          <Input
-            placeholder={placeholder}
-            className={`input input-bordered ${inputSize} w-full bg-base-100 text-base-content focus:input-primary`.trim()}
-          />
-        </SearchField>
-        <ListBox
-          aria-label="Results"
-          items={items}
-          selectionMode="none"
-          onAction={(key) => pick(String(key))}
-          renderEmptyState={() => (
-            <div className="px-3 py-2 text-sm text-base-content/50">
-              {list.loadingState === "loading" ? "Searching…" : "No results"}
+      {variant === "menu" ? (
+        <MenuTrigger isOpen={menuOpen} onOpenChange={setMenuOpen}>
+          <AriaButton
+            aria-label={fieldLabel}
+            className={`select select-bordered ${triggerSize} flex w-full items-center justify-between gap-2 bg-none text-left`.trim()}
+          >
+            <span className="truncate">{triggerLabel}</span>
+            <ChevronDown className="h-3 w-3 shrink-0 text-base-content/50" aria-hidden="true" />
+          </AriaButton>
+          <Popover className="z-50 w-(--trigger-width) data-[entering]:animate-popover-in data-[exiting]:animate-popover-out">
+            <div className="popover-panel flex max-h-80 w-full flex-col gap-2 p-2">
+              <Autocomplete
+                inputValue={list.filterText}
+                onInputChange={list.setFilterText}
+                filter={source.mode === "sync" ? contains : undefined}
+              >
+                {searchField}
+                <Menu
+                  aria-label={`${fieldLabel} results`}
+                  items={items}
+                  onAction={(key) => pick(String(key))}
+                  renderEmptyState={() => renderedEmptyState}
+                  className="menu menu-sm max-h-64 w-full overflow-auto p-1"
+                >
+                  {(option: ResourceOption) => (
+                    <MenuItem
+                      id={option.id}
+                      textValue={option.label}
+                      className="rounded-field px-3 py-2 text-sm outline-none data-[focused]:bg-base-200"
+                    >
+                      {renderOption ? renderOption(option) : defaultRenderOption(kind, option)}
+                    </MenuItem>
+                  )}
+                </Menu>
+              </Autocomplete>
             </div>
-          )}
-          className="menu mt-1 max-h-64 w-full overflow-auto rounded-box border border-base-300 bg-base-100 p-1"
+          </Popover>
+        </MenuTrigger>
+      ) : (
+        <Autocomplete
+          inputValue={list.filterText}
+          onInputChange={list.setFilterText}
+          filter={source.mode === "sync" ? contains : undefined}
         >
-          {(option: ResourceOption) => (
-            <ListBoxItem
-              id={option.id}
-              textValue={option.label}
-              className="rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200"
-            >
-              {renderOption ? renderOption(option) : defaultRenderOption(kind, option)}
-            </ListBoxItem>
-          )}
-        </ListBox>
-      </Autocomplete>
+          {searchField}
+          <ListBox
+            aria-label={`${fieldLabel} results`}
+            items={items}
+            selectionMode="none"
+            onAction={(key) => pick(String(key))}
+            renderEmptyState={() => renderedEmptyState}
+            className="menu mt-1 max-h-64 w-full overflow-auto rounded-box border border-base-300 bg-base-100 p-1"
+          >
+            {(option: ResourceOption) => (
+              <ListBoxItem
+                id={option.id}
+                textValue={option.label}
+                className="rounded-field px-3 py-2 text-sm data-[focused]:bg-base-200"
+              >
+                {renderOption ? renderOption(option) : defaultRenderOption(kind, option)}
+              </ListBoxItem>
+            )}
+          </ListBox>
+        </Autocomplete>
+      )}
 
-      {selectionMode === "single" && selectedIds[0] ? (
+      {variant === "inline" && selectionMode === "single" && selectedIds[0] ? (
         <span className="mt-1 text-xs text-base-content/60">Selected: {labelFor(selectedIds[0])}</span>
       ) : null}
       {name ? <input type="hidden" name={name} value={selectedIds.join(",")} /> : null}

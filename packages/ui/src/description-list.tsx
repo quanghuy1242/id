@@ -24,7 +24,7 @@ const columnsClass: Record<DescriptionColumns, string> = {
 export function DescriptionList({ items, columns = 2, dense }: DescriptionListProps) {
   const gap = dense ? "gap-x-6 gap-y-2" : "gap-x-8 gap-y-4";
   return (
-    <dl className={`grid ${columnsClass[columns]} ${gap}`}>
+    <dl className={`grid w-full ${columnsClass[columns]} ${gap}`}>
       {items.map((item) => (
         <div key={item.term} className="flex flex-col gap-0.5">
           <dt className="text-xs font-medium uppercase tracking-wide text-base-content/50">{item.term}</dt>

@@ -63,9 +63,16 @@ Actor-scoped. Platform admin sees all clients; org admin sees own org's clients 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
+| `/admin/oauth` | Legacy redirect to canonical `/admin/oauth/applications` application index | [oauth.md](oauth.md#adminoauth-moved--adminoauthapplications) | implemented |
 | `/admin/oauth/applications` | OAuth client list — stats, type badges, row navigation, create wizard entry | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/oauth/applications/new` | OAuth client creation wizard — type, basics, URIs, scopes, review, one-time secret reveal | [oauth.md](oauth.md#adminoauthapplicationsnew) | implemented |
 | `/admin/oauth/applications/:clientId` | OAuth client detail — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/credentials` | OAuth client detail tab — credentials | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/uris` | OAuth client detail tab — redirect and post-logout URIs | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/scopes` | OAuth client detail tab — scopes and grants | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/connections` | OAuth client detail tab — resource API connections | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/quickstart` | OAuth client detail tab — integration quickstart | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/oauth/applications/:clientId/audit` | OAuth client detail tab — activity timeline | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 
 Note: Detail actions moved to a route-backed detail surface per docs/027; destructive and one-shot secret actions still use guarded dialogs.
 

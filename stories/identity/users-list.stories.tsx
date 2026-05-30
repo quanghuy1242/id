@@ -64,7 +64,7 @@ function createStoryActions(initialUsers: readonly User[]) {
   };
 }
 
-export default { title: "Identity / Users List" } satisfies StoryDefault;
+export default { title: "Admin / Identity / Users" } satisfies StoryDefault;
 
 type UserDetailFrameActions =
   NonNullable<Parameters<typeof UserDetailProvider>[0]["actions"]> &

@@ -1,7 +1,7 @@
 import { ResponsiveBreadcrumb, Stack, Text } from "@id/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
-export default { title: "ResponsiveBreadcrumb" } satisfies StoryDefault;
+export default { title: "Packages UI / Responsive Breadcrumb" } satisfies StoryDefault;
 
 export const Short: Story = () => (
   <Stack gap="md" align="start">

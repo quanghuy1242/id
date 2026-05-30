@@ -11,8 +11,8 @@
 > batched `in` enrichment, and secret-stripping presenters (token values and the
 > JWKS `privateKey` are never returned, asserted by tests). The adapter
 > capability "spike" (docs/026 §8) was validated empirically by the plugin's
-> integration tests against the in-memory D1 adapter. The `sessions-tokens`,
-> `consents`, and enriched `jwks` screens are now live. Gap 5 (scope hard-delete)
+> integration tests against the in-memory D1 adapter. The `/admin/security/sessions`,
+> `/admin/security/tokens`, `consents`, and enriched `jwks` screens are now live. Gap 5 (scope hard-delete)
 > remains **won't-build** (disable is the correct primitive); gap 6 (single-scope
 > GET) stays low-priority/unbuilt.
 
@@ -22,7 +22,7 @@
 
 ### 1. `GET /api/auth/admin/list-sessions` — aggregate session listing
 
-**Needed for:** `/admin/oauth/sessions-tokens`
+**Needed for:** `/admin/security/sessions` (moved from legacy `/admin/oauth/sessions-tokens`)
 
 **What exists:** `POST /api/auth/admin/list-user-sessions` (per-user, takes `userId` in body).
 
@@ -37,7 +37,7 @@
 
 ### 2. `GET /api/auth/admin/list-tokens` — aggregate OAuth token listing
 
-**Needed for:** `/admin/oauth/sessions-tokens` (Tokens tab)
+**Needed for:** `/admin/security/tokens?type=access|refresh` (moved from legacy `/admin/oauth/sessions-tokens`)
 
 **What exists:** Nothing. `oauthAccessToken` and `oauthRefreshToken` tables exist but have no admin listing endpoint.
 

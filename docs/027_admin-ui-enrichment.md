@@ -130,9 +130,10 @@ Data flows from the `core-id` worker's Better Auth endpoints under `/api/auth/*`
 
 ### 3.5 Grants Surfaces (Sessions / Tokens / Consents)
 
-- `oauth/sessions-tokens` (in-page tabs) lives under **`/admin/oauth`**; `security/consents` and `security/jwks` live under **`/admin/security`**. All read `admin-audit` aggregate endpoints.
+- Historical finding before this redesign: `oauth/sessions-tokens` (in-page tabs) lived under **`/admin/oauth`**, while `security/consents` and `security/jwks` lived under **`/admin/security`**. All read `admin-audit` aggregate endpoints.
+- Current implementation: `/admin/oauth/sessions-tokens` permanently redirects to `/admin/security/sessions`; sessions, access tokens, refresh tokens, consents, signing keys, and token decoding live under URL-addressable `/admin/security/*` tabs.
 
-**Problems.** Sessions, tokens, and consents are facets of one concept (live grants) but are split across two sections with different tab positions; in-page tabs are not URL-addressable.
+**Resolved problem.** Sessions, tokens, and consents are facets of one concept (live grants); they are no longer split across OAuth and Security, and the old in-page tabs are now route tabs.
 
 ### 3.6 Cross-Cutting Gaps
 
@@ -270,6 +271,7 @@ Add team member
   - `value: string | string[]`, `onChange: (next) => void` — ids.
   - `source: { mode: "async"; load: (q: string, signal: AbortSignal) => Promise<ResourceOption[]> } | { mode: "sync"; items: ResourceOption[] }` — `async` wires `useAsyncList` (server search, e.g. `listUsers({ searchValue })`); `sync` wires `useFilter` over a preloaded list (e.g. `listMembers(orgId)` enriched with names).
   - `placeholder?`, `name?` (hidden field of joined ids), `excludeIds?: string[]` (hide already-chosen), `renderOption?: (o: ResourceOption) => ReactNode`, `size?`.
+  - `variant?: "inline" | "menu"` — inline renders a visible `SearchField + ListBox` for full-form selection; menu renders a compact React Aria `MenuTrigger + Popover + Autocomplete + Menu` picker for toolbar/header use such as adding a team member.
   - `ResourceOption = { id: string; label: string; sublabel?: string; image?: string | null; badge?: string }`.
 - Behavior: typing updates `filterText` (async: debounced backend fetch with `AbortSignal`; sync: local filter). Selecting calls `onChange` with the id(s). Multi mode renders chosen items as a `TagGroup` above/below the field. `excludeIds` removes current members from an "add member" search.
 - States: idle / typing / loading (async) / no-results / selected(single) / selected(multi). Tests: async load called with query + abort on rapid typing; sync filter; single vs multi selection payloads; `excludeIds` filtering; renders Avatar for `user`/`member` kinds; hidden field serialization.
@@ -339,8 +341,8 @@ Type      Auth      URIs      Scopes    Review
 
 **Target.** Treat sessions, access tokens, refresh tokens, and consents as one section with one route-tab bar; keep JWKS as a sibling. Classification: **[UI]** — navigation only; no API change; reuses `admin-audit` endpoints.
 
-- Route tabs (URL-addressable, `Tabs` with `href` items) under `/admin/security`: `Sessions · Access Tokens · Refresh Tokens · Consents`. Promote the current in-page sessions/tokens tabs into these route tabs.
-- New/renamed routes (each needs a `security.md` spec entry first): `/admin/security/sessions` (from `oauth/sessions-tokens`), `/admin/security/tokens` (`type=access|refresh` query), `/admin/security/consents`, `/admin/security/jwks`. Each gains a `StatGroup` header. Redirect old `/admin/oauth/sessions-tokens`.
+- Route tabs (URL-addressable, `Tabs` with `href` items) under `/admin/security`: `Sessions · Access Tokens · Refresh Tokens · Consents · Signing Keys · Token Decoder`. Promote the current in-page sessions/tokens tabs into these route tabs.
+- New/renamed routes (each needs a `security.md` spec entry first): `/admin/security/sessions` (from `oauth/sessions-tokens`), `/admin/security/tokens` (`type=access|refresh` query), `/admin/security/consents`, `/admin/security/jwks`, `/admin/security/introspect`. Each gains a `StatGroup` header where the screen is tabular. Redirect old `/admin/oauth/sessions-tokens`.
 
 ## 7. Redesign: JWKS / Signing Keys
 
@@ -433,7 +435,7 @@ Content API   [Confidential]  cli_contentapi_…   [⟳ secret][🗑]
 ③ UrlListBuilder(redirect_uris ≥1) + UrlListBuilder(post_logout_redirect_uris)   (hidden for M2M)
 ④ ScopeBuilder(scope, suggestions=catalog) + metadata (UrlListBuilder for contacts)
 ⑤ DescriptionList summary → [Create application]
-On complete: POST create-client → show-once secret reveal → router.push to /applications/[client_id]
+On complete: POST create-client → show-once secret reveal → router.push to /admin/oauth/applications/[client_id]
 ```
 
 - Step validity gates Next; ③ requires ≥1 redirect URI unless M2M.
@@ -566,7 +568,7 @@ Contract:
 
 - **Token introspection / JWT decoder** — **[Protocol]** RFC 7662. `/admin/security/introspect`: paste a token → decoded header/claims (`JsonViewer`) + signing `kid` + audience match. Verify an introspection endpoint exists in [api-1.yaml](../api-1.yaml) first.
 - **Effective-access view per client** — **[UI]**. Compose client `scope` × resource servers × M2M `allowedScopes` on the application Connections tab.
-- **Dashboard** (`/admin` still `planned`) — **[UI]**. `StatGroup` + `Meter`: users, active sessions, tokens by type, clients by type, consents, JWKS days-to-rotation.
+- **Dashboard** (`/admin`, implemented) — **[UI]**. `StatGroup` + quick links: users, active sessions, tokens by type, clients by type, consents, and JWKS status.
 - **Client test/playground** — **[Protocol]**. Run a real `client_credentials` exchange from the admin.
 - **Discovery / issuer-metadata** and **SCIM status** — **[Protocol]** (RFC 8414 / OIDC Discovery; SCIM v2). Already planned; pure reads.
 

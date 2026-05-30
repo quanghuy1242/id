@@ -26,6 +26,33 @@ describe("ResourceSelector", () => {
     expect(onChange).toHaveBeenCalledWith("u1");
   });
 
+  it("supports a compact menu picker with search and animated popover", async () => {
+    const onChange = vi.fn<(next: string | string[]) => void>();
+    render(
+      <ResourceSelector
+        kind="member"
+        value=""
+        onChange={onChange}
+        source={syncSource}
+        variant="menu"
+        width="compact"
+        label="Add member"
+      />,
+    );
+
+    expect(screen.queryByText("Alice Nguyen")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    expect(await screen.findByRole("searchbox", { name: /add member/i })).toBeInTheDocument();
+    const menu = await screen.findByRole("menu");
+    expect(menu.parentElement?.parentElement).toHaveClass(
+      "data-[entering]:animate-popover-in",
+      "data-[exiting]:animate-popover-out",
+    );
+    fireEvent.click(await screen.findByText("Alice Nguyen"));
+    expect(onChange).toHaveBeenCalledWith("u1");
+  });
+
   it("adds to the array in multiple mode", async () => {
     const onChange = vi.fn<(next: string | string[]) => void>();
     render(
@@ -46,7 +73,7 @@ describe("ResourceSelector", () => {
   it("filters sync results by the typed query", async () => {
     render(<ResourceSelector kind="member" value="" onChange={() => {}} source={syncSource} />);
     await screen.findByText("Alice Nguyen");
-    fireEvent.change(screen.getByRole("searchbox", { name: /search resources/i }), { target: { value: "bob" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: /search members/i }), { target: { value: "bob" } });
     expect(screen.getByText("Bob Tran")).toBeInTheDocument();
     expect(screen.queryByText("Alice Nguyen")).toBeNull();
   });
@@ -70,7 +97,7 @@ describe("ResourceSelector", () => {
     render(<ResourceSelector kind="user" value="" onChange={() => {}} source={asyncSource} />);
     expect(await screen.findByText("Alice Nguyen")).toBeInTheDocument();
     expect(load).toHaveBeenCalled();
-    fireEvent.change(screen.getByRole("searchbox", { name: /search resources/i }), { target: { value: "alice" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: /search users/i }), { target: { value: "alice" } });
     expect(await screen.findByText("Alice Nguyen")).toBeInTheDocument();
     expect(load).toHaveBeenCalledWith("alice", expect.any(AbortSignal));
   });

@@ -224,7 +224,11 @@ function Connections({ client, actions }: { readonly client: OAuthClient; readon
         <Stat title="Requested Covered" value={`${coveredScopes}/${requestedScopes.length}`} description="client default scopes" tone={coveredScopes === requestedScopes.length ? "success" : "warning"} />
         <Stat title="Disabled Bindings" value={disabledBindings} description="excluded from access" tone={disabledBindings > 0 ? "warning" : "neutral"} />
       </StatGroup>
-      {rows.length === 0 ? <EmptyState message="No resource API connections for this application" /> : <Panel padding="none"><DataTable<ClientResourceScope> columns={columns} rows={rows} getRowKey={(binding) => binding.id} /></Panel>}
+      <Panel padding={rows.length > 0 ? "none" : "md"}>
+        {rows.length === 0
+          ? <EmptyState message="No resource API connections for this application" />
+          : <DataTable<ClientResourceScope> columns={columns} rows={rows} getRowKey={(binding) => binding.id} />}
+      </Panel>
     </Stack>
   );
 }

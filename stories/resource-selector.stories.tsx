@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ResourceSelector, type ResourceOption, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Resource Selector" } satisfies StoryDefault;
 
 const members: ResourceOption[] = [
   { id: "u1", label: "Alice Nguyen", sublabel: "alice@acme.com", badge: "member" },
@@ -26,6 +28,25 @@ export const SingleMember: Story = () => {
         source={{ mode: "sync", items: members }}
         excludeIds={["u3"]}
         placeholder="Search members…"
+      />
+    </Stack>
+  );
+};
+
+export const MenuMember: Story = () => {
+  const [value, setValue] = useState<string>("");
+  return (
+    <Stack gap="md">
+      <Text variant="h2">Add team member</Text>
+      <ResourceSelector
+        kind="member"
+        value={value}
+        onChange={(next) => setValue(next as string)}
+        source={{ mode: "sync", items: members }}
+        variant="menu"
+        width="compact"
+        label="Add member"
+        placeholder="Add member…"
       />
     </Stack>
   );

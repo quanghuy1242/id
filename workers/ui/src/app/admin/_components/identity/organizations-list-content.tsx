@@ -5,11 +5,13 @@ import useSWR from "swr";
 import {
   Avatar,
   Button,
+  CodeEditor,
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
   EmptyState,
   ErrorAlert,
+  Inline,
   PageIntro,
   Panel,
   SearchInput,
@@ -18,7 +20,6 @@ import {
   Stat,
   StatGroup,
   Text,
-  Textarea,
   TextInput,
   toast,
 } from "@id/ui";
@@ -40,10 +41,10 @@ const columns: DataTableColumn<Organization>[] = [
     label: "Organization",
     sortable: true,
     render: (o) => (
-      <Stack gap="xs">
+      <Inline gap="sm" align="center">
         <Avatar initials={o.name.slice(0, 2).toUpperCase()} image={o.logo ?? undefined} alt={o.name} size="sm" />
         <Text variant="body">{o.name}</Text>
-      </Stack>
+      </Inline>
     ),
   },
   { key: "slug", label: "Slug" },
@@ -83,6 +84,7 @@ export function OrganizationsListContent({
   const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
   const [metadataError, setMetadataError] = useState<string | undefined>();
+  const [metadataValue, setMetadataValue] = useState("");
 
   const effectiveSearch = props.search ?? internalSearch;
   const effectiveSortBy = props.sortBy ?? internalSortBy;
@@ -174,7 +176,7 @@ export function OrganizationsListContent({
         <EmptyState
           message="No organizations"
           cta="Create Organization"
-          onCta={() => setCreateOpen(true)}
+          onCta={() => { setMetadataValue(""); setCreateOpen(true); }}
         />
       );
     }
@@ -198,7 +200,7 @@ export function OrganizationsListContent({
         description="Tenants that group members, teams, and invitations. Members sign in and pick an active organization."
         info="An organization is a workspace or tenant. Each has a unique slug that integrations and the active-organization session context rely on, so keep it stable. Open an organization to manage its members, teams, and pending invitations."
         actions={
-          <Button variant="primary" iconName="Plus" onClick={() => setCreateOpen(true)}>
+          <Button variant="primary" iconName="Plus" onClick={() => { setMetadataValue(""); setCreateOpen(true); }}>
             Create Organization
           </Button>
         }
@@ -224,7 +226,7 @@ export function OrganizationsListContent({
 
       <ConfirmDialog
         open={createOpen}
-        onOpenChange={(o) => { setCreateOpen(o); if (!o) { setCreateError(undefined); setMetadataError(undefined); } }}
+        onOpenChange={(o) => { setCreateOpen(o); if (!o) { setCreateError(undefined); setMetadataError(undefined); setMetadataValue(""); } }}
         title="Create Organization"
         description="Choose a stable slug. It can be used by integrations and should remain unique."
         confirmLabel="Create"
@@ -234,12 +236,14 @@ export function OrganizationsListContent({
         <TextInput label="Name" name="name" required />
         <TextInput label="Slug" name="slug" required />
         <TextInput label="Logo URL" name="logo" />
-        <Textarea
+        <CodeEditor
           label="Metadata (JSON)"
           name="metadata"
+          value={metadataValue}
           placeholder='{"plan":"enterprise"}'
           error={metadataError}
           onChange={(v) => {
+            setMetadataValue(v);
             if (!v) { setMetadataError(undefined); return; }
             try { JSON.parse(v); setMetadataError(undefined); }
             catch { setMetadataError("Must be valid JSON"); }

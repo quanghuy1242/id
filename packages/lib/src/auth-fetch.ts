@@ -51,6 +51,22 @@ async function apiPostFetch(path: string, body: unknown | undefined, init: Reque
 }
 
 /**
+ * Internal: performs an OAuth-style form POST against a Better Auth endpoint.
+ *
+ * Use this for protocol endpoints such as token introspection where the wire
+ * format is `application/x-www-form-urlencoded`, not JSON.
+ */
+async function apiFormPostFetch(path: string, body: URLSearchParams, init: RequestInit | undefined): Promise<Response> {
+  const { headers: initHeaders, ...restInit } = init ?? {};
+  return fetch(`/api/auth${path}`, {
+    ...restInit,
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", ...initHeaders },
+    body,
+  });
+}
+
+/**
  * Internal: performs a request with an arbitrary JSON body method (PATCH/DELETE).
  *
  * Only the OAuth2 client-management and OAuth plugin admin endpoints
@@ -146,6 +162,24 @@ export async function authApiPost<T>(path: string, body?: unknown, init?: Reques
  */
 export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await apiPostFetch(path, body, init);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<T>;
+}
+
+/**
+ * POST a Better Auth endpoint with an `application/x-www-form-urlencoded` body
+ * and throw `new Error(body)` on !ok.
+ *
+ * Use for standards-defined OAuth endpoints that require form encoding and may
+ * authenticate the client with headers. Do not use this for admin CRUD JSON
+ * mutations; use {@link authApiPostOrThrow} there.
+ *
+ * @param path  — path relative to `/api/auth` (e.g. `"/oauth2/introspect"`)
+ * @param body  — URLSearchParams carrying the form body
+ * @param init  — optional `RequestInit` overrides
+ */
+export async function authApiFormPostOrThrow<T>(path: string, body: URLSearchParams, init?: RequestInit): Promise<T> {
+  const res = await apiFormPostFetch(path, body, init);
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<T>;
 }

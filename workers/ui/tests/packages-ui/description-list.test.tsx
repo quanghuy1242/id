@@ -33,6 +33,7 @@ describe("DescriptionList", () => {
 
   it("uses semantic dl/dt/dd elements", () => {
     const { container } = render(<DescriptionList items={[{ term: "A", description: "1" }]} />);
+    expect(container.querySelector("dl")).toHaveClass("w-full");
     expect(container.querySelector("dl dt")).toHaveTextContent("A");
     expect(container.querySelector("dl dd")).toHaveTextContent("1");
   });

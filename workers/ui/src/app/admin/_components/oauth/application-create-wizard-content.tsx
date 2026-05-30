@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Button,
@@ -60,6 +60,7 @@ export function ApplicationCreateWizardContent({
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [created, setCreated] = useState<OAuthClient | null>(null);
   const [revealSecret, setRevealSecret] = useState<string | undefined>();
+  const completedRef = useRef(false);
 
   const { data: catalog } = useSWR(oauthScopesKey(), () => actions.listScopes());
   const suggestions: ScopeSuggestion[] = useMemo(
@@ -98,6 +99,7 @@ export function ApplicationCreateWizardContent({
         post_logout_redirect_uris: cleanedPostLogout,
         scope: scopes.length > 0 ? scopes.join(" ") : undefined,
       });
+      completedRef.current = false;
       setCreated(result);
       if (result.client_secret) setRevealSecret(result.client_secret);
       else onCreated?.(result.client_id);
@@ -105,6 +107,13 @@ export function ApplicationCreateWizardContent({
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Failed to create application");
     }
+  }
+
+  function completeCreatedNavigation() {
+    if (!created || completedRef.current) return;
+    completedRef.current = true;
+    setRevealSecret(undefined);
+    onCreated?.(created.client_id);
   }
 
   const steps = [
@@ -217,8 +226,7 @@ export function ApplicationCreateWizardContent({
         open={Boolean(revealSecret)}
         onOpenChange={(open) => {
           if (!open) {
-            setRevealSecret(undefined);
-            if (created) onCreated?.(created.client_id);
+            completeCreatedNavigation();
           }
         }}
         title="Client Secret"
@@ -226,7 +234,7 @@ export function ApplicationCreateWizardContent({
         confirmLabel="Done"
         cancelLabel="Close"
         onConfirm={() => {
-          if (created) onCreated?.(created.client_id);
+          completeCreatedNavigation();
           return true;
         }}
       >

@@ -1,5 +1,7 @@
 import { InfoPopover, Inline, Stack, Text } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Info Popover" } satisfies StoryDefault;
 
 export const NextToALabel: Story = () => (
   <Stack gap="md" align="start">

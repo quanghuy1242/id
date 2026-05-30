@@ -111,7 +111,7 @@ export function JwksContent({
   function renderBody() {
     if (showLoading) return <Skeleton rows={6} height="md" />;
     if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
-    if (list.length === 0) return <EmptyState message="No JWKS keys available" />;
+    if (list.length === 0) return <Panel><EmptyState message="No JWKS keys available" /></Panel>;
     return (
       <>
         <StatGroup columns={4}>

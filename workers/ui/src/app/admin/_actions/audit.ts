@@ -1,4 +1,4 @@
-import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import { authApiFormPostOrThrow, authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
 
 /**
  * Aggregate admin-audit reads (sessions, tokens, consents, JWKS metadata) and
@@ -129,5 +129,16 @@ export async function listActivityLog(params: ActivityLogParams): Promise<Pagina
 }
 
 export async function introspectToken(input: TokenIntrospectionInput): Promise<TokenIntrospectionResult> {
-  return authApiPostOrThrow<TokenIntrospectionResult>("/oauth2/introspect", input);
+  const form = new URLSearchParams({ token: input.token });
+  if (input.token_type_hint) form.set("token_type_hint", input.token_type_hint);
+  if (input.resource) form.set("resource", input.resource);
+  const headers: Record<string, string> = {};
+
+  if (input.client_id && input.client_secret) {
+    headers.authorization = `Basic ${btoa(`${input.client_id}:${input.client_secret}`)}`;
+  } else if (input.client_id) {
+    form.set("client_id", input.client_id);
+  }
+
+  return authApiFormPostOrThrow<TokenIntrospectionResult>("/oauth2/introspect", form, { headers });
 }

@@ -31,10 +31,11 @@ function makeActions() {
 
 describe("DashboardContent", () => {
   it("renders live admin stats and route shortcuts", async () => {
-    render(<DashboardContent actions={makeActions()} />);
+    const { container } = render(<DashboardContent actions={makeActions()} />);
     expect(screen.getByRole("heading", { level: 1, name: /admin console/i })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("registered accounts")).toBeInTheDocument());
     expect(screen.getByText("Active Sessions")).toBeInTheDocument();
+    expect(container.querySelectorAll(".grid.grid-cols-2.lg\\:grid-cols-4")).toHaveLength(2);
     expect(screen.getByRole("heading", { level: 3, name: "Token Decoder" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /open/i }).some((link) => link.getAttribute("href") === "/admin/security/introspect")).toBe(true);
   });

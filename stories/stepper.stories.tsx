@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { RadioGroup, ScopeBuilder, Stack, Stepper, type Step, Text, UrlListBuilder } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Stepper" } satisfies StoryDefault;
 
 export const CreateApplicationWizard: Story = () => {
   const [active, setActive] = useState(0);

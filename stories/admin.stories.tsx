@@ -10,7 +10,7 @@ function setMockUrl(pathname: string) {
 }
 
 export default {
-  title: "Admin",
+  title: "Admin / Dashboard",
 } satisfies StoryDefault;
 
 export const Dashboard: Story = () => {

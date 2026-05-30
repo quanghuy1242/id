@@ -4,13 +4,14 @@ import { useState } from "react";
 import {
   Badge,
   Button,
+  CodeEditor,
   ConfirmDialog,
+  DescriptionList,
   Inline,
+  JsonViewer,
   Panel,
   Skeleton,
   Stack,
-  Text,
-  Textarea,
   TextInput,
   toast,
 } from "@id/ui";
@@ -27,15 +28,6 @@ type OrgDetailOverviewContentProps = {
   actions?: typeof defaultActions;
 };
 
-function formatMetadata(metadata: string | null): string {
-  if (!metadata) return "No metadata";
-  try {
-    return JSON.stringify(JSON.parse(metadata), null, 2);
-  } catch {
-    return metadata;
-  }
-}
-
 export function OrgDetailOverviewContent({
   actions = defaultActions,
 }: OrgDetailOverviewContentProps) {
@@ -44,6 +36,12 @@ export function OrgDetailOverviewContent({
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
   const [editMetaError, setEditMetaError] = useState<string | undefined>();
+  const [editMetadata, setEditMetadata] = useState("");
+
+  function openEditDialog() {
+    setEditMetadata(org?.metadata ?? "");
+    setEditOpen(true);
+  }
 
   async function handleEdit(formData: FormData) {
     setEditError(undefined);
@@ -83,39 +81,27 @@ export function OrgDetailOverviewContent({
     <Stack gap="md">
       <Panel>
         <Stack gap="md">
-          <Stack gap="xs">
-            <Inline gap="sm">
-              <Text variant="caption">Name</Text>
-              <Text variant="body">{org.name}</Text>
-            </Inline>
-            <Inline gap="sm">
-              <Text variant="caption">Slug</Text>
-              <Badge tone="neutral">{org.slug}</Badge>
-            </Inline>
-            <Inline gap="sm">
-              <Text variant="caption">Logo URL</Text>
-              <Text variant="body">{org.logo || "No logo configured"}</Text>
-            </Inline>
-            <Inline gap="sm">
-              <Text variant="caption">Created</Text>
-              <Text variant="body">{new Date(org.createdAt).toLocaleDateString()}</Text>
-            </Inline>
-          </Stack>
-          <Panel tone="muted" padding="sm">
-            <Stack gap="xs">
-              <Text variant="caption">Metadata</Text>
-              <Text variant="body" as="pre">{formatMetadata(org.metadata)}</Text>
-            </Stack>
-          </Panel>
+          <DescriptionList
+            columns={2}
+            items={[
+              { term: "Name", description: org.name },
+              { term: "Slug", description: <Badge tone="neutral">{org.slug}</Badge> },
+              { term: "Logo URL", description: org.logo || "No logo configured", mono: Boolean(org.logo) },
+              { term: "Created", description: new Date(org.createdAt).toLocaleDateString() },
+            ]}
+          />
+          {org.metadata ? (
+            <JsonViewer label="Metadata" value={org.metadata} maxHeight="sm" />
+          ) : null}
           <Inline justify="end">
-            <Button variant="secondary" onClick={() => setEditOpen(true)}>Edit Organization</Button>
+            <Button variant="secondary" onClick={openEditDialog}>Edit Organization</Button>
           </Inline>
         </Stack>
       </Panel>
 
       <ConfirmDialog
         open={editOpen}
-        onOpenChange={(o) => { setEditOpen(o); if (!o) { setEditError(undefined); setEditMetaError(undefined); } }}
+        onOpenChange={(o) => { setEditOpen(o); if (!o) { setEditError(undefined); setEditMetaError(undefined); setEditMetadata(""); } }}
         title="Edit Organization"
         description="Changing the slug can affect organization links and integrations that store it. Metadata must be valid JSON."
         confirmLabel="Save"
@@ -125,13 +111,14 @@ export function OrgDetailOverviewContent({
         <TextInput label="Name" name="name" defaultValue={org.name} required />
         <TextInput label="Slug" name="slug" defaultValue={org.slug} required />
         <TextInput label="Logo URL" name="logo" defaultValue={org.logo ?? ""} />
-        <Textarea
+        <CodeEditor
           label="Metadata (JSON)"
           name="metadata"
-          defaultValue={org.metadata ?? ""}
+          value={editMetadata}
           placeholder='{"plan":"enterprise"}'
           error={editMetaError}
           onChange={(v) => {
+            setEditMetadata(v);
             if (!v) { setEditMetaError(undefined); return; }
             try { JSON.parse(v); setEditMetaError(undefined); }
             catch { setEditMetaError("Must be valid JSON"); }

@@ -33,7 +33,7 @@ import {
 import { mockOrganizations } from "../../workers/ui/src/app/admin/_mocks/organizations";
 import { AdminShell } from "../_decorators/shell";
 
-export default { title: "OAuth / OAuth Config" } satisfies StoryDefault;
+export default { title: "Admin / OAuth / Section Pages" } satisfies StoryDefault;
 
 const tabs = [
   { id: "/admin/oauth/applications", href: "/admin/oauth/applications", label: "Applications" },

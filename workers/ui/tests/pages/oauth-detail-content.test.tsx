@@ -33,7 +33,9 @@ describe("OAuth detail content", () => {
 
   it("renders M2M binding overview with scopes", async () => {
     render(<M2mBindingDetailContent bindingId="bind_001" actions={makeOauthActions()} />);
-    await waitFor(() => expect(screen.getByText(/Content API -> Content API/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Resource Access Binding" })).toBeInTheDocument());
+    expect(screen.getAllByText("Content API").length).toBeGreaterThan(1);
+    expect(screen.queryByText(/Content API -> Content API/)).toBeNull();
     expect(screen.getAllByText("content:read").length).toBeGreaterThan(0);
   });
 });

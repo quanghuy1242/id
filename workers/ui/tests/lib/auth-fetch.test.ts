@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   authApiGetOrThrow,
   authApiPostOrThrow,
+  authApiFormPostOrThrow,
   authApiPatchOrThrow,
   authApiDeleteOrThrow,
 } from "../../../../packages/lib/src/auth-fetch";
@@ -52,6 +53,25 @@ describe("auth-fetch helpers", () => {
     expect(init.method).toBe("POST");
     expect(JSON.parse(String(init.body))).toEqual({ client_name: "App" });
     expect(init.headers).toMatchObject({ "content-type": "application/json" });
+  });
+
+  it("form POST sends URLSearchParams with form content-type", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ active: true }));
+    const body = new URLSearchParams({ token: "tok" });
+
+    await authApiFormPostOrThrow("/oauth2/introspect", body, {
+      headers: { authorization: "Basic abc" },
+    });
+
+    const { url, init } = lastCall();
+    expect(url).toBe("/api/auth/oauth2/introspect");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(body);
+    expect(init.headers).toMatchObject({
+      accept: "application/json",
+      authorization: "Basic abc",
+      "content-type": "application/x-www-form-urlencoded",
+    });
   });
 
   it("PATCH sends a flat JSON body with the PATCH method", async () => {

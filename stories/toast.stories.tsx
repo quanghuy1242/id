@@ -1,5 +1,7 @@
 import { Button, Inline, Stack, Text, ToastRegion, toast } from "@id/ui";
-import type { Story } from "@ladle/react";
+import type { Story, StoryDefault } from "@ladle/react";
+
+export default { title: "Packages UI / Toast" } satisfies StoryDefault;
 
 export const Tones: Story = () => (
   <Stack gap="md" align="start">

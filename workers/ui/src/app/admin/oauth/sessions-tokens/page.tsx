@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 /**
  * Grants IA unification (docs/027 §6): sessions/tokens/consents now live under
@@ -6,5 +6,5 @@ import { redirect } from "next/navigation";
  * bookmarks do not 404.
  */
 export default function SessionsTokensRedirect() {
-  redirect("/admin/security/sessions");
+  permanentRedirect("/admin/security/sessions");
 }

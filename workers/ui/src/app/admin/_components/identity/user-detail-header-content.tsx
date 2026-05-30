@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  DescriptionList,
   ErrorAlert,
   Inline,
   LinkButton,
@@ -142,7 +143,19 @@ export function UserDetailHeaderContent({
         confirmLabel="Impersonate"
         error={impersonateError}
         onConfirm={handleImpersonate}
-      />
+      >
+        {user ? (
+          <DescriptionList
+            columns={1}
+            dense
+            items={[
+              { term: "User ID", description: user.id, mono: true },
+              { term: "Email", description: user.email, mono: true },
+              { term: "Role", description: user.role },
+            ]}
+          />
+        ) : null}
+      </ConfirmDialog>
     </>
   );
 }
