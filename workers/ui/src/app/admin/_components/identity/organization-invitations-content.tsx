@@ -148,20 +148,22 @@ export function OrganizationInvitationsContent({
     {
       key: "actions",
       label: "",
-      render: (inv) => (
-        <Inline gap="xs">
-          {inv.status === "pending" && (
-            <Button size="sm" onClick={() => { setResendError(undefined); setResendTarget(inv); }}>
-              Resend
-            </Button>
-          )}
-          {(inv.status === "pending" || inv.status === "expired") && (
-            <Button variant="danger" size="sm" onClick={() => { setCancelError(undefined); setCancelTarget(inv); }}>
-              Cancel
-            </Button>
-          )}
-        </Inline>
-      ),
+      actions: (inv) => [
+        {
+          id: "resend",
+          label: "Resend",
+          variant: "primary",
+          isHidden: inv.status !== "pending",
+          onAction: () => { setResendError(undefined); setResendTarget(inv); },
+        },
+        {
+          id: "cancel",
+          label: "Cancel",
+          variant: "danger",
+          isHidden: inv.status !== "pending" && inv.status !== "expired",
+          onAction: () => { setCancelError(undefined); setCancelTarget(inv); },
+        },
+      ],
     },
   ];
 

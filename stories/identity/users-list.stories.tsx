@@ -191,7 +191,7 @@ export const UserDetail_Populated: Story = () => {
   const actions = createDetailActions(mockUsers[0]);
   return (
     <UserDetailFrame activePath="/admin/identity/users/user_001" userId="user_001" activeTab="overview" actions={actions}>
-      <UserDetailOverviewContent actions={actions} />
+      <UserDetailOverviewContent />
     </UserDetailFrame>
   );
 };
@@ -201,7 +201,7 @@ export const UserDetail_Banned: Story = () => {
   const actions = createDetailActions(mockUsers[1]);
   return (
     <UserDetailFrame activePath="/admin/identity/users/user_002" userId="user_002" activeTab="overview" actions={actions}>
-      <UserDetailOverviewContent actions={actions} />
+      <UserDetailOverviewContent />
     </UserDetailFrame>
   );
 };
@@ -230,7 +230,7 @@ export const UserDetail_Impersonating: Story = () => {
   const actions = createDetailActions(mockUsers[0], true);
   return (
     <UserDetailFrame activePath="/admin/identity/users/user_001" userId="user_001" activeTab="overview" actions={actions}>
-      <UserDetailOverviewContent actions={actions} />
+      <UserDetailOverviewContent />
     </UserDetailFrame>
   );
 };

@@ -108,13 +108,24 @@ describe("Admin mobile navigation", () => {
 });
 
 describe("OAuth layout", () => {
-  it("renders configuration tabs on OAuth configuration routes", () => {
-    navigationMock.pathname = "/admin/oauth/resource-apis";
+  it("renders configuration tabs on OAuth listing routes only", () => {
+    const cases = [
+      ["/admin/oauth/applications", "Applications"],
+      ["/admin/oauth/resource-apis", "Resource APIs"],
+      ["/admin/oauth/scope-catalog", "Scope Catalog"],
+      ["/admin/oauth/m2m-bindings", "M2M Bindings"],
+    ] as const;
 
-    render(<OAuthLayout><div>Resource API content</div></OAuthLayout>);
+    for (const [pathname, activeLabel] of cases) {
+      navigationMock.pathname = pathname;
 
-    expect(screen.getByRole("tablist", { name: "OAuth configuration" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Resource APIs" })).toHaveClass("tab-active");
+      const { unmount } = render(<OAuthLayout><div>{activeLabel} content</div></OAuthLayout>);
+
+      expect(screen.getByRole("tablist", { name: "OAuth configuration" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: activeLabel })).toHaveClass("tab-active");
+
+      unmount();
+    }
   });
 
   it("does not render configuration tabs outside OAuth configuration routes", () => {
@@ -127,19 +138,24 @@ describe("OAuth layout", () => {
   });
 
   it("hides configuration tabs on OAuth detail and create routes", () => {
-    navigationMock.pathname = "/admin/oauth/applications/cli_123";
+    const hiddenCases = [
+      ["/admin/oauth", "OAuth redirect"],
+      ["/admin/oauth/applications/new", "Application create"],
+      ["/admin/oauth/applications/cli_123", "Application detail"],
+      ["/admin/oauth/resource-apis/rs_001", "Resource API detail"],
+      ["/admin/oauth/m2m-bindings/bind_001", "M2M binding detail"],
+    ] as const;
 
-    const { unmount } = render(<OAuthLayout><div>Application detail</div></OAuthLayout>);
+    for (const [pathname, label] of hiddenCases) {
+      navigationMock.pathname = pathname;
 
-    expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
-    expect(screen.getByText("Application detail")).toBeInTheDocument();
+      const { unmount } = render(<OAuthLayout><div>{label}</div></OAuthLayout>);
 
-    unmount();
-    navigationMock.pathname = "/admin/oauth/applications/new";
-    render(<OAuthLayout><div>Application create</div></OAuthLayout>);
+      expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
+      expect(screen.getByText(label)).toBeInTheDocument();
 
-    expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
-    expect(screen.getByText("Application create")).toBeInTheDocument();
+      unmount();
+    }
   });
 });
 
@@ -154,6 +170,9 @@ describe("Admin topbar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /open account menu/i }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /logout/i }));
+    expect(onLogout).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveTextContent(/complete mfa/i);
+    fireEvent.click(screen.getByRole("button", { name: /^log out$/i }));
 
     await waitFor(() => {
       expect(onLogout).toHaveBeenCalledTimes(1);

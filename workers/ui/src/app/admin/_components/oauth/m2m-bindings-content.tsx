@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -9,7 +9,6 @@ import {
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
-  DescriptionList,
   EmptyState,
   ErrorAlert,
   FilterDropdown,
@@ -27,7 +26,6 @@ import {
 import {
   listBindings as listBindingsAction,
   createBinding as createBindingAction,
-  updateBinding as updateBindingAction,
   deleteBinding as deleteBindingAction,
   listClients as listClientsAction,
   listResourceServers as listResourceServersAction,
@@ -46,7 +44,6 @@ import {
 const defaultActions = {
   listBindings: listBindingsAction,
   createBinding: createBindingAction,
-  updateBinding: updateBindingAction,
   deleteBinding: deleteBindingAction,
   listClients: listClientsAction,
   listResourceServers: listResourceServersAction,
@@ -89,14 +86,6 @@ export function M2mBindingsContent({
   const [createClientId, setCreateClientId] = useState("");
   const [createRsId, setCreateRsId] = useState("");
   const [createScopes, setCreateScopes] = useState<string[]>([]);
-
-  const [editTarget, setEditTarget] = useState<ClientResourceScope | null>(null);
-  const [editError, setEditError] = useState<string | undefined>();
-  const [editScopes, setEditScopes] = useState<string[]>([]);
-  const [editEnabled, setEditEnabled] = useState(true);
-  const lastEditRef = useRef<ClientResourceScope | null>(null);
-  if (editTarget) lastEditRef.current = editTarget;
-  const editDisplay = editTarget ?? lastEditRef.current;
 
   const [deleteTarget, setDeleteTarget] = useState<ClientResourceScope | null>(null);
   const [deleteError, setDeleteError] = useState<string | undefined>();
@@ -189,12 +178,17 @@ export function M2mBindingsContent({
     {
       key: "actions",
       label: "Actions",
-      render: (b) => (
-        <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel="Edit binding" tooltip="Edit allowed scopes" onClick={() => { setEditError(undefined); setEditScopes([...b.allowedScopes]); setEditEnabled(b.enabled); setEditTarget(b); }} />
-          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel="Delete binding" tooltip="Delete binding" onClick={() => { setDeleteError(undefined); setDeleteTarget(b); }} />
-        </Inline>
-      ),
+      actions: (b) => [
+        {
+          id: "delete",
+          label: "Delete",
+          variant: "danger",
+          iconName: "Trash2",
+          ariaLabel: "Delete binding",
+          tooltip: "Delete binding",
+          onAction: () => { setDeleteError(undefined); setDeleteTarget(b); },
+        },
+      ],
     },
   ];
 
@@ -210,22 +204,6 @@ export function M2mBindingsContent({
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create binding");
-      return false;
-    }
-  }
-
-  async function handleEdit() {
-    if (!editTarget) return false;
-    setEditError(undefined);
-    if (editScopes.length === 0) { setEditError("Select at least one scope"); return false; }
-    try {
-      await actions.updateBinding(editTarget.id, { allowedScopes: editScopes, enabled: editEnabled });
-      await mutate();
-      setEditTarget(null);
-      toast.success("Binding updated");
-      return true;
-    } catch (err: unknown) {
-      setEditError(err instanceof Error ? err.message : "Failed to update binding");
       return false;
     }
   }
@@ -259,7 +237,6 @@ export function M2mBindingsContent({
 
   const hasRows = displayed.length > 0 && !showLoading && !showError;
   const createScopeOptions = scopeOptionsFor(createRsId);
-  const editScopeOptions = editDisplay ? scopeOptionsFor(editDisplay.resourceServerId) : [];
 
   return (
     <Stack gap="md">
@@ -301,42 +278,6 @@ export function M2mBindingsContent({
               : createScopeOptions.map((s) => (
                 <Checkbox key={s} label={s} name={`scope:${s}`} selected={createScopes.includes(s)} onChange={(on) => setCreateScopes((cur) => toggleScope(cur, s, on))} />
               ))}
-          </Stack>
-        ) : null}
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={Boolean(editTarget)}
-        onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditError(undefined); } }}
-        title="Edit M2M Binding"
-        confirmLabel="Save"
-        error={editError}
-        onConfirm={handleEdit}
-      >
-        {editDisplay ? (
-          <Stack gap="xs">
-            <DescriptionList
-              dense
-              items={[
-                { term: "Created", description: `${formatDate(editDisplay.createdAt)} by ${editDisplay.createdBy}` },
-                { term: "Updated", description: `${formatDate(editDisplay.updatedAt)} by ${editDisplay.updatedBy}` },
-              ]}
-            />
-            <Inline gap="sm" align="center">
-              <Text variant="caption">Client:</Text>
-              <Text variant="body">{clientById.get(editDisplay.clientId)?.client_name ?? editDisplay.clientId}</Text>
-            </Inline>
-            <Inline gap="sm" align="center">
-              <Text variant="caption">Resource API:</Text>
-              <Text variant="body">{serverById.get(editDisplay.resourceServerId)?.name ?? editDisplay.resourceServerId}</Text>
-            </Inline>
-            <Text variant="caption">Allowed Scopes</Text>
-            {editScopeOptions.length === 0
-              ? <Text variant="caption">No scopes defined for this resource API.</Text>
-              : editScopeOptions.map((s) => (
-                <Checkbox key={s} label={s} name={`scope:${s}`} selected={editScopes.includes(s)} onChange={(on) => setEditScopes((cur) => toggleScope(cur, s, on))} />
-              ))}
-            <Checkbox label="Enabled" name="enabled" selected={editEnabled} onChange={setEditEnabled} />
           </Stack>
         ) : null}
       </ConfirmDialog>

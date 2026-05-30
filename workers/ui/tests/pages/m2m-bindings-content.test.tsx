@@ -64,14 +64,10 @@ describe("M2mBindingsContent", () => {
     await waitFor(() => expect(actions.deleteBinding).toHaveBeenCalledWith("bind_001"));
   });
 
-  it("edits a binding's scopes", async () => {
+  it("does not show inline edit for detail-backed bindings", async () => {
     const actions = makeActions(mockBindings);
     render(<M2mBindingsContent actions={actions} />);
     await waitFor(() => screen.getAllByText("Content API"));
-    fireEvent.click(screen.getAllByRole("button", { name: /edit binding/i })[0]);
-    await waitFor(() => screen.getByRole("dialog"));
-    const dialog = screen.getByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(actions.updateBinding).toHaveBeenCalledWith("bind_001", expect.objectContaining({ allowedScopes: expect.any(Array) })));
+    expect(screen.queryByRole("button", { name: /edit binding/i })).toBeNull();
   });
 });

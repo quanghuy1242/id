@@ -3,31 +3,35 @@
 @source "../../src/**/*.{tsx,ts,jsx,js}";
 @plugin "daisyui";
 
+/* Brand anchor: #3a5a6b — a muted petrol / slate-blue (H≈205° S≈30% L≈32%).
+   It is the light-mode primary; neutrals carry the same cool hue so surfaces
+   read as intentional rather than flat white, and a warm terracotta accent
+   provides a complementary lift against the cool field. */
 @plugin "daisyui/theme" {
   name: "lumina-light";
   default: true;
   prefersdark: false;
   color-scheme: light;
-  --color-base-100: #ffffff;
-  --color-base-200: #f7f8fb;
-  --color-base-300: #e6e8eb;
-  --color-base-content: #1f2328;
-  --color-primary: #155eef;
+  --color-base-100: #f9fbfc;
+  --color-base-200: #eaf0f3;
+  --color-base-300: #d3dde3;
+  --color-base-content: #18272f;
+  --color-primary: #3a5a6b;
   --color-primary-content: #ffffff;
-  --color-secondary: #475467;
+  --color-secondary: #557082;
   --color-secondary-content: #ffffff;
-  --color-accent: #0f766e;
+  --color-accent: #b65f34;
   --color-accent-content: #ffffff;
-  --color-neutral: #1f2328;
-  --color-neutral-content: #ffffff;
-  --color-info: #2563eb;
+  --color-neutral: #233640;
+  --color-neutral-content: #eef4f7;
+  --color-info: #2f7fb0;
   --color-info-content: #ffffff;
-  --color-success: #00c896;
-  --color-success-content: #042f2e;
-  --color-warning: #f59e0b;
-  --color-warning-content: #2f1b00;
-  --color-error: #ff4d6d;
-  --color-error-content: #3f0713;
+  --color-success: #2f9e75;
+  --color-success-content: #ffffff;
+  --color-warning: #d39a36;
+  --color-warning-content: #2a1d00;
+  --color-error: #cf5454;
+  --color-error-content: #ffffff;
   --radius-field: 0.375rem;
   --radius-box: 0.5rem;
   --size-field: 0.21875rem;
@@ -93,30 +97,33 @@
   --animate-popover-out: popover-out 100ms ease-in both;
 }
 
+/* Dark mode keeps the petrol identity: page and surfaces are deep blue-black
+   tints of the brand hue (not neutral gray), the primary lifts to a luminous
+   petrol so it reads on dark, and the terracotta accent warms up to balance. */
 @plugin "daisyui/theme" {
   name: "lumina-dark";
   prefersdark: true;
   color-scheme: dark;
-  --color-base-100: #121316;
-  --color-base-200: #181a1f;
-  --color-base-300: #2d3139;
-  --color-base-content: #f3f4f6;
-  --color-primary: #155eef;
-  --color-primary-content: #ffffff;
-  --color-secondary: #94a3b8;
-  --color-secondary-content: #0f172a;
-  --color-accent: #2dd4bf;
-  --color-accent-content: #052f2b;
-  --color-neutral: #f3f4f6;
-  --color-neutral-content: #121316;
-  --color-info: #60a5fa;
-  --color-info-content: #071a3d;
-  --color-success: #00e0a4;
-  --color-success-content: #03231c;
-  --color-warning: #fbbf24;
-  --color-warning-content: #2f1b00;
-  --color-error: #fb7185;
-  --color-error-content: #3f0713;
+  --color-base-100: #182530;
+  --color-base-200: #0f1a22;
+  --color-base-300: #2a3a45;
+  --color-base-content: #e4edf1;
+  --color-primary: #6fa6c0;
+  --color-primary-content: #07151d;
+  --color-secondary: #8aa6b4;
+  --color-secondary-content: #0c1419;
+  --color-accent: #e08a55;
+  --color-accent-content: #2a1206;
+  --color-neutral: #e4edf1;
+  --color-neutral-content: #182530;
+  --color-info: #5aa6d6;
+  --color-info-content: #04161f;
+  --color-success: #3fbf8d;
+  --color-success-content: #04231a;
+  --color-warning: #e6b357;
+  --color-warning-content: #2a1d00;
+  --color-error: #e87e79;
+  --color-error-content: #2c0a08;
   --radius-field: 0.375rem;
   --radius-box: 0.5rem;
   --size-field: 0.21875rem;

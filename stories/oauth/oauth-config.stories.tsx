@@ -1,14 +1,15 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
+import { useRouter } from "next/navigation";
 import { PageBody, Stack, Tabs } from "@id/ui";
 import { ApplicationsContent } from "../../workers/ui/src/app/admin/_components/oauth/applications-content";
 import { ApplicationCreateWizardContent } from "../../workers/ui/src/app/admin/_components/oauth/application-create-wizard-content";
-import { ApplicationDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/application-detail-content";
+import { ApplicationDetailContent, type ApplicationDetailTab } from "../../workers/ui/src/app/admin/_components/oauth/application-detail-content";
 import { ResourceApisContent } from "../../workers/ui/src/app/admin/_components/oauth/resource-apis-content";
-import { ResourceApiDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/resource-api-detail-content";
+import { ResourceApiDetailContent, type ResourceApiDetailTab } from "../../workers/ui/src/app/admin/_components/oauth/resource-api-detail-content";
 import { ScopeCatalogContent } from "../../workers/ui/src/app/admin/_components/oauth/scope-catalog-content";
 import { M2mBindingsContent } from "../../workers/ui/src/app/admin/_components/oauth/m2m-bindings-content";
-import { M2mBindingDetailContent } from "../../workers/ui/src/app/admin/_components/oauth/m2m-binding-detail-content";
+import { M2mBindingDetailContent, type M2mBindingDetailTab } from "../../workers/ui/src/app/admin/_components/oauth/m2m-binding-detail-content";
 import type {
   OAuthClient,
   ResourceServer,
@@ -42,18 +43,71 @@ const tabs = [
   { id: "/admin/oauth/m2m-bindings", href: "/admin/oauth/m2m-bindings", label: "M2M Bindings" },
 ];
 
+const listingTabIds = new Set(tabs.map((tab) => tab.id));
+
+function selectedListingTab(pathname: string): string | undefined {
+  return listingTabIds.has(pathname) ? pathname : undefined;
+}
+
 function OAuthShell({ activePath, children }: { activePath: string; children: ReactNode }) {
-  const selectedKey = tabs.find((t) => activePath.startsWith(t.id))?.id ?? tabs[0].id;
+  const selectedKey = selectedListingTab(activePath);
   return (
     <AdminShell activePath={activePath}>
       <PageBody>
         <Stack gap="md">
-          <Tabs ariaLabel="OAuth configuration" items={tabs} selectedKey={selectedKey} />
+          {selectedKey ? <Tabs ariaLabel="OAuth configuration" items={tabs} selectedKey={selectedKey} /> : null}
           {children}
         </Stack>
       </PageBody>
     </AdminShell>
   );
+}
+
+function normalizeRoute(href: string): string {
+  return new URL(href, "https://id.example.test").pathname;
+}
+
+function useLadleRoute(initialPath: string) {
+  const router = useRouter();
+  const [pathname, setPathname] = useState(() => normalizeRoute(initialPath));
+
+  const navigate = useCallback((href: string, mode: "push" | "replace" = "push") => {
+    setPathname(normalizeRoute(href));
+    if (mode === "replace") router.replace(href);
+    else router.push(href);
+  }, [router]);
+
+  useEffect(() => {
+    navigate(initialPath, "replace");
+  }, [initialPath, navigate]);
+
+  return { pathname, navigate };
+}
+
+function splitRoute(pathname: string) {
+  return pathname.split("?")[0]?.split("/").filter(Boolean) ?? [];
+}
+
+function applicationDetailTab(segment: string | undefined): ApplicationDetailTab {
+  if (
+    segment === "credentials"
+    || segment === "uris"
+    || segment === "scopes"
+    || segment === "connections"
+    || segment === "quickstart"
+    || segment === "audit"
+  ) {
+    return segment;
+  }
+  return "overview";
+}
+
+function resourceDetailTab(segment: string | undefined): ResourceApiDetailTab {
+  return segment === "audit" ? "audit" : "overview";
+}
+
+function bindingDetailTab(segment: string | undefined): M2mBindingDetailTab {
+  return segment === "audit" ? "audit" : "overview";
 }
 
 // ── Applications ────────────────
@@ -84,36 +138,6 @@ function appsActions(clients: OAuthClient[]) {
     deleteClient: async (clientId: string): Promise<void> => { current = current.filter((c) => c.client_id !== clientId); },
   };
 }
-
-export const Applications: Story = () => (
-  <OAuthShell activePath="/admin/oauth/applications">
-    <ApplicationsContent createHref="/admin/oauth/applications/new" actions={appsActions(mockClients)} />
-  </OAuthShell>
-);
-
-export const ApplicationDetail: Story = () => (
-  <OAuthShell activePath="/admin/oauth/applications/cli_contentapi_a1b2c3d4e5f6">
-    <ApplicationDetailContent
-      clientId="cli_contentapi_a1b2c3d4e5f6"
-      actions={{
-        listClients: async () => mockClients,
-        listBindings: async () => mockBindings,
-        listResourceServers: async () => mockResourceServers,
-      }}
-    />
-  </OAuthShell>
-);
-
-export const ApplicationNewWizard: Story = () => (
-  <OAuthShell activePath="/admin/oauth/applications/new">
-    <ApplicationCreateWizardContent
-      actions={{
-        createClient: appsActions(mockClients).createClient,
-        listScopes: async () => mockScopes,
-      }}
-    />
-  </OAuthShell>
-);
 
 // ── Resource APIs ───────────────
 
@@ -157,18 +181,6 @@ function rsActions(servers: ResourceServer[]) {
   };
 }
 
-export const ResourceAPIs: Story = () => (
-  <OAuthShell activePath="/admin/oauth/resource-apis">
-    <ResourceApisContent actions={rsActions(mockResourceServers)} />
-  </OAuthShell>
-);
-
-export const ResourceApiDetail: Story = () => (
-  <OAuthShell activePath="/admin/oauth/resource-apis/rs_001">
-    <ResourceApiDetailContent resourceServerId="rs_001" actions={{ listResourceServers: async () => mockResourceServers }} />
-  </OAuthShell>
-);
-
 // ── Scope Catalog ───────────────
 
 function scopeActions(scopes: OAuthResourceScope[]) {
@@ -197,12 +209,6 @@ function scopeActions(scopes: OAuthResourceScope[]) {
     listResourceServers: async (): Promise<ResourceServer[]> => mockResourceServers,
   };
 }
-
-export const ScopeCatalog: Story = () => (
-  <OAuthShell activePath="/admin/oauth/scope-catalog">
-    <ScopeCatalogContent actions={scopeActions(mockScopes)} />
-  </OAuthShell>
-);
 
 // ── M2M Bindings ────────────────
 
@@ -236,21 +242,168 @@ function bindingsActions(bindings: ClientResourceScope[]) {
   };
 }
 
-export const M2mBindings: Story = () => (
-  <OAuthShell activePath="/admin/oauth/m2m-bindings">
-    <M2mBindingsContent actions={bindingsActions(mockBindings)} />
-  </OAuthShell>
-);
+type OAuthStoryActions = {
+  readonly appActions: ReturnType<typeof appsActions>;
+  readonly resourceActions: ReturnType<typeof rsActions>;
+  readonly catalogActions: ReturnType<typeof scopeActions>;
+  readonly bindingActions: ReturnType<typeof bindingsActions>;
+};
 
-export const M2mBindingDetail: Story = () => (
-  <OAuthShell activePath="/admin/oauth/m2m-bindings/bind_001">
-    <M2mBindingDetailContent bindingId="bind_001" actions={{
-      listBindings: async () => mockBindings,
-      listClients: async () => mockClients,
-      listResourceServers: async () => mockResourceServers,
-    }} />
-  </OAuthShell>
-);
+type OAuthRouteContext = OAuthStoryActions & {
+  readonly route: string | undefined;
+  readonly id: string | undefined;
+  readonly tab: string | undefined;
+  readonly navigate: (href: string) => void;
+};
+
+function renderApplicationRoute(context: OAuthRouteContext): ReactNode {
+  const { id, tab, navigate, appActions, resourceActions, catalogActions, bindingActions } = context;
+  if (id === "new") {
+    return (
+      <ApplicationCreateWizardContent
+        onCreated={(clientId) => navigate(`/admin/oauth/applications/${clientId}`)}
+        actions={{ createClient: appActions.createClient, listScopes: catalogActions.listScopes }}
+      />
+    );
+  }
+  if (id) {
+    return (
+      <ApplicationDetailContent
+        clientId={id}
+        activeTab={applicationDetailTab(tab)}
+        actions={{
+          listClients: appActions.listClients,
+          listBindings: bindingActions.listBindings,
+          listResourceServers: resourceActions.listResourceServers,
+          updateClient: appActions.updateClient,
+          rotateClientSecret: appActions.rotateClientSecret,
+          deleteClient: appActions.deleteClient,
+        }}
+        onDeleted={() => navigate("/admin/oauth/applications")}
+      />
+    );
+  }
+  return (
+    <ApplicationsContent
+      createHref="/admin/oauth/applications/new"
+      actions={appActions}
+      onClientClick={(clientId) => navigate(`/admin/oauth/applications/${clientId}`)}
+    />
+  );
+}
+
+function renderResourceRoute(context: OAuthRouteContext): ReactNode {
+  const { id, tab, navigate, resourceActions } = context;
+  if (id) {
+    return (
+      <ResourceApiDetailContent
+        resourceServerId={id}
+        activeTab={resourceDetailTab(tab)}
+        actions={{
+          listResourceServers: resourceActions.listResourceServers,
+          updateResourceServer: resourceActions.updateResourceServer,
+          disableResourceServer: resourceActions.disableResourceServer,
+          enableResourceServer: resourceActions.enableResourceServer,
+          deleteResourceServer: resourceActions.deleteResourceServer,
+        }}
+        onDeleted={() => navigate("/admin/oauth/resource-apis")}
+      />
+    );
+  }
+  return (
+    <ResourceApisContent
+      actions={resourceActions}
+      onResourceClick={(resourceServerId) => navigate(`/admin/oauth/resource-apis/${resourceServerId}`)}
+    />
+  );
+}
+
+function renderBindingRoute(context: OAuthRouteContext): ReactNode {
+  const { id, tab, navigate, appActions, resourceActions, catalogActions, bindingActions } = context;
+  if (id) {
+    return (
+      <M2mBindingDetailContent
+        bindingId={id}
+        activeTab={bindingDetailTab(tab)}
+        actions={{
+          listBindings: bindingActions.listBindings,
+          listClients: appActions.listClients,
+          listResourceServers: resourceActions.listResourceServers,
+          listScopes: catalogActions.listScopes,
+          updateBinding: bindingActions.updateBinding,
+          deleteBinding: bindingActions.deleteBinding,
+        }}
+        onDeleted={() => navigate("/admin/oauth/m2m-bindings")}
+      />
+    );
+  }
+  return (
+    <M2mBindingsContent
+      actions={bindingActions}
+      onBindingClick={(bindingId) => navigate(`/admin/oauth/m2m-bindings/${bindingId}`)}
+    />
+  );
+}
+
+function renderOAuthContent(context: OAuthRouteContext): ReactNode {
+  if (context.route === "resource-apis") return renderResourceRoute(context);
+  if (context.route === "scope-catalog") return <ScopeCatalogContent actions={context.catalogActions} />;
+  if (context.route === "m2m-bindings") return renderBindingRoute(context);
+  return renderApplicationRoute(context);
+}
+
+function linkHrefFromEvent(event: MouseEvent<HTMLDivElement>): string | undefined {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return undefined;
+  const rawTarget = event.target;
+  const target = rawTarget instanceof Element
+    ? rawTarget.closest("a[href]")
+    : rawTarget instanceof Node
+      ? rawTarget.parentElement?.closest("a[href]")
+      : null;
+  const href = target?.getAttribute("href");
+  if (!href?.startsWith("/")) return undefined;
+  const targetAttr = target.getAttribute("target");
+  return targetAttr && targetAttr !== "_self" ? undefined : href;
+}
+
+function OAuthRoutes({ initialPath }: { readonly initialPath: string }) {
+  const { pathname, navigate } = useLadleRoute(initialPath);
+  const appActions = useMemo(() => appsActions(mockClients), []);
+  const resourceActions = useMemo(() => rsActions(mockResourceServers), []);
+  const catalogActions = useMemo(() => scopeActions(mockScopes), []);
+  const bindingActions = useMemo(() => bindingsActions(mockBindings), []);
+  const [, , route, id, tab] = splitRoute(pathname);
+  const content = renderOAuthContent({ route, id, tab, navigate, appActions, resourceActions, catalogActions, bindingActions });
+
+  function handleRouteLink(event: MouseEvent<HTMLDivElement>) {
+    const href = linkHrefFromEvent(event);
+    if (!href) return;
+    event.preventDefault();
+    navigate(href);
+  }
+
+  return (
+    <div onClickCapture={handleRouteLink}>
+      <OAuthShell key={pathname} activePath={pathname}>{content}</OAuthShell>
+    </div>
+  );
+}
+
+export const Applications: Story = () => <OAuthRoutes initialPath="/admin/oauth/applications" />;
+
+export const ApplicationDetail: Story = () => <OAuthRoutes initialPath="/admin/oauth/applications/cli_contentapi_a1b2c3d4e5f6" />;
+
+export const ApplicationNewWizard: Story = () => <OAuthRoutes initialPath="/admin/oauth/applications/new" />;
+
+export const ResourceAPIs: Story = () => <OAuthRoutes initialPath="/admin/oauth/resource-apis" />;
+
+export const ResourceApiDetail: Story = () => <OAuthRoutes initialPath="/admin/oauth/resource-apis/rs_001" />;
+
+export const ScopeCatalog: Story = () => <OAuthRoutes initialPath="/admin/oauth/scope-catalog" />;
+
+export const M2mBindings: Story = () => <OAuthRoutes initialPath="/admin/oauth/m2m-bindings" />;
+
+export const M2mBindingDetail: Story = () => <OAuthRoutes initialPath="/admin/oauth/m2m-bindings/bind_001" />;
 
 // ── Shared states ───────────────
 

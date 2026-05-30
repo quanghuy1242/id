@@ -236,34 +236,33 @@ export function OrganizationTeamsContent({
     {
       key: "actions",
       label: "",
-      render: (t) => (
-        <Inline gap="xs">
-          <Button
-            size="sm"
-            variant="secondary"
-            iconName={expandedTeamId === t.id ? "ChevronDown" : "ChevronRight"}
-            ariaLabel={expandedTeamId === t.id ? "Collapse" : "Expand"}
-            tooltip={expandedTeamId === t.id ? "Hide members" : "View & manage members"}
-            onClick={() => handleExpandTeam(t)}
-          />
-          <Button
-            size="sm"
-            variant="secondary"
-            iconName="Pencil"
-            ariaLabel="Rename team"
-            tooltip="Rename team"
-            onClick={() => { setRenameError(undefined); setRenameTarget(t); }}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            iconName="Trash2"
-            ariaLabel="Delete team"
-            tooltip="Delete team"
-            onClick={() => { setDeleteError(undefined); setDeleteTarget(t); }}
-          />
-        </Inline>
-      ),
+      actions: (t) => [
+        {
+          id: "expand",
+          label: expandedTeamId === t.id ? "Hide Members" : "View Members",
+          iconName: expandedTeamId === t.id ? "ChevronDown" : "ChevronRight",
+          ariaLabel: expandedTeamId === t.id ? "Collapse" : "Expand",
+          tooltip: expandedTeamId === t.id ? "Hide members" : "View & manage members",
+          onAction: () => handleExpandTeam(t),
+        },
+        {
+          id: "rename",
+          label: "Rename Team",
+          iconName: "Pencil",
+          ariaLabel: "Rename team",
+          tooltip: "Rename team",
+          onAction: () => { setRenameError(undefined); setRenameTarget(t); },
+        },
+        {
+          id: "delete",
+          label: "Delete Team",
+          variant: "danger",
+          iconName: "Trash2",
+          ariaLabel: "Delete team",
+          tooltip: "Delete team",
+          onAction: () => { setDeleteError(undefined); setDeleteTarget(t); },
+        },
+      ],
     },
   ];
 

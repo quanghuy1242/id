@@ -57,8 +57,8 @@ function sessionColumns(onRevoke: (session: AdminSession) => void): DataTableCol
       label: "Actions",
       render: (s) => (
         <Inline gap="xs">
-          {s.impersonatedBy ? <Badge tone="warning" size="sm">Impersonated</Badge> : null}
           <Button variant="danger" size="sm" onClick={() => onRevoke(s)}>Revoke</Button>
+          {s.impersonatedBy ? <Badge tone="warning" size="sm">Impersonated</Badge> : null}
         </Inline>
       ),
     },

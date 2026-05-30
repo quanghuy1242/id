@@ -146,29 +146,28 @@ export function OrganizationMembersContent({
     {
       key: "actions",
       label: "",
-      render: (m) => {
+      actions: (m) => {
         const isLastOwner = m.role === "owner" && owners.length === 1;
-        return (
-          <Inline gap="sm">
-            <Button
-              size="sm"
-              variant="secondary"
-              iconName="Pencil"
-              ariaLabel="Change role"
-              tooltip="Change role"
-              onClick={() => { setChangeRoleError(undefined); setSelectedRole(m.role); setChangeRoleTarget(m); }}
-            />
-            <Button
-              variant="danger"
-              size="sm"
-              iconName="Trash2"
-              ariaLabel="Remove member"
-              tooltip={isLastOwner ? "Add another owner first" : "Remove from organization"}
-              disabled={isLastOwner}
-              onClick={() => { setRemoveError(undefined); setRemoveTarget(m); }}
-            />
-          </Inline>
-        );
+        return [
+          {
+            id: "change-role",
+            label: "Change Role",
+            iconName: "Pencil",
+            ariaLabel: "Change role",
+            tooltip: "Change role",
+            onAction: () => { setChangeRoleError(undefined); setSelectedRole(m.role); setChangeRoleTarget(m); },
+          },
+          {
+            id: "remove",
+            label: "Remove Member",
+            variant: "danger",
+            iconName: "Trash2",
+            ariaLabel: "Remove member",
+            tooltip: isLastOwner ? "Add another owner first" : "Remove from organization",
+            disabled: isLastOwner,
+            onAction: () => { setRemoveError(undefined); setRemoveTarget(m); },
+          },
+        ];
       },
     },
   ];

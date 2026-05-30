@@ -231,26 +231,26 @@ Two themes: `lumina-light` (default) and `lumina-dark` (prefers-dark).
 
 | DaisyUI token | Light value | Dark value | Usage |
 |---|---|---|---|
-| `base-100` | `#ffffff` | `#121316` | Surface, card, input background |
-| `base-200` | `#f7f8fb` | `#181a1f` | Page background |
-| `base-300` | `#e6e8eb` | `#2d3139` | Borders, dividers |
-| `base-content` | `#1f2328` | `#f3f4f6` | Primary text |
-| `primary` | `#155eef` | `#155eef` | Actions, links, focus ring |
-| `primary-content` | `#ffffff` | `#ffffff` | Text on primary |
-| `secondary` | `#475467` | `#94a3b8` | Secondary semantic tone |
-| `secondary-content` | `#ffffff` | `#0f172a` | Text on secondary |
-| `accent` | `#0f766e` | `#2dd4bf` | Accent semantic tone |
-| `accent-content` | `#ffffff` | `#052f2b` | Text on accent |
-| `neutral` | `#1f2328` | `#f3f4f6` | Neutral badges/avatars |
-| `neutral-content` | `#ffffff` | `#121316` | Text on neutral |
-| `info` | `#2563eb` | `#60a5fa` | Informational feedback |
-| `info-content` | `#ffffff` | `#071a3d` | Text on info |
-| `success` | `#00c896` | `#00e0a4` | Success/active state |
-| `success-content` | `#042f2e` | `#03231c` | Text on success |
-| `warning` | `#f59e0b` | `#fbbf24` | Warning/unverified state |
-| `warning-content` | `#2f1b00` | `#2f1b00` | Text on warning |
-| `error` | `#ff4d6d` | `#fb7185` | Error/banned/destructive state |
-| `error-content` | `#3f0713` | `#3f0713` | Text on error |
+| `base-100` | `#f9fbfc` | `#182530` | Surface, card, input background |
+| `base-200` | `#eaf0f3` | `#0f1a22` | Page background |
+| `base-300` | `#d3dde3` | `#2a3a45` | Borders, dividers |
+| `base-content` | `#18272f` | `#e4edf1` | Primary text |
+| `primary` | `#3a5a6b` | `#6fa6c0` | Brand petrol — actions, links, focus ring |
+| `primary-content` | `#ffffff` | `#07151d` | Text on primary |
+| `secondary` | `#557082` | `#8aa6b4` | Secondary semantic tone |
+| `secondary-content` | `#ffffff` | `#0c1419` | Text on secondary |
+| `accent` | `#b65f34` | `#e08a55` | Warm terracotta accent |
+| `accent-content` | `#ffffff` | `#2a1206` | Text on accent |
+| `neutral` | `#233640` | `#e4edf1` | Neutral badges/avatars |
+| `neutral-content` | `#eef4f7` | `#182530` | Text on neutral |
+| `info` | `#2f7fb0` | `#5aa6d6` | Informational feedback |
+| `info-content` | `#ffffff` | `#04161f` | Text on info |
+| `success` | `#2f9e75` | `#3fbf8d` | Success/active state |
+| `success-content` | `#ffffff` | `#04231a` | Text on success |
+| `warning` | `#d39a36` | `#e6b357` | Warning/unverified state |
+| `warning-content` | `#2a1d00` | `#2a1d00` | Text on warning |
+| `error` | `#cf5454` | `#e87e79` | Error/banned/destructive state |
+| `error-content` | `#ffffff` | `#2c0a08` | Text on error |
 | `radius-field` | `0.375rem` | same | Input, button corner radius |
 | `radius-box` | `0.5rem` | same | Card, panel corner radius |
 
@@ -303,6 +303,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 |---|---|---|
 | `Button` | `variant?: "primary"\|"secondary"\|"danger"\|"ghost"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `circle?`, `square?`, `attached?: "left"\|"right"`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"`, `tooltip?`, `tooltipPlacement?: "top"\|"bottom"\|"left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). `square` is for joined input controls; `circle` is for standalone round icon buttons. Default position is left. **Set `tooltip` on every icon-only button** — it wraps the button in a hover/focus `Tooltip`. |
 | `LinkButton` | `href`, `variant?`, `size?`, `iconName?`, `ariaLabel?`, `hideOnMobile?` | Navigation, renders Next `Link` with DaisyUI button classes. |
+| `ResponsiveActions` | `actions: ResponsiveAction[]`, `ariaLabel?`, `size?: "sm"\|"md"` | Renders action buttons until the container overflows, then folds trailing actions into the shared React Aria `Menu` behind an ellipsis button. A single action stays direct; long action sets may fully collapse on narrow containers. Use for detail headers with long action sets. |
 
 ### Form
 
@@ -329,7 +330,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `DataTable` | `columns: DataTableColumn<T>[]`, `rows: T[]`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?: {total,limit,offset,onChange}` | React Aria Table backed by DaisyUI `table` class. Built-in keyboard navigation, sort indicators (chevron icons via `SortIcon`), and `onRowAction` handler. Renders native `<table>`/`<thead>`/`<tbody>` elements so DaisyUI classes apply directly. Sort state managed externally via `sortBy`/`sortDirection`/`onSort` (maps to RAC's `sortDescriptor`). Pagination rendered separately as `PaginationBar` (RAC Table has no built-in page pagination). |
+| `DataTable` | `columns: DataTableColumn<T>[]`, `rows: T[]`, `getRowKey`, `onRowClick?`, `sortBy?`, `sortDirection?`, `onSort?`, `pagination?: {total,limit,offset,onChange}` | React Aria Table backed by DaisyUI `table` class. Built-in keyboard navigation, sort indicators (chevron icons via `SortIcon`), and `onRowAction` handler. Columns may pass `actions(row)`; one visible action renders directly, while multiple actions collapse into a React Aria menu. Renders native `<table>`/`<thead>`/`<tbody>` elements so DaisyUI classes apply directly. Sort state managed externally via `sortBy`/`sortDirection`/`onSort` (maps to RAC's `sortDescriptor`). Pagination rendered separately as `PaginationBar` (RAC Table has no built-in page pagination). |
 
 ### Navigation
 

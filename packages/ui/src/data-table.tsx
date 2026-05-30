@@ -11,14 +11,31 @@ import {
   TableHeader as AriaTableHeader,
   type SortDescriptor,
 } from "react-aria-components";
+import { Button } from "./button";
+import { Menu, MenuItem, MenuTrigger } from "./menu";
 
 export type SortDirection = "asc" | "desc";
+
+type DataTableActionVariant = "primary" | "secondary" | "danger" | "ghost";
+
+export type DataTableAction = {
+  readonly id: string;
+  readonly label: string;
+  readonly variant?: DataTableActionVariant;
+  readonly iconName?: string;
+  readonly ariaLabel?: string;
+  readonly tooltip?: string;
+  readonly disabled?: boolean;
+  readonly isHidden?: boolean;
+  readonly onAction: () => void;
+};
 
 export type DataTableColumn<T extends object> = {
   readonly key: string;
   readonly label: string;
   readonly sortable?: boolean;
   readonly render?: (row: T) => ReactNode;
+  readonly actions?: (row: T) => readonly DataTableAction[];
 };
 
 type Pagination = {
@@ -84,6 +101,46 @@ function PaginationBar({ total, limit, offset, onChange }: Pagination) {
         ›
       </button>
     </div>
+  );
+}
+
+function DataTableActions({ actions }: { readonly actions: readonly DataTableAction[] }) {
+  const visibleActions = actions.filter((action) => !action.isHidden);
+  if (visibleActions.length === 0) return null;
+  if (visibleActions.length === 1) {
+    const action = visibleActions[0]!;
+    return (
+      <Button
+        size="sm"
+        variant={action.variant ?? "secondary"}
+        iconName={action.iconName}
+        ariaLabel={action.ariaLabel}
+        tooltip={action.tooltip}
+        disabled={action.disabled}
+        onClick={action.onAction}
+      >
+        {action.iconName ? undefined : action.label}
+      </Button>
+    );
+  }
+  const actionById = new Map(visibleActions.map((action) => [action.id, action]));
+  return (
+    <MenuTrigger>
+      <Button variant="ghost" size="sm" iconName="Ellipsis" ariaLabel="Actions" tooltip="More actions" />
+      <Menu
+        onAction={(key) => {
+          const action = actionById.get(String(key));
+          if (!action || action.disabled) return;
+          action.onAction();
+        }}
+      >
+        {visibleActions.map((action) => (
+          <MenuItem key={action.id} id={action.id} isDisabled={action.disabled}>
+            {action.label}
+          </MenuItem>
+        ))}
+      </Menu>
+    </MenuTrigger>
   );
 }
 
@@ -153,7 +210,9 @@ export function DataTable<T extends object>({
             >
               {columns.map((col) => (
                 <AriaCell key={col.key} className="text-sm text-base-content" data-label={col.label}>
-                  {col.render
+                  {col.actions
+                    ? <DataTableActions actions={col.actions(row)} />
+                    : col.render
                     ? col.render(row)
                     : String((row as Record<string, unknown>)[col.key] ?? "")}
                 </AriaCell>

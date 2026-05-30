@@ -8,7 +8,6 @@ import {
   ConfirmDialog,
   DescriptionList,
   ErrorAlert,
-  LinkButton,
   Panel,
   RadioGroup,
   ScopeBuilder,
@@ -25,6 +24,7 @@ import {
   listScopes as listScopesAction,
   type OAuthClient,
 } from "../../_actions/oauth";
+import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { copyToClipboard } from "@/shared/clipboard";
 import { oauthScopesKey } from "@/app/admin/_data/swr-keys";
 
@@ -212,8 +212,11 @@ export function ApplicationCreateWizardContent({
 
   return (
     <Stack gap="md">
-      <LinkButton href="/admin/oauth/applications" variant="secondary" iconName="ChevronLeft">OAuth Applications</LinkButton>
-      <Text variant="h1">New OAuth Application</Text>
+      <AdminDetailTitleRow
+        backHref="/admin/oauth/applications"
+        backLabel="OAuth Applications"
+        title="New OAuth Application"
+      />
       {submitError ? <ErrorAlert message={submitError} /> : null}
       <Stepper
         steps={steps}

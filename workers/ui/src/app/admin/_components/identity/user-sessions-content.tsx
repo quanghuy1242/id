@@ -80,12 +80,12 @@ export function UserSessionsContent({
       label: "Flags",
       render: (s) => (
         <Inline gap="xs">
-          {s.impersonatedBy && <Badge tone="warning" size="sm">Impersonation</Badge>}
           {!isExpired(s) && (
             <Button variant="danger" size="sm" onClick={() => { setRevokeError(undefined); setRevokeTarget(s); }}>
               Revoke
             </Button>
           )}
+          {s.impersonatedBy && <Badge tone="warning" size="sm">Impersonated</Badge>}
         </Inline>
       ),
     },

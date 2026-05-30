@@ -24,6 +24,7 @@ export default function UserDetailLayout({ children }: UserDetailLayoutProps) {
           <UserDetailHeaderContent
             activeTab={activeTab}
             onImpersonateRedirect={() => router.push("/")}
+            onNavigateToUsers={() => router.push("/admin/identity/users")}
           />
           {children}
         </Stack>

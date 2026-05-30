@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -30,7 +30,6 @@ import {
 import {
   listClients as listClientsAction,
   createClient as createClientAction,
-  updateClient as updateClientAction,
   rotateClientSecret as rotateClientSecretAction,
   deleteClient as deleteClientAction,
   clientType,
@@ -43,7 +42,6 @@ import { copyToClipboard } from "@/shared/clipboard";
 const defaultActions = {
   listClients: listClientsAction,
   createClient: createClientAction,
-  updateClient: updateClientAction,
   rotateClientSecret: rotateClientSecretAction,
   deleteClient: deleteClientAction,
 };
@@ -166,12 +164,6 @@ export function ApplicationsContent({
   const [createError, setCreateError] = useState<string | undefined>();
   const [createType, setCreateType] = useState<string>("confidential");
 
-  const [editTarget, setEditTarget] = useState<OAuthClient | null>(null);
-  const [editError, setEditError] = useState<string | undefined>();
-  const lastEditRef = useRef<OAuthClient | null>(null);
-  if (editTarget) lastEditRef.current = editTarget;
-  const editDisplay = editTarget ?? lastEditRef.current;
-
   const [rotateTarget, setRotateTarget] = useState<OAuthClient | null>(null);
   const [rotateError, setRotateError] = useState<string | undefined>();
 
@@ -262,36 +254,6 @@ export function ApplicationsContent({
     }
   }
 
-  async function handleEdit(formData: FormData) {
-    if (!editTarget) return false;
-    setEditError(undefined);
-    try {
-      const redirectUris = splitDelimited(formData.get("redirect_uris"));
-      if (clientType(editTarget) !== "M2M" && redirectUris.length === 0) {
-        setEditError("At least one redirect URI is required");
-        return false;
-      }
-      await actions.updateClient(editTarget.client_id, {
-        client_name: String(formData.get("client_name") ?? "").trim(),
-        scope: scopeString(formData.get("scope")) ?? "",
-        redirect_uris: redirectUris,
-        post_logout_redirect_uris: splitDelimited(formData.get("post_logout_redirect_uris")),
-        client_uri: optionalString(formData.get("client_uri")),
-        logo_uri: optionalString(formData.get("logo_uri")),
-        tos_uri: optionalString(formData.get("tos_uri")),
-        policy_uri: optionalString(formData.get("policy_uri")),
-        contacts: splitDelimited(formData.get("contacts")),
-      });
-      await mutate();
-      setEditTarget(null);
-      toast.success("Application updated");
-      return true;
-    } catch (err: unknown) {
-      setEditError(err instanceof Error ? err.message : "Failed to update application");
-      return false;
-    }
-  }
-
   async function handleRotate() {
     if (!rotateTarget) return false;
     setRotateError(undefined);
@@ -323,6 +285,84 @@ export function ApplicationsContent({
     }
   }
 
+  const columns: DataTableColumn<OAuthClient>[] = [
+    {
+      key: "client_name",
+      label: "Application",
+      render: (client) => (
+        <Stack gap="xs">
+          <Inline gap="sm">
+            <Text variant="body">{client.client_name}</Text>
+            {client.disabled ? <Badge tone="error" size="sm">Disabled</Badge> : null}
+          </Inline>
+          <Text variant="caption" mono>{client.client_id}</Text>
+        </Stack>
+      ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      render: (client) => {
+        const type = clientType(client);
+        return <Badge tone={typeBadgeTone[type]} size="sm">{typeLabel[type]}</Badge>;
+      },
+    },
+    {
+      key: "redirect_uris",
+      label: "Redirects",
+      render: (client) => client.redirect_uris.length > 0 ? client.redirect_uris.length : "—",
+    },
+    {
+      key: "scope",
+      label: "Scopes",
+      render: (client) => {
+        const scopes = scopeList(client.scope);
+        if (scopes.length === 0) return "—";
+        return (
+          <Inline gap="xs" wrap>
+            {scopes.map((scope) => <Badge key={scope} tone="primary" size="sm">{scope}</Badge>)}
+          </Inline>
+        );
+      },
+    },
+    {
+      key: "grant_types",
+      label: "Grants",
+      render: (client) => (
+        <Inline gap="xs" wrap>
+          {client.grant_types.map((grant) => <Badge key={grant} tone="neutral" size="sm">{grant}</Badge>)}
+        </Inline>
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      actions: (client) => {
+        const type = clientType(client);
+        return [
+          {
+            id: "rotate",
+            label: "Rotate Secret",
+            iconName: "RefreshCw",
+            ariaLabel: `Rotate secret for ${client.client_name}`,
+            tooltip: "Rotate client secret",
+            isHidden: type === "public",
+            onAction: () => { setRotateError(undefined); setRotateTarget(client); },
+          },
+          {
+            id: "delete",
+            label: "Delete",
+            variant: "danger",
+            iconName: "Trash2",
+            ariaLabel: `Delete ${client.client_name}`,
+            tooltip: "Delete application",
+            onAction: () => { setDeleteError(undefined); setDeleteTarget(client); },
+          },
+        ];
+      },
+    },
+  ];
+
   function renderList() {
     if (showLoading) return <Skeleton rows={5} />;
     if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
@@ -332,73 +372,6 @@ export function ApplicationsContent({
       }
       return <EmptyState message="No OAuth applications" cta="Create Application" onCta={() => setCreateOpen(true)} />;
     }
-    const columns: DataTableColumn<OAuthClient>[] = [
-      {
-        key: "client_name",
-        label: "Application",
-        render: (client) => (
-          <Stack gap="xs">
-            <Inline gap="sm">
-              <Text variant="body">{client.client_name}</Text>
-              {client.disabled ? <Badge tone="error" size="sm">Disabled</Badge> : null}
-            </Inline>
-            <Text variant="caption" mono>{client.client_id}</Text>
-          </Stack>
-        ),
-      },
-      {
-        key: "type",
-        label: "Type",
-        render: (client) => {
-          const type = clientType(client);
-          return <Badge tone={typeBadgeTone[type]} size="sm">{typeLabel[type]}</Badge>;
-        },
-      },
-      {
-        key: "redirect_uris",
-        label: "Redirects",
-        render: (client) => client.redirect_uris.length > 0 ? client.redirect_uris.length : "—",
-      },
-      {
-        key: "scope",
-        label: "Scopes",
-        render: (client) => {
-          const scopes = scopeList(client.scope);
-          if (scopes.length === 0) return "—";
-          return (
-            <Inline gap="xs" wrap>
-              {scopes.map((scope) => <Badge key={scope} tone="primary" size="sm">{scope}</Badge>)}
-            </Inline>
-          );
-        },
-      },
-      {
-        key: "grant_types",
-        label: "Grants",
-        render: (client) => (
-          <Inline gap="xs" wrap>
-            {client.grant_types.map((grant) => <Badge key={grant} tone="neutral" size="sm">{grant}</Badge>)}
-          </Inline>
-        ),
-      },
-      {
-        key: "actions",
-        label: "Actions",
-        render: (client) => {
-          const type = clientType(client);
-          return (
-            <Inline gap="xs">
-              <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${client.client_name}`} tooltip="Edit application" onClick={() => { setEditError(undefined); setEditTarget(client); }} />
-              {type !== "public" ? (
-                <Button size="sm" variant="secondary" iconName="RefreshCw" ariaLabel={`Rotate secret for ${client.client_name}`} tooltip="Rotate client secret" onClick={() => { setRotateError(undefined); setRotateTarget(client); }} />
-              ) : null}
-              <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${client.client_name}`} tooltip="Delete application" onClick={() => { setDeleteError(undefined); setDeleteTarget(client); }} />
-            </Inline>
-          );
-        },
-      },
-    ];
-
     return (
       <DataTable<OAuthClient>
         columns={columns}
@@ -492,51 +465,6 @@ export function ApplicationsContent({
             },
           ]}
         />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={Boolean(editTarget)}
-        onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditError(undefined); } }}
-        title="Edit Application"
-        confirmLabel="Save"
-        error={editError}
-        onConfirm={handleEdit}
-      >
-        {editDisplay ? (
-          <Stack gap="sm">
-            <Inline gap="sm" wrap>
-              <Badge tone={typeBadgeTone[clientType(editDisplay)]} size="sm">{typeLabel[clientType(editDisplay)]}</Badge>
-              <Text variant="caption" mono>{editDisplay.client_id}</Text>
-            </Inline>
-            <TextInput label="Name" name="client_name" defaultValue={editDisplay.client_name} required />
-            <Tabs
-              ariaLabel="Application settings"
-              size="sm"
-              items={[
-                {
-                  id: "access",
-                  label: "Access",
-                  content: (
-                    <Stack gap="sm">
-                      <Textarea label="Scopes" name="scope" rows={2} defaultValue={editDisplay.scope} />
-                      {clientType(editDisplay) !== "M2M" ? (
-                        <RedirectUriFields
-                          redirectUris={editDisplay.redirect_uris}
-                          postLogoutRedirectUris={editDisplay.post_logout_redirect_uris}
-                        />
-                      ) : null}
-                    </Stack>
-                  ),
-                },
-                {
-                  id: "metadata",
-                  label: "Metadata",
-                  content: <ClientMetadataFields client={editDisplay} />,
-                },
-              ]}
-            />
-          </Stack>
-        ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog

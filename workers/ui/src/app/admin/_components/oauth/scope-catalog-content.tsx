@@ -179,11 +179,16 @@ export function ScopeCatalogContent({
     {
       key: "actions",
       label: "Actions",
-      render: (s) => (
-        <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${s.scope}`} tooltip="Edit scope" onClick={() => { setEditError(undefined); setEditEnabled(s.enabled); setEditTarget(s); }} />
-        </Inline>
-      ),
+      actions: (s) => [
+        {
+          id: "edit",
+          label: "Edit",
+          iconName: "Pencil",
+          ariaLabel: `Edit ${s.scope}`,
+          tooltip: "Edit scope",
+          onAction: () => { setEditError(undefined); setEditEnabled(s.enabled); setEditTarget(s); },
+        },
+      ],
     },
   ];
 

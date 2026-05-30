@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Button,
+  ConfirmDialog,
   DockLink,
   MobileRouteTabs,
   NavLink,
@@ -184,13 +185,26 @@ export async function handleLogout(location: LogoutLocation = window.location): 
 }
 
 type AdminTopbarProps = {
-  readonly onLogout?: () => void;
+  readonly onLogout?: () => void | Promise<void>;
 };
 
 export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
   const pathname = usePathname();
   const currentPageLabel = getCurrentPageLabel(pathname);
   const [themeDialogOpen, setThemeDialogOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | undefined>();
+
+  async function confirmLogout() {
+    setLogoutError(undefined);
+    try {
+      await (onLogout ? onLogout() : handleLogout());
+      return true;
+    } catch (err: unknown) {
+      setLogoutError(err instanceof Error ? err.message : "Failed to log out");
+      return false;
+    }
+  }
 
   return (
     <>
@@ -204,11 +218,21 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
           initials="AD"
           items={[
             { label: "Theme", onAction: () => setThemeDialogOpen(true) },
-            { label: "Logout", onAction: onLogout ?? (() => { void handleLogout(); }) },
+            { label: "Logout", onAction: () => setLogoutOpen(true) },
           ]}
         />
       </TopbarEnd>
       <ThemeDialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen} />
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={(o) => { setLogoutOpen(o); if (!o) setLogoutError(undefined); }}
+        title="Log Out"
+        description="You will need to sign in again, verify your email if prompted, and complete MFA before returning to the dashboard."
+        confirmLabel="Log Out"
+        variant="danger"
+        error={logoutError}
+        onConfirm={confirmLogout}
+      />
     </>
   );
 }

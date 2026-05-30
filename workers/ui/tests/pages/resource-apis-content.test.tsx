@@ -9,6 +9,12 @@ import { mockOrganizations } from "@/app/admin/_mocks/organizations";
 import type { ResourceServer, CreateResourceServerInput, UpdateResourceServerInput } from "@/app/admin/_actions/oauth";
 import type { Organization } from "@/app/admin/_actions/organizations";
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
 function makeActions(servers: ResourceServer[]) {
   let current = [...servers];
   return {
@@ -66,16 +72,19 @@ describe("ResourceApisContent", () => {
   it("shows reversible status actions", async () => {
     render(<ResourceApisContent actions={makeActions(mockResourceServers)} />);
     await waitFor(() => screen.getByText("Content API"));
-    // 3 enabled servers (content, vendor, id-system) → 3 Disable buttons.
-    expect(screen.getAllByRole("button", { name: /^disable /i })).toHaveLength(3);
-    expect(screen.getByRole("button", { name: /activate analytics api/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Actions" })).toHaveLength(4);
+    const row = screen.getByText("Analytics API").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    expect(await screen.findByRole("menuitem", { name: /^activate$/i })).toBeInTheDocument();
   });
 
   it("activates a disabled resource API", async () => {
     const actions = makeActions(mockResourceServers);
     render(<ResourceApisContent actions={actions} />);
     await waitFor(() => screen.getByText("Analytics API"));
-    fireEvent.click(screen.getByRole("button", { name: /activate analytics api/i }));
+    const row = screen.getByText("Analytics API").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^activate$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^activate$/i }));
@@ -100,7 +109,9 @@ describe("ResourceApisContent", () => {
     const actions = makeActions(mockResourceServers);
     render(<ResourceApisContent actions={actions} />);
     await waitFor(() => screen.getByText("Content API"));
-    fireEvent.click(screen.getByRole("button", { name: /delete content api/i }));
+    const row = screen.getByText("Content API").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));

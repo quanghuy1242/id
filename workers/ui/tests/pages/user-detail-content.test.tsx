@@ -13,6 +13,31 @@ import type { User, CurrentSession } from "@/app/admin/_actions/users";
 const baseUser = mockUsers[0];
 const bannedUser = mockUsers[1];
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
+async function clickUserAction(name: RegExp) {
+  const directButton = screen.queryByRole("button", { name });
+  if (directButton) {
+    fireEvent.click(directButton);
+    return;
+  }
+
+  pressTrigger(screen.getByRole("button", { name: "User actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
+async function expectUserAction(name: RegExp) {
+  const directButton = screen.queryByRole("button", { name });
+  if (directButton) return;
+
+  pressTrigger(screen.getByRole("button", { name: "User actions" }));
+  expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
+}
+
 function makeActions(user: User, isImpersonating = false) {
   return {
     getUser: vi.fn<() => Promise<{ user: User }>>().mockResolvedValue({ user }),
@@ -50,8 +75,8 @@ function renderUserDetail({
   return render(
     <UserDetailProvider userId={userId} loading={loading} error={error} actions={actions}>
       <Stack gap="md">
-        <UserDetailHeaderContent activeTab="overview" actions={actions} />
-        <UserDetailOverviewContent actions={actions} onNavigateToUsers={onNavigateToUsers} />
+        <UserDetailHeaderContent activeTab="overview" actions={actions} onNavigateToUsers={onNavigateToUsers} />
+        <UserDetailOverviewContent />
       </Stack>
     </UserDetailProvider>,
   );
@@ -84,28 +109,30 @@ describe("User detail nested content", () => {
   it("shows Stop Impersonating button when impersonating", async () => {
     const actions = makeActions(baseUser, true);
     renderUserDetail({ actions, isImpersonating: true });
-    await waitFor(() => expect(screen.getByRole("button", { name: /stop impersonating/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "User actions" })).toBeInTheDocument());
+    await expectUserAction(/stop impersonating/i);
   });
 
   it("shows Impersonate button when not impersonating", async () => {
     const actions = makeActions(baseUser, false);
     renderUserDetail({ actions, isImpersonating: false });
-    await waitFor(() => expect(screen.getByRole("button", { name: /^impersonate$/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "User actions" })).toBeInTheDocument());
+    await expectUserAction(/^impersonate$/i);
   });
 
   it("opens Edit Profile dialog on button click", async () => {
     const actions = makeActions(baseUser);
     renderUserDetail({ actions });
-    await waitFor(() => screen.getByRole("button", { name: /edit profile/i }));
-    fireEvent.click(screen.getByRole("button", { name: /edit profile/i }));
+    await waitFor(() => screen.getByRole("button", { name: "User actions" }));
+    await clickUserAction(/edit profile/i);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("delete confirm button disabled until email typed", async () => {
     const actions = makeActions(baseUser);
     renderUserDetail({ actions });
-    await waitFor(() => screen.getAllByRole("button", { name: /delete user/i }));
-    fireEvent.click(screen.getAllByRole("button", { name: /delete user/i })[0]);
+    await waitFor(() => screen.getByRole("button", { name: "User actions" }));
+    await clickUserAction(/delete user/i);
     await waitFor(() => screen.getByRole("dialog"));
     const allDeleteBtns = screen.getAllByRole("button", { name: /delete user/i });
     expect(allDeleteBtns.some((b) => b.hasAttribute("disabled"))).toBe(true);
@@ -114,8 +141,8 @@ describe("User detail nested content", () => {
   it("enables delete confirm after typing correct email", async () => {
     const actions = makeActions(baseUser);
     renderUserDetail({ actions });
-    await waitFor(() => screen.getByRole("button", { name: /delete user/i }));
-    fireEvent.click(screen.getAllByRole("button", { name: /delete user/i })[0]);
+    await waitFor(() => screen.getByRole("button", { name: "User actions" }));
+    await clickUserAction(/delete user/i);
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.change(screen.getByLabelText(/type the user's email/i), { target: { value: "john@acme.com" } });
     await waitFor(() => {
@@ -128,8 +155,8 @@ describe("User detail nested content", () => {
     const actions = makeActions(baseUser);
     actions.banUser.mockRejectedValueOnce(new Error("Cannot ban the last admin"));
     renderUserDetail({ actions });
-    await waitFor(() => screen.getByRole("button", { name: /ban user/i }));
-    fireEvent.click(screen.getByRole("button", { name: /ban user/i }));
+    await waitFor(() => screen.getByRole("button", { name: "User actions" }));
+    await clickUserAction(/ban user/i);
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(screen.getByRole("button", { name: /^ban user$/i }));
     await waitFor(() => {

@@ -128,7 +128,7 @@ Components:
   UsersListContent:
   Stack(gap="md")
     Panel > Stack(gap="sm")
-      Inline(justify="between")
+      Inline(justify="between", wrap=false)
         Text(variant="h2", children="Users")
         Inline(gap="sm")
           FilterDropdown(label="Role", options=[{value:"all",label:"All Roles"},{value:"admin",label:"Admin"},{value:"user",label:"User"}], value, onChange, className="hidden lg:block")
@@ -255,9 +255,9 @@ Components:
         LinkButton(href="/admin/identity/users", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Users")
         Text(variant="h1", children=user.name)
         Badge(tone=role==="admin"?"primary":"neutral", children=user.role)
-      — Desktop: Button(variant="secondary", hideOnMobile, onClick=... "Impersonate")
-      — Mobile:  MenuTrigger > Button(variant="ghost", size="sm", hideOnDesktop, iconName="Ellipsis", ariaLabel="Actions") + Menu(MenuItem("Impersonate")|MenuItem("Stop Impersonating"))
-      — (Same pattern for both impersonate/stop-impersonating states — conditional menu item)
+      ResponsiveActions(ariaLabel="User actions")
+        Direct actions while space allows: Edit Profile, Impersonate|Stop Impersonating, Set Role, Reset Password, Ban User|Unban User, Delete User
+        Overflow: Button(iconName="Ellipsis", ariaLabel="User actions") + Menu(trailing actions)
 
     Tabs(
       selectedKey="overview",
@@ -269,7 +269,7 @@ Components:
     )
 
     users/:userId/page.tsx:
-      UserDetailOverviewContent(onNavigateToUsers)
+      UserDetailOverviewContent()
 
     — If banned: Alert(tone="warning") showing "This user is banned. Reason: {banReason}. Expires: {banExpires}."
     — If loading: Skeleton(rows=4, height="md")
@@ -279,14 +279,6 @@ Components:
         — Column 1: Avatar(initials/image/alt/size)
         — All label/value pairs: Text(variant="caption") for labels, Text(variant="body") for values
         Fields: Name, Email, Role, Email Verified (Badge), Banned (Badge/Yes-No), Created At
-
-    Panel(tone="base") — Actions
-      Inline(wrap, gap="md")
-        Button(variant="secondary", onClick=openEditModal, "Edit Profile")
-        Button(variant="secondary", onClick=openRoleModal, "Set Role")
-        Button(variant="secondary", onClick=openPasswordModal, "Reset Password")
-        — Toggle: user.banned ? Button("Unban User", onClick=unbanUser) : Button(variant="danger", onClick=openBanModal, "Ban User")
-        Button(variant="danger", onClick=openDeleteModal, "Delete User")
 
   Modals (all use ConfirmDialog):
     Edit Profile: ConfirmDialog(open, onOpenChange, title="Edit Profile", confirmLabel="Save", onConfirm)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -8,7 +8,6 @@ import {
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
-  DescriptionList,
   EmptyState,
   ErrorAlert,
   Inline,
@@ -28,7 +27,6 @@ import {
 import {
   listResourceServers as listResourceServersAction,
   createResourceServer as createResourceServerAction,
-  updateResourceServer as updateResourceServerAction,
   disableResourceServer as disableResourceServerAction,
   enableResourceServer as enableResourceServerAction,
   deleteResourceServer as deleteResourceServerAction,
@@ -40,7 +38,6 @@ import { resourceServersKey, orgsListKey } from "@/app/admin/_data/swr-keys";
 const defaultActions = {
   listResourceServers: listResourceServersAction,
   createResourceServer: createResourceServerAction,
-  updateResourceServer: updateResourceServerAction,
   disableResourceServer: disableResourceServerAction,
   enableResourceServer: enableResourceServerAction,
   deleteResourceServer: deleteResourceServerAction,
@@ -89,12 +86,6 @@ export function ResourceApisContent({
   const [createOpen, setCreateOpen] = useState(defaultCreateOpen);
   const [createError, setCreateError] = useState<string | undefined>();
   const [createOrgId, setCreateOrgId] = useState<string>("");
-
-  const [editTarget, setEditTarget] = useState<ResourceServer | null>(null);
-  const [editError, setEditError] = useState<string | undefined>();
-  const lastEditRef = useRef<ResourceServer | null>(null);
-  if (editTarget) lastEditRef.current = editTarget;
-  const editDisplay = editTarget ?? lastEditRef.current;
 
   const [disableTarget, setDisableTarget] = useState<ResourceServer | null>(null);
   const [disableError, setDisableError] = useState<string | undefined>();
@@ -175,17 +166,32 @@ export function ResourceApisContent({
     {
       key: "actions",
       label: "Actions",
-      render: (rs) => (
-        <Inline gap="xs">
-          <Button size="sm" variant="secondary" iconName="Pencil" ariaLabel={`Edit ${rs.name}`} tooltip="Edit resource API" onClick={() => { setEditError(undefined); setEditTarget(rs); }} />
-          {rs.enabled ? (
-            <Button size="sm" variant="secondary" ariaLabel={`Disable ${rs.name}`} tooltip="Reject new tokens for this audience" onClick={() => { setDisableError(undefined); setDisableTarget(rs); }}>Disable</Button>
-          ) : (
-            <Button size="sm" variant="secondary" ariaLabel={`Activate ${rs.name}`} tooltip="Allow tokens for this audience again" onClick={() => { setEnableError(undefined); setEnableTarget(rs); }}>Activate</Button>
-          )}
-          <Button size="sm" variant="danger" iconName="Trash2" ariaLabel={`Delete ${rs.name}`} tooltip="Delete resource API" onClick={() => { setDeleteError(undefined); setDeleteTarget(rs); }} />
-        </Inline>
-      ),
+      actions: (rs) => [
+        rs.enabled
+          ? {
+              id: "disable",
+              label: "Disable",
+              ariaLabel: `Disable ${rs.name}`,
+              tooltip: "Reject new tokens for this audience",
+              onAction: () => { setDisableError(undefined); setDisableTarget(rs); },
+            }
+          : {
+              id: "activate",
+              label: "Activate",
+              ariaLabel: `Activate ${rs.name}`,
+              tooltip: "Allow tokens for this audience again",
+              onAction: () => { setEnableError(undefined); setEnableTarget(rs); },
+            },
+        {
+          id: "delete",
+          label: "Delete",
+          variant: "danger",
+          iconName: "Trash2",
+          ariaLabel: `Delete ${rs.name}`,
+          tooltip: "Delete resource API",
+          onAction: () => { setDeleteError(undefined); setDeleteTarget(rs); },
+        },
+      ],
     },
   ];
 
@@ -206,26 +212,6 @@ export function ResourceApisContent({
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to register resource API");
-      return false;
-    }
-  }
-
-  async function handleEdit(formData: FormData) {
-    if (!editTarget) return false;
-    setEditError(undefined);
-    try {
-      await actions.updateResourceServer(editTarget.id, {
-        name: String(formData.get("name") ?? "").trim(),
-        slug: String(formData.get("slug") ?? "").trim(),
-        audience: String(formData.get("audience") ?? "").trim(),
-        description: String(formData.get("description") ?? "").trim() || null,
-      });
-      await mutate();
-      setEditTarget(null);
-      toast.success("Resource API updated");
-      return true;
-    } catch (err: unknown) {
-      setEditError(err instanceof Error ? err.message : "Failed to update resource API");
       return false;
     }
   }
@@ -337,31 +323,6 @@ export function ResourceApisContent({
         <TextInput label="Audience URL" name="audience" required />
         <Textarea label="Description" name="description" />
         <RadioGroup title="Organization" name="organizationId" options={orgOptions} value={createOrgId} onChange={setCreateOrgId} />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={Boolean(editTarget)}
-        onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditError(undefined); } }}
-        title="Edit Resource API"
-        confirmLabel="Save"
-        error={editError}
-        onConfirm={handleEdit}
-      >
-        {editDisplay ? (
-          <>
-            <DescriptionList
-              dense
-              items={[
-                { term: "Created", description: `${formatDate(editDisplay.createdAt)} by ${editDisplay.createdBy}` },
-                { term: "Updated", description: `${formatDate(editDisplay.updatedAt)} by ${editDisplay.updatedBy}` },
-              ]}
-            />
-            <TextInput label="Name" name="name" defaultValue={editDisplay.name} required />
-            <TextInput label="Slug" name="slug" defaultValue={editDisplay.slug} required />
-            <TextInput label="Audience URL" name="audience" defaultValue={editDisplay.audience} required />
-            <Textarea label="Description" name="description" defaultValue={editDisplay.description ?? ""} />
-          </>
-        ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog

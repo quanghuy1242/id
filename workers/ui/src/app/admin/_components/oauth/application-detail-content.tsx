@@ -1,17 +1,21 @@
 "use client";
 
-import useSWR from "swr";
+import { useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import {
   Badge,
   Button,
   CodeBlock,
+  ConfirmDialog,
   DataTable,
   type DataTableColumn,
   DescriptionList,
   EmptyState,
   ErrorAlert,
   Inline,
-  LinkButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   Panel,
   Skeleton,
   Stack,
@@ -19,6 +23,8 @@ import {
   StatGroup,
   Tabs,
   Text,
+  Textarea,
+  TextInput,
   toast,
 } from "@id/ui";
 import {
@@ -26,18 +32,25 @@ import {
   listBindings as listBindingsAction,
   listClients as listClientsAction,
   listResourceServers as listResourceServersAction,
+  updateClient as updateClientAction,
+  rotateClientSecret as rotateClientSecretAction,
+  deleteClient as deleteClientAction,
   type ClientResourceScope,
   type OAuthClient,
   type ResourceServer,
 } from "../../_actions/oauth";
+import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { ActivityLogContent } from "../activity-log-content";
 import { copyToClipboard } from "@/shared/clipboard";
-import { m2mBindingsKey, oauthClientsKey, resourceServersKey } from "@/app/admin/_data/swr-keys";
+import { isM2mBindingsKey, m2mBindingsKey, oauthClientsKey, resourceServersKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   listClients: listClientsAction,
   listBindings: listBindingsAction,
   listResourceServers: listResourceServersAction,
+  updateClient: updateClientAction,
+  rotateClientSecret: rotateClientSecretAction,
+  deleteClient: deleteClientAction,
 };
 
 const typeBadgeTone = {
@@ -59,6 +72,7 @@ type ApplicationDetailContentProps = {
   readonly activeTab?: ApplicationDetailTab;
   readonly loading?: boolean;
   readonly error?: string;
+  readonly onDeleted?: () => void;
   readonly actions?: typeof defaultActions;
 };
 
@@ -78,6 +92,25 @@ function scopeList(scope: string | undefined): string[] {
   return (scope ?? "").split(/\s+/).filter(Boolean);
 }
 
+function splitDelimited(raw: FormDataEntryValue | null): string[] {
+  return String(raw ?? "")
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function scopeString(raw: FormDataEntryValue | null): string {
+  return String(raw ?? "")
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function optionalString(raw: FormDataEntryValue | null): string | undefined {
+  return String(raw ?? "").trim() || undefined;
+}
+
 function formatList(values: readonly string[] | undefined): string {
   return values && values.length > 0 ? values.join("\n") : "None";
 }
@@ -88,17 +121,87 @@ async function copyText(value: string, label: string) {
   else toast.error("Couldn't copy", `Copy the ${label.toLowerCase()} manually.`);
 }
 
-function Header({ client, clientId, activeTab }: { readonly client: OAuthClient | undefined; readonly clientId: string; readonly activeTab: ApplicationDetailTab }) {
+function RedirectUriFields({
+  redirectUris,
+  postLogoutRedirectUris,
+}: {
+  readonly redirectUris?: readonly string[];
+  readonly postLogoutRedirectUris?: readonly string[];
+}) {
+  return (
+    <>
+      <Textarea label="Redirect URIs" name="redirect_uris" rows={3} defaultValue={redirectUris?.join("\n")} required />
+      <Textarea label="Post-Logout Redirect URIs" name="post_logout_redirect_uris" rows={2} defaultValue={postLogoutRedirectUris?.join("\n")} />
+    </>
+  );
+}
+
+function ClientMetadataFields({ client }: { readonly client: OAuthClient }) {
+  return (
+    <Stack gap="sm">
+      <TextInput label="Client URI" name="client_uri" defaultValue={client.client_uri ?? ""} />
+      <TextInput label="Logo URI" name="logo_uri" defaultValue={client.logo_uri ?? ""} />
+      <TextInput label="Terms URI" name="tos_uri" defaultValue={client.tos_uri ?? ""} />
+      <TextInput label="Policy URI" name="policy_uri" defaultValue={client.policy_uri ?? ""} />
+      <Textarea label="Contacts" name="contacts" rows={2} defaultValue={client.contacts?.join("\n")} />
+    </Stack>
+  );
+}
+
+function Header({
+  client,
+  clientId,
+  activeTab,
+  onEdit,
+  onRotate,
+  onDelete,
+}: {
+  readonly client: OAuthClient | undefined;
+  readonly clientId: string;
+  readonly activeTab: ApplicationDetailTab;
+  readonly onEdit?: () => void;
+  readonly onRotate?: () => void;
+  readonly onDelete?: () => void;
+}) {
   const type = client ? clientType(client) : "confidential";
   return (
     <Stack gap="sm">
       <Inline justify="between">
-        <Inline gap="sm">
-          <LinkButton href="/admin/oauth/applications" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to OAuth Applications" tooltip="Back to OAuth Applications" />
-          <Text variant="h1">{client?.client_name ?? clientId}</Text>
+        <AdminDetailTitleRow
+          backHref="/admin/oauth/applications"
+          backLabel="OAuth Applications"
+          title={client?.client_name ?? clientId}
+        >
           {client ? <Badge tone={typeBadgeTone[type]}>{typeLabel[type]}</Badge> : null}
           <Text variant="caption" mono>{clientId}</Text>
-        </Inline>
+        </AdminDetailTitleRow>
+        {client ? (
+          <Inline gap="sm" justify="end">
+            <Button variant="secondary" hideOnMobile iconName="Pencil" onClick={onEdit}>
+              Edit Application
+            </Button>
+            {type !== "public" ? (
+              <Button variant="secondary" hideOnMobile iconName="RefreshCw" onClick={onRotate}>
+                Rotate Secret
+              </Button>
+            ) : null}
+            <Button variant="danger" hideOnMobile iconName="Trash2" onClick={onDelete}>
+              Delete
+            </Button>
+            <MenuTrigger>
+              <Button variant="ghost" size="sm" hideOnDesktop iconName="Ellipsis" ariaLabel="Actions" tooltip="More actions" />
+              <Menu onAction={(key) => {
+                if (key === "edit") onEdit?.();
+                if (key === "rotate") onRotate?.();
+                if (key === "delete") onDelete?.();
+              }}>
+                <MenuItem id="edit">Edit Application</MenuItem>
+                {type !== "public" ? <MenuItem id="rotate">Rotate Secret</MenuItem> : null}
+                <MenuItem id="delete">Delete</MenuItem>
+              </Menu>
+            </MenuTrigger>
+          </Inline>
+        ) : null}
       </Inline>
       <Tabs ariaLabel="OAuth application detail tabs" selectedKey={activeTab} items={tabs(clientId)} />
     </Stack>
@@ -262,8 +365,18 @@ export function ApplicationDetailContent({
   activeTab = "overview",
   loading: loadingOverride,
   error: errorOverride,
+  onDeleted,
   actions = defaultActions,
 }: ApplicationDetailContentProps) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState<string | undefined>();
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotateError, setRotateError] = useState<string | undefined>();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [revealSecret, setRevealSecret] = useState<string | undefined>();
+  const { mutate: globalMutate } = useSWRConfig();
+
   const { data: clients, isLoading, error, mutate } = useSWR(
     loadingOverride || errorOverride ? null : oauthClientsKey(),
     () => actions.listClients(),
@@ -271,6 +384,68 @@ export function ApplicationDetailContent({
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
   const client = clients?.find((item) => item.client_id === clientId);
+
+  async function handleEdit(formData: FormData) {
+    if (!client) return false;
+    setEditError(undefined);
+    try {
+      const redirectUris = splitDelimited(formData.get("redirect_uris"));
+      if (clientType(client) !== "M2M" && redirectUris.length === 0) {
+        setEditError("At least one redirect URI is required");
+        return false;
+      }
+      const updated = await actions.updateClient(client.client_id, {
+        client_name: String(formData.get("client_name") ?? "").trim(),
+        scope: scopeString(formData.get("scope")),
+        redirect_uris: redirectUris,
+        post_logout_redirect_uris: splitDelimited(formData.get("post_logout_redirect_uris")),
+        client_uri: optionalString(formData.get("client_uri")),
+        logo_uri: optionalString(formData.get("logo_uri")),
+        tos_uri: optionalString(formData.get("tos_uri")),
+        policy_uri: optionalString(formData.get("policy_uri")),
+        contacts: splitDelimited(formData.get("contacts")),
+      });
+      await mutate((current) => (current ?? []).map((item) => item.client_id === updated.client_id ? updated : item), { revalidate: false });
+      setEditOpen(false);
+      toast.success("Application updated");
+      return true;
+    } catch (err: unknown) {
+      setEditError(err instanceof Error ? err.message : "Failed to update application");
+      return false;
+    }
+  }
+
+  async function handleRotate() {
+    if (!client) return false;
+    setRotateError(undefined);
+    try {
+      const { client_secret } = await actions.rotateClientSecret(client.client_id);
+      setRotateOpen(false);
+      setRevealSecret(client_secret);
+      toast.success("Secret rotated", "The previous secret is now invalid. Update your app config.");
+      return true;
+    } catch (err: unknown) {
+      setRotateError(err instanceof Error ? err.message : "Failed to rotate secret");
+      return false;
+    }
+  }
+
+  async function handleDelete() {
+    if (!client) return false;
+    setDeleteError(undefined);
+    try {
+      await actions.deleteClient(client.client_id);
+      await mutate((current) => (current ?? []).filter((item) => item.client_id !== client.client_id), { revalidate: false });
+      await globalMutate(isM2mBindingsKey, undefined, { revalidate: false });
+      setDeleteOpen(false);
+      toast.success("Application deleted", `${client.client_name} and its tokens were revoked.`);
+      onDeleted?.();
+      return true;
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete application");
+      return false;
+    }
+  }
 
   if (showLoading) {
     return (
@@ -301,8 +476,100 @@ export function ApplicationDetailContent({
 
   return (
     <Stack gap="md">
-      <Header client={client} clientId={clientId} activeTab={activeTab} />
+      <Header
+        client={client}
+        clientId={clientId}
+        activeTab={activeTab}
+        onEdit={() => setEditOpen(true)}
+        onRotate={() => { setRotateError(undefined); setRotateOpen(true); }}
+        onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
+      />
       {renderTab(activeTab, client, actions)}
+      <ConfirmDialog
+        open={editOpen}
+        onOpenChange={(o) => { setEditOpen(o); if (!o) setEditError(undefined); }}
+        title="Edit Application"
+        confirmLabel="Save"
+        error={editError}
+        onConfirm={handleEdit}
+      >
+        <Stack gap="sm">
+          <Inline gap="sm" wrap>
+            <Badge tone={typeBadgeTone[clientType(client)]} size="sm">{typeLabel[clientType(client)]}</Badge>
+            <Text variant="caption" mono>{client.client_id}</Text>
+          </Inline>
+          <TextInput label="Name" name="client_name" defaultValue={client.client_name} required />
+          <Tabs
+            ariaLabel="Application settings"
+            size="sm"
+            items={[
+              {
+                id: "access",
+                label: "Access",
+                content: (
+                  <Stack gap="sm">
+                    <Textarea label="Scopes" name="scope" rows={2} defaultValue={client.scope} />
+                    {clientType(client) !== "M2M" ? (
+                      <RedirectUriFields
+                        redirectUris={client.redirect_uris}
+                        postLogoutRedirectUris={client.post_logout_redirect_uris}
+                      />
+                    ) : null}
+                  </Stack>
+                ),
+              },
+              {
+                id: "metadata",
+                label: "Metadata",
+                content: <ClientMetadataFields client={client} />,
+              },
+            ]}
+          />
+        </Stack>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={rotateOpen}
+        onOpenChange={(o) => { setRotateOpen(o); if (!o) setRotateError(undefined); }}
+        title="Rotate Client Secret"
+        description={`This invalidates the current secret for ${client.client_name} immediately. Make sure to update your application config.`}
+        confirmLabel="Rotate"
+        variant="danger"
+        error={rotateError}
+        onConfirm={handleRotate}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={(o) => { setDeleteOpen(o); if (!o) setDeleteError(undefined); }}
+        title="Delete Application"
+        description={`Delete ${client.client_name}? This invalidates all tokens issued for this client and breaks every integration using it.`}
+        confirmLabel="Delete Application"
+        variant="danger"
+        error={deleteError}
+        onConfirm={handleDelete}
+      />
+      <ConfirmDialog
+        open={Boolean(revealSecret)}
+        onOpenChange={(o) => { if (!o) setRevealSecret(undefined); }}
+        title="Client Secret"
+        description="Copy this secret now — it is shown only once and cannot be retrieved later."
+        confirmLabel="Done"
+        cancelLabel="Close"
+        onConfirm={() => true}
+      >
+        <CodeBlock
+          label="Secret"
+          value={revealSecret ?? ""}
+          maxHeight="sm"
+          action={
+            <Button size="sm" variant="secondary" iconName="Copy" tooltip="Copy to clipboard" onClick={() => {
+              if (!revealSecret) return;
+              void copyText(revealSecret, "Secret");
+            }}>
+              Copy
+            </Button>
+          }
+        />
+      </ConfirmDialog>
     </Stack>
   );
 }

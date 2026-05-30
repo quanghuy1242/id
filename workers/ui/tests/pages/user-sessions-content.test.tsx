@@ -39,10 +39,10 @@ describe("UserSessionsContent", () => {
     await waitFor(() => expect(screen.getByText("192.168.1.1")).toBeInTheDocument());
   });
 
-  it("shows Impersonation badge for impersonated sessions", async () => {
+  it("shows Impersonated badge for impersonated sessions", async () => {
     const actions = makeActions(mockUsers[0], mockSessions);
     render(<UserSessionsContent userId="user_001" actions={actions} />);
-    await waitFor(() => expect(screen.getByText("Impersonation")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Impersonated")).toBeInTheDocument());
   });
 
   it("shows Revoke button only for non-expired sessions", async () => {

@@ -21,6 +21,12 @@ const rows: Item[] = [
   { id: "c", name: "Gamma", value: 3 },
 ];
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
 describe("DataTable", () => {
   it("renders rows", () => {
     render(<DataTable columns={columns} rows={rows} getRowKey={(r) => r.id} />);
@@ -121,5 +127,59 @@ describe("DataTable", () => {
     ];
     render(<DataTable columns={customColumns} rows={rows} getRowKey={(r) => r.id} />);
     expect(screen.getByText("$2.00")).toBeInTheDocument();
+  });
+
+  it("renders a single action directly", () => {
+    const onOpen = vi.fn<(id: string) => void>();
+    const actionColumns: DataTableColumn<Item>[] = [
+      { key: "name", label: "Name" },
+      {
+        key: "actions",
+        label: "Actions",
+        actions: (row) => [{ id: "open", label: "Open", onAction: () => onOpen(row.id) }],
+      },
+    ];
+    render(<DataTable columns={actionColumns} rows={rows.slice(0, 1)} getRowKey={(r) => r.id} />);
+    expect(screen.queryByRole("button", { name: "Actions" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(onOpen).toHaveBeenCalledWith("a");
+  });
+
+  it("folds multiple actions into a menu", async () => {
+    const onOpen = vi.fn<(id: string) => void>();
+    const onDelete = vi.fn<(id: string) => void>();
+    const actionColumns: DataTableColumn<Item>[] = [
+      { key: "name", label: "Name" },
+      {
+        key: "actions",
+        label: "Actions",
+        actions: (row) => [
+          { id: "open", label: "Open", onAction: () => onOpen(row.id) },
+          { id: "delete", label: "Delete", variant: "danger", onAction: () => onDelete(row.id) },
+        ],
+      },
+    ];
+    render(<DataTable columns={actionColumns} rows={rows.slice(0, 1)} getRowKey={(r) => r.id} />);
+    pressTrigger(screen.getByRole("button", { name: "Actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledWith("a");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger row navigation from action clicks", () => {
+    const onRowClick = vi.fn<(row: Item) => void>();
+    const onOpen = vi.fn<(id: string) => void>();
+    const actionColumns: DataTableColumn<Item>[] = [
+      { key: "name", label: "Name" },
+      {
+        key: "actions",
+        label: "Actions",
+        actions: (row) => [{ id: "open", label: "Open", onAction: () => onOpen(row.id) }],
+      },
+    ];
+    render(<DataTable columns={actionColumns} rows={rows.slice(0, 1)} getRowKey={(r) => r.id} onRowClick={onRowClick} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(onOpen).toHaveBeenCalledWith("a");
+    expect(onRowClick).not.toHaveBeenCalled();
   });
 });

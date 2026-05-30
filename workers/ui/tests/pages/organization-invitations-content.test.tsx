@@ -11,6 +11,12 @@ import type { User } from "@/app/admin/_actions/users";
 
 const userMap = new Map<string, User>(mockUsers.map((u) => [u.id, u]));
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
 function makeActions(invs: Invitation[]) {
   let current = [...invs];
   return {
@@ -55,12 +61,14 @@ describe("OrganizationInvitationsContent", () => {
     expect(screen.getByText("alice@venture.com")).toBeInTheDocument();
   });
 
-  it("shows Resend button for pending invitations only", async () => {
+  it("folds pending invitation actions into menus", async () => {
     const actions = makeActions(mockInvitations);
     render(<OrganizationInvitationsContent orgId="org_001" actions={actions} />);
-    await waitFor(() => screen.getAllByRole("button", { name: /resend/i }));
-    // Only 2 pending invitations in mock data have Resend
-    expect(screen.getAllByRole("button", { name: /resend/i }).length).toBe(2);
+    await waitFor(() => expect(screen.getByText("bob@corp.com")).toBeInTheDocument());
+    expect(screen.getAllByRole("button", { name: "Actions" })).toHaveLength(2);
+    const row = screen.getByText("bob@corp.com").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    expect(await screen.findByRole("menuitem", { name: /resend/i })).toBeInTheDocument();
   });
 
   it("opens cancel dialog and calls cancelInvitation", async () => {

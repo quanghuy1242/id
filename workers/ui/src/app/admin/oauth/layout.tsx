@@ -15,14 +15,26 @@ const tabs = [
   { id: "/admin/oauth/m2m-bindings", href: "/admin/oauth/m2m-bindings", label: "M2M Bindings" },
 ];
 
+const listingTabIds = new Set(tabs.map((tab) => tab.id));
+
+function normalizePathname(pathname: string | null): string {
+  if (!pathname) return "";
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function getListingTabId(pathname: string | null): string | undefined {
+  const normalized = normalizePathname(pathname);
+  return listingTabIds.has(normalized) ? normalized : undefined;
+}
+
 export default function OAuthLayout({ children }: OAuthLayoutProps) {
   const pathname = usePathname();
-  const selectedTab = tabs.find((tab) => pathname === tab.id) ?? (pathname === "/admin/oauth" ? tabs[0] : undefined);
+  const selectedTabId = getListingTabId(pathname);
 
   return (
     <PageBody>
       <Stack gap="md">
-        {selectedTab ? <Tabs ariaLabel="OAuth configuration" items={tabs} selectedKey={selectedTab.id} /> : null}
+        {selectedTabId ? <Tabs ariaLabel="OAuth configuration" items={tabs} selectedKey={selectedTabId} /> : null}
         {children}
       </Stack>
     </PageBody>

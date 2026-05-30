@@ -5,24 +5,29 @@ import { useSWRConfig } from "swr";
 import {
   Badge,
   Button,
+  CodeEditor,
   ConfirmDialog,
   DescriptionList,
   ErrorAlert,
   Inline,
-  LinkButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   Skeleton,
   Tabs,
-  Text,
   TextInput,
   toast,
 } from "@id/ui";
 import {
+  updateOrganization as updateOrganizationAction,
   deleteOrganization as deleteOrganizationAction,
 } from "../../_actions/organizations";
+import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { useOrgDetail } from "./org-detail-context";
 import { isOrgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
+  updateOrganization: updateOrganizationAction,
   deleteOrganization: deleteOrganizationAction,
 };
 
@@ -47,12 +52,52 @@ export function OrgDetailHeaderContent({
   onNavigateToOrgs,
   actions = defaultActions,
 }: OrgDetailHeaderContentProps) {
-  const { orgId, org, isLoading, error, refetch } = useOrgDetail();
+  const { orgId, org, setOrg, isLoading, error, refetch } = useOrgDetail();
   const { mutate: globalMutate } = useSWRConfig();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState<string | undefined>();
+  const [editMetaError, setEditMetaError] = useState<string | undefined>();
+  const [editMetadata, setEditMetadata] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
   const [typedSlug, setTypedSlug] = useState("");
+
+  function openEditDialog() {
+    setEditMetadata(org?.metadata ?? "");
+    setEditOpen(true);
+  }
+
+  async function handleEdit(formData: FormData) {
+    setEditError(undefined);
+    const name = String(formData.get("name") ?? "").trim();
+    const slug = String(formData.get("slug") ?? "").trim();
+    const logo = String(formData.get("logo") ?? "").trim();
+    const metadata = String(formData.get("metadata") ?? "").trim();
+    if (metadata) {
+      try {
+        JSON.parse(metadata);
+      } catch {
+        setEditError("Metadata must be valid JSON");
+        return false;
+      }
+    }
+    try {
+      const updated = await actions.updateOrganization(orgId, {
+        ...(name ? { name } : {}),
+        ...(slug ? { slug } : {}),
+        logo: logo || "",
+        metadata,
+      });
+      setOrg(updated);
+      toast.success("Organization updated");
+      return true;
+    } catch (err: unknown) {
+      setEditError(err instanceof Error ? err.message : "Failed to update organization");
+      return false;
+    }
+  }
 
   async function handleDelete() {
     setDeleteError(undefined);
@@ -75,20 +120,32 @@ export function OrgDetailHeaderContent({
   return (
     <>
       <Inline justify="between">
-        <Inline gap="sm">
-          <LinkButton href="/admin/identity/organizations" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Organizations" tooltip="Back to Organizations" />
-          {org && (
-            <>
-              <Text variant="h1">{org.name}</Text>
-              <Badge tone="neutral">#{org.slug}</Badge>
-            </>
-          )}
-          {error && !org && <Text variant="h1">Organization unavailable</Text>}
-        </Inline>
+        <AdminDetailTitleRow
+          backHref="/admin/identity/organizations"
+          backLabel="Organizations"
+          title={org?.name ?? "Organization unavailable"}
+        >
+          {org ? <Badge tone="neutral">#{org.slug}</Badge> : null}
+        </AdminDetailTitleRow>
         {!error && (
-          <Button variant="danger" disabled={!org} onClick={() => { setTypedSlug(""); setDeleteOpen(true); }}>
-            Delete
-          </Button>
+          <Inline gap="sm" justify="end">
+            <Button variant="secondary" hideOnMobile disabled={!org} onClick={openEditDialog}>
+              Edit Organization
+            </Button>
+            <Button variant="danger" hideOnMobile disabled={!org} onClick={() => { setTypedSlug(""); setDeleteOpen(true); }}>
+              Delete
+            </Button>
+            <MenuTrigger>
+              <Button variant="ghost" size="sm" hideOnDesktop iconName="Ellipsis" ariaLabel="Actions" tooltip="More actions" />
+              <Menu onAction={(key) => {
+                if (key === "edit") openEditDialog();
+                if (key === "delete") { setTypedSlug(""); setDeleteOpen(true); }
+              }}>
+                <MenuItem id="edit" isDisabled={!org}>Edit Organization</MenuItem>
+                <MenuItem id="delete" isDisabled={!org}>Delete</MenuItem>
+              </Menu>
+            </MenuTrigger>
+          </Inline>
         )}
       </Inline>
 
@@ -99,6 +156,33 @@ export function OrgDetailHeaderContent({
         selectedKey={activeTab}
         items={orgTabs(orgId)}
       />
+
+      <ConfirmDialog
+        open={editOpen}
+        onOpenChange={(o) => { setEditOpen(o); if (!o) { setEditError(undefined); setEditMetaError(undefined); setEditMetadata(""); } }}
+        title="Edit Organization"
+        description="Changing the slug can affect organization links and integrations that store it. Metadata must be valid JSON."
+        confirmLabel="Save"
+        error={editError}
+        onConfirm={handleEdit}
+      >
+        <TextInput label="Name" name="name" defaultValue={org?.name ?? ""} required />
+        <TextInput label="Slug" name="slug" defaultValue={org?.slug ?? ""} required />
+        <TextInput label="Logo URL" name="logo" defaultValue={org?.logo ?? ""} />
+        <CodeEditor
+          label="Metadata (JSON)"
+          name="metadata"
+          value={editMetadata}
+          placeholder='{"plan":"enterprise"}'
+          error={editMetaError}
+          onChange={(v) => {
+            setEditMetadata(v);
+            if (!v) { setEditMetaError(undefined); return; }
+            try { JSON.parse(v); setEditMetaError(undefined); }
+            catch { setEditMetaError("Must be valid JSON"); }
+          }}
+        />
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteOpen}

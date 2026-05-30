@@ -11,6 +11,12 @@ import type { User } from "@/app/admin/_actions/users";
 
 const userMap = new Map<string, User>(mockUsers.map((u) => [u.id, u]));
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
 function makeActions(members: Member[]) {
   let current = [...members];
   return {
@@ -62,16 +68,20 @@ describe("OrganizationMembersContent", () => {
     const singleOwner = [mockMembers[0]];
     const actions = makeActions(singleOwner);
     render(<OrganizationMembersContent orgId="org_001" actions={actions} />);
-    await waitFor(() => screen.getAllByRole("button", { name: /remove member/i }));
-    const removeBtn = screen.getByRole("button", { name: /remove member/i });
-    expect(removeBtn).toBeDisabled();
+    await waitFor(() => screen.getByText("John Doe"));
+    const row = screen.getByText("John Doe").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    const removeItem = await screen.findByRole("menuitem", { name: /remove member/i });
+    expect(removeItem).toHaveAttribute("aria-disabled", "true");
   });
 
   it("opens Change Role dialog on icon button click", async () => {
     const actions = makeActions(mockMembers);
     render(<OrganizationMembersContent orgId="org_001" actions={actions} />);
-    await waitFor(() => screen.getAllByRole("button", { name: /change role/i }));
-    fireEvent.click(screen.getAllByRole("button", { name: /change role/i })[0]);
+    await waitFor(() => screen.getByText("John Doe"));
+    const row = screen.getByText("John Doe").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /change role/i }));
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
   });
 

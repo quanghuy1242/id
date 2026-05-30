@@ -7,6 +7,12 @@ import { ApplicationsContent } from "@/app/admin/_components/oauth/applications-
 import { mockClients } from "@/app/admin/_mocks/oauth";
 import type { OAuthClient, CreateClientInput, UpdateClientInput } from "@/app/admin/_actions/oauth";
 
+function pressTrigger(button: HTMLElement) {
+  button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+  button.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+  fireEvent.click(button);
+}
+
 function makeActions(clients: OAuthClient[]) {
   let current = [...clients];
   return {
@@ -82,7 +88,9 @@ describe("ApplicationsContent", () => {
     const actions = makeActions(mockClients);
     render(<ApplicationsContent actions={actions} />);
     await waitFor(() => screen.getByText("Content API"));
-    fireEvent.click(screen.getByRole("button", { name: /delete content api/i }));
+    const row = screen.getByText("Content API").closest("tr")!;
+    pressTrigger(row.querySelector("button[aria-label='Actions']")!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /delete application/i }));

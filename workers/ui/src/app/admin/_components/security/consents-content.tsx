@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
-  Button,
   ConfirmDialog,
   DataTable,
   type DataTableColumn,
@@ -108,9 +107,14 @@ export function ConsentsContent({ loading, error, actions = defaultActions }: Co
     {
       key: "actions",
       label: "Actions",
-      render: (c) => (
-        <Button variant="danger" size="sm" onClick={() => { setRevokeError(undefined); setRevokeTarget(c); }}>Revoke</Button>
-      ),
+      actions: (c) => [
+        {
+          id: "revoke",
+          label: "Revoke",
+          variant: "danger",
+          onAction: () => { setRevokeError(undefined); setRevokeTarget(c); },
+        },
+      ],
     },
   ];
 
