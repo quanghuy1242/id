@@ -54,20 +54,21 @@ export function SessionsTokensContent({ loading, error, actions = defaultActions
 
   return (
     <Stack gap="md">
-      <PageIntro
-        title="Sessions & Tokens"
-        description="Live audit of who is signed in and which OAuth tokens are active across the whole identity provider."
-        info="Browser Sessions are interactive sign-ins (cookies) — revoke one to sign that person out immediately. OAuth Tokens are access and refresh tokens issued to applications; they are listed for visibility and only ever show an 8-character prefix, never the full token. Use this page to spot unexpected activity and cut off compromised sessions."
-      />
       <Tabs
         ariaLabel="Sessions and tokens"
         selectedKey={tab}
         onSelectionChange={(k) => setTab(String(k))}
         items={[
-          { id: "sessions", label: "Browser Sessions", content: <SessionsPanel loading={loading} error={error} actions={actions} /> },
-          { id: "tokens", label: "OAuth Tokens", content: <TokensPanel loading={loading} error={error} actions={actions} /> },
+          { id: "sessions", label: "Browser Sessions" },
+          { id: "tokens", label: "OAuth Tokens" },
         ]}
       />
+      <PageIntro
+        title="Sessions & Tokens"
+        description="Live audit of who is signed in and which OAuth tokens are active across the whole identity provider."
+        info="Browser Sessions are interactive sign-ins (cookies) — revoke one to sign that person out immediately. OAuth Tokens are access and refresh tokens issued to applications; they are listed for visibility and only ever show an 8-character prefix, never the full token. Use this page to spot unexpected activity and cut off compromised sessions."
+      />
+      {tab === "sessions" ? <SessionsPanel loading={loading} error={error} actions={actions} /> : <TokensPanel loading={loading} error={error} actions={actions} />}
     </Stack>
   );
 }
@@ -214,14 +215,14 @@ function TokensPanel({ loading, error, actions }: { loading?: boolean; error?: s
   return (
     <Stack gap="md">
       <Panel>
-        <Inline gap="sm" justify="between" wrap>
-          <SearchInput grow placeholder="Search by client or user…" value={search} onChange={setSearch} />
+        <Inline gap="sm" wrap>
           <FilterDropdown
             label="Type"
             options={[{ value: "access", label: "Access" }, { value: "refresh", label: "Refresh" }]}
             value={type}
             onChange={(v) => { setType(v === "refresh" ? "refresh" : "access"); setOffset(0); }}
           />
+          <SearchInput grow placeholder="Search by client or user…" value={search} onChange={setSearch} />
         </Inline>
       </Panel>
       <Panel padding={hasRows ? "none" : "md"}>{renderContent()}</Panel>

@@ -308,6 +308,12 @@
       "file": "stories/oauth/oauth-config.stories.tsx",
       "rule": "security/hardcoded-secret",
       "reason": "Reviewed: Ladle story fixtures returning fake one-time client secrets (sk-demo-…, sk-rotated-…) from a mocked actions object; no real credentials and never shipped in the worker bundle."
+    },
+    {
+      "tool": "aislop",
+      "file": ".ladle/components.tsx",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Architectural rationale for not writing data-theme to document.documentElement — Ladle's toolbar CSS depends on its own data-theme values."
     }
   ]
 }

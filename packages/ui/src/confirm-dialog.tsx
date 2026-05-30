@@ -12,6 +12,7 @@ import {
 import { Alert } from "./alert";
 import { Button } from "./button";
 import { Form } from "./form";
+import { getActiveThemeName } from "./theme";
 
 type ConfirmDialogProps = {
   readonly open: boolean;
@@ -26,16 +27,6 @@ type ConfirmDialogProps = {
   readonly confirmDisabled?: boolean;
   readonly children?: ReactNode;
 };
-
-function getActiveThemeName(): string {
-  if (typeof document === "undefined") return "lumina-light";
-  return (
-    document.documentElement.getAttribute("data-theme") ||
-    document.body.getAttribute("data-theme") ||
-    document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
-    "lumina-light"
-  );
-}
 
 export function ConfirmDialog({
   open,

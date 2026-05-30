@@ -18,7 +18,7 @@ type BaseTabItem = {
 };
 
 export type PanelTabItem = BaseTabItem & {
-  readonly content: ReactNode;
+  readonly content?: ReactNode;
   readonly href?: never;
 };
 
@@ -27,7 +27,12 @@ export type LinkTabItem = BaseTabItem & {
   readonly content?: never;
 };
 
-export type TabItem = PanelTabItem | LinkTabItem;
+export type ControlTabItem = BaseTabItem & {
+  readonly content?: never;
+  readonly href?: never;
+};
+
+export type TabItem = PanelTabItem | LinkTabItem | ControlTabItem;
 
 type TabsBaseProps = {
   readonly ariaLabel: string;
@@ -47,7 +52,11 @@ type LinkTabsProps = TabsBaseProps & {
   readonly items: readonly LinkTabItem[];
 };
 
-type TabsProps = PanelTabsProps | LinkTabsProps;
+type ControlTabsProps = TabsBaseProps & {
+  readonly items: readonly ControlTabItem[];
+};
+
+type TabsProps = PanelTabsProps | LinkTabsProps | ControlTabsProps;
 
 const variantClass = {
   border: "tabs-border",
@@ -72,7 +81,7 @@ export function Tabs({
   const sizeClass = size === "sm" ? "tabs-sm" : "";
   const disabled = new Set(disabledKeys ?? items.filter((item) => item.disabled).map((item) => item.id));
   const panelItems = items.filter(isPanelTabItem);
-  const hasPanels = panelItems.length === items.length;
+  const hasPanels = panelItems.length > 0;
 
   return (
     <AriaTabs

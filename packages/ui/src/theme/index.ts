@@ -26,10 +26,11 @@ export function applyTheme(mode: ThemeMode): void {
 
 export function getActiveThemeName(): string {
   if (typeof document === "undefined") return "lumina-light";
-  return (
-    document.documentElement.getAttribute("data-theme") ||
-    document.body.getAttribute("data-theme") ||
-    document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
-    "lumina-light"
-  );
+  const bodyTheme = document.body.getAttribute("data-theme");
+  if (bodyTheme === "lumina-light" || bodyTheme === "lumina-dark") return bodyTheme;
+  const docTheme = document.documentElement.getAttribute("data-theme");
+  if (docTheme === "lumina-light" || docTheme === "lumina-dark") return docTheme;
+  const anyTheme = document.querySelector("[data-theme]")?.getAttribute("data-theme");
+  if (anyTheme === "lumina-light" || anyTheme === "lumina-dark") return anyTheme;
+  return "lumina-light";
 }

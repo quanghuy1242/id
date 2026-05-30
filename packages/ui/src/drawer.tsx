@@ -5,6 +5,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Dialog, Heading as DialogHeading, Modal, ModalOverlay } from "react-aria-components";
 import { Button } from "./button";
+import { getActiveThemeName } from "./theme";
 
 type DrawerProps = {
   readonly open: boolean;
@@ -14,16 +15,6 @@ type DrawerProps = {
   readonly width?: "sm" | "md" | "lg";
   readonly children?: ReactNode;
 };
-
-function getActiveThemeName(): string {
-  if (typeof document === "undefined") return "lumina-light";
-  return (
-    document.documentElement.getAttribute("data-theme") ||
-    document.body.getAttribute("data-theme") ||
-    document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
-    "lumina-light"
-  );
-}
 
 const widthClass: Record<NonNullable<DrawerProps["width"]>, string> = {
   sm: "w-80",

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { ThemeState, type GlobalProvider } from "@ladle/react";
 import globalStylesHref from "../workers/ui/src/app/globals.css?url";
 
@@ -9,10 +9,11 @@ function getThemeName(theme: ThemeState): "lumina-light" | "lumina-dark" {
 export const Provider: GlobalProvider = ({ globalState, children }) => {
   const themeName = getThemeName(globalState.theme);
 
-  // React Aria portals render on <body>, outside the wrapper div.
-  // Setting data-theme on both document roots ensures portals inherit theme tokens.
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", themeName);
+  // Set data-theme only on <body> for portal-rendered overlays (modals, popovers,
+  // tooltips, toasts). Do NOT set on document.documentElement — Ladle's own theme
+  // toggle writes "light"/"dark" there for its toolbar CSS, and our DaisyUI theme
+  // names ("lumina-light"/"lumina-dark") would break Ladle's toolbar styling.
+  useLayoutEffect(() => {
     document.body.setAttribute("data-theme", themeName);
   }, [themeName]);
 
