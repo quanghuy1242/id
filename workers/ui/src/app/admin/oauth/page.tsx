@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { ApplicationsContent } from "../_components/oauth/applications-content";
 
 export default function OAuthPage() {
-  redirect("/admin/oauth/applications");
+  return <ApplicationsContent />;
 }

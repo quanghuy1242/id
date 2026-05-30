@@ -17,7 +17,7 @@ const tabs = [
 
 export default function OAuthLayout({ children }: OAuthLayoutProps) {
   const pathname = usePathname();
-  const selectedTab = tabs.find((tab) => pathname === tab.id || pathname?.startsWith(`${tab.id}/`));
+  const selectedTab = tabs.find((tab) => pathname === tab.id || pathname?.startsWith(`${tab.id}/`)) ?? (pathname === "/admin/oauth" ? tabs[0] : undefined);
 
   return (
     <PageBody>

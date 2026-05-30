@@ -4,6 +4,12 @@ export type ThemeMode = "system" | "light" | "dark";
 
 const storageKey = "lumina-theme";
 
+function systemPrefersDark(): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
 export function getStoredTheme(): ThemeMode {
   if (typeof window === "undefined") return "system";
   const stored = localStorage.getItem(storageKey);
@@ -30,7 +36,5 @@ export function getActiveThemeName(): string {
   if (bodyTheme === "lumina-light" || bodyTheme === "lumina-dark") return bodyTheme;
   const docTheme = document.documentElement.getAttribute("data-theme");
   if (docTheme === "lumina-light" || docTheme === "lumina-dark") return docTheme;
-  const anyTheme = document.querySelector("[data-theme]")?.getAttribute("data-theme");
-  if (anyTheme === "lumina-light" || anyTheme === "lumina-dark") return anyTheme;
-  return "lumina-light";
+  return systemPrefersDark() ? "lumina-dark" : "lumina-light";
 }
