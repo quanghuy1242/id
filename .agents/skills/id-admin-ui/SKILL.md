@@ -301,7 +301,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 | Component | Key props | Notes |
 |---|---|---|
-| `Button` | `variant?: "primary"\|"secondary"\|"danger"\|"ghost"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `circle?`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"`, `tooltip?`, `tooltipPlacement?: "top"\|"bottom"\|"left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). Default position is left. **Set `tooltip` on every icon-only button** — it wraps the button in a hover/focus `Tooltip`. |
+| `Button` | `variant?: "primary"\|"secondary"\|"danger"\|"ghost"`, `size?: "sm"\|"md"`, `type?`, `name?`, `value?`, `disabled?`, `circle?`, `square?`, `attached?: "left"\|"right"`, `onClick?`, `iconName?`, `iconPosition?: "left"\|"right"`, `tooltip?`, `tooltipPlacement?: "top"\|"bottom"\|"left"\|"right"` | React Aria Button styled with DaisyUI. `iconName` accepts a lucide icon name string (e.g. `"Plus"`). Icon uses `size-[1.2em]` (DaisyUI-native). `square` is for joined input controls; `circle` is for standalone round icon buttons. Default position is left. **Set `tooltip` on every icon-only button** — it wraps the button in a hover/focus `Tooltip`. |
 | `LinkButton` | `href`, `variant?`, `size?`, `iconName?`, `ariaLabel?`, `hideOnMobile?` | Navigation, renders Next `Link` with DaisyUI button classes. |
 
 ### Form
@@ -394,6 +394,28 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `MenuTrigger` | `children`, `isOpen?`, `onOpenChange?` | RAC `MenuTrigger` wrapper that splits `children` into trigger + menu slots. Renders `Popover` with `placement="bottom end"` and enter/exit animations. |
 | `Menu` | `children`, `items?`, `renderEmptyState?`, ... | RAC `Menu` styled with DaisyUI `menu menu-sm dropdown-content bg-base-100 rounded-box shadow`. |
 | `MenuItem` | `href?`, `label?`, `badge?`, `onAction?`, ... | RAC `MenuItem` with optional `menu-active` focus highlight. Accepts `badge` prop for a DaisyUI `badge badge-sm` suffix. |
+
+### Enrichment Toolkit (docs/027 §5)
+
+Reusable primitives for the detail-route redesigns. All default to `size="md"` where sized; tests live in `workers/ui/tests/packages-ui/`; stories at `stories/<name>.stories.tsx`.
+
+| Component | Key props | Notes |
+|---|---|---|
+| `StatGroup` | `children`, `columns?: "auto"\|2\|3\|4`, `layout?: "grid"\|"inline"` | Grid of `Stat` cards with divider borders, or compact inline stats when the summary must not fill the row. Summary KPI row at the top of list pages (JWKS, Scopes, Users, Orgs). |
+| `Stat` | `title`, `value: ReactNode`, `description?`, `tone?: "neutral"\|"primary"\|"success"\|"warning"\|"error"\|"info"`, `iconName?`, `meter?: { value, max }` | DaisyUI `stat`. `iconName` renders a `NavIcon` figure; `meter` renders an accessible `progress` (role="meter"). `value` may be a `Skeleton` while loading. |
+| `Switch` | `label`, `name?`, `selected?`, `defaultSelected?`, `onChange?: (v: boolean) => void`, `size?: "sm"\|"md"`, `tone?: "primary"\|"success"`, `disabled?` | DaisyUI `toggle` via `react-aria` `useSwitch` + native input (mirrors `Checkbox`). For boolean enable/disable (scope, resource-server, binding). |
+| `Disclosure` | `title: ReactNode`, `children`, `id?`, `defaultExpanded?`, `expanded?`, `onExpandedChange?`, `icon?: "chevron"\|"plus"`, `disabled?` | RAC `Disclosure` + DaisyUI `collapse` (`collapse-open`/`collapse-close` forced from RAC state). |
+| `DisclosureGroup` | `children`, `allowsMultiple?`, `defaultExpandedKeys?` | Accordion wrapper; child `Disclosure` needs an `id`. |
+| `DescriptionList` | `items: { term, description: ReactNode, mono? }[]`, `columns?: 1\|2\|3`, `dense?` | Semantic `<dl>/<dt>/<dd>`. Replaces the `Grid(two) > caption+body` block in overviews. |
+| `ScopeBuilder` | `label`, `value: string[]`, `onChange`, `suggestions?: { value, description?, group? }[]`, `allowCustom?`, `validate?`, `name?`, `size?` | RAC `Autocomplete` + `TagGroup` + `ListBox` + `useFilter`. Catalog-aware scope entry; chips flag values not in the catalog. Exports `defaultScopeValidate`. Hidden field is space-joined. |
+| `ResourceSelector` | `kind: "user"\|"organization"\|"team"\|"member"`, `selectionMode?: "single"\|"multiple"`, `value: string\|string[]`, `onChange: (next: string\|string[]) => void`, `source: { mode:"async", load } \| { mode:"sync", items }`, `excludeIds?`, `renderOption?`, `placeholder?`, `name?`, `size?` | RAC `Autocomplete` + `ListBox`/`TagGroup` + `useAsyncList` (async, aborts in-flight) or `useFilter` (sync). Returns ids; the missing identity picker (team add-member, etc.). `ResourceOption = { id, label, sublabel?, image?, badge? }`. Hidden field is comma-joined. |
+| `UrlListBuilder` | `label`, `value: string[]`, `onChange`, `validate?`, `placeholder?`, `name?`, `minRows?`, `addLabel?`, `size?: "sm"\|"md"` | One validated row per URL (redirect URIs). Exports `defaultUrlValidate` (https or localhost, no fragment). Hidden field is newline-joined. |
+| `Stepper` | `steps: { id, label, content, isValid? }[]`, `activeStep`, `onStepChange`, `onComplete: () => void\|Promise<void>`, `completeLabel?`, `size?: "sm"\|"md"` | DaisyUI `steps`. Controlled; caller owns form state. Next is gated on `isValid !== false`; completed steps jump back; final step calls `onComplete`. |
+| `Timeline` | `items: { id, icon?, tone?, title: ReactNode, meta?, detail? }[]`, `compact?` | DaisyUI `timeline` (semantic `<ol>`). Renders Audit-tab activity entries. |
+| `JsonViewer` | `value: object\|string`, `label?`, `maxHeight?: "sm"\|"md"\|"lg"`, `action?` | Read-only, in-house JSON highlighter (no external dep, SSR-safe, renders React spans). Exports `highlightJson`. |
+| `CodeEditor` | `value`, `onChange`, `language?: "json"`, `error?`, `label?`, `readOnly?` | Controlled monospace editor (DaisyUI `textarea`). CodeMirror 6 upgrade deferred (docs/027 §14); prop surface is forward-compatible. |
+| `FileDropzone` | `label`, `accept?: string[]`, `onFiles: (files: File[]) => void`, `multiple?`, `maxSizeBytes?`, `hint?` | RAC `DropZone` + `FileTrigger`. Validates type/size; rejection surfaces an inline alert. |
+| `Drawer` | `open`, `onOpenChange`, `title`, `side?: "right"\|"left"`, `width?: "sm"\|"md"\|"lg"`, `children?` | RAC `Modal`/`ModalOverlay` side panel for quick-peek. Prefer a route for durable, deep-linkable detail. |
 
 ## Screen Spec Format
 

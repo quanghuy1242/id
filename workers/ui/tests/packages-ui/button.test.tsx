@@ -152,3 +152,19 @@ describe("Button circle prop", () => {
     expect(button).toHaveClass("btn-circle");
   });
 });
+
+describe("Button square and attached props", () => {
+  it("adds btn-square when square is true", () => {
+    render(<Button iconName="Plus" square ariaLabel="Add" />);
+    const button = screen.getByRole("button", { name: /add/i });
+    expect(button).toHaveClass("btn-square");
+    expect(button).not.toHaveClass("btn-circle");
+  });
+
+  it("removes the left radius when attached on the left side", () => {
+    render(<Button iconName="X" square attached="left" ariaLabel="Remove" />);
+    const button = screen.getByRole("button", { name: /remove/i });
+    expect(button).toHaveClass("rounded-l-none");
+    expect(button).toHaveClass("-ml-px");
+  });
+});

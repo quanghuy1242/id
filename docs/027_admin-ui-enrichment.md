@@ -202,7 +202,7 @@ Each component below is specified to implementation grade: file path, DaisyUI ci
 └──────────────┴──────────────┴──────────────┴──────────────┘
 ```
 
-- Props: `StatGroup`: `children`, `columns?: "auto" | 2 | 3 | 4`. `Stat`: `title`, `value: ReactNode`, `description?`, `tone?: "neutral" | "primary" | "success" | "warning" | "error" | "info"`, `iconName?: string` (NavIcon in `stat-figure`), `meter?: { value: number; max: number }`.
+- Props: `StatGroup`: `children`, `columns?: "auto" | 2 | 3 | 4`, `layout?: "grid" | "inline"` for compact non-full-width summaries. `Stat`: `title`, `value: ReactNode`, `description?`, `tone?: "neutral" | "primary" | "success" | "warning" | "error" | "info"`, `iconName?: string` (NavIcon in `stat-figure`), `meter?: { value: number; max: number }`.
 - States: numeric value; `value` may be a `Skeleton` while loading.
 - Tests: title/value/description render; tone class on value; columns class; meter renders when passed.
 
@@ -290,7 +290,7 @@ Redirect URIs
   ⚠ Row 3: must be https or localhost and contain no fragment
 ```
 
-- Props: `label`, `value: string[]`, `onChange`, `validate?` (default: absolute URL, `https` or `localhost`, no `#fragment`), `placeholder?`, `name?` (hidden newline-joined), `minRows?`, `addLabel?`.
+- Props: `label`, `value: string[]`, `onChange`, `validate?` (default: absolute URL, `https` or `localhost`, no `#fragment`), `placeholder?`, `name?` (hidden newline-joined), `minRows?`, `addLabel?`, `size?: "sm" | "md"`.
 - States: single empty row / multiple / per-row invalid / at `minRows`. Tests: add/remove; per-row validation; default validator accepts https + localhost, rejects fragment/non-absolute; serialization.
 
 ### 5.8 Stepper / Wizard
@@ -303,7 +303,7 @@ Type      Auth      URIs      Scopes    Review
 ▲ done     ▲ done     ● active   ○         ○
 ```
 
-- Props: `steps: { id; label; content: ReactNode; isValid?: boolean }[]`, `activeStep`, `onStepChange`, `onComplete: () => void | Promise<void>`, `completeLabel?`. Next disabled when active step `isValid === false`; completed-step indicator click jumps back; final step calls `onComplete`. Form field state is owned by the caller (controlled).
+- Props: `steps: { id; label; content: ReactNode; isValid?: boolean }[]`, `activeStep`, `onStepChange`, `onComplete: () => void | Promise<void>`, `completeLabel?`, `size?: "sm" | "md"`. Next disabled when active step `isValid === false`; completed-step indicator click jumps back; final step calls `onComplete`. Form field state is owned by the caller (controlled).
 - States: first / middle / final / step-invalid / submitting. Tests: Next/Back; `isValid` gates forward; jump-back; `onComplete`; indicator classes.
 
 ### 5.9 Timeline

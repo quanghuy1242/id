@@ -52,6 +52,22 @@
   from { opacity: 1; transform: scale(1) translateY(0); }
   to { opacity: 0; transform: scale(0.95) translateY(8px); }
 }
+@keyframes drawer-right-in {
+  from { opacity: 0.92; transform: translateX(100%) scaleX(0.985); }
+  to { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+@keyframes drawer-right-out {
+  from { opacity: 1; transform: translateX(0) scaleX(1); }
+  to { opacity: 0.92; transform: translateX(100%) scaleX(0.985); }
+}
+@keyframes drawer-left-in {
+  from { opacity: 0.92; transform: translateX(-100%) scaleX(0.985); }
+  to { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+@keyframes drawer-left-out {
+  from { opacity: 1; transform: translateX(0) scaleX(1); }
+  to { opacity: 0.92; transform: translateX(-100%) scaleX(0.985); }
+}
 @keyframes popover-in {
   from { opacity: 0; transform: scale(0.98) translateY(-4px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
@@ -70,6 +86,10 @@
   --animate-modal-overlay-out: modal-overlay-out 150ms ease-in both;
   --animate-modal-panel-in: modal-panel-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-modal-panel-out: modal-panel-out 150ms ease-in both;
+  --animate-drawer-right-in: drawer-right-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-drawer-right-out: drawer-right-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  --animate-drawer-left-in: drawer-left-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-drawer-left-out: drawer-left-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
   --animate-popover-in: popover-in 140ms ease-out both;
   --animate-popover-out: popover-out 100ms ease-in both;
 }

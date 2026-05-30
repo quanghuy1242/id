@@ -9,6 +9,7 @@ import { Tooltip } from "./tooltip";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 type ButtonSize = "sm" | "md";
+type ButtonAttachedSide = "left" | "right";
 type TooltipPlacement = "top" | "bottom" | "left" | "right";
 
 type ButtonProps = {
@@ -19,6 +20,8 @@ type ButtonProps = {
   readonly value?: string;
   readonly disabled?: boolean;
   readonly circle?: boolean;
+  readonly square?: boolean;
+  readonly attached?: ButtonAttachedSide;
   readonly children?: ReactNode;
   readonly ariaLabel?: string;
   readonly onClick?: () => void;
@@ -31,7 +34,15 @@ type ButtonProps = {
   readonly tooltipPlacement?: TooltipPlacement;
 };
 
-function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean, hideOnDesktop?: boolean, hideOnMobile?: boolean): string {
+function buttonClass(
+  variant: ButtonVariant,
+  size: ButtonSize,
+  circle?: boolean,
+  square?: boolean,
+  attached?: ButtonAttachedSide,
+  hideOnDesktop?: boolean,
+  hideOnMobile?: boolean,
+): string {
   const variantClass = {
     primary: "btn-primary",
     secondary: "btn-outline",
@@ -42,10 +53,11 @@ function buttonClass(variant: ButtonVariant, size: ButtonSize, circle?: boolean,
     sm: "btn-sm",
     md: "",
   }[size];
-  const shapeClass = circle ? " btn-circle" : "";
+  const shapeClass = circle ? "btn-circle" : square ? "btn-square" : "";
+  const attachedClass = attached === "left" ? "rounded-l-none -ml-px" : attached === "right" ? "rounded-r-none -mr-px" : "";
   const hideClass = [hideOnDesktop ? "lg:hidden" : "", hideOnMobile ? "hidden lg:inline-flex" : ""].filter(Boolean).join(" ");
 
-  return `btn ${sizeClass} ${variantClass}${shapeClass} ${hideClass}`.trim();
+  return ["btn", sizeClass, variantClass, shapeClass, attachedClass, hideClass].filter(Boolean).join(" ");
 }
 
 export function Button({
@@ -56,6 +68,8 @@ export function Button({
   value,
   disabled,
   circle,
+  square,
+  attached,
   children,
   ariaLabel,
   onClick,
@@ -76,7 +90,7 @@ export function Button({
       isDisabled={disabled}
       onPress={onClick}
       aria-label={ariaLabel}
-      className={buttonClass(variant, size, circle, hideOnDesktop, hideOnMobile)}
+      className={buttonClass(variant, size, circle, square, attached, hideOnDesktop, hideOnMobile)}
     >
       {iconPosition === "left" && icon}
       {children}
@@ -110,7 +124,7 @@ export function LinkButton({ href, variant = "primary", size = "md", children, h
   const icon = iconName ? <NavIcon name={iconName} variant="dock" /> : null;
 
   return (
-    <Link href={href} className={buttonClass(variant, size, false, false, hideOnMobile)} aria-label={ariaLabel} title={tooltip}>
+    <Link href={href} className={buttonClass(variant, size, false, false, undefined, false, hideOnMobile)} aria-label={ariaLabel} title={tooltip}>
       {icon}
       {children}
     </Link>
