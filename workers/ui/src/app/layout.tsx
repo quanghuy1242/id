@@ -1,42 +1,21 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { ThemeInit } from "./_components/theme-init";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "id admin",
 };
 
-export default function RootLayout({ children }: { readonly children: ReactNode }) {
+export default async function RootLayout({ children }: { readonly children: ReactNode }) {
+  const cookieStore = await cookies();
+  const themePref = cookieStore.get("lumina-theme")?.value;
+  const dataTheme =
+    themePref === "light" ? "lumina-light" : themePref === "dark" ? "lumina-dark" : undefined;
+
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: [
-              "(function () {",
-              "  try {",
-              "    var t = localStorage.getItem('lumina-theme');",
-              "    if (t === 'dark') {",
-              "      document.documentElement.setAttribute('data-theme', 'lumina-dark');",
-              "      document.body.setAttribute('data-theme', 'lumina-dark');",
-              "    } else if (t === 'light') {",
-              "      document.documentElement.setAttribute('data-theme', 'lumina-light');",
-              "      document.body.setAttribute('data-theme', 'lumina-light');",
-              "    } else {",
-              "      document.documentElement.removeAttribute('data-theme');",
-              "      document.body.removeAttribute('data-theme');",
-              "    }",
-              "  } catch (e) {}",
-              "})();",
-            ].join("\n"),
-          }}
-        />
-      </head>
-      <body>
-        <ThemeInit />
-        {children}
-      </body>
+    <html lang="en" suppressHydrationWarning {...(dataTheme ? { "data-theme": dataTheme } : {})}>
+      <body>{children}</body>
     </html>
   );
 }

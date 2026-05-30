@@ -22,10 +22,12 @@ export function applyTheme(mode: ThemeMode): void {
   if (mode === "system") {
     document.documentElement.removeAttribute("data-theme");
     document.body.removeAttribute("data-theme");
+    document.cookie = `${storageKey}=; path=/; max-age=0; SameSite=Lax`;
   } else {
     const value = mode === "light" ? "lumina-light" : "lumina-dark";
     document.documentElement.setAttribute("data-theme", value);
     document.body.setAttribute("data-theme", value);
+    document.cookie = `${storageKey}=${mode}; path=/; max-age=31536000; SameSite=Lax`;
   }
   localStorage.setItem(storageKey, mode);
 }
