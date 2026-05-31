@@ -670,6 +670,8 @@ Response:
 
 Authorization: session required; revoke only current-user consent rows. If consent is not resource-specific in the current Better Auth model, document that the request revokes the whole client/user consent.
 
+> Review note (2026-05-31): the `clientId + resource` request shape and the `oauthConsent.userId`/`resources` fields above are an assumption about Better Auth's consent schema, not a verified fact. Before settling this contract, inspect the installed `@better-auth/oauth-provider` consent model (schema and stored columns) and confirm whether consent is keyed per-resource or only per-client/user. If it is per-client/user only, drop `resource` from the request and make the UI copy say the whole app is disconnected. Recheck on any Better Auth upgrade. Keep the standards boundary explicit in the UI: this is consent-record management, not RFC 7009 token revocation, so existing access tokens may remain valid until expiry.
+
 #### `GET /api/auth/account/organizations`
 
 Purpose: current user's membership map and tenant navigation.
@@ -774,6 +776,8 @@ Implementation options:
 - Rename conceptually to `idSignInContextGuard` only when code churn is acceptable.
 
 The important behavior is not the file name. It is that context-less login remains closed while `/account` is a valid first-party login target.
+
+> Review note (2026-05-31): this change touches the one guard that enforces admin step-up (the OTP fix from docs/024), so the existing admin-OTP test suite is the rollback safety net and must stay green through every step of this phase. One interaction is under-specified above: `guardLogin` in `workers/ui/src/proxy.ts` currently redirects an already-signed-in admin off `/login` to the admin target. Once direct `/login` defaults to `/account` (Decision 5), a signed-in admin hitting bare `/login` must land somewhere coherent — add an explicit test for the signed-in-admin-on-bare-`/login` case so the account default and the admin skip do not produce surprising redirects. Also re-verify, against installed types, that `safeAdminCallbackURL`/`loginPayload` still reject absolute and non-`/account`/non-`/admin` local paths after generalization; the safe-callback allowlist widening is the easiest place to accidentally introduce an open-redirect.
 
 ### 9.2 Forgot Password
 

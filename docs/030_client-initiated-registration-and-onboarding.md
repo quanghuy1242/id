@@ -413,6 +413,8 @@ Strict quota needs atomic reservation. If Better Auth adapter APIs cannot expres
 
 Do not hand-write migrations, triggers, or snapshots for quota enforcement. Any tables still come from Better Auth plugin schema and `pnpm db:generate`.
 
+> Review note (2026-05-31): a plugin-owned D1 helper performing an atomic conditional reservation is a raw-SQL exception to the repo custom-table rule. It is defensible only as the documented "narrow auth-plugin exception" pattern already set by `workers/core/src/auth/plugins/resource-server/audiences.ts` (the approved D1 fallback), and it still requires explicit architecture-plan approval before it lands — it is exactly the "repository-specific mechanism allowed only when the precise unmet requirement is documented" case from the architecture rules. Recommendation: ship the soft-quota path first (adapter count + insert, documented best-effort under concurrency) and defer strict atomic reservation to its own approved change with its own concurrency tests, rather than bundling raw-SQL atomicity into the first release. Oversubscription on a beta/campaign cap is a low-severity failure; an unreviewed raw-SQL surface inside the auth boundary is not.
+
 ### 7.4 Invitation Relationship
 
 Existing organization invitations should remain the membership source of truth for invite flows. `idRegistration` should not create a parallel invitation table for organization membership.
@@ -662,6 +664,8 @@ Recommended implementation if Better Auth hook ordering proves viable:
 This preserves Better Auth as the account-creation runtime while keeping direct public signup blocked.
 
 If proof tests show Better Auth cannot be safely guarded this way, use a custom plugin endpoint only after documenting how it creates a password account without duplicating or bypassing Better Auth internals. That fallback is riskier and should not be the first choice.
+
+> Review note (2026-05-31, hard gate): this is the single highest-risk change in the registration program. Setting `disableSignUp: false` trades a hard library-level closure (today proven by `workers/core/tests/auth/auth-core.test.ts` asserting `400` on `POST /sign-up/email`) for a soft, hook-dependent closure. Any path, ordering bug, or later refactor where the `hooks.before` guard does not run reopens fully public signup. The Phase-0 spike must therefore prove three things, not two: (1) a valid intent permits one guarded signup; (2) hook ordering relative to Better Auth's own `disableSignUp`/sign-up short-circuit — confirm whether `before` hooks run before or after the built-in disable check, because if the built-in check short-circuits first the guard is moot; (3) intent-less direct `POST /sign-up/email` still returns `400` after the flag flips. Do not delete the existing 400 assertion. Invert and keep it: it must continue to fail closed for any request without a valid intent, and that test is the merge gate for this section. If the spike cannot prove (2) deterministically, prefer the custom-endpoint fallback over flipping the flag.
 
 ### 9.4 OAuth Continue Contract
 
@@ -927,7 +931,7 @@ Implementation checks:
 Focused tests:
 
 - Better Auth contract test proves `signup.page` type and `/oauth2/continue` expectation from installed package.
-- Direct `/sign-up/email` without intent fails.
+- Direct `/sign-up/email` without intent fails. This is the inverted-and-kept regression of the current `auth-core.test.ts` 400 assertion and is a hard merge gate per the §9.3 review note: it must keep failing closed after `disableSignUp` flips to `false`.
 - Guarded `/sign-up/email` with valid intent succeeds.
 - Guarded signup cannot reuse intent.
 - `prompt=create` redirects to `/register`.

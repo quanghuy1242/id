@@ -572,6 +572,8 @@ That means org-scoped OAuth client create/list/update/delete cannot be fully URL
 
 This bridge must be documented in code comments at the action wrapper and tested with cross-tab-like sequencing: switching active org for one call must not let cached data from another org render under the wrong route. If Better Auth later supports explicit reference-id management endpoints, replace the bridge instead of patching Better Auth internals.
 
+> Review note (2026-05-31): this is the architectural soft spot of the whole tenant-scoped console. `clientReference` resolving ownership from `session.activeOrganizationId` is confirmed in `workers/core/src/auth/oauth-provider.ts`, so OAuth-client CRUD cannot be fully URL-owned in v1 and the bridge mutates server session state as a per-action side effect. Two constraints make this acceptable rather than a future foot-gun: (1) confine the active-org mutation strictly to OAuth-client actions — resource-server, scope-catalog, and M2M-binding CRUD must take an explicit `organizationId` parameter and must never depend on session active-org (see §8.5); (2) treat the cross-tab isolation test (active org switched for one call must not surface another org's cached rows under the wrong route) as a hard merge gate, not an optional case. If either constraint cannot hold, do not ship URL-owned OAuth-client management in this phase — keep it platform-only until Better Auth exposes an explicit reference-id argument. Re-verify the `clientReference` shape on every Better Auth upgrade, because this bridge silently breaks if the session field is renamed or removed.
+
 ### 8.5 Typed UI Action Changes
 
 Every admin action should accept a context object or explicit organization id:
@@ -620,6 +622,8 @@ Recommended endpoint placement:
 | dashboard aggregate | Hono `/api/admin/dashboard` if already allowlisted | Cross-domain aggregate exception. Add context-aware variants only if needed. |
 
 Do not add standalone Drizzle tables for delegated admin. If future partial-admin state is needed, add a Better Auth plugin schema and run `pnpm db:generate`.
+
+> Review note (2026-05-31): the "dashboard aggregate -> Hono `/api/admin/dashboard` if already allowlisted" row assumes that route and its architecture-lint allowlist entry exist. Confirm both before relying on them at implementation time; if the route is not actually allowlisted, adding it is itself a gated change (it is a Hono `/api/admin/*` cross-domain exception, not a default-allowed surface). Do not assume the allowlist from this table.
 
 ### 8.7 Audit Model
 
