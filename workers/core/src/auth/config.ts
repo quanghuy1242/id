@@ -46,6 +46,9 @@ export const OAUTH_CONTEXT_SELECTION_TTL_SECONDS = 300;
 /** Admin login one-time-passcode lifetime, in seconds. */
 export const ADMIN_OTP_TTL_SECONDS = 300;
 
+/** Freshness window for a completed platform-console step-up, in seconds. */
+export const ADMIN_STEP_UP_TTL_SECONDS = 900;
+
 /** Maximum admin-login OTP emails per generation window. */
 export const ADMIN_OTP_GENERATE_MAX_ATTEMPTS = 3;
 
@@ -105,6 +108,7 @@ export type AuthPluginConfig = {
   readonly adminOtpStoragePrefix: string;
   readonly adminOtpGenerateAttemptsPrefix: string;
   readonly adminOtpVerifyAttemptsPrefix: string;
+  readonly adminStepUpStoragePrefix: string;
   readonly jwksPath: string;
   readonly jwksRotationIntervalSeconds: number;
   readonly jwksGracePeriodSeconds: number;
@@ -162,6 +166,7 @@ export const authPluginConfig = {
   adminOtpStoragePrefix: "id-admin-otp:code:",
   adminOtpGenerateAttemptsPrefix: "id-admin-otp:generate:",
   adminOtpVerifyAttemptsPrefix: "id-admin-otp:verify:",
+  adminStepUpStoragePrefix: "id-admin-step-up:session:",
   jwksPath: "/jwks",
   jwksRotationIntervalSeconds: JWKS_ROTATION_INTERVAL_SECONDS,
   jwksGracePeriodSeconds: JWKS_GRACE_PERIOD_SECONDS,

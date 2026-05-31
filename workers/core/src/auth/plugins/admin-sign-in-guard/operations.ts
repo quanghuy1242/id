@@ -12,9 +12,23 @@ import {
 } from "../../config";
 import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
 
-/** True when a sign-in `callbackURL` targets the admin surface. */
-export function isAdminCallback(callbackURL: string | undefined): callbackURL is string {
-  return typeof callbackURL === "string" && (callbackURL === "/admin" || callbackURL.startsWith("/admin/"));
+function isLocalPath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//");
+}
+
+function hasAllowedCallbackPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/account" || pathname.startsWith("/account/");
+}
+
+/** True when a sign-in `callbackURL` targets a first-party app shell. */
+export function isFirstPartyAppCallback(callbackURL: string | undefined): callbackURL is string {
+  if (typeof callbackURL !== "string" || !isLocalPath(callbackURL)) return false;
+  try {
+    const url = new URL(callbackURL, "https://id.local");
+    return url.origin === "https://id.local" && hasAllowedCallbackPath(url.pathname);
+  } catch {
+    return false;
+  }
 }
 
 /** Generates a 6-digit code using a CSPRNG. */
@@ -54,6 +68,16 @@ export function maskEmail(email: string): string {
 
 export function otpCodeKey(userId: string): string {
   return `${authPluginConfig.adminOtpStoragePrefix}${userId}`;
+}
+
+/** Session-bound key proving a recent platform-console step-up. */
+export function stepUpSessionKey(secret: string, sessionToken: string): string {
+  const digest = createHmac("sha256", secret)
+    .update("admin-step-up-session:v1")
+    .update("\0")
+    .update(sessionToken)
+    .digest("hex");
+  return `${authPluginConfig.adminStepUpStoragePrefix}${digest}`;
 }
 
 /** Same status and timing posture as the stock `signInEmail` credential errors. */

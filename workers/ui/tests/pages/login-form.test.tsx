@@ -67,7 +67,7 @@ describe("LoginForm", () => {
     });
   });
 
-  it("submits the form with valid credentials and defaults the admin callbackURL", async () => {
+  it("submits the form with valid credentials and defaults the account callbackURL", async () => {
     mockAuthApiPost.mockResolvedValue({});
 
     render(<LoginForm />);
@@ -80,7 +80,7 @@ describe("LoginForm", () => {
         email: "test@example.com",
         password: "password12345",
         oauth_query: "",
-        callbackURL: "/admin",
+        callbackURL: "/account",
       });
     });
   });
@@ -178,7 +178,27 @@ describe("LoginForm", () => {
     });
   });
 
-  it("drops unsafe callback URLs and falls back to the default admin callbackURL", async () => {
+  it("passes a safe account callback URL to Better Auth sign-in", async () => {
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/account/security" });
+    window.history.replaceState({}, "", "/login?callbackURL=%2Faccount%2Fsecurity");
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
+        email: "user@example.com",
+        password: "password12345",
+        oauth_query: "",
+        callbackURL: "/account/security",
+      });
+    });
+  });
+
+
+  it("drops unsafe callback URLs and falls back to the default account callbackURL", async () => {
     mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/" });
     window.history.replaceState({}, "", "/login?callbackURL=https%3A%2F%2Fevil.example%2Fadmin");
 
@@ -192,7 +212,7 @@ describe("LoginForm", () => {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
-        callbackURL: "/admin",
+        callbackURL: "/account",
       });
     });
   });
@@ -242,7 +262,7 @@ describe("LoginForm", () => {
         email: "admin@example.com",
         password: "password12345",
         oauth_query: "",
-        callbackURL: "/admin",
+        callbackURL: "/account",
         otp: "123456",
       });
     });
@@ -273,9 +293,35 @@ describe("LoginForm", () => {
         email: "owner@example.com",
         password: "new-password123",
         oauth_query: "",
-        callbackURL: "/admin",
+        callbackURL: "/account",
       });
     });
+  });
+
+  it("runs signed-in platform step-up without credential fields", async () => {
+    mockAuthApiPost
+      .mockResolvedValueOnce({ status: true, maskedEmail: "a***@e***.test" })
+      .mockResolvedValueOnce({ steppedUp: true });
+    window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
+
+    render(<LoginForm />);
+
+    expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/admin/step-up/request", {});
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("We sent a verification code to a***@e***.test");
+    });
+
+    fireEvent.change(screen.getByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+
+    await waitFor(() => {
+      expect(mockAuthApiPost).toHaveBeenLastCalledWith("/admin/step-up/verify", { otp: "123456" });
+    });
+    expect(mockPush).toHaveBeenCalledWith("/admin/platform");
   });
 
   it("shows admin-required redirects as login errors", async () => {

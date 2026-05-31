@@ -324,6 +324,24 @@
       "tool": "fallow",
       "files": "workers/ui/src/app/admin/_components/oauth/application-detail-content.tsx|workers/ui/src/app/admin/_components/security/jwks-detail-content.tsx",
       "reason": "Detail content components intentionally share route-tab loading/error/not-found structure while keeping OAuth application and JWKS data contracts separate."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/account/_components/account-security-content.tsx",
+      "rule": "security/hardcoded-secret",
+      "reason": "False positive: matches 'currentPassword'/'newPassword'/'confirmPassword' form field name literals in the change-password form, not real credentials."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/reset-password/reset-password-form.tsx",
+      "rule": "security/hardcoded-secret",
+      "reason": "False positive: matches 'newPassword' form field name literal in the reset-password form, not a real credential."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/account/_mocks/account.ts",
+      "rule": "code-quality/duplicate-block",
+      "reason": "Mock fixture objects (consents) intentionally share the same record shape by design, like other admin _mocks fixtures; explicit per-record data is required."
     }
   ]
 }

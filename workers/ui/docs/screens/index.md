@@ -7,6 +7,8 @@
 ## Table Of Contents
 
 - [Shell chrome (Topbar / Sidebar / MobileDock)](shell.md) — layout.tsx for all `/admin` routes
+- [Auth flow](auth-flow.md) — hosted `/login`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email` (centered panels, not the admin shell)
+- [Account Center](account.md) — self-service `/account/*` shell (docs/029); distinct from the operator Console
 - [API Gaps](api-gaps.md) — endpoints the admin UI needs but don't exist yet; ordered by priority
 - [Admin Action Contracts](action-contracts.md) — `_actions` request/response contracts and future audit checklist
 - [Access](access.md) — service-account Access lenses and the deferred Admins & Roles placeholder

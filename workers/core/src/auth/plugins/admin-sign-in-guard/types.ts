@@ -15,6 +15,8 @@ export interface AdminSignInGuardOptions {
   readonly kv: BetterAuthKvStorage;
   /** Secret used to HMAC low-entropy OTP codes before storing them in KV. */
   readonly otpHmacSecret: string;
+  /** Returns true when the user role can enter the platform console scope. */
+  readonly isPlatformAdmin?: (role: unknown) => boolean;
 }
 
 /**

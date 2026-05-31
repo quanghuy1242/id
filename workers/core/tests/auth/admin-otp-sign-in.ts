@@ -24,21 +24,18 @@ export function latestAdminOtp(sender: CapturedAuthEmailSender): string {
 }
 
 /**
- * Completes the admin-login email-OTP flow against `auth` (doc 024): submit
- * credentials with `callbackURL: "/admin"`, read the captured OTP, then resubmit
- * with the code. Returns the final sign-in `Response` (200 with a session cookie
- * on success). `auth` must have been built with the captured `sender` so the OTP
- * email is observable.
+ * Signs in with an admin callback. The historical helper name is kept so the
+ * existing auth tests do not churn while admin OTP moves from login to
+ * platform-scope step-up.
  */
 export async function adminOtpSignIn(
   auth: AuthHandler,
-  sender: CapturedAuthEmailSender,
+  _sender: CapturedAuthEmailSender,
   creds: { readonly email: string; readonly password: string },
   options: { readonly headers?: Record<string, string>; readonly origin?: string } = {},
 ): Promise<Response> {
   const base = { email: creds.email, password: creds.password, callbackURL: "/admin" };
-  const first = await auth.handler(signInRequest(base, options.headers, options.origin));
-  expect(first.status).toBe(401);
-  const otp = latestAdminOtp(sender);
-  return auth.handler(signInRequest({ ...base, otp }, options.headers, options.origin));
+  const response = await auth.handler(signInRequest(base, options.headers, options.origin));
+  expect(response.status).toBe(200);
+  return response;
 }

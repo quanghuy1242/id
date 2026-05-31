@@ -15,6 +15,7 @@ import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { idAdminAudit } from "./plugins/admin-audit";
 import { idAdminActivityLog } from "./plugins/admin-activity-log";
 import { idConsoleScopes } from "./plugins/console-scopes";
+import { idAccountCenter } from "./plugins/account-center";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -132,6 +133,7 @@ export function getAuthOptions(
           sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
         kv: env.KV,
         otpHmacSecret: env.BETTER_AUTH_SECRET,
+        isPlatformAdmin,
       }),
       createOAuthProviderPlugin(env, catalog, runtime, isPlatformAdmin),
       idResourceServer({
@@ -159,6 +161,9 @@ export function getAuthOptions(
         authorize: (role) => isPlatformAdmin(role),
       }),
       idConsoleScopes({
+        isPlatformAdmin,
+      }),
+      idAccountCenter({
         isPlatformAdmin,
       }),
       idScimDirectory({

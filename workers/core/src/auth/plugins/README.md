@@ -19,6 +19,7 @@ Every custom plugin lives fully inside the `auth/` boundary: BA schema + `create
 | `id-scim-directory` | `scim-directory/` | Read-only SCIM v2 directory (RFC 7644) for users, org users, teams/groups, and virtual org-admin group — doc 017 A3 |
 | `id-admin-activity-log` | `admin-activity-log/` | Append-only admin mutation history for entity Audit tabs, with recursive secret stripping |
 | `id-console-scopes` | `console-scopes/` | Current-session platform/org console scope discovery for the scope selector and `/admin` entry gate |
+| `id-account-center` | `account-center/` | Current-user Account Center projections for sessions, consents, organizations, and account summary |
 
 ## File structure
 

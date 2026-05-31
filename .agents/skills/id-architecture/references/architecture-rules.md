@@ -75,7 +75,7 @@ Auth adapter rule:
 `workers/ui` contains admin presentation:
 
 - Vinext/App Router route files
-- public App Router routes only under `/admin/**`, `/login`, `/consent`, `/select-authorization-context`, and `/ui-health`
+- public App Router routes only under `/admin/**`, `/account/**`, `/login`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email`, and `/ui-health`
 - direct browser calls to same-origin core `/api/auth/*` endpoints for hosted auth pages
 - `/admin/api` reserved for future UI-owned BFF endpoints, not for catch-all core proxying
 - no Better Auth, Drizzle, Jose, D1/KV binding types, or imports from `workers/core`

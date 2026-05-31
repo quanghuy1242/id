@@ -1,6 +1,9 @@
 /** BA model name for the user table. */
 export const USER_MODEL = "user" as const;
 
+/** BA model name for credential/social account rows. */
+export const ACCOUNT_MODEL = "account" as const;
+
 /** BA model name for the member (organization membership) table. */
 export const MEMBER_MODEL = "member" as const;
 
@@ -9,6 +12,9 @@ export const ORGANIZATION_MODEL = "organization" as const;
 
 /** BA model name for the team table. */
 export const TEAM_MODEL = "team" as const;
+
+/** BA model name for team membership rows. */
+export const TEAM_MEMBER_MODEL = "teamMember" as const;
 
 /** BA model name for the JWKS table. */
 export const JWKS_MODEL = "jwks" as const;

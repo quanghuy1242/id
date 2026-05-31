@@ -5,7 +5,7 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 This repo implements the first-batch documented scope:
 
 - `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), console scope discovery (`GET /api/auth/admin/console-scopes`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
-- `ui-id` Worker — scoped admin UI under `/admin/*` with canonical platform (`/admin/platform/**`) and organization (`/admin/orgs/:orgId/**`) lenses, a console scope selector, identity/application/access/security surfaces, live aggregate sessions/tokens/consents/JWKS backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md), entity Audit tabs backed by `admin-activity-log`, and a standards-based token decoder/introspection console; hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
+- `ui-id` Worker — scoped admin UI under `/admin/*` with canonical platform (`/admin/platform/**`) and organization (`/admin/orgs/:orgId/**`) lenses, a console scope selector, identity/application/access/security surfaces, live aggregate sessions/tokens/consents/JWKS backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md), entity Audit tabs backed by `admin-activity-log`, and a standards-based token decoder/introspection console; a self-service Account shell under `/account/*` (profile, security, sessions, connected apps, organizations — the `myaccount` counterpart to the console per [docs/029](docs/029_account-center-and-self-service-identity.md)); hosted login/consent and recovery pages (`/forgot-password`, `/reset-password`, `/verify-email`), UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
 
 ## Contracts
 
@@ -143,7 +143,7 @@ pnpm dev:ui                      # ui-id Worker (Vinext dev)
 pnpm dev:ladle                   # Ladle component workshop for @id/ui
 ```
 
-In production, route specificity sends `/admin*`, `/login*`, `/consent*`, `/select-authorization-context*`, `/ui-health`, and `/assets/*` to `ui-id`; `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. The wildcard suffix is required on browser page routes because Cloudflare Worker route matching includes query strings. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
+In production, route specificity sends `/admin*`, `/account*`, `/login*`, `/consent*`, `/select-authorization-context*`, `/forgot-password*`, `/reset-password*`, `/verify-email*`, `/ui-health`, and `/assets/*` to `ui-id`; `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. The wildcard suffix is required on browser page routes because Cloudflare Worker route matching includes query strings. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
 
 ## First Admin And API-Only Operation
 

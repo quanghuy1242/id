@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
-import { Alert, Button, Form, HiddenInput, Inline, Stack, TextInput } from "@id/ui";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Alert, Button, Form, HiddenInput, Inline, LinkButton, Stack, Text, TextInput } from "@id/ui";
 import { authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
@@ -31,21 +31,34 @@ function isAdminPath(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-function safeAdminCallbackURL(value: string | null): string {
+function isAccountPath(pathname: string): boolean {
+  return pathname === "/account" || pathname.startsWith("/account/");
+}
+
+function isFirstPartyAppPath(pathname: string): boolean {
+  return isAdminPath(pathname) || isAccountPath(pathname);
+}
+
+function safeFirstPartyCallbackURL(value: string | null): string {
   if (typeof window === "undefined") return "";
   if (!value) return "";
   try {
     const url = new URL(value, window.location.origin);
-    if (url.origin !== window.location.origin || !isAdminPath(url.pathname)) return "";
+    if (url.origin !== window.location.origin || !isFirstPartyAppPath(url.pathname)) return "";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return "";
   }
 }
 
-function currentAdminCallbackURL(): string {
+function currentFirstPartyCallbackURL(): string {
   if (typeof window === "undefined") return "";
-  return safeAdminCallbackURL(new URL(window.location.href).searchParams.get("callbackURL"));
+  return safeFirstPartyCallbackURL(new URL(window.location.href).searchParams.get("callbackURL"));
+}
+
+function isStepUpRequest(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URL(window.location.href).searchParams.get("stepUp") === "platform";
 }
 
 function initialError(): string {
@@ -71,9 +84,9 @@ function loginPayload(data: Record<string, string>): Record<string, string> {
     password: data.password,
     [OAUTH_QUERY_PARAM]: oauthQuery,
   };
-  // Admin logins default to /admin so the handler returns a redirect (and the
-  // server guard sees a valid context). OAuth flows never carry a callbackURL.
-  const callbackURL = oauthQuery ? currentAdminCallbackURL() : (currentAdminCallbackURL() || "/admin");
+  // Direct logins default to Account Center. OAuth flows never carry a
+  // callbackURL; console/account callbacks are allowed only when local.
+  const callbackURL = oauthQuery ? currentFirstPartyCallbackURL() : (currentFirstPartyCallbackURL() || "/account");
   if (callbackURL) payload.callbackURL = callbackURL;
   if (data.otp) payload.otp = data.otp;
   return payload;
@@ -115,6 +128,16 @@ async function submitLogin(data: Record<string, string>): Promise<LoginResult> {
   };
 }
 
+async function requestPlatformStepUp(): Promise<{ readonly maskedEmail?: string }> {
+  const body = await authApiPost<Record<string, unknown>>("/admin/step-up/request", {});
+  return { maskedEmail: body.maskedEmail as string | undefined };
+}
+
+async function verifyPlatformStepUp(otp: string): Promise<boolean> {
+  const body = await authApiPost<Record<string, unknown>>("/admin/step-up/verify", { otp });
+  return body.steppedUp === true;
+}
+
 function validateOtp(value: string): string | undefined {
   return /^\d{6}$/.test(value) ? undefined : "Enter the 6-digit code";
 }
@@ -128,14 +151,40 @@ export function LoginForm() {
   const router = useRouter();
   const oauthQuery = useOauthQuery();
   const pendingCredentials = useRef<PendingCredentials | null>(null);
+  const [stepUpMode] = useState(isStepUpRequest);
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [pendingChallenge, setPendingChallenge] = useState<PendingChallenge | null>(null);
   const [emailDefault, setEmailDefault] = useState("");
-  const submitLabel = pendingChallenge ? "Verify and sign in" : "Sign in";
-  const loadingLabel = pendingChallenge ? "Verifying..." : "Signing in...";
+  const submitLabel = stepUpMode ? "Verify and continue" : pendingChallenge ? "Verify and sign in" : "Sign in";
+  const loadingLabel = stepUpMode ? "Verifying..." : pendingChallenge ? "Verifying..." : "Signing in...";
+
+  useEffect(() => {
+    if (!stepUpMode) return;
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const result = await requestPlatformStepUp();
+        if (cancelled) return;
+        setNotice(
+          result.maskedEmail
+            ? `We sent a verification code to ${result.maskedEmail}. Enter it below to continue.`
+            : "We sent a verification code to your email. Enter it below to continue.",
+        );
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Unable to start platform verification");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stepUpMode]);
 
   const handleUseDifferentEmail = () => {
     const email = pendingCredentials.current?.email ?? pendingChallenge?.email ?? "";
@@ -155,6 +204,28 @@ export function LoginForm() {
 
     const form = event.currentTarget;
     const formData = Object.fromEntries(new FormData(form)) as Record<string, string>;
+
+    if (stepUpMode) {
+      const nextValidationErrors = otpValidationErrorsFor(formData);
+      if (Object.keys(nextValidationErrors).length > 0) {
+        setValidationErrors(nextValidationErrors);
+        return;
+      }
+      setLoading(true);
+      try {
+        if (!(await verifyPlatformStepUp(formData.otp ?? ""))) {
+          setError("Verification failed. Please try again.");
+          return;
+        }
+        router.push(currentFirstPartyCallbackURL() || "/admin/platform");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Verification failed. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const activePendingCredentials = pendingCredentials.current;
     const data = activePendingCredentials
       ? {
@@ -206,7 +277,21 @@ export function LoginForm() {
       <Form onSubmit={handleSubmit} validationErrors={validationErrors}>
         <Stack>
           <HiddenInput name={OAUTH_QUERY_PARAM} value={oauthQuery} />
-          {pendingChallenge ? (
+          {stepUpMode ? (
+            <>
+              <Text variant="caption">
+                Verify this session before opening the platform console.
+              </Text>
+              <TextInput
+                label="Verification code"
+                name="otp"
+                type="text"
+                autoComplete="one-time-code"
+                required
+                validate={validateOtp}
+              />
+            </>
+          ) : pendingChallenge ? (
             <div className="rounded-box border border-base-300 bg-base-200 px-4 py-3">
               <Inline justify="between">
                 <div>
@@ -255,7 +340,17 @@ export function LoginForm() {
               validate={validateOtp}
             />
           )}
-          <Inline justify="end">
+          <Inline justify={stepUpMode ? "between" : "end"}>
+            {stepUpMode && (
+              <LinkButton href="/account" variant="ghost">
+                Back to account
+              </LinkButton>
+            )}
+            {!stepUpMode && !pendingChallenge && (
+              <LinkButton href="/forgot-password" variant="ghost">
+                Forgot password?
+              </LinkButton>
+            )}
             <Button type="submit" disabled={loading}>
               {loading ? loadingLabel : submitLabel}
             </Button>

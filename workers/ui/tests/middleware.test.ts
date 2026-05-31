@@ -68,7 +68,7 @@ describe("admin middleware", () => {
   });
 
   it("matches /admin, nested admin pages, and the login page", () => {
-    expect(config.matcher).toEqual(["/admin", "/admin/:path*", "/login"]);
+    expect(config.matcher).toEqual(["/admin", "/admin/:path*", "/account", "/account/:path*", "/login"]);
   });
 
   it("redirects unauthenticated admin page requests to login with callbackURL", async () => {
@@ -80,6 +80,17 @@ describe("admin middleware", () => {
     expect(response.status).toBe(307);
     expect(location.pathname).toBe("/login");
     expect(location.searchParams.get("callbackURL")).toBe("/admin/identity/users?role=admin");
+  });
+
+  it("redirects unauthenticated account page requests to login with callbackURL", async () => {
+    mockedFetch().mockResolvedValue(Response.json(null));
+
+    const response = await proxy(adminRequest("/account/sessions?filter=active"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackURL")).toBe("/account/sessions?filter=active");
   });
 
   it("forwards the session cookie to the core session endpoint", async () => {
@@ -116,11 +127,27 @@ describe("admin middleware", () => {
   });
 
   it("allows scoped console routes through", async () => {
-    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
+    mockedFetch()
+      .mockResolvedValueOnce(Response.json(platformEnvelope))
+      .mockResolvedValueOnce(Response.json({ steppedUp: true }));
 
     const response = await proxy(adminRequest("/admin/platform", "id-auth.session_token=admin"));
 
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("requires step-up before rendering platform console routes", async () => {
+    mockedFetch()
+      .mockResolvedValueOnce(Response.json(platformEnvelope))
+      .mockResolvedValueOnce(Response.json({ steppedUp: false }));
+
+    const response = await proxy(adminRequest("/admin/platform/identity/users", "id-auth.session_token=admin"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("callbackURL")).toBe("/admin/platform/identity/users");
+    expect(location.searchParams.get("stepUp")).toBe("platform");
   });
 
   it("allows platform admins to enter organization scopes from the scope envelope", async () => {
@@ -216,15 +243,15 @@ describe("admin middleware", () => {
     expect(location.pathname).toBe("/admin/platform/identity/users");
   });
 
-  it("defaults an authenticated admin on /login without a callback to the default scope", async () => {
+  it("defaults an authenticated user on /login without a callback to account", async () => {
     mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(loginRequest("", "id-auth.session_token=admin"));
 
-    expect(new URL(response.headers.get("location") ?? "").pathname).toBe("/admin/platform");
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe("/account");
   });
 
-  it("ignores off-origin or non-admin callbacks when leaving /login", async () => {
+  it("ignores off-origin or non-app callbacks when leaving /login", async () => {
     mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(
@@ -233,7 +260,16 @@ describe("admin middleware", () => {
     const location = new URL(response.headers.get("location") ?? "");
 
     expect(location.origin).toBe("https://id.quanghuy.dev");
-    expect(location.pathname).toBe("/admin/platform");
+    expect(location.pathname).toBe("/account");
+  });
+
+  it("allows signed-in users to view the platform step-up login screen", async () => {
+    const response = await proxy(
+      loginRequest("?callbackURL=%2Fadmin%2Fplatform&stepUp=platform", "id-auth.session_token=admin"),
+    );
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(mockedFetch()).not.toHaveBeenCalled();
   });
 
   it("shows the login form to unauthenticated visitors", async () => {

@@ -1,28 +1,43 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { ConsoleScopeEnvelope } from "@id/lib";
 
-const matcher = ["/admin", "/admin/:path*", "/login"] as const;
+const matcher = ["/admin", "/admin/:path*", "/account", "/account/:path*", "/login"] as const;
 
 // Query params the login page consumes locally. Anything else means the login
 // form is mid-OAuth-authorize and must never be intercepted.
-const localLoginParams = new Set(["callbackURL", "error"]);
+const localLoginParams = new Set(["callbackURL", "error", "stepUp"]);
 
 function isAdminPath(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+function isAccountPath(pathname: string): boolean {
+  return pathname === "/account" || pathname.startsWith("/account/");
+}
+
+function isFirstPartyAppPath(pathname: string): boolean {
+  return isAdminPath(pathname) || isAccountPath(pathname);
 }
 
 function isCanonicalAdminPath(pathname: string): boolean {
   return pathname === "/admin/platform" || pathname.startsWith("/admin/platform/") || pathname.startsWith("/admin/orgs/");
 }
 
-function adminCallbackPath(url: URL): string {
+function callbackPath(url: URL): string {
   return `${url.pathname}${url.search}`;
 }
 
 function loginRedirect(request: NextRequest, error?: string) {
   const url = new URL("/login", request.url);
-  url.searchParams.set("callbackURL", adminCallbackPath(request.nextUrl));
+  url.searchParams.set("callbackURL", callbackPath(request.nextUrl));
   if (error) url.searchParams.set("error", error);
+  return NextResponse.redirect(url);
+}
+
+function stepUpRedirect(request: NextRequest) {
+  const url = new URL("/login", request.url);
+  url.searchParams.set("callbackURL", callbackPath(request.nextUrl));
+  url.searchParams.set("stepUp", "platform");
   return NextResponse.redirect(url);
 }
 
@@ -33,15 +48,15 @@ function isOauthAuthorizeRequest(url: URL): boolean {
   return false;
 }
 
-function adminLoginTarget(request: NextRequest): string {
+function loginTarget(request: NextRequest): string {
   const callback = request.nextUrl.searchParams.get("callbackURL");
-  if (!callback) return "/admin";
+  if (!callback) return "/account";
   try {
     const url = new URL(callback, request.url);
-    if (url.origin !== request.nextUrl.origin || !isAdminPath(url.pathname)) return "/admin";
+    if (url.origin !== request.nextUrl.origin || !isFirstPartyAppPath(url.pathname)) return "/account";
     return `${url.pathname}${url.search}`;
   } catch {
-    return "/admin";
+    return "/account";
   }
 }
 
@@ -60,6 +75,23 @@ async function readConsoleScopes(request: NextRequest): Promise<ConsoleScopeEnve
   if (!response) return null;
   if (!response.ok) return null;
   return (await response.json().catch(() => null)) as ConsoleScopeEnvelope | null;
+}
+
+async function readStepUpStatus(request: NextRequest): Promise<boolean> {
+  const url = new URL("/api/auth/admin/step-up/status", request.url);
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+      cookie: request.headers.get("cookie") ?? "",
+    },
+    redirect: "manual",
+  }).catch(() => null);
+
+  if (!response?.ok) return false;
+  const body = await response.json().catch(() => null) as { readonly steppedUp?: unknown } | null;
+  return body?.steppedUp === true;
 }
 
 function defaultAdminTarget(envelope: ConsoleScopeEnvelope): string {
@@ -150,6 +182,15 @@ async function guardAdmin(request: NextRequest) {
   if (!canOpenScopedRoute(request.nextUrl.pathname, envelope)) {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
   }
+  if ((request.nextUrl.pathname === "/admin/platform" || request.nextUrl.pathname.startsWith("/admin/platform/")) && !(await readStepUpStatus(request))) {
+    return stepUpRedirect(request);
+  }
+  return NextResponse.next();
+}
+
+async function guardAccount(request: NextRequest) {
+  const envelope = await readConsoleScopes(request);
+  if (!envelope) return loginRedirect(request);
   return NextResponse.next();
 }
 
@@ -157,14 +198,19 @@ async function guardLogin(request: NextRequest) {
   // OAuth authorize flows reuse the login form even for signed-in users, so the
   // session-aware skip only applies to the plain admin sign-in page.
   if (isOauthAuthorizeRequest(request.nextUrl)) return NextResponse.next();
+  if (request.nextUrl.searchParams.get("stepUp") === "platform") return NextResponse.next();
 
   const envelope = await readConsoleScopes(request);
-  if (envelope?.actor.canEnterConsole) {
-    const target = adminLoginTarget(request);
+  if (envelope) {
+    const target = loginTarget(request);
+    const targetUrl = new URL(target, request.url);
+    if (isAccountPath(targetUrl.pathname)) {
+      return NextResponse.redirect(new URL(`${targetUrl.pathname}${targetUrl.search}`, request.url));
+    }
+    if (!envelope.actor.canEnterConsole) {
+      return NextResponse.redirect(new URL("/account", request.url));
+    }
     return NextResponse.redirect(new URL(canonicalLoginTarget(target, request, envelope), request.url));
-  }
-  if (envelope && !envelope.actor.canEnterConsole) {
-    return NextResponse.redirect(new URL("/account", request.url));
   }
 
   return NextResponse.next();
@@ -172,6 +218,7 @@ async function guardLogin(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === "/login") return guardLogin(request);
+  if (isAccountPath(request.nextUrl.pathname)) return guardAccount(request);
   return guardAdmin(request);
 }
 

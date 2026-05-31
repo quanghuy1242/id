@@ -1,7 +1,10 @@
 import type { Story, StoryDefault } from "@ladle/react";
 import ConsentPage from "../workers/ui/src/app/consent/page";
+import ForgotPasswordPage from "../workers/ui/src/app/forgot-password/page";
 import LoginPage from "../workers/ui/src/app/login/page";
+import ResetPasswordPage from "../workers/ui/src/app/reset-password/page";
 import SelectAuthorizationContextPage from "../workers/ui/src/app/select-authorization-context/page";
+import VerifyEmailPage from "../workers/ui/src/app/verify-email/page";
 import { setMockPathname } from "../.ladle/mocks/next-navigation";
 
 const OAUTH_QUERY = "client_id=acme-web&scope=openid%20profile%20email%20org%3Aread&redirect_uri=%2Fcallback&state=demo-state";
@@ -13,38 +16,65 @@ function setMockUrl(pathname: string, search = "") {
   window.history.replaceState({}, "", `${pathname}${suffix}`);
 }
 
-function installAdminOtpFetchMock() {
+function installPlatformStepUpFetchMock() {
   if (typeof window === "undefined") return;
 
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
-    if (url.startsWith("/api/auth/sign-in/email")) {
-      const body = typeof init?.body === "string" ? JSON.parse(init.body) as { otp?: string } : {};
-      if (body.otp) {
-        return new Response(
-          JSON.stringify(
-            body.otp === "123456"
-              ? { redirect: true, url: "/admin" }
-              : { code: "invalid_otp", message: "Invalid or expired code" },
-          ),
-          {
-            status: body.otp === "123456" ? 200 : 401,
-            headers: { "content-type": "application/json" },
-          },
-        );
-      }
-
+    if (url.startsWith("/api/auth/admin/step-up/request")) {
       return new Response(
-        JSON.stringify({ code: "admin_otp_required", maskedEmail: "a***@e***.com" }),
+        JSON.stringify({ status: true, maskedEmail: "a***@e***.com" }),
         {
-          status: 401,
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }
+    if (url.startsWith("/api/auth/admin/step-up/verify")) {
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) as { otp?: string } : {};
+      return new Response(
+        JSON.stringify(
+          body.otp === "123456"
+            ? { steppedUp: true }
+            : { code: "invalid_otp", message: "Invalid or expired code" },
+        ),
+        {
+          status: body.otp === "123456" ? 200 : 401,
           headers: { "content-type": "application/json" },
         },
       );
     }
 
     return originalFetch(input, init);
+  };
+}
+
+function installAccountUtilityFetchMock() {
+  if (typeof window === "undefined") return;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+    if (url.startsWith("/api/auth/request-password-reset")) {
+      return new Response(JSON.stringify({ status: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.startsWith("/api/auth/reset-password")) {
+      return new Response(JSON.stringify({ status: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.startsWith("/api/auth/verify-email")) {
+      return new Response(JSON.stringify({ status: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return originalFetch(input);
   };
 }
 
@@ -80,10 +110,28 @@ export const Login: Story = () => {
   return <LoginPage />;
 };
 
-export const AdminLoginOtpChallenge: Story = () => {
-  setMockUrl("/login", "");
-  installAdminOtpFetchMock();
+export const PlatformStepUp: Story = () => {
+  setMockUrl("/login", "callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
+  installPlatformStepUpFetchMock();
   return <LoginPage />;
+};
+
+export const ForgotPassword: Story = () => {
+  setMockUrl("/forgot-password");
+  installAccountUtilityFetchMock();
+  return <ForgotPasswordPage />;
+};
+
+export const ResetPassword: Story = () => {
+  setMockUrl("/reset-password", "token=reset_story_token");
+  installAccountUtilityFetchMock();
+  return <ResetPasswordPage />;
+};
+
+export const VerifyEmail: Story = () => {
+  setMockUrl("/verify-email", "token=verify_story_token");
+  installAccountUtilityFetchMock();
+  return <VerifyEmailPage />;
 };
 
 export const Consent: Story = () => {

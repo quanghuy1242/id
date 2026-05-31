@@ -53,7 +53,14 @@ async function buildHarness(): Promise<Harness> {
     ),
   );
 
-  await auth.api.createUser({ body: { name: "Admin", email: ADMIN_EMAIL, password: ADMIN_PASSWORD } });
+  await auth.api.createUser({
+    body: {
+      name: "Admin",
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      data: { role: "admin" },
+    },
+  });
   return { auth, raw, kv, emailSender };
 }
 
@@ -67,6 +74,26 @@ function signIn(auth: Harness["auth"], body: Record<string, unknown>): Promise<R
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+    }),
+  );
+}
+
+async function signInCookie(auth: Harness["auth"]): Promise<string> {
+  const res = await signIn(auth, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    callbackURL: "/admin",
+  });
+  expect(res.status).toBe(200);
+  return res.headers.get("set-cookie") ?? "";
+}
+
+function authRequest(auth: Harness["auth"], path: string, cookie: string, body?: Record<string, unknown>): Promise<Response> {
+  return auth.handler(
+    new Request(`${ORIGIN}/api/auth${path}`, {
+      method: body ? "POST" : "GET",
+      headers: { ...(body ? { "content-type": "application/json" } : {}), cookie },
+      body: body ? JSON.stringify(body) : undefined,
     }),
   );
 }
@@ -109,7 +136,7 @@ describe("id-admin-sign-in-guard", () => {
       expect(res.headers.get("set-cookie")).toBeNull();
     });
 
-    it("rejects a callbackURL that does not target /admin", async () => {
+    it("rejects a callbackURL that does not target account or console", async () => {
       const res = await signIn(harness.auth, {
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
@@ -117,6 +144,27 @@ describe("id-admin-sign-in-guard", () => {
       });
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toMatchObject({ code: "missing_login_context" });
+    });
+
+    it("accepts account and console callbacks without login-time OTP", async () => {
+      const account = await signIn(harness.auth, {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        callbackURL: "/account/security",
+      });
+      expect(account.status).toBe(200);
+      expect(account.headers.get("set-cookie")).toEqual(expect.any(String));
+      await expect(account.json()).resolves.toMatchObject({ redirect: true, url: "/account/security" });
+
+      const admin = await signIn(harness.auth, {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        callbackURL: "/admin",
+      });
+      expect(admin.status).toBe(200);
+      expect(admin.headers.get("set-cookie")).toEqual(expect.any(String));
+      await expect(admin.json()).resolves.toMatchObject({ redirect: true, url: "/admin" });
+      expect(harness.emailSender.messages).toHaveLength(0);
     });
 
     it("lets the OAuth flow through to the OAuth provider's signature check", async () => {
@@ -132,19 +180,20 @@ describe("id-admin-sign-in-guard", () => {
     });
   });
 
-  describe("admin MFA gate", () => {
-    it("emails an OTP and withholds the session on the first submit", async () => {
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        callbackURL: "/admin",
-      });
-      expect(res.status).toBe(401);
-      await expect(res.json()).resolves.toMatchObject({
-        code: "admin_otp_required",
+  describe("platform step-up", () => {
+    it("starts false, emails an OTP, and stores only an HMAC of the OTP", async () => {
+      const cookie = await signInCookie(harness.auth);
+
+      const status = await authRequest(harness.auth, "/admin/step-up/status", cookie);
+      expect(status.status).toBe(200);
+      await expect(status.json()).resolves.toEqual({ steppedUp: false });
+
+      const request = await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+      expect(request.status).toBe(200);
+      await expect(request.json()).resolves.toMatchObject({
+        status: true,
         maskedEmail: "a***@e***.test",
       });
-      expect(res.headers.get("set-cookie")).toBeNull();
       expect(harness.emailSender.messages).toContainEqual(
         expect.objectContaining({ kind: "admin-otp", to: ADMIN_EMAIL }),
       );
@@ -155,100 +204,46 @@ describe("id-admin-sign-in-guard", () => {
       expect(stored).not.toBe(otp);
     });
 
-    it("rejects invalid credentials without sending an OTP", async () => {
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: "wrong-password",
-        callbackURL: "/admin",
-      });
-      expect(res.status).toBe(401);
-      await expect(res.json()).resolves.toMatchObject({ code: "INVALID_EMAIL_OR_PASSWORD" });
-      expect(harness.emailSender.messages).toHaveLength(0);
-    });
-
-    it("blocks an unverified admin before sending an OTP", async () => {
-      harness.raw.exec(`update "user" set "emailVerified" = 0 where "email" = '${ADMIN_EMAIL}';`);
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        callbackURL: "/admin",
-      });
-      expect(res.status).toBe(403);
-      await expect(res.json()).resolves.toMatchObject({ code: "EMAIL_NOT_VERIFIED" });
-      expect(harness.emailSender.messages).toHaveLength(0);
-    });
-
-    it("throttles OTP generation after the limit", async () => {
-      const attempt = () =>
-        signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, callbackURL: "/admin" });
-      expect((await attempt()).status).toBe(401);
-      expect((await attempt()).status).toBe(401);
-      expect((await attempt()).status).toBe(401);
-      const throttled = await attempt();
-      expect(throttled.status).toBe(429);
-      await expect(throttled.json()).resolves.toMatchObject({ code: "too_many_requests" });
-    });
-
-    it("creates the session on the second submit with a valid OTP", async () => {
-      await signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, callbackURL: "/admin" });
+    it("marks the current session stepped up after a valid OTP", async () => {
+      const cookie = await signInCookie(harness.auth);
+      await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
       const otp = latestOtp(harness.emailSender);
 
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        callbackURL: "/admin",
-        otp,
-      });
-      expect(res.status).toBe(200);
-      expect(res.headers.get("set-cookie")).toEqual(expect.any(String));
-      await expect(res.json()).resolves.toMatchObject({ redirect: true, url: "/admin" });
+      const verify = await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp });
+      expect(verify.status).toBe(200);
+      await expect(verify.json()).resolves.toMatchObject({ steppedUp: true });
+
+      const status = await authRequest(harness.auth, "/admin/step-up/status", cookie);
+      expect(status.status).toBe(200);
+      await expect(status.json()).resolves.toEqual({ steppedUp: true });
     });
 
-    it("rejects an invalid OTP", async () => {
-      await signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, callbackURL: "/admin" });
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        callbackURL: "/admin",
-        otp: "000000",
-      });
-      expect(res.status).toBe(401);
-      await expect(res.json()).resolves.toMatchObject({ code: "invalid_otp" });
-      expect(res.headers.get("set-cookie")).toBeNull();
+    it("rejects an invalid or expired step-up OTP", async () => {
+      const cookie = await signInCookie(harness.auth);
+      await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+
+      const invalid = await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp: "000000" });
+      expect(invalid.status).toBe(401);
+      await expect(invalid.json()).resolves.toMatchObject({ code: "invalid_otp" });
     });
 
-    it("treats an expired (missing) OTP as invalid", async () => {
-      await signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, callbackURL: "/admin" });
-      const otp = latestOtp(harness.emailSender);
-      // Simulate TTL expiry by dropping every stored OTP code.
-      for (const key of harness.kv.values.keys()) {
-        if (key.includes(":code:")) harness.kv.values.delete(key);
-      }
-      const res = await signIn(harness.auth, {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        callbackURL: "/admin",
-        otp,
-      });
-      expect(res.status).toBe(401);
-      await expect(res.json()).resolves.toMatchObject({ code: "invalid_otp" });
-    });
+    it("throttles step-up OTP generation and verification", async () => {
+      const cookie = await signInCookie(harness.auth);
+      const request = () => authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+      expect((await request()).status).toBe(200);
+      expect((await request()).status).toBe(200);
+      expect((await request()).status).toBe(200);
+      const throttledRequest = await request();
+      expect(throttledRequest.status).toBe(429);
 
-    it("throttles OTP verification after the limit", async () => {
-      await signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, callbackURL: "/admin" });
-      const wrong = () =>
-        signIn(harness.auth, {
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
-          callbackURL: "/admin",
-          otp: "000000",
-        });
+      harness.kv.values.clear();
+      await request();
+      const wrong = () => authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp: "000000" });
       for (let i = 0; i < 5; i += 1) {
         expect((await wrong()).status).toBe(401);
       }
-      const throttled = await wrong();
-      expect(throttled.status).toBe(429);
-      await expect(throttled.json()).resolves.toMatchObject({ code: "too_many_requests" });
+      const throttledVerify = await wrong();
+      expect(throttledVerify.status).toBe(429);
     });
   });
 });

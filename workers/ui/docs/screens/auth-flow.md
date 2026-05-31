@@ -171,3 +171,128 @@ Notes:
   Selection is initialized to "workspace:{orgs[0].id}" if orgs exist, otherwise DIRECT_SHARE_VALUE.
   x-id-oauth-context header encoding: workspace access = "workspace:{orgId}"; personal = "direct-share".
   DIRECT_SHARE_VALUE and WORKSPACE_CONTEXT_PREFIX are exported from @/shared/constants.
+
+---
+
+## /forgot-password
+
+```
++------------- centered panel (max-w-md) ---------------+
+| Reset your password                                   |
+|                                                       |
+| Email                                                 |
+| _____________________________________________________ |
+| [! invalid email message]                             |
+|                                                       |
+| [ Back ]                          [ Send reset link ] |
+|                                                       |
+|   — after submit (neutral) —                          |
+| [✓ If that account exists, a reset link has been sent]|
+| Use the latest email link. Older links may expire.    |
+|                                       [ Back to sign in ] |
++-------------------------------------------------------+
+```
+
+Components:
+  Page(layout="centered") > Panel > Stack
+  Stack: Text(variant="h1", "Reset your password") + ForgotPasswordForm
+  ForgotPasswordForm ("use client"):
+    [if submitted] Stack
+      Alert(tone="success", neutral copy) + Text(variant="caption") + Inline(justify="end") > LinkButton(href="/login?callbackURL=/account")
+    [else] Form > Stack
+      TextInput(label="Email", name="email", type="email", autoComplete="username", required, validate)
+      Inline(justify="between") > LinkButton(href="/login?callbackURL=/account", variant="ghost") "Back" + Button(type="submit", disabled=submitting) "Send reset link" | "Sending..."
+
+Data: POST /api/auth/request-password-reset
+        body: { email, redirectTo: "/reset-password" }
+        always render neutral success (no enumeration)
+
+States: idle | field-error | submitting | submitted (neutral success, terminal)
+
+Notes:
+  Email enumeration is prevented: success copy is identical for known and unknown emails.
+  Submitted state is shown even if the request fails (the action does not throw to the form).
+
+---
+
+## /reset-password
+
+```
++------------- centered panel (max-w-md) ---------------+
+| Choose a new password                                 |
+|                                                       |
+|   — if no token —                                     |
+| [! This reset link is missing a token]                |
+|                              [ Request a new link ]   |
+|                                                       |
+|   — with token —                                      |
+| [! Error if reset fails]                              |
+| New password     ____________________________________ |
+| Confirm password ____________________________________ |
+|                                     [ Reset password ]|
++-------------------------------------------------------+
+```
+
+Components:
+  Page(layout="centered") > Panel > Stack
+  Stack: Text(variant="h1", "Choose a new password") + Suspense(fallback=Skeleton) > ResetPasswordForm
+  ResetPasswordForm ("use client"): reads token from useSearchParams ("token" or "code")
+    [if no token] Stack > Alert(tone="error") + Inline(justify="end") > LinkButton(href="/forgot-password")
+    [else] Stack
+      [if error] Alert(tone="error", message)
+      Form(validationErrors) > Stack
+        TextInput(label="New password", name="newPassword", type="password", autoComplete="new-password", required, validate≥12)
+        TextInput(label="Confirm password", name="confirmPassword", type="password", autoComplete="new-password", required)
+        Inline(justify="end") > Button(type="submit", disabled=submitting) "Reset password" | "Resetting..."
+
+Data: POST /api/auth/reset-password
+        body: { newPassword, token }
+        success → router.push("/login?callbackURL=/account/security")
+
+States: no-token | idle | field-error (length/match) | submitting | server-error
+
+Notes:
+  Token comes from the Better Auth reset email callback (?token=... or ?code=...).
+  Client validation: newPassword ≥ 12 chars; confirmPassword must match. Server enforces full policy.
+  The Suspense boundary is required because the form reads useSearchParams().
+
+---
+
+## /verify-email
+
+```
++------------- centered panel (max-w-md) ---------------+
+| Verifying email                                       |
+|                                                       |
+|   — checking —                                        |
+| ▒▒▒▒▒▒▒▒▒▒▒▒▒  (Skeleton rows=3)                      |
+|                                                       |
+|   — success —                                         |
+| [✓ Email verified]                                    |
+| You can return to your account security settings.     |
+|                              [ Open security settings ] |
+|                                                       |
+|   — invalid / expired / no token —                    |
+| [! Verification link is invalid or expired]           |
+|                              [ Open security settings ] |
++-------------------------------------------------------+
+```
+
+Components:
+  Page(layout="centered") > Panel > Stack
+  Stack: Text(variant="h1", "Verifying email") + Suspense(fallback=Skeleton rows=3) > VerifyEmailStatus
+  VerifyEmailStatus ("use client"): reads token from useSearchParams; useSWR(["/verify-email", token]) → verifyEmail(token)
+    [if no token] Stack > Alert(tone="error") + LinkButton(href="/account/security")
+    [if loading] Skeleton(rows=3)
+    [if data.error] Stack > Alert(tone="error", data.message) + LinkButton(href="/account/security")
+    [else] Stack > Alert(tone="success", "Email verified.") + Text(variant="caption") + LinkButton(href="/account/security")
+
+Data: GET /api/auth/verify-email
+        params: { token, callbackURL: "/account/security" }
+        response surfaces success / { error, message } for invalid/expired/already-verified
+
+States: no-token | checking (Skeleton) | success | invalid/expired
+
+Notes:
+  Resend originates from /account/security; the link carries a Better Auth verification token.
+  The exact Better Auth callback shape (JSON vs redirect) is verified by integration tests before final production routing (docs/029 §9.4).
