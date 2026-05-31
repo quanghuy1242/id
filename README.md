@@ -40,6 +40,9 @@ This implementation follows the planning and architecture documents:
 - [docs/025_admin-ui-swr-caching-strategy.md](docs/025_admin-ui-swr-caching-strategy.md) — SWR-based client-side caching strategy for admin UI (dedup, cross-navigation cache, rate-limit-aware configuration)
 - [docs/026_admin-oauth-security-screens-and-api-contracts.md](docs/026_admin-oauth-security-screens-and-api-contracts.md) — OAuth/security admin screens, verified API contracts, and the BA-plugin/adapter approach for the missing aggregate endpoints
 - [docs/027_admin-ui-enrichment.md](docs/027_admin-ui-enrichment.md) — admin UI enrichment & redesign (redesign-first): detailed component toolkit, grants-section IA unification, the `admin-activity-log` audit plugin, and JWKS/Applications/Scope-catalog detail-route redesigns with ASCII layouts, component trees, and standards classification
+- [docs/028_tenant-scoped-platform-experience.md](docs/028_tenant-scoped-platform-experience.md) — tenant-scoped console proposal: active platform/org/account contexts, org-admin views, standards classification, and delegated-admin direction
+- [docs/029_account-center-and-self-service-identity.md](docs/029_account-center-and-self-service-identity.md) — Account Center and self-service identity proposal: hosted normal-user account UI, password/reset/verification flows, safe current-user APIs, standards boundaries for OIDC, OAuth, and SCIM
+- [docs/030_client-initiated-registration-and-onboarding.md](docs/030_client-initiated-registration-and-onboarding.md) — client-initiated registration and onboarding proposal: OIDC `prompt=create`, guarded signup, registration policies, invite/domain/quota controls, and scope/permission boundaries
 - [docs/reference/content-api-architecture.md](docs/reference/content-api-architecture.md) — reference architecture from the production `content-api` codebase
 
 ## Future Implementation
