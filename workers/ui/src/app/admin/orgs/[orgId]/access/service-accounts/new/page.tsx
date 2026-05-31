@@ -13,7 +13,7 @@ export default function OrgServiceAccountCreatePage() {
     <PageBody>
       <ApplicationCreateWizardContent
         scope={{ kind: "organization", organizationId: orgId }}
-        defaultKind="M2M"
+        variant="serviceAccount"
         title="New Service Account"
         backHref={`/admin/orgs/${orgId}/access/service-accounts`}
         backLabel="Service Accounts"

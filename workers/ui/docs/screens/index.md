@@ -49,7 +49,7 @@ The planned `/admin/platform/system/**` rows are registry placeholders only; the
 | `/admin/platform/oauth/applications/:clientId[/...]` | OAuth application detail tabs — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 | `/admin/platform/access/admins-roles` | Derived admins and roles view — platform admins plus org owner/admin memberships; role management deferred | [access.md](access.md#adminplatformaccessadmins-roles) | implemented |
 | `/admin/platform/access/service-accounts` | Service accounts — system and tenant M2M clients grouped by tier | [access.md](access.md#adminplatformaccessservice-accounts) | implemented |
-| `/admin/platform/access/service-accounts/new` | Service-account creation wizard — defaults to the M2M OAuth client flow | [access.md](access.md#adminplatformaccessservice-accountsnew) | implemented |
+| `/admin/platform/access/service-accounts/new` | Service-account creation wizard — fixed M2M OAuth client flow with app-only choices hidden | [access.md](access.md#adminplatformaccessservice-accountsnew) | implemented |
 | `/admin/platform/access/resource-apis` | Resource server list — all platform and tenant audiences | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
 | `/admin/platform/access/resource-apis/:resourceServerId[/audit]` | Resource API detail tabs — overview and audit | [oauth.md](oauth.md#adminoauthresource-apisresourceserverid) | implemented |
 | `/admin/platform/access/scope-catalog` | Scope catalog — all resource-server scopes with System/Tenant tier badges | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
@@ -82,7 +82,7 @@ Canonical organization console route prefix. The shell renders the selected orga
 | `/admin/orgs/:orgId/oauth/applications` | Org-owned OAuth client-facing applications (`reference_id == orgId`) | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/orgs/:orgId/oauth/applications/:clientId[/...]` | Org-owned OAuth application detail tabs | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 | `/admin/orgs/:orgId/access/service-accounts` | Tenant service accounts (`client_credentials`, `reference_id == orgId`) | [access.md](access.md#adminorgsorgidaccessservice-accounts) | implemented |
-| `/admin/orgs/:orgId/access/service-accounts/new` | Tenant service-account creation wizard — defaults to the M2M OAuth client flow | [access.md](access.md#adminorgsorgidaccessservice-accountsnew) | implemented |
+| `/admin/orgs/:orgId/access/service-accounts/new` | Tenant service-account creation wizard — fixed M2M OAuth client flow with app-only choices hidden | [access.md](access.md#adminorgsorgidaccessservice-accountsnew) | implemented |
 | `/admin/orgs/:orgId/access/resource-apis` | Org-owned resource APIs (`organizationId == orgId`) | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
 | `/admin/orgs/:orgId/access/resource-apis/:resourceServerId[/audit]` | Org-owned Resource API detail tabs | [oauth.md](oauth.md#adminoauthresource-apisresourceserverid) | implemented |
 | `/admin/orgs/:orgId/access/scope-catalog` | Scopes for org-owned resource APIs | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |

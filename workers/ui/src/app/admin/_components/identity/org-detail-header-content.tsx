@@ -135,6 +135,7 @@ export function OrgDetailHeaderContent({
         <AdminDetailTitleRow
           backHref={backHref}
           backLabel="Organizations"
+          showBack={!scopedRoute}
           title={org?.name ?? "Organization unavailable"}
         >
           {org ? <Badge tone="neutral">#{org.slug}</Badge> : null}
@@ -163,11 +164,13 @@ export function OrgDetailHeaderContent({
 
       {error && !org && <ErrorAlert message={error} onRetry={refetch} />}
 
-      <Tabs
-        ariaLabel="Organization detail tabs"
-        selectedKey={activeTab}
-        items={orgTabs(orgId, routeBasePath, scopedRoute)}
-      />
+      {scopedRoute ? null : (
+        <Tabs
+          ariaLabel="Organization detail tabs"
+          selectedKey={activeTab}
+          items={orgTabs(orgId, routeBasePath, scopedRoute)}
+        />
+      )}
 
       <ConfirmDialog
         open={editOpen}

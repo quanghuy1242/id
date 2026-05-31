@@ -10,7 +10,7 @@ export default function PlatformServiceAccountCreatePage() {
   return (
     <PageBody>
       <ApplicationCreateWizardContent
-        defaultKind="M2M"
+        variant="serviceAccount"
         title="New Service Account"
         backHref="/admin/platform/access/service-accounts"
         backLabel="Service Accounts"

@@ -8,7 +8,9 @@ import {
   AdminMobileRouteTabs,
   AdminTopbar,
 } from "@/app/admin/_components/admin-nav";
+import { AdminScopeProvider } from "@/app/admin/_components/admin-scope-provider";
 import { ADMIN_LOGIN_REDIRECT_URL } from "@/shared/constants";
+import type { ConsoleScopeEnvelope } from "@id/lib";
 
 const navigationMock = vi.hoisted(() => ({ pathname: "/admin" }));
 
@@ -16,7 +18,42 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigationMock.pathname,
 }));
 
+const orgScopeEnvelope: ConsoleScopeEnvelope = {
+  actor: { userId: "user_001", email: "quanghuy1242@gmail.com", canEnterConsole: true },
+  defaultScopeId: "organization:org_001",
+  memberships: [],
+  scopes: [
+    {
+      kind: "platform",
+      id: "platform",
+      label: "Platform",
+      role: "platform-admin",
+      permissions: ["platform:read"],
+      requiresStepUp: true,
+    },
+    {
+      kind: "organization",
+      id: "organization:org_001",
+      organizationId: "org_001",
+      label: "Default",
+      role: "owner",
+      permissions: ["members:read", "members:write", "oauth-clients:read", "resource-servers:read", "security-audit:read"],
+      requiresStepUp: false,
+    },
+  ],
+};
+
 describe("Admin sidebar navigation", () => {
+  it("flattens single-item nav groups", () => {
+    navigationMock.pathname = "/admin/platform";
+
+    const { container } = render(<AdminSidebarNav />);
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveClass("menu-active");
+    expect(container.querySelectorAll("details")).toHaveLength(3);
+    expect(screen.queryByText("Overview")).toBeNull();
+  });
+
   it("activates only the most specific sidebar item", () => {
     navigationMock.pathname = "/admin/platform/security/sessions";
 
@@ -49,6 +86,22 @@ describe("Admin sidebar navigation", () => {
       "/admin/platform/oauth/applications",
     );
     expect(screen.getByRole("link", { name: "Sessions" })).not.toHaveClass("menu-active");
+  });
+
+  it("labels the scoped organization landing route as overview", () => {
+    navigationMock.pathname = "/admin/orgs/org_001";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
+      >
+        <AdminSidebarNav />
+      </AdminScopeProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveClass("menu-active");
+    expect(screen.queryByRole("link", { name: "Dashboard" })).toBeNull();
   });
 });
 
@@ -104,6 +157,37 @@ describe("Admin mobile navigation", () => {
 
     expect(screen.queryByRole("tablist")).toBeNull();
   });
+
+  it("does not render shell route tabs in scoped organization context", () => {
+    navigationMock.pathname = "/admin/orgs/org_001/identity/invitations";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
+      >
+        <AdminMobileRouteTabs />
+      </AdminScopeProvider>,
+    );
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("labels the scoped organization dock entry as overview", () => {
+    navigationMock.pathname = "/admin/orgs/org_001";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
+      >
+        <AdminMobileNav />
+      </AdminScopeProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveClass("dock-active");
+    expect(screen.queryByRole("link", { name: "Dash" })).toBeNull();
+  });
 });
 
 describe("Admin topbar", () => {
@@ -119,6 +203,50 @@ describe("Admin topbar", () => {
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(breadcrumb).getByRole("button", { name: /select console scope/i })).toHaveTextContent("Platform");
     expect(breadcrumb).toHaveTextContent("Resource APIs");
+  });
+
+  it("highlights the selected scope badge in the dropdown", async () => {
+    navigationMock.pathname = "/admin/platform/access/admins-roles";
+    const envelope: ConsoleScopeEnvelope = {
+      actor: { userId: "user_001", email: "quanghuy1242@gmail.com", canEnterConsole: true },
+      defaultScopeId: "platform",
+      memberships: [],
+      scopes: [
+        {
+          kind: "platform",
+          id: "platform",
+          label: "Platform",
+          role: "platform-admin",
+          permissions: ["platform:read"],
+          requiresStepUp: true,
+        },
+        {
+          kind: "organization",
+          id: "organization:org_001",
+          organizationId: "org_001",
+          label: "Default",
+          role: "platform-admin",
+          permissions: ["members:read"],
+          requiresStepUp: false,
+        },
+      ],
+    };
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={envelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(envelope) }}
+      >
+        <AdminTopbar />
+      </AdminScopeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /select console scope/i }));
+    const menu = await screen.findByRole("menu");
+    const selectedBadge = within(menu).getAllByText("Platform").find((element) => element.classList.contains("badge"));
+    expect(selectedBadge).toBeDefined();
+    expect(selectedBadge!).toHaveClass("badge-accent");
+    expect(within(menu).getByText("platform-admin")).toHaveClass("badge-neutral");
   });
 
   it("wires the avatar menu logout action", async () => {

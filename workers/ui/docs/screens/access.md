@@ -31,16 +31,17 @@ Creates a system or tenant service account through the same Better Auth OAuth cl
 ┌────────────────────────────────────────────────────────────────┐
 │ < Service Accounts                                              │
 │ New Service Account                                             │
-│ Steps: Type → Auth → URIs → Scopes → Review                     │
-│ Type: [x] Machine-to-machine                                    │
+│ Steps: Basics → URIs → Scopes → Review                          │
+│ Flow: client_credentials                                        │
 │ Complete: Create service account                                │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 Components:
-  PageBody > ApplicationCreateWizardContent(defaultKind="M2M", title="New Service Account", backHref="/admin/platform/access/service-accounts", completeLabel="Create service account")
+  PageBody > ApplicationCreateWizardContent(variant="serviceAccount", title="New Service Account", backHref="/admin/platform/access/service-accounts", completeLabel="Create service account")
 
 Data: `POST /api/auth/oauth2/create-client` through `createClient(input, { kind: "platform" })`; the action clears the Better Auth active organization before the OAuth client call so a platform service account is not accidentally attached to a stale org session.
+Behavior: the service-account variant fixes the OAuth client type to M2M, hides the application type and token-auth choice steps, sends `grant_types: ["client_credentials"]`, and still collects the redirect URI required by Better Auth's registration schema.
 
 ## /admin/orgs/:orgId/access/service-accounts
 
@@ -70,16 +71,17 @@ Creates a tenant service account in the selected organization. The route org id 
 ┌────────────────────────────────────────────────────────────────┐
 │ < Service Accounts                                              │
 │ New Service Account                                             │
-│ Steps: Type → Auth → URIs → Scopes → Review                     │
-│ Type: [x] Machine-to-machine                                    │
+│ Steps: Basics → URIs → Scopes → Review                          │
+│ Flow: client_credentials                                        │
 │ Complete: Create service account                                │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 Components:
-  PageBody > ApplicationCreateWizardContent(scope={organization}, defaultKind="M2M", title="New Service Account", backHref="/admin/orgs/:orgId/access/service-accounts", completeLabel="Create service account")
+  PageBody > ApplicationCreateWizardContent(scope={organization}, variant="serviceAccount", title="New Service Account", backHref="/admin/orgs/:orgId/access/service-accounts", completeLabel="Create service account")
 
 Data: `POST /api/auth/organization/set-active` with `{ organizationId }`, then `POST /api/auth/oauth2/create-client`.
+Behavior: the organization route uses the same fixed service-account wizard variant and scopes the OAuth create action to the selected organization before registration.
 
 ## /admin/platform/access/admins-roles
 
@@ -90,6 +92,7 @@ Read-only derived view for human principals holding authority. Full delegated ro
 │ Admins & Roles                                                  │
 │ Platform admins 1 · Org authorities 2 · Organizations 1         │
 │ [Search principals, scopes, or roles...]                        │
+│                                                                │
 │ Principal            Authority          Scope        Source     │
 │ John Doe             Platform Admin     Platform     user.role  │
 │ Jane Adams           Org Admin          Acme Corp    member.role│
@@ -98,6 +101,7 @@ Read-only derived view for human principals holding authority. Full delegated ro
 
 Components:
   PageBody > AdminsRolesContent
-  AdminsRolesContent renders PageIntro(title="Admins & Roles"), StatGroup(Platform admins, Org authorities, Organizations), SearchInput, and read-only DataTable.
+  AdminsRolesContent renders PageIntro(title="Admins & Roles"), StatGroup(Platform admins, Org authorities, Organizations), a standalone SearchInput panel, and a separate read-only DataTable panel with zero padding when rows are present so the table matches Users and Organizations.
 
 Data: Composed from existing Better Auth endpoints only: `GET /api/auth/admin/list-users?filterField=role&filterValue=admin&filterOperator=eq`, `GET /api/auth/organization/list`, `GET /api/auth/organization/list-members?organizationId=:orgId`, and `GET /api/auth/admin/get-user?id=:userId` for member enrichment. No delegated-admin table or management endpoint exists in v1.
+Behavior: organization authority rows display the organization name and slug; raw organization IDs remain searchable but are not shown as the secondary label.

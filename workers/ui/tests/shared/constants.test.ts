@@ -66,6 +66,10 @@ describe("constants", () => {
     const visible = visibleNavItems(CONSOLE_NAV_ITEMS, scope);
     const sections = visibleNavSections(scope);
 
+    expect(visible.find((item) => item.id === "dashboard")).toMatchObject({
+      label: "Overview",
+      href: "/admin/orgs/org_123",
+    });
     expect(visible.find((item) => item.id === "identity-users")).toMatchObject({
       label: "Members",
       href: "/admin/orgs/org_123/identity/members",

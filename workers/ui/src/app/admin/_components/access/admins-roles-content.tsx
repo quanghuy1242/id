@@ -8,7 +8,6 @@ import {
   type DataTableColumn,
   EmptyState,
   ErrorAlert,
-  Inline,
   PageIntro,
   Panel,
   SearchInput,
@@ -46,6 +45,7 @@ type AuthorityRow = {
   readonly user: User | null;
   readonly scope: "Platform" | string;
   readonly organizationId?: string;
+  readonly organizationSlug?: string;
   readonly authority: "platform-admin" | "owner" | "admin";
   readonly source: "user.role" | "member.role";
   readonly createdAt: string;
@@ -67,8 +67,9 @@ function rowsFromSnapshot(snapshot: AdminsRolesSnapshot | undefined, usersById: 
       id: `organization:${organization.id}:${member.id}`,
       userId: member.userId,
       user: usersById.get(member.userId) ?? null,
-      scope: organization.name,
+      scope: organization.name || organization.slug || organization.id,
       organizationId: organization.id,
+      organizationSlug: organization.slug,
       authority: member.role === "owner" ? "owner" as const : "admin" as const,
       source: "member.role" as const,
       createdAt: member.createdAt,
@@ -152,7 +153,7 @@ export function AdminsRolesContent({
       render: (row) => (
         <Stack gap="xs">
           <Text variant="body">{row.scope}</Text>
-          {row.organizationId ? <Text variant="caption" mono>{row.organizationId}</Text> : null}
+          {row.organizationSlug ? <Text variant="caption" mono>#{row.organizationSlug}</Text> : null}
         </Stack>
       ),
     },
@@ -197,17 +198,15 @@ export function AdminsRolesContent({
         <Stat title="Organizations" value={showLoading ? <Skeleton rows={1} /> : stats.orgs} tone="warning" iconName="Building2" />
       </StatGroup>
       <Panel>
-        <Stack gap="md">
-          <Inline justify="between" align="center" wrap>
-            <SearchInput
-              value={effectiveSearch}
-              onChange={handleSearchChange}
-              placeholder="Search principals, scopes, or roles..."
-              grow
-            />
-          </Inline>
-          {content()}
-        </Stack>
+        <SearchInput
+          value={effectiveSearch}
+          onChange={handleSearchChange}
+          placeholder="Search principals, scopes, or roles..."
+          grow
+        />
+      </Panel>
+      <Panel padding={visibleRows.length > 0 && !showLoading && !showError ? "none" : "md"}>
+        {content()}
       </Panel>
     </Stack>
   );

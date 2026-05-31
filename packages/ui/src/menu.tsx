@@ -4,6 +4,7 @@
 
 import { type ReactNode, Children } from "react";
 import {
+  composeRenderProps,
   Menu as AriaMenu,
   MenuItem as AriaMenuItem,
   MenuTrigger as AriaMenuTrigger,
@@ -31,11 +32,14 @@ export function MenuTrigger({ children, placement = "bottom end", ...props }: { 
 }
 
 export function Menu<T extends object>(props: MenuProps<T>) {
+  const { className, ...menuProps } = props;
+  const baseClassName = className ? "menu popover-panel z-1" : "menu popover-panel w-52 z-1";
+
   return (
     <AriaMenu
-      {...props}
+      {...menuProps}
       render={((rp: Record<string, unknown>) => <ul {...rp} />) as never}
-      className="menu popover-panel w-52 z-1"
+      className={composeRenderProps(className, (resolvedClassName) => [baseClassName, resolvedClassName].filter(Boolean).join(" "))}
     />
   );
 }

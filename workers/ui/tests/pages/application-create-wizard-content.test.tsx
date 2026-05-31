@@ -18,7 +18,21 @@ const createdClient: OAuthClient = {
 };
 
 describe("ApplicationCreateWizardContent", () => {
-  it("can default to the service-account creation flow", () => {
+  it("does not offer machine-to-machine from the application creation flow", () => {
+    const actions = {
+      listScopes: vi.fn<() => Promise<OAuthResourceScope[]>>().mockResolvedValue([]),
+      createClient: vi.fn<(input: CreateClientInput) => Promise<OAuthClient>>().mockResolvedValue(createdClient),
+    };
+
+    render(<ApplicationCreateWizardContent actions={actions} />);
+
+    expect(screen.getByRole("heading", { name: "New OAuth Application" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Web server")).toBeChecked();
+    expect(screen.getByLabelText("SPA / native")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Machine-to-machine")).not.toBeInTheDocument();
+  });
+
+  it("uses a fixed service-account creation flow", () => {
     const actions = {
       listScopes: vi.fn<() => Promise<OAuthResourceScope[]>>().mockResolvedValue([]),
       createClient: vi.fn<(input: CreateClientInput) => Promise<OAuthClient>>().mockResolvedValue(createdClient),
@@ -27,14 +41,17 @@ describe("ApplicationCreateWizardContent", () => {
     render(
       <ApplicationCreateWizardContent
         actions={actions}
-        defaultKind="M2M"
+        variant="serviceAccount"
         title="New Service Account"
         completeLabel="Create service account"
       />,
     );
 
     expect(screen.getByRole("heading", { name: "New Service Account" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Machine-to-machine")).toBeChecked();
+    expect(screen.getByText("Basics")).toBeInTheDocument();
+    expect(screen.queryByText("Auth")).not.toBeInTheDocument();
+    expect(screen.queryByText("Application Type")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Machine-to-machine")).not.toBeInTheDocument();
   });
 
   it("navigates once after the one-time secret dialog closes", async () => {
@@ -44,16 +61,21 @@ describe("ApplicationCreateWizardContent", () => {
       createClient: vi.fn<(input: CreateClientInput) => Promise<OAuthClient>>().mockResolvedValue(createdClient),
     };
 
-    render(<ApplicationCreateWizardContent actions={actions} onCreated={onCreated} />);
+    render(
+      <ApplicationCreateWizardContent
+        actions={actions}
+        variant="serviceAccount"
+        completeLabel="Create service account"
+        onCreated={onCreated}
+      />,
+    );
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Content API" } });
-    fireEvent.click(screen.getByLabelText("Machine-to-machine"));
-    fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.change(screen.getByLabelText("Redirect URIs 1"), { target: { value: "https://service.example.com/callback" } });
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    fireEvent.click(screen.getByRole("button", { name: /create application/i }));
+    fireEvent.click(screen.getByRole("button", { name: /create service account/i }));
 
     await waitFor(() => expect(actions.createClient).toHaveBeenCalledTimes(1));
     expect(actions.createClient).toHaveBeenCalledWith(

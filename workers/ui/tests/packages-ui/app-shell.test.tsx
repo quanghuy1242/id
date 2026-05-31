@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   Page,
@@ -280,6 +280,16 @@ describe("TopbarAvatarMenu", () => {
   it("labels the avatar menu trigger", () => {
     render(<TopbarAvatarMenu items={[{ label: "Logout", onAction: () => undefined }]} />);
     expect(screen.getByRole("button", { name: /open account menu/i })).toBeInTheDocument();
+  });
+
+  it("constrains long account labels inside the menu", async () => {
+    render(<TopbarAvatarMenu items={[{ label: "quanghuy1242@gmail.com", badge: "Account", onAction: () => undefined }]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open account menu/i }));
+
+    expect(await screen.findByRole("menu")).toHaveClass("w-72", "max-w-[calc(100vw-1rem)]", "overflow-hidden");
+    expect(screen.getByText("quanghuy1242@gmail.com")).toHaveClass("min-w-0", "flex-1", "truncate");
+    expect(screen.getByText("Account")).toHaveClass("shrink-0");
   });
 });
 

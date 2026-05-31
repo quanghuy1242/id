@@ -11,14 +11,12 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 | id [ Platform v ] / Dashboard                         [bell][avatar] |
 +-- Sidebar (aside bg-base-100 border-r p-4) -+-- MainContent -----+
 | +-- menu bg-base-200 rounded-box --------+ |                    |
-| | Overview                               | |  PageHeader        |
-| |   Dashboard                            | |  +------------+   |
+| | Dashboard                              | |  PageHeader        |
 | | Identity                               | |  +------------+   |
 | |   Users                                | |  | Title      |   |
 | |   Organizations                        | |  | [Actions]  |   |
 | | Applications                           | |  PageBody         |
-| |   Applications                         | |  (scrolls)        |
-| | Access                                 | |                   |
+| | Access                                 | |  (scrolls)        |
 | |   Admins & Roles                       | |                   |
 | |   Service Accounts                     | |                   |
 | |   Resource APIs                        | |                   |
@@ -31,7 +29,6 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 | |   Introspection                        | |                   |
 | |   JWKS                                 | |                   |
 | | Audit                                  | |                   |
-| |   Audit                                | |                   |
 | +----------------------------------------+ |                   |
 +---------------------------------------------+------------------+
 ```
@@ -42,7 +39,7 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 +-- Topbar (navbar bg-base-100 shadow-sm border-b) ---------------+
 | id [ Acme Publishing v ] / Members                       [avatar] |
 +----------------------------------------------------------------+
-| MobileRouteTabs (visible only when current section has siblings)|
+| MobileRouteTabs (platform only when current section has siblings)|
 |  [Members] [Teams] [Invitations]                               |
 +----------------------------------------------------------------+
 | MainContent (full width, no sidebar visible)                   |
@@ -54,7 +51,7 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 |  PageBody (scrolls inside MainContent)                         |
 |                                                                |
 +-- MobileDock (dock dock-sm bg-base-100 border-t) --------------+
-|  [• Dash] [• Identity] [• Apps] [• Access] [• Audit]          |
+|  [• Overview] [• Identity] [• Apps] [• Access] [• Audit]      |
 +----------------------------------------------------------------+
 ```
 
@@ -62,12 +59,12 @@ Components:
   AdminSwrProvider > AdminScopeProvider > AppShell > Topbar + AdminMobileRouteTabs + SidebarLayout + MobileDock
   AdminScopeProvider: fetches `GET /api/auth/admin/console-scopes` through `_actions/console-scopes.ts`, resolves the active scope from the URL, and exposes the envelope, active `ConsoleScope`, loading/error state, and scope-switch hrefs.
   Topbar: AdminTopbar (`usePathname()` + AdminScopeProvider-driven breadcrumb in `navbar-start`; DaisyUI navbar with `btn btn-ghost text-xl normal-case` brand link, scope selector `MenuTrigger` rendered as the first breadcrumb item, `ScopePickerTrigger` using normal button height with tighter horizontal padding and badge-toned border/text (`accent` for platform, `info` for organization), current page crumb, notifications, and avatar menu in `navbar-end`)
-  Scope selector: operable `ConsoleScope` rows link to the equivalent route under the selected scope when an equivalent exists; member-only `ConsoleMembershipHint` rows link to `/account/organizations` and are never selectable console scopes.
-  AdminMobileRouteTabs: `MobileRouteTabs` > section-level `Tabs` using URL-route items from the active visible nav section. Empty sections do not render, and dashboard hides tabs because its section has one item.
+  Scope selector: operable `ConsoleScope` rows link to the equivalent route under the selected scope when an equivalent exists; the selected scope row uses a stronger badge tone matching the trigger; member-only `ConsoleMembershipHint` rows link to `/account/organizations` and are never selectable console scopes.
+  AdminMobileRouteTabs: `MobileRouteTabs` > section-level `Tabs` using URL-route items from the active visible nav section. Empty sections do not render, dashboard hides tabs because its section has one item, and organization-scoped routes hide shell tabs entirely because the org lens is already represented by sidebar/dock navigation and route content.
   SidebarLayout > Sidebar + MainContent
-  Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile) renders `visibleNavSections(activeScope)` from the single nav definition in `workers/ui/src/shared/constants.ts`; grouped sections use DaisyUI collapsible `details > summary + ul > li > a`
+  Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile) renders `visibleNavSections(activeScope)` from the single nav definition in `workers/ui/src/shared/constants.ts`; sections with multiple visible items use DaisyUI collapsible `details > summary + ul > li > a`, while single-item sections render as direct menu links so labels like Dashboard, Applications, and Audit are not repeated as group headers. The root scoped-organization route is labeled Overview; platform keeps Dashboard.
   MainContent: children slot — each page renders content body here; route title lives in the topbar breadcrumb
-  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden) with one section-level entry per visible section, `dock-label` text under a compact glyph
+  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden) with one section-level entry per visible section, `dock-label` text under a compact glyph; the organization-scope overview entry is labeled Overview instead of Dash.
 
 Active state rules:
   Sidebar items: active item uses the same menu row shape as all other items, with only text emphasis + aria-current; Dashboard uses exact match within the active route scope.

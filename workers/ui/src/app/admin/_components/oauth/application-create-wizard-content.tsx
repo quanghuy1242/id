@@ -45,6 +45,7 @@ type ApplicationCreateWizardContentProps = {
   readonly backHref?: string;
   readonly backLabel?: string;
   readonly title?: string;
+  readonly variant?: "application" | "serviceAccount";
   readonly defaultKind?: ApplicationKind;
   readonly completeLabel?: string;
   readonly actions?: typeof defaultActions;
@@ -67,12 +68,15 @@ export function ApplicationCreateWizardContent({
   backHref = "/admin/platform/oauth/applications",
   backLabel = "OAuth Applications",
   title = "New OAuth Application",
+  variant = "application",
   defaultKind = "confidential",
   completeLabel = "Create application",
   actions = defaultActions,
 }: ApplicationCreateWizardContentProps) {
+  const isServiceAccount = variant === "serviceAccount";
+  const initialKind = isServiceAccount ? "M2M" : defaultKind === "M2M" ? "confidential" : defaultKind;
   const [activeStep, setActiveStep] = useState(0);
-  const [kind, setKind] = useState<ApplicationKind>(defaultKind);
+  const [kind, setKind] = useState<ApplicationKind>(initialKind);
   const [name, setName] = useState("");
   const [authMethod, setAuthMethod] = useState("client_secret_post");
   const [redirectUris, setRedirectUris] = useState<string[]>([""]);
@@ -93,8 +97,11 @@ export function ApplicationCreateWizardContent({
   const cleanedPostLogout = postLogoutRedirectUris.map((uri) => uri.trim()).filter(Boolean);
   const nameValid = name.trim().length > 0;
   const urisValid = cleanedRedirects.length > 0;
-  const forcedAuthMethod = kind === "public" ? "none" : "client_secret_post";
-  const effectiveAuthMethod = kind === "confidential" ? authMethod : forcedAuthMethod;
+  const effectiveKind = isServiceAccount ? "M2M" : kind;
+  const forcedAuthMethod = effectiveKind === "public" ? "none" : "client_secret_post";
+  const effectiveAuthMethod = effectiveKind === "confidential" ? authMethod : forcedAuthMethod;
+  const redirectStepIndex = isServiceAccount ? 1 : 2;
+  const subjectLabel = isServiceAccount ? "Service account" : "Application";
 
   async function handleCreate() {
     setSubmitError(undefined);
@@ -106,11 +113,11 @@ export function ApplicationCreateWizardContent({
     const redirectUriInput = toNonEmptyArray(cleanedRedirects);
     if (!redirectUriInput) {
       setSubmitError("At least one redirect URI is required");
-      setActiveStep(2);
+      setActiveStep(redirectStepIndex);
       return;
     }
     try {
-      const isM2M = kind === "M2M";
+      const isM2M = effectiveKind === "M2M";
       const postLogoutUriInput = toNonEmptyArray(cleanedPostLogout);
       const result = await actions.createClient({
         client_name: name.trim(),
@@ -125,9 +132,9 @@ export function ApplicationCreateWizardContent({
       setCreated(result);
       if (result.client_secret) setRevealSecret(result.client_secret);
       else onCreated?.(result.client_id);
-      toast.success("Application created", `${result.client_name} is registered.`);
+      toast.success(`${subjectLabel} created`, `${result.client_name} is registered.`);
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to create application");
+      setSubmitError(err instanceof Error ? err.message : `Failed to create ${subjectLabel.toLowerCase()}`);
     }
   }
 
@@ -138,53 +145,86 @@ export function ApplicationCreateWizardContent({
     onCreated?.(created.client_id);
   }
 
+  const typeStep = isServiceAccount
+    ? {
+        id: "basics",
+        label: "Basics",
+        isValid: nameValid,
+        content: (
+          <Panel>
+            <Stack gap="md">
+              <TextInput label="Name" name="client_name" required defaultValue={name} onChange={setName} />
+              <Text variant="caption">Service accounts are created as machine-to-machine OAuth clients using client credentials.</Text>
+            </Stack>
+          </Panel>
+        ),
+      }
+    : {
+        id: "type",
+        label: "Type",
+        isValid: nameValid,
+        content: (
+          <Panel>
+            <Stack gap="md">
+              <TextInput label="Name" name="client_name" required defaultValue={name} onChange={setName} />
+              <RadioGroup
+                title="Application Type"
+                name="type"
+                value={effectiveKind}
+                onChange={(next) => setKind(next as ApplicationKind)}
+                options={[
+                  { value: "confidential", label: "Web server" },
+                  { value: "public", label: "SPA / native" },
+                ]}
+              />
+              <Text variant="caption">{kindDescription(effectiveKind)}</Text>
+            </Stack>
+          </Panel>
+        ),
+      };
+
+  const reviewItems = isServiceAccount
+    ? [
+        { term: "Name", description: name || "Not set" },
+        { term: "Flow", description: "Client credentials" },
+        { term: "Redirect URIs", description: cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
+        { term: "Scopes", description: scopes.length > 0 ? scopes.join(" ") : "None", mono: scopes.length > 0 },
+      ]
+    : [
+        { term: "Name", description: name || "Not set" },
+        { term: "Type", description: kindDescription(effectiveKind) },
+        { term: "Token auth method", description: effectiveAuthMethod, mono: true },
+        { term: "Grant types", description: "authorization_code, refresh_token" },
+        { term: "Redirect URIs", description: cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
+        { term: "Scopes", description: scopes.length > 0 ? scopes.join(" ") : "None", mono: scopes.length > 0 },
+      ];
+
   const steps = [
-    {
-      id: "type",
-      label: "Type",
-      isValid: nameValid,
-      content: (
-        <Panel>
-          <Stack gap="md">
-            <TextInput label="Name" name="client_name" required defaultValue={name} onChange={setName} />
-            <RadioGroup
-              title="Application Type"
-              name="type"
-              value={kind}
-              onChange={(next) => setKind(next as ApplicationKind)}
-              options={[
-                { value: "confidential", label: "Web server" },
-                { value: "public", label: "SPA / native" },
-                { value: "M2M", label: "Machine-to-machine" },
-              ]}
-            />
-            <Text variant="caption">{kindDescription(kind)}</Text>
-          </Stack>
-        </Panel>
-      ),
-    },
-    {
-      id: "auth",
-      label: "Auth",
-      content: (
-        <Panel>
-          {kind === "confidential" ? (
-            <RadioGroup
-              title="Token Auth Method"
-              name="token_endpoint_auth_method"
-              value={authMethod}
-              onChange={setAuthMethod}
-              options={[
-                { value: "client_secret_post", label: "client_secret_post" },
-                { value: "client_secret_basic", label: "client_secret_basic" },
-              ]}
-            />
-          ) : (
-            <Text variant="body">{kind === "public" ? "Public clients use PKCE with no client secret." : "M2M clients use client_secret_post and the client credentials grant."}</Text>
-          )}
-        </Panel>
-      ),
-    },
+    typeStep,
+    ...(!isServiceAccount ? [
+      {
+        id: "auth",
+        label: "Auth",
+        content: (
+          <Panel>
+            {effectiveKind === "confidential" ? (
+              <RadioGroup
+                title="Token Auth Method"
+                name="token_endpoint_auth_method"
+                value={authMethod}
+                onChange={setAuthMethod}
+                options={[
+                  { value: "client_secret_post", label: "client_secret_post" },
+                  { value: "client_secret_basic", label: "client_secret_basic" },
+                ]}
+              />
+            ) : (
+              <Text variant="body">Public clients use PKCE with no client secret.</Text>
+            )}
+          </Panel>
+        ),
+      },
+    ] : []),
     {
       id: "uris",
       label: "URIs",
@@ -192,11 +232,11 @@ export function ApplicationCreateWizardContent({
       content: (
         <Panel>
           <Stack gap="md">
-            {kind === "M2M" ? (
-              <Text variant="body">Client registration requires one registered redirect URI; client credentials token requests do not use it.</Text>
+            {isServiceAccount ? (
+              <Text variant="caption">Required for client registration; client credentials token requests do not redirect users.</Text>
             ) : null}
             <UrlListBuilder label="Redirect URIs" value={redirectUris} onChange={setRedirectUris} placeholder="https://app.example.com/callback" />
-            {kind === "M2M" ? null : (
+            {isServiceAccount ? null : (
               <UrlListBuilder label="Post-Logout Redirect URIs" value={postLogoutRedirectUris} onChange={setPostLogoutRedirectUris} placeholder="https://app.example.com/signed-out" minRows={0} />
             )}
           </Stack>
@@ -219,14 +259,7 @@ export function ApplicationCreateWizardContent({
         <Panel>
           <DescriptionList
             columns={2}
-            items={[
-              { term: "Name", description: name || "Not set" },
-              { term: "Type", description: kindDescription(kind) },
-              { term: "Token auth method", description: effectiveAuthMethod, mono: true },
-              { term: "Grant types", description: kind === "M2M" ? "client_credentials" : "authorization_code, refresh_token" },
-              { term: "Redirect URIs", description: cleanedRedirects.join("\n") || "None", mono: cleanedRedirects.length > 0 },
-              { term: "Scopes", description: scopes.length > 0 ? scopes.join(" ") : "None", mono: scopes.length > 0 },
-            ]}
+            items={reviewItems}
           />
         </Panel>
       ),

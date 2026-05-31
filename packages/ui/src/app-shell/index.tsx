@@ -204,20 +204,24 @@ export function TopbarAvatarMenu({
         <Avatar initials={initials} size="sm" />
       </Button>
       <Popover
-        className="z-50 data-[entering]:animate-popover-in data-[exiting]:animate-popover-out"
+        className="z-50 max-w-[calc(100vw-1rem)] data-[entering]:animate-popover-in data-[exiting]:animate-popover-out"
         placement="bottom end"
         offset={4}
         crossOffset={0}
+        containerPadding={8}
       >
-        <Menu>
+        <Menu className="w-72 max-w-[calc(100vw-1rem)] overflow-hidden">
           {items.map((item) => (
             <MenuItem
               key={item.href ?? item.label}
               href={item.href}
-              badge={item.badge}
-              label={item.label}
+              textValue={item.label}
+              className="flex min-w-0 items-center gap-2"
               onAction={item.onAction}
-            />
+            >
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.badge ? <span className="badge badge-sm shrink-0">{item.badge}</span> : null}
+            </MenuItem>
           ))}
         </Menu>
       </Popover>

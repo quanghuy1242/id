@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  Badge,
   Button,
   ConfirmDialog,
   DockLink,
@@ -87,8 +88,8 @@ function getMobileRouteTabs(pathname: string, groups: readonly SidebarGroup[]): 
   return { group: activeGroup, selectedKey: selectedItem.href };
 }
 
-function mobileLabel(section: VisibleConsoleNavSection, item: VisibleConsoleNavItem): string {
-  if (section.id === "overview") return "Dash";
+function mobileLabel(section: VisibleConsoleNavSection, item: VisibleConsoleNavItem, scopeKind: "platform" | "organization"): string {
+  if (section.id === "overview") return scopeKind === "organization" ? "Overview" : "Dash";
   if (section.id === "identity") return "Identity";
   if (section.id === "applications") return "Apps";
   if (section.id === "access") return "Access";
@@ -106,6 +107,10 @@ function scopeTone(kind: "platform" | "organization"): "accent" | "info" {
   return kind === "platform" ? "accent" : "info";
 }
 
+function scopeBadgeLabel(scope: { readonly kind: "platform" | "organization"; readonly role: string }): string {
+  return scope.kind === "platform" ? "Platform" : scope.role;
+}
+
 function ScopeSelector() {
   const { envelope, activeScope, loading, error, switchHref } = useAdminScope();
   const scopeLabel = loading ? "Loading scope" : activeScope.label;
@@ -114,14 +119,22 @@ function ScopeSelector() {
     <MenuTrigger placement="bottom start">
       <ScopePickerTrigger label={scopeLabel} tone={scopeTone(activeScope.kind)} />
       <Menu aria-label="Console scopes">
-        {envelope.scopes.map((scope) => (
-          <MenuItem
-            key={scope.id}
-            href={switchHref(scope)}
-            label={scope.label}
-            badge={scope.kind === "platform" ? "Platform" : scope.role}
-          />
-        ))}
+        {envelope.scopes.map((scope) => {
+          const selected = scope.id === activeScope.id;
+          return (
+            <MenuItem
+              key={scope.id}
+              href={switchHref(scope)}
+              textValue={`${scope.label} ${scopeBadgeLabel(scope)}`}
+              className={selected ? "font-semibold" : undefined}
+            >
+              {scope.label}
+              <Badge tone={selected ? scopeTone(scope.kind) : "neutral"} size="sm">
+                {scopeBadgeLabel(scope)}
+              </Badge>
+            </MenuItem>
+          );
+        })}
         {envelope.memberships.map((membership) => (
           <MenuItem
             key={membership.organizationId}
@@ -142,26 +155,32 @@ export function AdminSidebarNav() {
   const groups = getSidebarNavGroups(visibleNavSections(activeScope));
   const activeItem = getBestActiveItem(pathname, getSidebarItems(groups));
 
+  function renderSidebarItem(item: VisibleConsoleNavItem) {
+    const active = activeItem?.href === item.href;
+    return (
+      <NavLink
+        key={item.href}
+        href={item.href}
+        active={active}
+        current={active ? "page" : undefined}
+        iconName={item.icon}
+      >
+        {item.label}
+      </NavLink>
+    );
+  }
+
   return (
     <NavMenu label="Admin sidebar navigation">
-      {groups.map((entry) => (
-        <NavSection key={entry.title} title={entry.title ?? undefined} collapsible>
-          {entry.items.map((item) => {
-            const active = activeItem?.href === item.href;
-            return (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                active={active}
-                current={active ? "page" : undefined}
-                iconName={item.icon}
-              >
-                {item.label}
-              </NavLink>
-            );
-          })}
-        </NavSection>
-      ))}
+      {groups.map((entry) => {
+        if (entry.items.length === 1 && entry.items[0]) return renderSidebarItem(entry.items[0]);
+
+        return (
+          <NavSection key={entry.title} title={entry.title ?? undefined} collapsible>
+            {entry.items.map(renderSidebarItem)}
+          </NavSection>
+        );
+      })}
     </NavMenu>
   );
 }
@@ -183,7 +202,7 @@ export function AdminMobileNav() {
             href={item.href}
             current={active ? "page" : undefined}
             active={active}
-            label={mobileLabel(section, item)}
+            label={mobileLabel(section, item, activeScope.kind)}
             iconName={item.icon}
           />
         );
@@ -195,6 +214,8 @@ export function AdminMobileNav() {
 export function AdminMobileRouteTabs() {
   const pathname = usePathname();
   const { activeScope } = useAdminScope();
+  if (activeScope.kind === "organization") return null;
+
   const mobileTabs = getMobileRouteTabs(pathname, getSidebarNavGroups(visibleNavSections(activeScope)));
 
   if (!mobileTabs) return null;

@@ -110,7 +110,7 @@ function navItems(
 
 const dashboardNavItem: ConsoleNavItem = {
   id: "dashboard",
-  label: "Dashboard",
+  label: { platform: "Dashboard", organization: "Overview" },
   section: "overview",
   appliesTo: "both",
   requiredPermission: { platform: "platform:read", organization: "members:read" },

@@ -32,12 +32,19 @@ function actions(data: AdminsRolesSnapshot) {
 
 describe("AdminsRolesContent", () => {
   it("renders platform admins and organization authority rows", async () => {
-    render(<AdminsRolesContent actions={actions(snapshot())} />);
+    const { container } = render(<AdminsRolesContent actions={actions(snapshot())} />);
 
     await waitFor(() => expect(screen.getByText("Platform Admin")).toBeInTheDocument());
     expect(screen.getByText("Owner")).toBeInTheDocument();
     expect(screen.getByText("Org Admin")).toBeInTheDocument();
     expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("#acme").length).toBeGreaterThan(0);
+    expect(screen.queryByText("org_001")).toBeNull();
+    const panels = container.querySelectorAll("section.card");
+    expect(panels).toHaveLength(2);
+    expect(panels[0]).toContainElement(screen.getByRole("searchbox"));
+    expect(panels[0]!.querySelector(".table")).toBeNull();
+    expect(panels[1]!.querySelector(".table")).not.toBeNull();
   });
 
   it("filters the derived rows by search", async () => {

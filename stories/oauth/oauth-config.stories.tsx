@@ -371,7 +371,7 @@ function renderServiceAccountRoute(context: OAuthRouteContext): ReactNode {
   if (id === "new") {
     return (
       <ApplicationCreateWizardContent
-        defaultKind="M2M"
+        variant="serviceAccount"
         title="New Service Account"
         backHref="/admin/platform/access/service-accounts"
         backLabel="Service Accounts"

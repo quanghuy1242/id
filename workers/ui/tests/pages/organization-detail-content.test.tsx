@@ -32,6 +32,7 @@ function renderOrgDetail({
   error,
   actions = makeActions(org),
   onNavigateToOrgs,
+  scopedRoute,
 }: {
   org?: Organization;
   orgId?: string;
@@ -39,11 +40,12 @@ function renderOrgDetail({
   error?: string;
   actions?: ReturnType<typeof makeActions>;
   onNavigateToOrgs?: () => void;
+  scopedRoute?: boolean;
 } = {}) {
   return render(
     <OrgDetailProvider orgId={orgId} loading={loading} error={error} actions={actions}>
       <Stack gap="md">
-        <OrgDetailHeaderContent activeTab="overview" actions={actions} onNavigateToOrgs={onNavigateToOrgs} />
+        <OrgDetailHeaderContent activeTab="overview" actions={actions} onNavigateToOrgs={onNavigateToOrgs} scopedRoute={scopedRoute} />
         <OrgDetailOverviewContent actions={actions} />
       </Stack>
     </OrgDetailProvider>,
@@ -68,6 +70,13 @@ describe("Organization detail nested content", () => {
     expect(screen.getByText("#acme")).toBeInTheDocument();
     expect(screen.getByText("Metadata")).toBeInTheDocument();
     expect(screen.getByText(/"plan":/)).toBeInTheDocument();
+  });
+
+  it("hides the back button in scoped organization context", async () => {
+    renderOrgDetail({ scopedRoute: true });
+    await waitFor(() => expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0));
+    expect(screen.queryByRole("link", { name: /back to organizations/i })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: /organization detail tabs/i })).toBeNull();
   });
 
   it("opens Edit Organization dialog", async () => {

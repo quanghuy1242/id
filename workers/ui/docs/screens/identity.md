@@ -587,7 +587,7 @@ Components:
     OrgDetailHeaderContent:
       Inline(justify="between")
       Inline(gap="sm")
-        LinkButton(href="/admin/identity/organizations", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Organizations")
+        LinkButton(href="/admin/platform/identity/organizations", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Organizations") — rendered only when the header is used from the platform organization-list drilldown; the scoped `/admin/orgs/:orgId/**` context hides the back button.
         Text(variant="h1", org.name)
         Badge(tone="neutral", children=`#${org.slug}`)
       Button(variant="danger", onClick=openDeleteModal, "Delete")
@@ -603,6 +603,7 @@ Components:
         {id:"audit", href:`/admin/identity/organizations/${orgId}/audit`, label:"Audit"}
       ]
     )
+    — NOTE: platform organization drilldown renders these entity-local tabs; scoped `/admin/orgs/:orgId/**` hides them on desktop and mobile because the scoped lens uses sidebar/dock navigation.
     — NOTE: the layout derives activeTab from pathname and renders the shared header once.
       Sub-page route files render only OrganizationMembersContent, OrganizationTeamsContent, or OrganizationInvitationsContent.
 

@@ -271,9 +271,9 @@ Components:
   ApplicationCreateWizardContent
     LinkButton back
     Stepper(steps=[Type, Auth, URIs, Scopes, Review])
-    Type: RadioGroup(type: confidential | public | M2M) + TextInput(name)
-    Auth: RadioGroup(token_endpoint_auth_method) for confidential; read-only labels for public PKCE and M2M client_credentials
-    URIs: UrlListBuilder(redirect_uris) for every client type + UrlListBuilder(post_logout_redirect_uris) for non-M2M
+    Type: RadioGroup(type: confidential | public) + TextInput(name)
+    Auth: RadioGroup(token_endpoint_auth_method) for confidential; read-only label for public PKCE
+    URIs: UrlListBuilder(redirect_uris) + UrlListBuilder(post_logout_redirect_uris)
     Scopes: ScopeBuilder(suggestions=scope catalog, allowCustom)
     Review: DescriptionList summary
     Secret reveal: existing one-shot ConfirmDialog after create
@@ -281,8 +281,9 @@ Components:
 Data: GET /api/auth/admin/oauth-scopes → suggestions; POST /api/auth/oauth2/create-client → OAuthClient.
 
 Behavior:
-  - Redirect URIs are required by Better Auth's `/oauth2/create-client` schema for every client registration. M2M clients still collect one registered redirect URI even though the `client_credentials` token flow does not use browser redirects.
-  - Public clients force `token_endpoint_auth_method: "none"`; M2M forces `client_credentials`; confidential clients select `client_secret_post` or `client_secret_basic`.
+  - M2M is not offered from the OAuth application wizard. Machine clients are created from Access → Service Accounts so admins do not mix app and service-account paths.
+  - Redirect URIs are required by Better Auth's `/oauth2/create-client` schema for every client registration.
+  - Public clients force `token_endpoint_auth_method: "none"`; confidential clients select `client_secret_post` or `client_secret_basic`.
 
 ---
 
