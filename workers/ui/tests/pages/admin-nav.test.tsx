@@ -158,7 +158,7 @@ describe("Admin mobile navigation", () => {
     expect(screen.queryByRole("tablist")).toBeNull();
   });
 
-  it("does not render shell route tabs in scoped organization context", () => {
+  it("renders mobile section tabs in scoped organization context", () => {
     navigationMock.pathname = "/admin/orgs/org_001/identity/invitations";
 
     render(
@@ -170,7 +170,9 @@ describe("Admin mobile navigation", () => {
       </AdminScopeProvider>,
     );
 
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("tablist", { name: "Identity section navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("href", "/admin/orgs/org_001/identity/members");
+    expect(screen.getByRole("tab", { name: "Invitations" })).toHaveClass("tab-active");
   });
 
   it("labels the scoped organization dock entry as overview", () => {

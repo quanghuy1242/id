@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { LoginForm } from "@/app/login/login-form";
 
 const mockPush = vi.fn<() => void>();
 const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPostOrThrow = vi.fn<(...args: unknown[]) => void>();
 let mockOauthQuery = "";
 
 vi.mock("next/navigation", () => ({
@@ -21,6 +23,7 @@ vi.mock("@/lib/oauth-query", () => ({
 vi.mock("@id/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
   authApiPost: (...args: unknown[]) => mockAuthApiPost(...args),
+  authApiPostOrThrow: (...args: unknown[]) => mockAuthApiPostOrThrow(...args),
 }));
 
 describe("LoginForm", () => {
@@ -299,7 +302,7 @@ describe("LoginForm", () => {
   });
 
   it("runs signed-in platform step-up without credential fields", async () => {
-    mockAuthApiPost
+    mockAuthApiPostOrThrow
       .mockResolvedValueOnce({ status: true, maskedEmail: "a***@e***.test" })
       .mockResolvedValueOnce({ steppedUp: true });
     window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
@@ -309,7 +312,7 @@ describe("LoginForm", () => {
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(mockAuthApiPost).toHaveBeenCalledWith("/admin/step-up/request", {});
+      expect(mockAuthApiPostOrThrow).toHaveBeenCalledWith("/admin/step-up/request", {});
     });
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("We sent a verification code to a***@e***.test");
@@ -319,9 +322,45 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
 
     await waitFor(() => {
-      expect(mockAuthApiPost).toHaveBeenLastCalledWith("/admin/step-up/verify", { otp: "123456" });
+      expect(mockAuthApiPostOrThrow).toHaveBeenLastCalledWith("/admin/step-up/verify", { otp: "123456" });
     });
     expect(mockPush).toHaveBeenCalledWith("/admin/platform");
+  });
+
+  it("shows an error instead of a sent notice when platform step-up email request fails", async () => {
+    mockAuthApiPostOrThrow.mockRejectedValueOnce(new Error("Too many attempts. Try again later."));
+    window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
+
+    render(<LoginForm />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Too many attempts. Try again later.");
+    });
+    expect(screen.queryByText(/we sent a verification code/i)).toBeNull();
+  });
+
+  it("does not show a generic sent notice when platform step-up response lacks masked email", async () => {
+    mockAuthApiPostOrThrow.mockResolvedValueOnce({ status: true });
+    window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
+
+    render(<LoginForm />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Verification email response was missing the recipient.");
+    });
+    expect(screen.queryByText(/we sent a verification code to your email/i)).toBeNull();
+  });
+
+  it("starts the platform step-up request once under StrictMode effect replay", async () => {
+    mockAuthApiPostOrThrow.mockResolvedValue({ status: true, maskedEmail: "a***@e***.test" });
+    window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fplatform&stepUp=platform");
+
+    render(<StrictMode><LoginForm /></StrictMode>);
+
+    await waitFor(() => {
+      expect(mockAuthApiPostOrThrow).toHaveBeenCalledWith("/admin/step-up/request", {});
+    });
+    expect(mockAuthApiPostOrThrow).toHaveBeenCalledTimes(1);
   });
 
   it("shows admin-required redirects as login errors", async () => {

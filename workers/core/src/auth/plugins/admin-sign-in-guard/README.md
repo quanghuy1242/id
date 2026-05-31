@@ -1,109 +1,94 @@
 # id-admin-sign-in-guard
 
-> **Purpose**: Protects the hosted admin console at `/admin`. Anyone signing in
-> there must enter a one-time code emailed to them, on top of their password —
-> so a leaked admin password alone cannot open the console. It also stops a
-> bare email/password POST (with no admin or app context) from silently
-> creating a session. Enforced server-side; the only consumer that needs to do
-> anything is the `/login` page, which shows the code field when prompted.
+> **Purpose**: Protects platform-console entry by requiring a signed-in platform admin to complete an emailed one-time-code step-up before `/admin/platform/**` renders. It also stops bare email/password POSTs with no OAuth, Account, or Console context from silently creating a session.
 
 ## Setup
 
-None. The plugin is registered in `workers/core/src/auth/get-auth.ts` and is
-active for every `POST /api/auth/sign-in/email`. It needs an email sender and a
-KV binding, both injected at registration:
+None. The plugin is registered in `workers/core/src/auth/get-auth.ts`. It needs an email sender, a KV binding, the OTP HMAC secret, and the platform-admin role predicate, all injected at registration:
 
 ```ts
 idAdminSignInGuard({
-  sendEmail: ({ to, otp }) =>
-    sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
+  sendEmail: ({ to, otp }) => sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }),
   kv: env.KV,
+  otpHmacSecret: env.BETTER_AUTH_SECRET,
+  isPlatformAdmin,
 }),
 ```
 
-Admin accounts must have a verified email — an unverified admin is rejected
-before any code is sent (the underlying sign-in would reject it anyway).
+Platform admins must have a verified email before a code is sent.
 
 ## Usage
 
-Admin login is a two-step exchange against the standard sign-in endpoint.
-
-**Step 1 — credentials.** The `/login` page sends the admin `callbackURL`:
+Email/password login is a normal Better Auth sign-in when the request has a safe first-party context.
 
 ```http
 POST /api/auth/sign-in/email
 Content-Type: application/json
 
-{ "email": "admin@id.example", "password": "…", "oauth_query": "", "callbackURL": "/admin" }
-```
-
-```http
-401 Unauthorized
-{ "code": "admin_otp_required", "maskedEmail": "a***@i***.example" }
-```
-
-A 6-digit code is emailed; no session cookie is set.
-
-**Step 2 — code.** The user re-submits the same form with the code:
-
-```http
-POST /api/auth/sign-in/email
-Content-Type: application/json
-
-{ "email": "admin@id.example", "password": "…", "oauth_query": "", "callbackURL": "/admin", "otp": "123456" }
+{ "email": "admin@id.example", "password": "...", "callbackURL": "/admin" }
 ```
 
 ```http
 200 OK
-Set-Cookie: id-auth.session_token=…
-{ "redirect": true, "url": "/admin", "user": { … } }
+Set-Cookie: id-auth.session_token=...
+{ "redirect": true, "url": "/admin", "user": { ... } }
 ```
 
-OAuth/PKCE sign-ins carry a signed `oauth_query` instead of an admin
-`callbackURL`; they bypass both gates and are unaffected.
+When the signed-in actor enters `/admin/platform/**`, the UI proxy redirects to `/login?callbackURL=/admin/platform...&stepUp=platform`. The login page then starts the platform step-up:
+
+```http
+POST /api/auth/admin/step-up/request
+Content-Type: application/json
+
+{}
+```
+
+```http
+200 OK
+{ "status": true, "maskedEmail": "a***@i***.example" }
+```
+
+A 6-digit code is emailed and stored as a purpose-bound HMAC digest in KV.
+
+The user submits the code:
+
+```http
+POST /api/auth/admin/step-up/verify
+Content-Type: application/json
+
+{ "otp": "123456" }
+```
+
+```http
+200 OK
+{ "steppedUp": true, "expiresIn": 172800 }
+```
+
+OAuth/PKCE sign-ins carry a signed `oauth_query`; they bypass the context gate here and are validated by the OAuth provider's own hook.
 
 ## Routes
 
-The plugin declares no endpoints of its own. It hooks one existing path:
+The plugin declares the platform step-up endpoints and hooks one existing sign-in path:
 
-| Hook | Path | Outcomes |
+| Kind | Path | Outcomes |
 |---|---|---|
-| `hooks.before` | `POST /sign-in/email` | `400 missing_login_context` (no admin/OAuth context) · `401 admin_otp_required` (step 1) · `403 EMAIL_NOT_VERIFIED` · `401 invalid_otp` · `429 too_many_requests` · pass-through → `200` + session (valid OTP) |
+| endpoint | `GET /admin/step-up/status` | `{ steppedUp: boolean }` for the current session |
+| endpoint | `POST /admin/step-up/request` | `200` with masked email · `403 EMAIL_NOT_VERIFIED` · `403 platform_step_up_required` · `429 too_many_requests` |
+| endpoint | `POST /admin/step-up/verify` | `200` with proof TTL · `401 invalid_otp` · `403 platform_step_up_required` · `429 too_many_requests` |
+| hook | `POST /sign-in/email` | `400 missing_login_context` for no OAuth or safe first-party callback · pass-through to Better Auth sign-in otherwise |
 
 ## Technical detail
 
-Two gates run inside the `hooks.before` matcher on `ctx.path === "/sign-in/email"`,
-before the stock `signInEmail` body — so throwing an `APIError` here can never
-leave a session cookie behind.
+The sign-in hook runs before the stock `signInEmail` body, so a missing context cannot leave a session cookie behind. A truthy `oauth_query` returns immediately because the OAuth provider validates the signed query. Otherwise the request must carry a local `/admin`, `/admin/*`, `/account`, or `/account/*` `callbackURL`.
 
-1. **Context gate.** A truthy `oauth_query` returns immediately (the OAuth
-   provider's own before-hook validates the signature). Otherwise the request
-   must carry a `callbackURL` of `/admin` or `/admin/*`; anything else is
-   rejected with `400 missing_login_context`.
-
-2. **Admin MFA gate (email OTP).**
-   - *First submit (no `otp`)*: verify credentials mirroring `signInEmail`'s
-     branches and timing (calls `password.hash` on the not-found/no-credential
-     path for user-enumeration resistance), short-circuit unverified emails,
-     check the generation rate limit, store a purpose-bound HMAC-SHA256 digest
-     in KV (5-minute TTL), email the code, and throw `401 admin_otp_required`
-     with a masked email.
-   - *Second submit (`otp` present)*: check the verification rate limit, compare
-     the stored digest in constant time, delete it, and return so `signInEmail`
-     re-verifies the password and creates the session.
+The step-up endpoints use Better Auth's `sessionMiddleware`. `request` verifies the actor is a platform admin with a verified email, checks the generation throttle, stores a purpose-bound OTP digest in KV for 5 minutes, and awaits transactional email acceptance before returning success. `verify` checks the verification throttle, compares the submitted code in constant time, deletes the OTP digest, and stores a session-bound step-up proof in KV for `ADMIN_STEP_UP_TTL_SECONDS` (2 days).
 
 **Storage.** OTP digests and rate-limit counters live in KV
-(`BetterAuthKvStorage`), keyed by the prefixes in `auth/config.ts`. OTP digests
-are HMAC-SHA256 values derived from `BETTER_AUTH_SECRET`, the user ID, and the
-purpose string `admin-login-otp:v1`, so a KV-only leak cannot brute-force the
-6-digit code offline. KV read-modify-write is not atomic, so the rate limits are
-best-effort backstops; edge WAF remains the primary throttle for password
-guessing.
+(`BetterAuthKvStorage`), keyed by the prefixes in `auth/config.ts`. OTP digests are HMAC-SHA256 values derived from `BETTER_AUTH_SECRET`, the user ID, and the purpose string `admin-login-otp:v1`, so a KV-only leak cannot brute-force the 6-digit code offline. The final step-up proof is bound to the Better Auth session token, so changing sessions requires a new step-up. KV read-modify-write is not atomic, so the rate limits are best-effort backstops; edge WAF remains the primary throttle for password guessing.
 
 **File responsibilities.**
 
-- `index.ts` — the Better Auth contract surface: the plugin factory and the
-  single `hooks.before` matcher/handler. No endpoints.
+- `index.ts` — the Better Auth contract surface: the plugin factory, step-up endpoints, and the sign-in context hook.
 - `operations.ts` — context-helpers unit-testable without a BA context: OTP
   generation/HMAC digesting, email masking, the KV rate-limit helpers, and the
   invalid-credentials error.

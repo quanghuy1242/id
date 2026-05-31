@@ -214,7 +214,6 @@ export function AdminMobileNav() {
 export function AdminMobileRouteTabs() {
   const pathname = usePathname();
   const { activeScope } = useAdminScope();
-  if (activeScope.kind === "organization") return null;
 
   const mobileTabs = getMobileRouteTabs(pathname, getSidebarNavGroups(visibleNavSections(activeScope)));
 

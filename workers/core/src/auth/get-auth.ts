@@ -130,7 +130,7 @@ export function getAuthOptions(
       idOAuthM2MBridge(),
       idAdminSignInGuard({
         sendEmail: ({ to, otp }) =>
-          sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }, runtime.backgroundTaskRunner),
+          sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }),
         kv: env.KV,
         otpHmacSecret: env.BETTER_AUTH_SECRET,
         isPlatformAdmin,

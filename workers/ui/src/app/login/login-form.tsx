@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Alert, Button, Form, HiddenInput, Inline, LinkButton, Stack, Text, TextInput } from "@id/ui";
-import { authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
+import { authApiPost, authApiPostOrThrow, OAUTH_QUERY_PARAM } from "@id/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -129,12 +129,15 @@ async function submitLogin(data: Record<string, string>): Promise<LoginResult> {
 }
 
 async function requestPlatformStepUp(): Promise<{ readonly maskedEmail?: string }> {
-  const body = await authApiPost<Record<string, unknown>>("/admin/step-up/request", {});
-  return { maskedEmail: body.maskedEmail as string | undefined };
+  const body = await authApiPostOrThrow<Record<string, unknown>>("/admin/step-up/request", {});
+  if (typeof body.maskedEmail !== "string" || !body.maskedEmail) {
+    throw new Error("Verification email response was missing the recipient.");
+  }
+  return { maskedEmail: body.maskedEmail };
 }
 
 async function verifyPlatformStepUp(otp: string): Promise<boolean> {
-  const body = await authApiPost<Record<string, unknown>>("/admin/step-up/verify", { otp });
+  const body = await authApiPostOrThrow<Record<string, unknown>>("/admin/step-up/verify", { otp });
   return body.steppedUp === true;
 }
 
@@ -151,6 +154,7 @@ export function LoginForm() {
   const router = useRouter();
   const oauthQuery = useOauthQuery();
   const pendingCredentials = useRef<PendingCredentials | null>(null);
+  const stepUpRequestStarted = useRef(false);
   const [stepUpMode] = useState(isStepUpRequest);
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState("");
@@ -163,6 +167,8 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!stepUpMode) return;
+    if (stepUpRequestStarted.current) return;
+    stepUpRequestStarted.current = true;
     let cancelled = false;
     setLoading(true);
     void (async () => {
@@ -170,9 +176,7 @@ export function LoginForm() {
         const result = await requestPlatformStepUp();
         if (cancelled) return;
         setNotice(
-          result.maskedEmail
-            ? `We sent a verification code to ${result.maskedEmail}. Enter it below to continue.`
-            : "We sent a verification code to your email. Enter it below to continue.",
+          `We sent a verification code to ${result.maskedEmail}. Enter it below to continue.`,
         );
       } catch (err: unknown) {
         if (cancelled) return;

@@ -549,7 +549,7 @@ The path passed to `authApi*` is relative to `/api/auth`, matching existing admi
 | Request Shape | Context | Server Behavior | UI Behavior |
 |---|---|---|---|
 | `oauth_query` present | OAuth | Existing signed-query validation and continuation. | Login form does not inject a callback URL. |
-| `callbackURL` starts with `/admin` | Console | Validate credentials and sign in. | No OTP at login; the Console challenges step-up on platform-scope entry or sensitive actions. |
+| `callbackURL` starts with `/admin` | Console | Validate credentials and sign in. | No OTP at login; the Console challenges step-up on platform-scope entry once per session, or again for sensitive actions that require a fresh check. |
 | `callbackURL` starts with `/account` | Account | Validate credentials and sign in. | Normal account login. |
 | no OAuth query and no callback | Account default | Treat as `/account`. | Direct `/login` lands in the Account shell. |
 | absolute or unsafe callback | Invalid | Reject or normalize to the safe account default. | Show error or ignore the unsafe value. |

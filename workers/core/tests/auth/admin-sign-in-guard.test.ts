@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
-import { authPluginConfig } from "../../src/auth/config";
+import { ADMIN_STEP_UP_TTL_SECONDS, authPluginConfig } from "../../src/auth/config";
 import { otpHmacHex } from "../../src/auth/plugins/admin-sign-in-guard/operations";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 import { createCapturedAuthEmailSender, type CapturedAuthEmailSender } from "../helpers/test-email";
@@ -211,7 +211,10 @@ describe("id-admin-sign-in-guard", () => {
 
       const verify = await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp });
       expect(verify.status).toBe(200);
-      await expect(verify.json()).resolves.toMatchObject({ steppedUp: true });
+      await expect(verify.json()).resolves.toMatchObject({
+        steppedUp: true,
+        expiresIn: ADMIN_STEP_UP_TTL_SECONDS,
+      });
 
       const status = await authRequest(harness.auth, "/admin/step-up/status", cookie);
       expect(status.status).toBe(200);

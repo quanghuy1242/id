@@ -633,7 +633,7 @@ Under the one-console model, administration is not a separate identity, so the a
 
 First-release policy:
 
-- Entering the platform scope requires step-up (`ConsoleScope.requiresStepUp === true` for the platform scope).
+- Entering the platform scope requires step-up (`ConsoleScope.requiresStepUp === true` for the platform scope), remembered for the current Better Auth session.
 - High-impact platform actions — JWKS rotation, system settings writes, deleting an organization — require step-up at the action even within an already-stepped-up session, subject to a freshness window.
 - Organization-scope entry does not require step-up in v1 (`requiresStepUp === false`); org owners/admins sign in normally. A later policy may require step-up for org-destructive actions.
 - Plain account sign-in (Account shell) never requires step-up.

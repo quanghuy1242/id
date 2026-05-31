@@ -46,8 +46,8 @@ export const OAUTH_CONTEXT_SELECTION_TTL_SECONDS = 300;
 /** Admin login one-time-passcode lifetime, in seconds. */
 export const ADMIN_OTP_TTL_SECONDS = 300;
 
-/** Freshness window for a completed platform-console step-up, in seconds. */
-export const ADMIN_STEP_UP_TTL_SECONDS = 900;
+/** Session-bound platform-console step-up proof lifetime, in seconds. */
+export const ADMIN_STEP_UP_TTL_SECONDS = 60 * 60 * 24 * 2;
 
 /** Maximum admin-login OTP emails per generation window. */
 export const ADMIN_OTP_GENERATE_MAX_ATTEMPTS = 3;
