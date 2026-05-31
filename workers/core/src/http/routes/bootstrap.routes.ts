@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { CoreEnv } from "../../config/env";
 import { getAuth } from "../../auth/get-auth";
+import { ensureSystemAccessCatalog } from "../../auth/system-access-seed";
 import { nativeAdminExists } from "../../infrastructure/persistence/bootstrap-store";
 import { MIN_BOOTSTRAP_PASSWORD_LENGTH, MIN_BOOTSTRAP_TOKEN_LENGTH, BOOTSTRAP_RATE_LIMIT_MAX_ATTEMPTS, BOOTSTRAP_RATE_LIMIT_TTL_SECONDS, BOOTSTRAP_LOCK_TTL_SECONDS } from "../../shared/constants";
 import { extractBearerToken } from "../../shared/request";
@@ -85,6 +86,7 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
 
   const auth = getAuth(env);
   try {
+    const authContext = await auth.$context;
     const created = await auth.api.createUser({
       body: {
         email: body.data.email,
@@ -104,6 +106,8 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
         },
       });
     }
+
+    await ensureSystemAccessCatalog(env, authContext.adapter as Parameters<typeof ensureSystemAccessCatalog>[1], created.user.id);
 
     return c.json({
       user: {

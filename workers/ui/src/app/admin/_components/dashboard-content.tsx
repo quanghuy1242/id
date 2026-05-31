@@ -49,14 +49,14 @@ type DashboardContentProps = {
 };
 
 const sections = [
-  { href: "/admin/identity/users", title: "Users", body: "Create accounts, assign roles, verify emails, and manage bans." },
-  { href: "/admin/identity/organizations", title: "Organizations", body: "Manage tenants, their members, teams, and invitations." },
-  { href: "/admin/oauth/applications", title: "OAuth Applications", body: "Register clients, manage secrets, scopes, and redirect URIs." },
-  { href: "/admin/security/sessions", title: "Sessions", body: "Review live browser sessions and revoke active grants." },
-  { href: "/admin/security/tokens?type=access", title: "Tokens", body: "Inspect issued token prefixes without exposing token bodies." },
-  { href: "/admin/security/introspect", title: "Token Decoder", body: "Decode JWTs and call the RFC 7662 introspection endpoint." },
-  { href: "/admin/security/jwks", title: "Signing Keys", body: "Inspect public JWKS metadata and emergency-rotate signing keys." },
-  { href: "/admin/security/consents", title: "Consents", body: "Review and revoke the apps users have authorized." },
+  { href: "/admin/platform/identity/users", title: "Users", body: "Create accounts, assign roles, verify emails, and manage bans." },
+  { href: "/admin/platform/identity/organizations", title: "Organizations", body: "Manage tenants, their members, teams, and invitations." },
+  { href: "/admin/platform/oauth/applications", title: "OAuth Applications", body: "Register clients, manage secrets, scopes, and redirect URIs." },
+  { href: "/admin/platform/security/sessions", title: "Sessions", body: "Review live browser sessions and revoke active grants." },
+  { href: "/admin/platform/security/tokens?type=access", title: "Tokens", body: "Inspect issued token prefixes without exposing token bodies." },
+  { href: "/admin/platform/security/introspect", title: "Token Decoder", body: "Decode JWTs and call the RFC 7662 introspection endpoint." },
+  { href: "/admin/platform/security/jwks", title: "Signing Keys", body: "Inspect public JWKS metadata and emergency-rotate signing keys." },
+  { href: "/admin/platform/security/consents", title: "Consents", body: "Review and revoke the apps users have authorized." },
 ];
 
 function statValue(value: number | undefined): string {

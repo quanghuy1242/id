@@ -1,6 +1,7 @@
 import { expect } from "vitest";
 import { createApp } from "../../src/composition/create-app";
 import { getAuth } from "../../src/auth/get-auth";
+import { systemResourceServerAudience } from "../../src/auth/config";
 import type { CoreEnv } from "../../src/config/env";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
 import { adminOtpSignIn } from "./admin-otp-sign-in";
@@ -90,6 +91,16 @@ export async function createResourceServer(
     },
     test.env,
   );
+  if (
+    response.status !== 200
+    && args.organizationId === null
+    && args.audience === systemResourceServerAudience(test.env.BETTER_AUTH_URL)
+  ) {
+    const existing = test.raw
+      .prepare(`select "id" from "resourceServer" where "audience" = ?`)
+      .get(args.audience) as { readonly id: string } | undefined;
+    if (existing) return existing.id;
+  }
   expect(response.status).toBe(200);
   const body = (await response.json()) as { readonly id: string };
   return body.id;
@@ -109,6 +120,12 @@ export async function createOAuthScope(
     },
     test.env,
   );
+  if (response.status !== 200) {
+    const existing = test.raw
+      .prepare(`select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`)
+      .get(args.resourceServerId, args.scope) as { readonly id: string } | undefined;
+    if (existing) return;
+  }
   expect(response.status).toBe(200);
 }
 

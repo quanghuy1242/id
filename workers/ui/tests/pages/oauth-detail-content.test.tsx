@@ -48,7 +48,7 @@ describe("OAuth detail content", () => {
     fireEvent.click(screen.getByRole("button", { name: /rotate secret/i }));
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^rotate$/i }));
-    await waitFor(() => expect(actions.rotateClientSecret).toHaveBeenCalledWith("cli_contentapi_a1b2c3d4e5f6"));
+    await waitFor(() => expect(actions.rotateClientSecret).toHaveBeenCalledWith("cli_contentapi_a1b2c3d4e5f6", { kind: "platform" }));
     expect(await screen.findByText("sk-rotated-secret")).toBeInTheDocument();
   });
 
@@ -68,6 +68,7 @@ describe("OAuth detail content", () => {
         redirect_uris: ["https://admin.example.com/callback"],
         post_logout_redirect_uris: ["https://admin.example.com/signed-out"],
       }),
+      { kind: "platform" },
     ));
     expect(actions.updateClient.mock.calls[0]?.[1]).not.toHaveProperty("contacts");
     expect(actions.updateClient.mock.calls[0]?.[1]).not.toHaveProperty("token_endpoint_auth_method");
@@ -84,6 +85,7 @@ describe("OAuth detail content", () => {
     await waitFor(() => expect(actions.updateClient).toHaveBeenCalledWith(
       "cli_contentapi_a1b2c3d4e5f6",
       expect.not.objectContaining({ redirect_uris: expect.any(Array) }),
+      { kind: "platform" },
     ));
   });
 
@@ -94,7 +96,7 @@ describe("OAuth detail content", () => {
     fireEvent.click(screen.getByRole("button", { name: /^disable$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^disable$/i }));
-    await waitFor(() => expect(actions.disableResourceServer).toHaveBeenCalledWith("rs_001"));
+    await waitFor(() => expect(actions.disableResourceServer).toHaveBeenCalledWith("rs_001", { kind: "platform" }));
   });
 
   it("renders M2M binding overview with scopes", async () => {
@@ -112,7 +114,7 @@ describe("OAuth detail content", () => {
     fireEvent.click(screen.getByRole("button", { name: /edit binding/i }));
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(actions.updateBinding).toHaveBeenCalledWith("bind_001", expect.objectContaining({ allowedScopes: expect.any(Array) })));
+    await waitFor(() => expect(actions.updateBinding).toHaveBeenCalledWith("bind_001", expect.objectContaining({ allowedScopes: expect.any(Array) }), { kind: "platform" }));
   });
 
   it("deletes an M2M binding from the detail header", async () => {
@@ -123,7 +125,7 @@ describe("OAuth detail content", () => {
     fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
-    await waitFor(() => expect(actions.deleteBinding).toHaveBeenCalledWith("bind_001"));
+    await waitFor(() => expect(actions.deleteBinding).toHaveBeenCalledWith("bind_001", { kind: "platform" }));
     expect(onDeleted).toHaveBeenCalledTimes(1);
   });
 });

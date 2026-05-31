@@ -9,10 +9,23 @@
 
 /** Minimal adapter surface needed for plugin-local uniqueness checks. */
 export type AdapterContext = {
+  readonly findOne: <T>(params: {
+    model: string;
+    where: Array<{ field: string; value: unknown }>;
+  }) => Promise<T | null>;
   readonly findMany: <T>(params: {
     model: string;
     where?: Array<{ field: string; value: unknown }>;
   }) => Promise<T[]>;
+  readonly create: <T>(params: {
+    model: string;
+    data: Record<string, unknown>;
+  }) => Promise<T>;
+  readonly update: <T>(params: {
+    model: string;
+    where: Array<{ field: string; value: unknown }>;
+    update: Record<string, unknown>;
+  }) => Promise<T>;
 };
 
 /** Options accepted by the `idResourceServer` BA plugin factory. */

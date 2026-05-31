@@ -117,6 +117,8 @@ export type AuthPluginConfig = {
   readonly maxTokenTeamIds: number;
   /** Slug for id-owned system resource-server audiences. */
   readonly systemResourceServerSlug: string;
+  /** Display name for id-owned system resource-server audiences. */
+  readonly systemResourceServerName: string;
   /** OAuth scope that authorizes `/api/auth/admin/oauth-clients/lookup` for M2M callers. */
   readonly systemOAuthClientPickerScope: string;
   /** OAuth scope that authorizes SCIM directory read endpoints. */
@@ -171,6 +173,7 @@ export const authPluginConfig = {
   workspaceOnlyScopes: ["content:share"],
   maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
   systemResourceServerSlug: "id-system",
+  systemResourceServerName: "id system",
   systemOAuthClientPickerScope: "oauth:clients:read",
   scimDirectoryScope: "identity:directory:read",
 } as const satisfies AuthPluginConfig;

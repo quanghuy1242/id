@@ -25,6 +25,6 @@ describe("AdminPage", () => {
     render(<AdminPage />);
     const links = screen.getAllByRole("link", { name: /open/i });
     expect(links.length).toBeGreaterThanOrEqual(6);
-    expect(links.some((l) => l.getAttribute("href") === "/admin/identity/users")).toBe(true);
+    expect(links.some((l) => l.getAttribute("href") === "/admin/platform/identity/users")).toBe(true);
   });
 });

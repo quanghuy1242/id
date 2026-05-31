@@ -65,21 +65,25 @@ const banDurationOptions = [
 
 type UserDetailHeaderContentProps = {
   activeTab?: "overview" | "sessions" | "audit";
+  routeBasePath?: string;
+  backHref?: string;
   onImpersonateRedirect?: () => void;
   onNavigateToUsers?: () => void;
   actions?: typeof defaultActions;
 };
 
-function userDetailTabs(userId: string) {
+function userDetailTabs(routeBasePath: string) {
   return [
-    { id: "overview", href: `/admin/identity/users/${userId}`, label: "Overview" },
-    { id: "sessions", href: `/admin/identity/users/${userId}/sessions`, label: "Sessions" },
-    { id: "audit", href: `/admin/identity/users/${userId}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "sessions", href: `${routeBasePath}/sessions`, label: "Sessions" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
 export function UserDetailHeaderContent({
   activeTab = "overview",
+  routeBasePath,
+  backHref = "/admin/identity/users",
   onImpersonateRedirect,
   onNavigateToUsers,
   actions = defaultActions,
@@ -286,7 +290,7 @@ export function UserDetailHeaderContent({
     <>
       <Inline justify="between" wrap={false}>
         <AdminDetailTitleRow
-          backHref="/admin/identity/users"
+          backHref={backHref}
           backLabel="Users"
           title={user?.name ?? "User unavailable"}
         >
@@ -303,7 +307,7 @@ export function UserDetailHeaderContent({
       <Tabs
         ariaLabel="User detail tabs"
         selectedKey={activeTab}
-        items={userDetailTabs(userId)}
+        items={userDetailTabs(routeBasePath ?? `/admin/identity/users/${userId}`)}
       />
 
       <ConfirmDialog

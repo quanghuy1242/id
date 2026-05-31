@@ -6,7 +6,7 @@ import { SecurityShell } from "../_decorators/security-shell";
 
 export default { title: "Admin / Grants & Keys / Sessions" } satisfies StoryDefault;
 
-const ACTIVE = "/admin/security/sessions";
+const ACTIVE = "/admin/platform/security/sessions";
 
 function makeActions(sessions: AdminSession[]) {
   return {

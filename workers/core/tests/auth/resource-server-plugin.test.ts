@@ -212,6 +212,25 @@ describe("idResourceServer plugin endpoint", () => {
     expect(resourceTwo.status).toBe(200);
     const createdTwo = (await resourceTwo.json()) as { readonly id: string };
 
+    const platformScopedCrossOrgPatch = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}?organizationId=${organizationOne.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie: adminCookie },
+        body: JSON.stringify({ description: "cross-org update attempt" }),
+      }),
+    );
+    expect(platformScopedCrossOrgPatch.status).toBe(404);
+
+    const platformOrgList = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/resource-servers?organizationId=${organizationOne.id}`, {
+        headers: { cookie: adminCookie },
+      }),
+    );
+    expect(platformOrgList.status).toBe(200);
+    await expect(platformOrgList.json()).resolves.toEqual({
+      resourceServers: [expect.objectContaining({ id: createdOne.id, organizationId: organizationOne.id })],
+    });
+
     const list = await auth.handler(
       new Request("https://id.example.test/api/auth/admin/resource-servers", {
         headers: { cookie: ownerCookie },

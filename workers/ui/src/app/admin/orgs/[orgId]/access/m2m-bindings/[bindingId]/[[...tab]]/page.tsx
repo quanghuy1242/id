@@ -1,0 +1,30 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { PageBody } from "@id/ui";
+import { M2mBindingDetailContent, type M2mBindingDetailTab } from "../../../../../../_components/oauth/m2m-binding-detail-content";
+
+function activeTab(value: unknown): M2mBindingDetailTab {
+  const tab = Array.isArray(value) ? value[0] : undefined;
+  return tab === "audit" ? "audit" : "overview";
+}
+
+export default function OrgM2mBindingDetailPage() {
+  const params = useParams<{ orgId: string; bindingId: string; tab?: string[] }>();
+  const router = useRouter();
+  const scope = { kind: "organization" as const, organizationId: params.orgId };
+  const basePath = `/admin/orgs/${params.orgId}/access/m2m-bindings/${params.bindingId}`;
+
+  return (
+    <PageBody>
+      <M2mBindingDetailContent
+        bindingId={params.bindingId}
+        activeTab={activeTab(params.tab)}
+        scope={scope}
+        routeBasePath={basePath}
+        backHref={`/admin/orgs/${params.orgId}/access/m2m-bindings`}
+        onDeleted={() => router.push(`/admin/orgs/${params.orgId}/access/m2m-bindings`)}
+      />
+    </PageBody>
+  );
+}

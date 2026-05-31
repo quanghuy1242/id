@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -75,18 +76,24 @@ type ApplicationDetailContentProps = {
   readonly loading?: boolean;
   readonly error?: string;
   readonly onDeleted?: () => void;
+  readonly scope?: ActiveScope;
+  readonly routeBasePath?: string;
+  readonly backHref?: string;
+  readonly backLabel?: string;
   readonly actions?: typeof defaultActions;
 };
 
-function tabs(clientId: string) {
+const platformScope: ActiveScope = { kind: "platform" };
+
+function tabs(routeBasePath: string) {
   return [
-    { id: "overview", href: `/admin/oauth/applications/${clientId}`, label: "Overview" },
-    { id: "credentials", href: `/admin/oauth/applications/${clientId}/credentials`, label: "Credentials" },
-    { id: "uris", href: `/admin/oauth/applications/${clientId}/uris`, label: "URIs" },
-    { id: "scopes", href: `/admin/oauth/applications/${clientId}/scopes`, label: "Scopes & Grants" },
-    { id: "connections", href: `/admin/oauth/applications/${clientId}/connections`, label: "Connections" },
-    { id: "quickstart", href: `/admin/oauth/applications/${clientId}/quickstart`, label: "Quickstart" },
-    { id: "audit", href: `/admin/oauth/applications/${clientId}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "credentials", href: `${routeBasePath}/credentials`, label: "Credentials" },
+    { id: "uris", href: `${routeBasePath}/uris`, label: "URIs" },
+    { id: "scopes", href: `${routeBasePath}/scopes`, label: "Scopes & Grants" },
+    { id: "connections", href: `${routeBasePath}/connections`, label: "Connections" },
+    { id: "quickstart", href: `${routeBasePath}/quickstart`, label: "Quickstart" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
@@ -159,6 +166,9 @@ function Header({
   client,
   clientId,
   activeTab,
+  routeBasePath,
+  backHref,
+  backLabel,
   onEdit,
   onRotate,
   onDelete,
@@ -166,6 +176,9 @@ function Header({
   readonly client: OAuthClient | undefined;
   readonly clientId: string;
   readonly activeTab: ApplicationDetailTab;
+  readonly routeBasePath: string;
+  readonly backHref: string;
+  readonly backLabel: string;
   readonly onEdit?: () => void;
   readonly onRotate?: () => void;
   readonly onDelete?: () => void;
@@ -175,8 +188,8 @@ function Header({
     <Stack gap="sm">
       <Inline justify="between">
         <AdminDetailTitleRow
-          backHref="/admin/oauth/applications"
-          backLabel="OAuth Applications"
+          backHref={backHref}
+          backLabel={backLabel}
           title={client?.client_name ?? clientId}
         >
           {client ? <Badge tone={typeBadgeTone[type]}>{typeLabel[type]}</Badge> : null}
@@ -210,7 +223,7 @@ function Header({
           </Inline>
         ) : null}
       </Inline>
-      <Tabs ariaLabel="OAuth application detail tabs" selectedKey={activeTab} items={tabs(clientId)} />
+      <Tabs ariaLabel="OAuth application detail tabs" selectedKey={activeTab} items={tabs(routeBasePath)} />
     </Stack>
   );
 }
@@ -302,14 +315,14 @@ function ScopesAndGrants({ client }: { readonly client: OAuthClient }) {
   );
 }
 
-function Connections({ client, actions }: { readonly client: OAuthClient; readonly actions: typeof defaultActions }) {
-  const { data: bindings, isLoading, error, mutate } = useSWR(m2mBindingsKey(), () => actions.listBindings());
-  const { data: servers } = useSWR(resourceServersKey(), () => actions.listResourceServers());
+function Connections({ client, actions, scope }: { readonly client: OAuthClient; readonly actions: typeof defaultActions; readonly scope: ActiveScope }) {
+  const { data: bindings, isLoading, error, mutate } = useSWR(m2mBindingsKey(scope), () => actions.listBindings(scope));
+  const { data: servers } = useSWR(resourceServersKey(scope), () => actions.listResourceServers(scope));
   const serverById = new Map((servers ?? []).map((server: ResourceServer) => [server.id, server.name]));
   const rows = (bindings ?? []).filter((binding) => binding.clientId === client.client_id);
   const requestedScopes = scopeList(client.scope);
   const activeAllowedScopes = new Set(rows.filter((binding) => binding.enabled).flatMap((binding) => binding.allowedScopes));
-  const coveredScopes = requestedScopes.filter((scope) => activeAllowedScopes.has(scope)).length;
+  const coveredScopes = requestedScopes.filter((scopeName) => activeAllowedScopes.has(scopeName)).length;
   const disabledBindings = rows.filter((binding) => !binding.enabled).length;
   const columns: DataTableColumn<ClientResourceScope>[] = [
     { key: "resourceServerId", label: "Resource API", render: (binding) => serverById.get(binding.resourceServerId) ?? binding.resourceServerId },
@@ -318,7 +331,7 @@ function Connections({ client, actions }: { readonly client: OAuthClient; readon
       label: "Allowed Scopes",
       render: (binding) => (
         <Inline gap="xs" wrap>
-          {binding.allowedScopes.map((scope) => <Badge key={scope} tone="primary" size="sm">{scope}</Badge>)}
+          {binding.allowedScopes.map((scopeName) => <Badge key={scopeName} tone="primary" size="sm">{scopeName}</Badge>)}
         </Inline>
       ),
     },
@@ -357,11 +370,11 @@ function Quickstart({ client }: { readonly client: OAuthClient }) {
   );
 }
 
-function renderTab(activeTab: ApplicationDetailTab, client: OAuthClient, actions: typeof defaultActions) {
+function renderTab(activeTab: ApplicationDetailTab, client: OAuthClient, actions: typeof defaultActions, scope: ActiveScope) {
   if (activeTab === "credentials") return <Credentials client={client} />;
   if (activeTab === "uris") return <Uris client={client} />;
   if (activeTab === "scopes") return <ScopesAndGrants client={client} />;
-  if (activeTab === "connections") return <Connections client={client} actions={actions} />;
+  if (activeTab === "connections") return <Connections client={client} actions={actions} scope={scope} />;
   if (activeTab === "quickstart") return <Quickstart client={client} />;
   if (activeTab === "audit") return <ActivityLogContent targetType="oauth_client" targetId={client.client_id} />;
   return <Overview client={client} />;
@@ -373,6 +386,10 @@ export function ApplicationDetailContent({
   loading: loadingOverride,
   error: errorOverride,
   onDeleted,
+  scope = platformScope,
+  routeBasePath = `/admin/oauth/applications/${clientId}`,
+  backHref = "/admin/oauth/applications",
+  backLabel = "OAuth Applications",
   actions = defaultActions,
 }: ApplicationDetailContentProps) {
   const [editOpen, setEditOpen] = useState(false);
@@ -385,8 +402,8 @@ export function ApplicationDetailContent({
   const { mutate: globalMutate } = useSWRConfig();
 
   const { data: clients, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : oauthClientsKey(),
-    () => actions.listClients(),
+    loadingOverride || errorOverride ? null : oauthClientsKey(scope),
+    () => actions.listClients(scope),
   );
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
@@ -426,7 +443,7 @@ export function ApplicationDetailContent({
       if (redirectUriInput) update.redirect_uris = redirectUriInput;
       if (postLogoutUriInput) update.post_logout_redirect_uris = postLogoutUriInput;
       if (contactsInput) update.contacts = contactsInput;
-      const updated = await actions.updateClient(client.client_id, update);
+      const updated = await actions.updateClient(client.client_id, update, scope);
       await mutate((current) => (current ?? []).map((item) => item.client_id === updated.client_id ? updated : item), { revalidate: false });
       setEditOpen(false);
       toast.success("Application updated");
@@ -441,7 +458,7 @@ export function ApplicationDetailContent({
     if (!client) return false;
     setRotateError(undefined);
     try {
-      const { client_secret } = await actions.rotateClientSecret(client.client_id);
+      const { client_secret } = await actions.rotateClientSecret(client.client_id, scope);
       setRotateOpen(false);
       setRevealSecret(client_secret);
       toast.success("Secret rotated", "The previous secret is now invalid. Update your app config.");
@@ -456,7 +473,7 @@ export function ApplicationDetailContent({
     if (!client) return false;
     setDeleteError(undefined);
     try {
-      await actions.deleteClient(client.client_id);
+      await actions.deleteClient(client.client_id, scope);
       await mutate((current) => (current ?? []).filter((item) => item.client_id !== client.client_id), { revalidate: false });
       await globalMutate(isM2mBindingsKey, undefined, { revalidate: false });
       setDeleteOpen(false);
@@ -472,7 +489,7 @@ export function ApplicationDetailContent({
   if (showLoading) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
         <Skeleton rows={6} />
       </Stack>
     );
@@ -481,7 +498,7 @@ export function ApplicationDetailContent({
   if (showError) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
         <ErrorAlert message={showError} onRetry={() => void mutate()} />
       </Stack>
     );
@@ -490,7 +507,7 @@ export function ApplicationDetailContent({
   if (!client) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
         <ErrorAlert message="Application not found" onRetry={() => void mutate()} />
       </Stack>
     );
@@ -502,11 +519,14 @@ export function ApplicationDetailContent({
         client={client}
         clientId={clientId}
         activeTab={activeTab}
+        routeBasePath={routeBasePath}
+        backHref={backHref}
+        backLabel={backLabel}
         onEdit={() => setEditOpen(true)}
         onRotate={() => { setRotateError(undefined); setRotateOpen(true); }}
         onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
       />
-      {renderTab(activeTab, client, actions)}
+      {renderTab(activeTab, client, actions, scope)}
       <ConfirmDialog
         open={editOpen}
         onOpenChange={(o) => { setEditOpen(o); if (!o) setEditError(undefined); }}

@@ -39,8 +39,8 @@ const panelTabs: PanelTabItem[] = [
 ];
 
 const routedTabs: LinkTabItem[] = [
-  { id: "users", href: "/admin/identity/users", label: "Users" },
-  { id: "organizations", href: "/admin/identity/organizations", label: "Organizations" },
+  { id: "users", href: "/admin/platform/identity/users", label: "Users" },
+  { id: "organizations", href: "/admin/platform/identity/organizations", label: "Organizations" },
 ];
 
 export const PanelTabs: Story = () => {

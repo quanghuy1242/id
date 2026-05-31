@@ -4,6 +4,9 @@ export const USER_MODEL = "user" as const;
 /** BA model name for the member (organization membership) table. */
 export const MEMBER_MODEL = "member" as const;
 
+/** BA model name for the organization table. */
+export const ORGANIZATION_MODEL = "organization" as const;
+
 /** BA model name for the team table. */
 export const TEAM_MODEL = "team" as const;
 
@@ -36,6 +39,15 @@ export const OAUTH_CONSENT_MODEL = "oauthConsent" as const;
 
 /** BA model name for the admin activity-log plugin table. */
 export const ADMIN_ACTIVITY_LOG_MODEL = "adminActivityLog" as const;
+
+/** Sort rank for organization owner memberships in console scope discovery. */
+export const CONSOLE_OWNER_ROLE_RANK = 3;
+
+/** Sort rank for organization admin memberships in console scope discovery. */
+export const CONSOLE_ADMIN_ROLE_RANK = 2;
+
+/** Sort rank for ordinary member memberships in console scope discovery. */
+export const CONSOLE_MEMBER_ROLE_RANK = 1;
 
 /** Warm-isolate TTL for the resource-server audience list before falling back to KV. */
 export const RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS = 60_000;

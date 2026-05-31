@@ -75,6 +75,16 @@ const enableResourceServerMetadata = resourceServerEndpointMeta({
   responseDescription: "Resource server enabled successfully",
 });
 
+function requestedOrganizationId(query: Record<string, unknown> | undefined): string | undefined {
+  return typeof query?.organizationId === "string" && query.organizationId ? query.organizationId : undefined;
+}
+
+function assertRequestedOrganization(row: Pick<ResourceServerRow, "organizationId">, organizationId: string | undefined): void {
+  if (organizationId !== undefined && row.organizationId !== organizationId) {
+    throw new APIError("NOT_FOUND");
+  }
+}
+
 /** Better Auth plugin that owns resource-server persistence and admin endpoints. */
 export const idResourceServer = (options: ResourceServerPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-resource-server",
@@ -124,6 +134,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
+        const organizationId = requestedOrganizationId(ctx.query);
 
         const rows = await ctx.context.adapter.findMany<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
@@ -141,7 +152,10 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
             ),
           })),
         );
-        const visible = access.filter((entry) => entry.visible).map((entry) => entry.row);
+        const visible = access
+          .filter((entry) => entry.visible)
+          .map((entry) => entry.row)
+          .filter((row) => organizationId === undefined || row.organizationId === organizationId);
 
         return ctx.json({ resourceServers: visible });
       },
@@ -163,6 +177,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!row) throw new APIError("NOT_FOUND");
+        assertRequestedOrganization(row, requestedOrganizationId(ctx.query));
         if (!(await canAccessResourceServer(options.authorize, row, session.user.id, session.user.role, ctx.context.adapter))) {
           throw new APIError("NOT_FOUND");
         }
@@ -188,6 +203,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
+        assertRequestedOrganization(existing, requestedOrganizationId(ctx.query));
 
         await assertResourceServerAccess(
           options.authorize,
@@ -226,6 +242,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
+        assertRequestedOrganization(existing, requestedOrganizationId(ctx.query));
 
         await assertResourceServerAccess(
           options.authorize,
@@ -260,6 +277,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
+        assertRequestedOrganization(existing, requestedOrganizationId(ctx.query));
 
         await assertResourceServerAccess(
           options.authorize,
@@ -295,6 +313,7 @@ export const idResourceServer = (options: ResourceServerPluginOptions = {}): Bet
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
+        assertRequestedOrganization(existing, requestedOrganizationId(ctx.query));
 
         await assertResourceServerAccess(
           options.authorize,

@@ -12,6 +12,7 @@ import {
   revokeConsent,
   rotateAdminJwks,
 } from "@/app/admin/_actions/audit";
+import { listAdminsRoles } from "@/app/admin/_actions/access";
 import {
   createBinding,
   createClient,
@@ -33,6 +34,8 @@ import {
   updateScope,
 } from "@/app/admin/_actions/oauth";
 import { mockBindings, mockClients, mockResourceServers, mockScopes } from "@/app/admin/_mocks/oauth";
+import { mockMembers, mockOrganizations } from "@/app/admin/_mocks/organizations";
+import { mockUsers } from "@/app/admin/_mocks/users";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -106,10 +109,31 @@ describe("admin action contracts", () => {
     expect(jsonBody()).toEqual({ client_id: "cli_portal" });
   });
 
+  it("uses the active-organization bridge only for org-scoped OAuth client actions", async () => {
+    const orgClients = [
+      { ...mockClients[0], reference_id: "org_001" },
+      { ...mockClients[1], reference_id: "org_002" },
+    ];
+    fetchMock
+      .mockResolvedValueOnce(emptyResponse())
+      .mockResolvedValueOnce(jsonResponse(orgClients));
+
+    await expect(listClients({ kind: "organization", organizationId: "org_001" })).resolves.toEqual([orgClients[0]]);
+
+    const [setActiveUrl, setActiveInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(setActiveUrl).toBe("/api/auth/organization/set-active");
+    expect(JSON.parse(String(setActiveInit.body))).toEqual({ organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/oauth2/get-clients");
+  });
+
   it("unwraps repo-owned OAuth admin plugin envelopes and preserves flat mutation bodies", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ resourceServers: mockResourceServers }));
     await expect(listResourceServers()).resolves.toEqual(mockResourceServers);
     expect(lastCall().url).toBe("/api/auth/admin/resource-servers");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ resourceServers: [mockResourceServers[0]] }));
+    await expect(listResourceServers({ kind: "organization", organizationId: "org_001" })).resolves.toEqual([mockResourceServers[0]]);
+    expect(lastCall().url).toBe("/api/auth/admin/resource-servers?organizationId=org_001");
 
     fetchMock.mockResolvedValueOnce(jsonResponse(mockResourceServers[0]));
     await createResourceServer({ name: "Content API", slug: "content-api", audience: "https://content.example.com", description: "Main content API", organizationId: "org_001" });
@@ -122,44 +146,56 @@ describe("admin action contracts", () => {
     expect(jsonBody()).toEqual({ description: null });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...mockResourceServers[0], enabled: false }));
-    await disableResourceServer("rs_001");
-    expect(lastCall().url).toBe("/api/auth/admin/resource-servers/rs_001/disable");
+    await disableResourceServer("rs_001", { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/resource-servers/rs_001/disable?organizationId=org_001");
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...mockResourceServers[0], enabled: true }));
-    await enableResourceServer("rs_001");
-    expect(lastCall().url).toBe("/api/auth/admin/resource-servers/rs_001/enable");
+    await enableResourceServer("rs_001", { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/resource-servers/rs_001/enable?organizationId=org_001");
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ deleted: true }));
-    await deleteResourceServer("rs_001");
+    await deleteResourceServer("rs_001", { kind: "organization", organizationId: "org_001" });
     expect(lastCall().init.method).toBe("DELETE");
+    expect(lastCall().url).toBe("/api/auth/admin/resource-servers/rs_001?organizationId=org_001");
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ oauthScopes: mockScopes }));
     await expect(listScopes()).resolves.toEqual(mockScopes);
 
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oauthScopes: [mockScopes[0]] }));
+    await expect(listScopes({ kind: "organization", organizationId: "org_001" })).resolves.toEqual([mockScopes[0]]);
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-scopes?organizationId=org_001");
+
     fetchMock.mockResolvedValueOnce(jsonResponse(mockScopes[0]));
-    await createScope({ resourceServerId: "rs_001", scope: "content:read", description: "Read" });
+    await createScope({ resourceServerId: "rs_001", scope: "content:read", description: "Read" }, { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-scopes?organizationId=org_001");
     expect(jsonBody()).toEqual({ resourceServerId: "rs_001", scope: "content:read", description: "Read" });
 
     fetchMock.mockResolvedValueOnce(jsonResponse(mockScopes[0]));
-    await updateScope("sc_001", { enabled: false });
-    expect(lastCall().url).toBe("/api/auth/admin/oauth-scopes/sc_001");
+    await updateScope("sc_001", { enabled: false }, { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-scopes/sc_001?organizationId=org_001");
     expect(jsonBody()).toEqual({ enabled: false });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ oauthClientResourceScopes: mockBindings }));
     await expect(listBindings()).resolves.toEqual(mockBindings);
 
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oauthClientResourceScopes: [mockBindings[0]] }));
+    await expect(listBindings({ kind: "organization", organizationId: "org_001" })).resolves.toEqual([mockBindings[0]]);
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-client-resource-scopes?organizationId=org_001");
+
     fetchMock.mockResolvedValueOnce(jsonResponse(mockBindings[0]));
-    await createBinding({ clientId: "cli_content", resourceServerId: "rs_001", allowedScopes: ["content:read"] });
+    await createBinding({ clientId: "cli_content", resourceServerId: "rs_001", allowedScopes: ["content:read"] }, { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-client-resource-scopes?organizationId=org_001");
     expect(jsonBody()).toEqual({ clientId: "cli_content", resourceServerId: "rs_001", allowedScopes: ["content:read"] });
 
     fetchMock.mockResolvedValueOnce(jsonResponse(mockBindings[0]));
-    await updateBinding("bind_001", { allowedScopes: ["content:read", "content:write"] });
-    expect(lastCall().url).toBe("/api/auth/admin/oauth-client-resource-scopes/bind_001");
+    await updateBinding("bind_001", { allowedScopes: ["content:read", "content:write"] }, { kind: "organization", organizationId: "org_001" });
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-client-resource-scopes/bind_001?organizationId=org_001");
     expect(jsonBody()).toEqual({ allowedScopes: ["content:read", "content:write"] });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ deleted: true }));
-    await deleteBinding("bind_001");
+    await deleteBinding("bind_001", { kind: "organization", organizationId: "org_001" });
     expect(lastCall().init.method).toBe("DELETE");
+    expect(lastCall().url).toBe("/api/auth/admin/oauth-client-resource-scopes/bind_001?organizationId=org_001");
   });
 
   it("matches audit and introspection endpoint wire contracts", async () => {
@@ -207,5 +243,24 @@ describe("admin action contracts", () => {
     expect(body.get("token_type_hint")).toBe("access_token");
     expect(body.get("resource")).toBe("https://content.example.com");
     expect(body.has("client_id")).toBe(false);
+  });
+
+  it("composes the Admins & Roles derived view from existing Better Auth endpoints", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ users: [mockUsers[0]], total: 1, limit: 100, offset: 0 }))
+      .mockResolvedValueOnce(jsonResponse([mockOrganizations[0]]))
+      .mockResolvedValueOnce(jsonResponse({ members: mockMembers, total: mockMembers.length }));
+
+    await expect(listAdminsRoles()).resolves.toMatchObject({
+      platformAdmins: [expect.objectContaining({ id: mockUsers[0].id, role: "admin" })],
+      organizationAuthorities: [
+        expect.objectContaining({ member: expect.objectContaining({ role: "owner" }) }),
+        expect.objectContaining({ member: expect.objectContaining({ role: "admin" }) }),
+      ],
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/auth/admin/list-users?limit=100&offset=0&filterField=role&filterValue=admin&filterOperator=eq");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/organization/list");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(`/api/auth/organization/list-members?organizationId=${mockOrganizations[0].id}`);
   });
 });

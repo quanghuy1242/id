@@ -63,6 +63,8 @@ await import("./pages/oauth-actions.test");
 await import("./pages/applications-content.test");
 await import("./pages/application-create-wizard-content.test");
 await import("./pages/oauth-detail-content.test");
+await import("./pages/scope-cache.test");
+await import("./pages/admins-roles-content.test");
 await import("./pages/resource-apis-content.test");
 await import("./pages/scope-catalog-content.test");
 await import("./pages/m2m-bindings-content.test");

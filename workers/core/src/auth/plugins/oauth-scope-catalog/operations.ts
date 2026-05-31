@@ -160,6 +160,60 @@ export async function assertUniqueResourceScope(
   }
 }
 
+export type EnsureOAuthResourceScopeResult = {
+  readonly row: OAuthResourceScopeRow;
+  readonly changed: boolean;
+};
+
+type OAuthResourceScopeUpdate = {
+  -readonly [Key in keyof OAuthResourceScopeRow]?: OAuthResourceScopeRow[Key];
+};
+
+/**
+ * Ensures one resource-server scope exists and is enabled using the plugin's
+ * natural key and BA adapter model.
+ */
+export async function ensureOAuthResourceScope(
+  adapter: AdapterContext,
+  body: CreateOAuthResourceScopeBody,
+  actorId: string,
+): Promise<EnsureOAuthResourceScopeResult> {
+  const key = resourceScopeKey(body.resourceServerId, body.scope);
+  const existing = await adapter.findOne<OAuthResourceScopeRow>({
+    model: OAUTH_RESOURCE_SCOPE_MODEL,
+    where: [{ field: "resourceScopeKey", value: key }],
+  });
+
+  if (!existing) {
+    const row = await adapter.create<OAuthResourceScopeRow>({
+      model: OAUTH_RESOURCE_SCOPE_MODEL,
+      data: buildCreateScopePayload(body, actorId),
+    });
+    return { row, changed: true };
+  }
+
+  const update: OAuthResourceScopeUpdate = {};
+  if (!existing.enabled) update.enabled = true;
+  if (body.description !== undefined && existing.description !== body.description) {
+    update.description = body.description;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return { row: existing, changed: false };
+  }
+
+  const row = await adapter.update<OAuthResourceScopeRow>({
+    model: OAUTH_RESOURCE_SCOPE_MODEL,
+    where: [{ field: "id", value: existing.id }],
+    update: {
+      ...update,
+      updatedBy: actorId,
+      updatedAt: Date.now(),
+    },
+  });
+  return { row, changed: true };
+}
+
 export async function assertGrantScopesExist(
   adapter: AdapterContext,
   resourceServerId: string,

@@ -1,10 +1,13 @@
 import type { Arguments } from "swr";
+import type { ActiveScope } from "@id/lib";
 import type { ListUsersParams } from "../_actions/users";
 import {
   USERS_LIST,
   USER_DETAIL,
   USER_SESSIONS,
   CURRENT_SESSION,
+  CONSOLE_SCOPES,
+  ACCESS_ADMINS_ROLES,
   ORGS_LIST,
   ORG_DETAIL,
   ORG_MEMBERS,
@@ -33,11 +36,15 @@ import {
  * structurally, so the same logical key always resolves to the same cache slot.
  */
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 /** Server params only — the caller passes the debounced search, never raw input. */
 export const usersListKey = (params: ListUsersParams) => [USERS_LIST, params] as const;
 export const userDetailKey = (id: string) => [USER_DETAIL, { id }] as const;
 export const userSessionsKey = (userId: string) => [USER_SESSIONS, { userId }] as const;
 export const currentSessionKey = () => [CURRENT_SESSION] as const;
+export const consoleScopesKey = () => [CONSOLE_SCOPES] as const;
+export const adminsRolesKey = () => [ACCESS_ADMINS_ROLES] as const;
 export const orgsListKey = () => [ORGS_LIST] as const;
 export const orgDetailKey = (organizationId: string) => [ORG_DETAIL, { organizationId }] as const;
 export const orgMembersKey = (organizationId: string) => [ORG_MEMBERS, { organizationId }] as const;
@@ -50,10 +57,10 @@ export const orgInvitationsKey = (organizationId: string) => [ORG_INVITATIONS, {
  * so every builder is keyless — the cache slot is identified by the endpoint
  * path alone.
  */
-export const oauthClientsKey = () => [OAUTH_CLIENTS] as const;
-export const resourceServersKey = () => [RESOURCE_SERVERS] as const;
-export const oauthScopesKey = () => [OAUTH_SCOPES] as const;
-export const m2mBindingsKey = () => [OAUTH_CLIENT_RESOURCE_SCOPES] as const;
+export const oauthClientsKey = (scope: ActiveScope = platformScope) => [OAUTH_CLIENTS, scope] as const;
+export const resourceServersKey = (scope: ActiveScope = platformScope) => [RESOURCE_SERVERS, scope] as const;
+export const oauthScopesKey = (scope: ActiveScope = platformScope) => [OAUTH_SCOPES, scope] as const;
+export const m2mBindingsKey = (scope: ActiveScope = platformScope) => [OAUTH_CLIENT_RESOURCE_SCOPES, scope] as const;
 export const jwksKey = () => [JWKS] as const;
 
 /** Aggregate audit keys — server params (page window, type, client filter) only. */

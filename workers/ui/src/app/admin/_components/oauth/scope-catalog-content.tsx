@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -45,6 +46,8 @@ const defaultActions = {
   listResourceServers: listResourceServersAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 /** Scope strings are lowercase per the OpenAPI contract. */
 function isValidScope(scope: string): boolean {
   return /^[a-z][a-z0-9:_-]*$/.test(scope);
@@ -66,6 +69,7 @@ type ScopeCatalogContentProps = {
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
+  scope?: ActiveScope;
   actions?: typeof defaultActions;
 };
 
@@ -78,6 +82,7 @@ export function ScopeCatalogContent({
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
+  scope = platformScope,
   actions = defaultActions,
 }: ScopeCatalogContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -106,12 +111,12 @@ export function ScopeCatalogContent({
   const editDisplay = editTarget ?? lastEditRef.current;
 
   const { data: allScopes, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : oauthScopesKey(),
-    () => actions.listScopes(),
+    loadingOverride || errorOverride ? null : oauthScopesKey(scope),
+    () => actions.listScopes(scope),
   );
   const { data: servers } = useSWR(
-    loadingOverride || errorOverride ? null : resourceServersKey(),
-    () => actions.listResourceServers(),
+    loadingOverride || errorOverride ? null : resourceServersKey(scope),
+    () => actions.listResourceServers(scope),
   );
 
   const serverById = useMemo(() => {
@@ -195,20 +200,20 @@ export function ScopeCatalogContent({
   async function handleCreate(formData: FormData) {
     setCreateError(undefined);
     if (!createRsId) { setCreateError("Select a resource API"); return false; }
-    const scope = String(formData.get("scope") ?? "").trim();
-    if (!isValidScope(scope)) {
+    const scopeName = String(formData.get("scope") ?? "").trim();
+    if (!isValidScope(scopeName)) {
       setCreateError("Scope must be lowercase and match ^[a-z][a-z0-9:_-]*$");
       return false;
     }
     try {
       await actions.createScope({
         resourceServerId: createRsId,
-        scope,
+        scope: scopeName,
         description: String(formData.get("description") ?? "").trim() || undefined,
-      });
+      }, scope);
       await mutate();
       setCreateOpen(false);
-      toast.success("Scope created", `"${scope}" can now be requested by clients.`);
+      toast.success("Scope created", `"${scopeName}" can now be requested by clients.`);
       return true;
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create scope");
@@ -223,7 +228,7 @@ export function ScopeCatalogContent({
       await actions.updateScope(editTarget.id, {
         description: String(formData.get("description") ?? "").trim() || null,
         enabled: editEnabled,
-      });
+      }, scope);
       await mutate();
       setEditTarget(null);
       toast.success("Scope updated");
@@ -235,7 +240,7 @@ export function ScopeCatalogContent({
   }
 
   function parseBulkCsv(text: string): BulkScopeRow[] {
-    const existing = new Set((allScopes ?? []).map((scope) => scope.scope));
+    const existing = new Set((allScopes ?? []).map((catalogScope) => catalogScope.scope));
     const serverLookup = new Map<string, ResourceServer>();
     for (const server of servers ?? []) {
       serverLookup.set(server.id, server);
@@ -249,14 +254,14 @@ export function ScopeCatalogContent({
       .filter((line, index) => !(index === 0 && line.toLowerCase().startsWith("scope,")))
       .map((line) => {
         const [rawScope, rawServer, ...descriptionParts] = line.split(",");
-        const scope = (rawScope ?? "").trim();
+        const scopeName = (rawScope ?? "").trim();
         const serverKey = (rawServer ?? "").trim();
         const server = serverLookup.get(serverKey) ?? serverLookup.get(serverKey.toLowerCase());
         const description = descriptionParts.join(",").trim() || undefined;
-        if (!isValidScope(scope)) return { scope, resourceServerId: null, description, error: "Invalid scope" };
-        if (existing.has(scope)) return { scope, resourceServerId: null, description, error: "Already exists" };
-        if (!server) return { scope, resourceServerId: null, description, error: "Unknown resource API" };
-        return { scope, resourceServerId: server.id, description };
+        if (!isValidScope(scopeName)) return { scope: scopeName, resourceServerId: null, description, error: "Invalid scope" };
+        if (existing.has(scopeName)) return { scope: scopeName, resourceServerId: null, description, error: "Already exists" };
+        if (!server) return { scope: scopeName, resourceServerId: null, description, error: "Unknown resource API" };
+        return { scope: scopeName, resourceServerId: server.id, description };
       });
   }
 
@@ -275,7 +280,7 @@ export function ScopeCatalogContent({
       return false;
     }
     try {
-      await Promise.all(validRows.map((row) => actions.createScope({ resourceServerId: row.resourceServerId, scope: row.scope, description: row.description })));
+      await Promise.all(validRows.map((row) => actions.createScope({ resourceServerId: row.resourceServerId, scope: row.scope, description: row.description }, scope)));
       await mutate();
       setBulkOpen(false);
       setBulkRows([]);

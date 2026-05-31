@@ -19,58 +19,58 @@ vi.mock("next/navigation", () => ({
 
 describe("Admin sidebar navigation", () => {
   it("activates only the most specific sidebar item", () => {
-    navigationMock.pathname = "/admin/security/sessions";
+    navigationMock.pathname = "/admin/platform/security/sessions";
 
     render(<AdminSidebarNav />);
 
-    expect(screen.getByRole("link", { name: "OAuth" })).not.toHaveClass("menu-active");
-    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveClass("menu-active");
-    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Applications" })).not.toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Sessions" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Sessions" })).toHaveAttribute(
       "href",
-      "/admin/security/sessions",
+      "/admin/platform/security/sessions",
     );
   });
 
   it("keeps the security section item active across grants sub-routes", () => {
-    navigationMock.pathname = "/admin/security/jwks";
+    navigationMock.pathname = "/admin/platform/security/jwks";
 
     render(<AdminSidebarNav />);
 
-    expect(screen.getByRole("link", { name: "Grants & Keys" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "JWKS" })).toHaveClass("menu-active");
   });
 
   it("keeps the OAuth section item active for nested configuration routes", () => {
-    navigationMock.pathname = "/admin/oauth/resource-apis";
+    navigationMock.pathname = "/admin/platform/oauth/applications";
 
     render(<AdminSidebarNav />);
 
-    expect(screen.getByRole("link", { name: "OAuth" })).toHaveClass("menu-active");
-    expect(screen.getByRole("link", { name: "OAuth" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Applications" })).toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Applications" })).toHaveAttribute(
       "href",
-      "/admin/oauth/applications",
+      "/admin/platform/oauth/applications",
     );
-    expect(screen.getByRole("link", { name: "Grants & Keys" })).not.toHaveClass("menu-active");
+    expect(screen.getByRole("link", { name: "Sessions" })).not.toHaveClass("menu-active");
   });
 });
 
 describe("Admin mobile navigation", () => {
   it("links dock section entries to primary routes", () => {
-    navigationMock.pathname = "/admin";
+    navigationMock.pathname = "/admin/platform";
 
     render(<AdminMobileNav />);
 
     expect(screen.getByRole("link", { name: "Identity" })).toHaveAttribute(
       "href",
-      "/admin/identity/users",
+      "/admin/platform/identity/users",
     );
-    expect(screen.getByRole("link", { name: "OAuth" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Apps" })).toHaveAttribute(
       "href",
-      "/admin/oauth/applications",
+      "/admin/platform/oauth/applications",
     );
   });
 
   it("keeps the section dock item active across sibling mobile routes", () => {
-    navigationMock.pathname = "/admin/identity/organizations";
+    navigationMock.pathname = "/admin/platform/identity/organizations";
 
     render(<AdminMobileNav />);
 
@@ -80,17 +80,17 @@ describe("Admin mobile navigation", () => {
   });
 
   it("renders mobile section tabs for the active section", () => {
-    navigationMock.pathname = "/admin/identity/organizations";
+    navigationMock.pathname = "/admin/platform/identity/organizations";
 
     render(<AdminMobileRouteTabs />);
 
     expect(screen.getByRole("tablist", { name: "Identity section navigation" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Users" })).toHaveAttribute("href", "/admin/identity/users");
+    expect(screen.getByRole("tab", { name: "Users" })).toHaveAttribute("href", "/admin/platform/identity/users");
     expect(screen.getByRole("tab", { name: "Organizations" })).toHaveClass("tab-active");
   });
 
   it("selects the most specific mobile section tab", () => {
-    navigationMock.pathname = "/admin/identity/organizations";
+    navigationMock.pathname = "/admin/platform/identity/organizations";
 
     render(<AdminMobileRouteTabs />);
 
@@ -99,7 +99,7 @@ describe("Admin mobile navigation", () => {
   });
 
   it("does not render mobile section tabs on dashboard", () => {
-    navigationMock.pathname = "/admin";
+    navigationMock.pathname = "/admin/platform";
 
     render(<AdminMobileRouteTabs />);
 

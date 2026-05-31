@@ -249,4 +249,91 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     });
     expect(attach.status).toBe(400);
   });
+
+  it("filters scope catalog and M2M binding lists by explicit organization id", async () => {
+    const test = await createTestEnv();
+    const cookie = await bootstrapAdmin(test);
+    await withOrg(test, "org_a", "org-a");
+    await withOrg(test, "org_b", "org-b");
+
+    const resourceA = await createResourceServer(test, cookie, {
+      organizationId: "org_a",
+      slug: "content-a",
+      name: "Content A",
+      audience: "https://content-a.example.test",
+    });
+    const resourceB = await createResourceServer(test, cookie, {
+      organizationId: "org_b",
+      slug: "content-b",
+      name: "Content B",
+      audience: "https://content-b.example.test",
+    });
+    await createOAuthScope(test, cookie, { resourceServerId: resourceA, scope: "content:read" });
+    await createOAuthScope(test, cookie, { resourceServerId: resourceB, scope: "content:read" });
+    const scopeB = test.raw
+      .prepare(`select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`)
+      .get(resourceB, "content:read") as { readonly id: string };
+    const crossOrgScopeCreate = await test.app.request(
+      "/api/auth/admin/oauth-scopes?organizationId=org_a",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ resourceServerId: resourceB, scope: "content:write" }),
+      },
+      test.env,
+    );
+    expect(crossOrgScopeCreate.status).toBe(404);
+    const crossOrgScopeUpdate = await test.app.request(
+      `/api/auth/admin/oauth-scopes/${scopeB.id}?organizationId=org_a`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ description: "cross-org update attempt" }),
+      },
+      test.env,
+    );
+    expect(crossOrgScopeUpdate.status).toBe(404);
+    const clientA = await createM2MClient(test, cookie, { name: "A client", scope: "content:read", referenceId: "org_a" });
+    const clientB = await createM2MClient(test, cookie, { name: "B client", scope: "content:read", referenceId: "org_b" });
+    const bindingA = await attachClientResourceScope(test, cookie, {
+      clientId: clientA.clientId,
+      resourceServerId: resourceA,
+      allowedScopes: ["content:read"],
+    });
+    expect(bindingA.status).toBe(200);
+    const bindingB = await attachClientResourceScope(test, cookie, {
+      clientId: clientB.clientId,
+      resourceServerId: resourceB,
+      allowedScopes: ["content:read"],
+    });
+    expect(bindingB.status).toBe(200);
+    const crossOrgBindingDelete = await test.app.request(
+      `/api/auth/admin/oauth-client-resource-scopes/${bindingB.id}?organizationId=org_a`,
+      { method: "DELETE", headers: { cookie } },
+      test.env,
+    );
+    expect(crossOrgBindingDelete.status).toBe(404);
+
+    const scopes = await test.app.request(
+      "/api/auth/admin/oauth-scopes?organizationId=org_a",
+      { method: "GET", headers: { cookie } },
+      test.env,
+    );
+    expect(scopes.status).toBe(200);
+    const scopesBody = (await scopes.json()) as { readonly oauthScopes: readonly { readonly resourceServerId: string }[] };
+    expect(scopesBody.oauthScopes).toEqual([expect.objectContaining({ resourceServerId: resourceA })]);
+
+    const bindings = await test.app.request(
+      "/api/auth/admin/oauth-client-resource-scopes?organizationId=org_a",
+      { method: "GET", headers: { cookie } },
+      test.env,
+    );
+    expect(bindings.status).toBe(200);
+    const bindingsBody = (await bindings.json()) as {
+      readonly oauthClientResourceScopes: readonly { readonly id: string; readonly clientId: string; readonly resourceServerId: string }[];
+    };
+    expect(bindingsBody.oauthClientResourceScopes).toEqual([
+      expect.objectContaining({ id: bindingA.id, clientId: clientA.clientId, resourceServerId: resourceA }),
+    ]);
+  });
 });

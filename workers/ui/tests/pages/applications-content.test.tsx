@@ -70,6 +70,6 @@ describe("ApplicationsContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /delete application/i }));
-    await waitFor(() => expect(actions.deleteClient).toHaveBeenCalledWith("cli_contentapi_a1b2c3d4e5f6"));
+    await waitFor(() => expect(actions.deleteClient).toHaveBeenCalledWith("cli_contentapi_a1b2c3d4e5f6", { kind: "platform" }));
   });
 });

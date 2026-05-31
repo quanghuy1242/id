@@ -9,7 +9,10 @@
 - [Shell chrome (Topbar / Sidebar / MobileDock)](shell.md) — layout.tsx for all `/admin` routes
 - [API Gaps](api-gaps.md) — endpoints the admin UI needs but don't exist yet; ordered by priority
 - [Admin Action Contracts](action-contracts.md) — `_actions` request/response contracts and future audit checklist
+- [Access](access.md) — service-account Access lenses and the deferred Admins & Roles placeholder
 - [/admin — Dashboard](#admin--dashboard)
+- [/admin/platform — Platform Lens](#adminplatform--platform-lens)
+- [/admin/orgs/:orgId — Organization Lens](#adminorgsorgid--organization-lens)
 - [/admin/identity — Users](#adminidentity--users)
 - [/admin/identity — Organizations](#adminidentity--organizations)
 - [/admin/oauth — Applications](#adminoauth--applications)
@@ -26,9 +29,66 @@
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin` | Dashboard — live users/orgs/apps/grants/JWKS stats plus workflow shortcuts | [shell.md](shell.md) | implemented |
+| `/admin` | Scope entry — redirects to `/admin/platform`, `/admin/orgs/:orgId`, or `/account` from `console-scopes.defaultScopeId` | [shell.md](shell.md) | implemented |
 
 ---
+
+## /admin/platform — Platform Lens
+
+Canonical platform console route prefix. The shell renders the platform scope selector entry, platform-visible nav sections, and platform-owned/global data surfaces.
+
+| Route | Page | Spec | Status |
+|---|---|---|---|
+| `/admin/platform` | Platform dashboard — live users/orgs/apps/grants/JWKS stats plus workflow shortcuts | [shell.md](shell.md) | implemented |
+| `/admin/platform/identity/users` | User list — search by name/email, sort, filter by role/ban status | [identity.md](identity.md#adminidentityusers) | implemented |
+| `/admin/platform/identity/users/:userId[/sessions|/audit]` | User detail tabs — overview, sessions, audit | [identity.md](identity.md#adminidentityusersuserid) | implemented |
+| `/admin/platform/identity/organizations` | Organization list | [identity.md](identity.md#adminidentityorganizations) | implemented |
+| `/admin/platform/oauth/applications` | OAuth client-facing application list | [oauth.md](oauth.md#adminoauthapplications) | implemented |
+| `/admin/platform/oauth/applications/:clientId[/...]` | OAuth application detail tabs — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/platform/access/admins-roles` | Derived admins and roles view — platform admins plus org owner/admin memberships; role management deferred | [access.md](access.md#adminplatformaccessadmins-roles) | implemented |
+| `/admin/platform/access/service-accounts` | Service accounts — system and tenant M2M clients grouped by tier | [access.md](access.md#adminplatformaccessservice-accounts) | implemented |
+| `/admin/platform/access/resource-apis` | Resource server list — all platform and tenant audiences | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
+| `/admin/platform/access/resource-apis/:resourceServerId[/audit]` | Resource API detail tabs — overview and audit | [oauth.md](oauth.md#adminoauthresource-apisresourceserverid) | implemented |
+| `/admin/platform/access/scope-catalog` | Scope catalog — all resource-server scopes with System/Tenant tier badges | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
+| `/admin/platform/access/m2m-bindings` | M2M bindings — all client-resource-scope grants | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
+| `/admin/platform/access/m2m-bindings/:bindingId[/audit]` | M2M binding detail tabs — overview and audit | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
+| `/admin/platform/security/sessions` | Active browser sessions — stats, live page, per-session revoke | [security.md](security.md#adminsecuritysessions) | implemented |
+| `/admin/platform/security/tokens?type=access` | Access token audit — prefixes only, no token bodies | [security.md](security.md#adminsecuritytokens) | implemented |
+| `/admin/platform/security/tokens?type=refresh` | Refresh token audit — prefixes only, no token bodies | [security.md](security.md#adminsecuritytokens) | implemented |
+| `/admin/platform/security/consents` | Global consent audit — paginated and revoke by grant | [security.md](security.md#adminsecurityconsents) | implemented |
+| `/admin/platform/security/introspect` | Token decoder and RFC 7662 introspection console | [security.md](security.md#adminsecurityintrospect) | implemented |
+| `/admin/platform/security/jwks` | JWKS key list — issuer signing keys | [security.md](security.md#adminsecurityjwks) | implemented |
+| `/admin/platform/security/jwks/:kid[/...]` | JWKS key detail tabs — overview, public JWK, metrics, audit | [security.md](security.md#adminsecurityjwkskid) | implemented |
+| `/admin/platform/system/issuer-metadata` | RFC 8414 + OIDC discovery preview | — | planned |
+| `/admin/platform/system/scim-status` | SCIM ServiceProviderConfig, ResourceTypes, Schemas health | — | planned |
+| `/admin/platform/system/health` | D1 connectivity, KV status, queue depth | — | planned |
+| `/admin/platform/system/settings` | Token lifetimes, JWKS rotation interval, bootstrap config | — | planned |
+
+---
+
+## /admin/orgs/:orgId — Organization Lens
+
+Canonical organization console route prefix. The shell renders the selected organization scope, org-visible nav sections, and org-scoped data. Platform-only global users, global keys, system settings, sessions, and token audit do not render in this lens.
+
+| Route | Page | Spec | Status |
+|---|---|---|---|
+| `/admin/orgs/:orgId` | Organization overview dashboard | [identity.md](identity.md#adminidentityorganizationsorgid) | implemented |
+| `/admin/orgs/:orgId/identity/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminidentityorganizationsorgidmembers) | implemented |
+| `/admin/orgs/:orgId/identity/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminidentityorganizationsorgidteams) | implemented |
+| `/admin/orgs/:orgId/identity/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminidentityorganizationsorgidinvitations) | implemented |
+| `/admin/orgs/:orgId/oauth/applications` | Org-owned OAuth client-facing applications (`reference_id == orgId`) | [oauth.md](oauth.md#adminoauthapplications) | implemented |
+| `/admin/orgs/:orgId/oauth/applications/:clientId[/...]` | Org-owned OAuth application detail tabs | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/orgs/:orgId/access/service-accounts` | Tenant service accounts (`client_credentials`, `reference_id == orgId`) | [access.md](access.md#adminorgsorgidaccessservice-accounts) | implemented |
+| `/admin/orgs/:orgId/access/resource-apis` | Org-owned resource APIs (`organizationId == orgId`) | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |
+| `/admin/orgs/:orgId/access/resource-apis/:resourceServerId[/audit]` | Org-owned Resource API detail tabs | [oauth.md](oauth.md#adminoauthresource-apisresourceserverid) | implemented |
+| `/admin/orgs/:orgId/access/scope-catalog` | Scopes for org-owned resource APIs | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
+| `/admin/orgs/:orgId/access/m2m-bindings` | Org-owned M2M bindings where client and resource server both belong to the org | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
+| `/admin/orgs/:orgId/access/m2m-bindings/:bindingId[/audit]` | Org-owned M2M binding detail tabs | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
+| `/admin/orgs/:orgId/audit` | Organization-scoped audit timeline | [identity.md](identity.md#adminidentityorganizationsorgidaudit) | implemented |
+
+---
+
+The route families below are legacy documentation rows retained for lookup while the UI finishes collapsing old files. Runtime routing is canonical: the proxy redirects `/admin/identity/**`, `/admin/oauth/**`, and `/admin/security/**` to `/admin/platform/**` or `/admin/orgs/:orgId/**` before those old paths render. New specs, stories, and links should use the platform/org sections above.
 
 ## /admin/identity — Users
 
@@ -64,7 +124,7 @@ Actor-scoped. Platform admin sees all clients; org admin sees own org's clients 
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/oauth` | Legacy redirect to canonical `/admin/oauth/applications` application index | [oauth.md](oauth.md#adminoauth-moved--adminoauthapplications) | implemented |
+| `/admin/oauth` | Legacy redirect to canonical `/admin/platform/oauth/applications` application index | [oauth.md](oauth.md#adminoauth-moved--adminoauthapplications) | implemented |
 | `/admin/oauth/applications` | OAuth client list — stats, type badges, row navigation, create wizard entry | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/oauth/applications/new` | OAuth client creation wizard — type, basics, URIs, scopes, review, one-time secret reveal | [oauth.md](oauth.md#adminoauthapplicationsnew) | implemented |
 | `/admin/oauth/applications/:clientId` | OAuth client detail — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
@@ -110,7 +170,7 @@ Note: Scope delete is not yet available in the API. Disable toggle via PATCH is 
 |---|---|---|---|
 | `/admin/oauth/m2m-bindings` | Grid of all `oauthClientResourceScope` rows — stats, client × resource server × allowed scopes × enabled, created/updated by, create/edit/delete modals | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
 | `/admin/oauth/m2m-bindings/:bindingId` | M2M binding detail — overview and audit | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
-| `/admin/oauth/sessions-tokens` | Legacy redirect to `/admin/security/sessions` after grants IA unification | [oauth.md](oauth.md#adminoauthsessions-tokens-moved--adminsecurity) | implemented |
+| `/admin/oauth/sessions-tokens` | Legacy redirect to `/admin/platform/security/sessions` after grants IA unification | [oauth.md](oauth.md#adminoauthsessions-tokens-moved--adminsecurity) | implemented |
 
 ---
 

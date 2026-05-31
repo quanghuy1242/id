@@ -61,7 +61,7 @@ describe("M2mBindingsContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
-    await waitFor(() => expect(actions.deleteBinding).toHaveBeenCalledWith("bind_001"));
+    await waitFor(() => expect(actions.deleteBinding).toHaveBeenCalledWith("bind_001", { kind: "platform" }));
   });
 
   it("does not show inline edit for detail-backed bindings", async () => {

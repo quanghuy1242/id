@@ -4,7 +4,13 @@ export type AuthRouteContract = {
   readonly name: string;
   readonly path: string;
   readonly method: "DELETE" | "GET" | "PATCH" | "POST";
-  readonly source: "better-auth" | "jwt-plugin" | "oauth-provider-plugin" | "id-resource-server-plugin" | "open-api-plugin";
+  readonly source:
+    | "better-auth"
+    | "jwt-plugin"
+    | "oauth-provider-plugin"
+    | "id-resource-server-plugin"
+    | "id-console-scopes-plugin"
+    | "open-api-plugin";
 };
 
 function publicAuthPath(path: string): string {
@@ -88,5 +94,11 @@ export const authRouteMap = [
     path: publicAuthPath("/admin/resource-servers/:id/disable"),
     method: "POST",
     source: "id-resource-server-plugin",
+  },
+  {
+    name: "getConsoleScopes",
+    path: publicAuthPath("/admin/console-scopes"),
+    method: "GET",
+    source: "id-console-scopes-plugin",
   },
 ] as const satisfies readonly AuthRouteContract[];

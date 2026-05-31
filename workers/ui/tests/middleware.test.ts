@@ -18,6 +18,46 @@ function mockedFetch() {
   return vi.mocked(globalThis.fetch);
 }
 
+const platformEnvelope = {
+  actor: { userId: "usr_admin", email: "admin@example.test", canEnterConsole: true },
+  scopes: [
+    { kind: "platform", id: "platform", label: "Platform", role: "platform-admin", permissions: ["platform:read"], requiresStepUp: true },
+    {
+      kind: "organization",
+      id: "organization:org_123",
+      organizationId: "org_123",
+      label: "Acme",
+      role: "platform-admin",
+      permissions: ["members:read"],
+      requiresStepUp: false,
+    },
+  ],
+  memberships: [],
+  defaultScopeId: "platform",
+};
+
+const orgEnvelope = {
+  actor: { userId: "usr_org", email: "owner@example.test", canEnterConsole: true },
+  scopes: [{
+    kind: "organization",
+    id: "organization:org_123",
+    organizationId: "org_123",
+    label: "Acme",
+    role: "admin",
+    permissions: ["members:read"],
+    requiresStepUp: false,
+  }],
+  memberships: [],
+  defaultScopeId: "organization:org_123",
+};
+
+const memberEnvelope = {
+  actor: { userId: "usr_member", email: "member@example.test", canEnterConsole: false },
+  scopes: [],
+  memberships: [{ organizationId: "org_123", label: "Acme", role: "member" }],
+  defaultScopeId: null,
+};
+
 describe("admin middleware", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -43,38 +83,106 @@ describe("admin middleware", () => {
   });
 
   it("forwards the session cookie to the core session endpoint", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "admin" } }));
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
-    await proxy(adminRequest("/admin", "id-auth.session_token=abc"));
+    await proxy(adminRequest("/admin/platform", "id-auth.session_token=abc"));
 
     const [url, init] = mockedFetch().mock.calls[0] as [URL, RequestInit];
-    expect(url.pathname).toBe("/api/auth/get-session");
-    expect(url.searchParams.get("disableRefresh")).toBe("true");
-    expect(url.searchParams.get("disableCookieCache")).toBe("true");
+    expect(url.pathname).toBe("/api/auth/admin/console-scopes");
     expect((init.headers as Record<string, string>).cookie).toBe("id-auth.session_token=abc");
   });
 
-  it("redirects authenticated non-admin users with an admin-required error", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "user" } }));
+  it("redirects signed-in users without an operable console scope to account", async () => {
+    mockedFetch().mockResolvedValue(Response.json(memberEnvelope));
 
     const response = await proxy(adminRequest("/admin", "id-auth.session_token=user"));
     const location = new URL(response.headers.get("location") ?? "");
 
     expect(response.status).toBe(307);
-    expect(location.pathname).toBe("/login");
-    expect(location.searchParams.get("callbackURL")).toBe("/admin");
-    expect(location.searchParams.get("error")).toBe("admin_required");
+    expect(location.pathname).toBe("/account");
 
     const [, init] = mockedFetch().mock.calls[0] as [URL, RequestInit];
     expect((init.headers as Record<string, string>).cookie).toBe("id-auth.session_token=user");
   });
 
-  it("allows admin users through", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "admin" } }));
+  it("redirects /admin to the default operable scope", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(adminRequest("/admin", "id-auth.session_token=admin"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/admin/platform");
+  });
+
+  it("allows scoped console routes through", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
+
+    const response = await proxy(adminRequest("/admin/platform", "id-auth.session_token=admin"));
 
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("allows platform admins to enter organization scopes from the scope envelope", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
+
+    const response = await proxy(adminRequest("/admin/orgs/org_123/identity/members", "id-auth.session_token=admin"));
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("redirects legacy platform routes to the canonical platform prefix", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
+
+    const response = await proxy(adminRequest("/admin/identity/users?role=admin", "id-auth.session_token=admin"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/admin/platform/identity/users");
+    expect(location.searchParams.get("role")).toBe("admin");
+  });
+
+  it("redirects moved legacy admin routes to their canonical platform or org homes", async () => {
+    mockedFetch().mockImplementation(() => Promise.resolve(Response.json(platformEnvelope)));
+
+    const cases = [
+      ["/admin/oauth", "/admin/platform/oauth/applications", ""],
+      ["/admin/oauth/sessions-tokens", "/admin/platform/security/sessions", ""],
+      ["/admin/oauth/resource-apis/rs_001/audit", "/admin/platform/access/resource-apis/rs_001/audit", ""],
+      ["/admin/oauth/scope-catalog?q=content", "/admin/platform/access/scope-catalog", "?q=content"],
+      ["/admin/oauth/m2m-bindings/bind_001", "/admin/platform/access/m2m-bindings/bind_001", ""],
+      ["/admin/security", "/admin/platform/security/sessions", ""],
+      ["/admin/identity/organizations/org_123/teams", "/admin/orgs/org_123/identity/teams", ""],
+    ] as const;
+
+    for (const [source, expectedPath, expectedSearch] of cases) {
+      const response = await proxy(adminRequest(source, "id-auth.session_token=admin"));
+      const location = new URL(response.headers.get("location") ?? "");
+
+      expect(response.status).toBe(307);
+      expect(location.pathname).toBe(expectedPath);
+      expect(location.search).toBe(expectedSearch);
+    }
+  });
+
+  it("redirects org-only admins from legacy routes to their default org scope", async () => {
+    mockedFetch().mockResolvedValue(Response.json(orgEnvelope));
+
+    const response = await proxy(adminRequest("/admin/identity/users", "id-auth.session_token=org"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/admin/orgs/org_123");
+  });
+
+  it("prevents opening an organization route outside the actor's operable scopes", async () => {
+    mockedFetch().mockResolvedValue(Response.json(orgEnvelope));
+
+    const response = await proxy(adminRequest("/admin/orgs/org_other/identity/members", "id-auth.session_token=org"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/admin/orgs/org_123");
   });
 
   it("fails closed when the session endpoint is unavailable", async () => {
@@ -87,7 +195,7 @@ describe("admin middleware", () => {
   });
 
   it("sends an already-authenticated admin from /login to the admin callback", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "admin" } }));
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(
       loginRequest("?callbackURL=%2Fadmin%2Fidentity%2Fusers", "id-auth.session_token=admin"),
@@ -95,19 +203,19 @@ describe("admin middleware", () => {
     const location = new URL(response.headers.get("location") ?? "");
 
     expect(response.status).toBe(307);
-    expect(location.pathname).toBe("/admin/identity/users");
+    expect(location.pathname).toBe("/admin/platform/identity/users");
   });
 
-  it("defaults an authenticated admin on /login without a callback to /admin", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "admin" } }));
+  it("defaults an authenticated admin on /login without a callback to the default scope", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(loginRequest("", "id-auth.session_token=admin"));
 
-    expect(new URL(response.headers.get("location") ?? "").pathname).toBe("/admin");
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe("/admin/platform");
   });
 
   it("ignores off-origin or non-admin callbacks when leaving /login", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "admin" } }));
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(
       loginRequest("?callbackURL=https%3A%2F%2Fevil.example%2Fadmin", "id-auth.session_token=admin"),
@@ -115,7 +223,7 @@ describe("admin middleware", () => {
     const location = new URL(response.headers.get("location") ?? "");
 
     expect(location.origin).toBe("https://id.quanghuy.dev");
-    expect(location.pathname).toBe("/admin");
+    expect(location.pathname).toBe("/admin/platform");
   });
 
   it("shows the login form to unauthenticated visitors", async () => {
@@ -126,14 +234,16 @@ describe("admin middleware", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it("shows the login form to authenticated non-admins so the error renders", async () => {
-    mockedFetch().mockResolvedValue(Response.json({ user: { role: "user" } }));
+  it("redirects authenticated users without console scope away from the login form", async () => {
+    mockedFetch().mockResolvedValue(Response.json(memberEnvelope));
 
     const response = await proxy(
       loginRequest("?callbackURL=%2Fadmin&error=admin_required", "id-auth.session_token=user"),
     );
+    const location = new URL(response.headers.get("location") ?? "");
 
-    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/account");
   });
 
   it("never intercepts an OAuth authorize request on /login", async () => {

@@ -6,6 +6,8 @@ await import("./auth/audiences.test");
 await import("./auth/auth-core.test");
 await import("./auth/bootstrap.test");
 await import("./auth/contracts.test");
+await import("./auth/system-access-seed.test");
+await import("./auth/console-scopes.test");
 await import("./auth/cors-rate-contracts.test");
 await import("./auth/jwks-proof.test");
 await import("./auth/jwks.test");

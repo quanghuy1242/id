@@ -88,7 +88,7 @@ describe("ResourceApisContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^activate$/i }));
-    await waitFor(() => expect(actions.enableResourceServer).toHaveBeenCalledWith("rs_003"));
+    await waitFor(() => expect(actions.enableResourceServer).toHaveBeenCalledWith("rs_003", { kind: "platform" }));
   });
 
   it("registers a new resource API", async () => {
@@ -102,6 +102,7 @@ describe("ResourceApisContent", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^register$/i }));
     await waitFor(() => expect(actions.createResourceServer).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Billing API", slug: "billing-api", audience: "https://billing.example.com" }),
+      { kind: "platform" },
     ));
   });
 
@@ -115,6 +116,6 @@ describe("ResourceApisContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
-    await waitFor(() => expect(actions.deleteResourceServer).toHaveBeenCalledWith("rs_001"));
+    await waitFor(() => expect(actions.deleteResourceServer).toHaveBeenCalledWith("rs_001", { kind: "platform" }));
   });
 });

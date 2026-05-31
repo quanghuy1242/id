@@ -88,6 +88,7 @@ describe("Better Auth installed contract", () => {
     expect(options.rateLimit).toEqual({ enabled: false });
     expect(options.plugins?.some((plugin) => plugin.id === "id-resource-server")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "id-oauth-scope-catalog")).toBe(true);
+    expect(options.plugins?.some((plugin) => plugin.id === "id-console-scopes")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "oauth-provider")).toBe(true);
   });
 

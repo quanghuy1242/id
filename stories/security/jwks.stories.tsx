@@ -7,7 +7,7 @@ import { SecurityShell } from "../_decorators/security-shell";
 
 export default { title: "Admin / Grants & Keys / Signing Keys" } satisfies StoryDefault;
 
-const ACTIVE = "/admin/security/jwks";
+const ACTIVE = "/admin/platform/security/jwks";
 
 function makeActions(keys: AdminJwk[]) {
   return {
@@ -41,25 +41,25 @@ export const Error: Story = () => (
 );
 
 export const DetailOverview: Story = () => (
-  <SecurityShell activePath="/admin/security/jwks/abc123def456">
+  <SecurityShell activePath="/admin/platform/security/jwks/abc123def456">
     <JwksDetailContent kid="abc123def456" actions={makeActions(mockAdminJwks)} />
   </SecurityShell>
 );
 
 export const DetailPublicJwk: Story = () => (
-  <SecurityShell activePath="/admin/security/jwks/abc123def456/public-jwk">
+  <SecurityShell activePath="/admin/platform/security/jwks/abc123def456/public-jwk">
     <JwksDetailContent kid="abc123def456" activeTab="public-jwk" actions={makeActions(mockAdminJwks)} />
   </SecurityShell>
 );
 
 export const DetailMetrics: Story = () => (
-  <SecurityShell activePath="/admin/security/jwks/abc123def456/metrics">
+  <SecurityShell activePath="/admin/platform/security/jwks/abc123def456/metrics">
     <JwksDetailContent kid="abc123def456" activeTab="metrics" actions={makeActions(mockAdminJwks)} />
   </SecurityShell>
 );
 
 export const DetailNotFound: Story = () => (
-  <SecurityShell activePath="/admin/security/jwks/missing-key">
+  <SecurityShell activePath="/admin/platform/security/jwks/missing-key">
     <JwksDetailContent kid="missing-key" actions={makeActions(mockAdminJwks)} />
   </SecurityShell>
 );

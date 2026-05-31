@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -40,6 +41,8 @@ const defaultActions = {
   deleteClient: deleteClientAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 const defaultCreateHref = "/admin/oauth/applications/new";
 
 const typeBadgeTone: Record<ClientType, "neutral" | "info" | "accent"> = {
@@ -63,8 +66,10 @@ type ApplicationsContentProps = {
   onSearchChange?: (v: string) => void;
   onClientClick?: (clientId: string) => void;
   createHref?: string;
+  variant?: "applications" | "serviceAccounts";
   loading?: boolean;
   error?: string;
+  scope?: ActiveScope;
   actions?: typeof defaultActions;
 };
 
@@ -73,8 +78,10 @@ export function ApplicationsContent({
   onSearchChange,
   onClientClick,
   createHref = defaultCreateHref,
+  variant = "applications",
   loading: loadingOverride,
   error: errorOverride,
+  scope = platformScope,
   actions = defaultActions,
 }: ApplicationsContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -90,23 +97,27 @@ export function ApplicationsContent({
   const [revealSecret, setRevealSecret] = useState<string | undefined>();
 
   const { data: allClients, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : oauthClientsKey(),
-    () => actions.listClients(),
+    loadingOverride || errorOverride ? null : oauthClientsKey(scope),
+    () => actions.listClients(scope),
   );
 
   const displayed = useMemo(() => {
-    const clients = allClients ?? [];
+    const clients = variant === "serviceAccounts"
+      ? (allClients ?? []).filter((client) => clientType(client) === "M2M")
+      : allClients ?? [];
     if (!effectiveSearch) return clients;
     const q = effectiveSearch.toLowerCase();
     return clients.filter(
       (c) => c.client_name.toLowerCase().includes(q) || c.client_id.toLowerCase().includes(q),
     );
-  }, [allClients, effectiveSearch]);
+  }, [allClients, effectiveSearch, variant]);
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
   const stats = useMemo(() => {
-    const clients = allClients ?? [];
+    const clients = variant === "serviceAccounts"
+      ? (allClients ?? []).filter((client) => clientType(client) === "M2M")
+      : allClients ?? [];
     return clients.reduce(
       (acc, client) => {
         acc.total += 1;
@@ -115,13 +126,23 @@ export function ApplicationsContent({
       },
       { total: 0, confidential: 0, public: 0, M2M: 0 } as Record<ClientType | "total", number>,
     );
+  }, [allClients, variant]);
+
+  const serviceAccountStats = useMemo(() => {
+    const clients = (allClients ?? []).filter((client) => clientType(client) === "M2M");
+    return {
+      total: clients.length,
+      system: clients.filter((client) => !client.reference_id).length,
+      tenant: clients.filter((client) => Boolean(client.reference_id)).length,
+      disabled: clients.filter((client) => client.disabled).length,
+    };
   }, [allClients]);
 
   async function handleRotate() {
     if (!rotateTarget) return false;
     setRotateError(undefined);
     try {
-      const { client_secret } = await actions.rotateClientSecret(rotateTarget.client_id);
+      const { client_secret } = await actions.rotateClientSecret(rotateTarget.client_id, scope);
       setRotateTarget(null);
       setRevealSecret(client_secret);
       toast.success("Secret rotated", "The previous secret is now invalid. Update your app config.");
@@ -137,7 +158,7 @@ export function ApplicationsContent({
     setDeleteError(undefined);
     try {
       const removedName = deleteTarget.client_name;
-      await actions.deleteClient(deleteTarget.client_id);
+      await actions.deleteClient(deleteTarget.client_id, scope);
       await mutate((cur) => (cur ?? []).filter((c) => c.client_id !== deleteTarget.client_id), { revalidate: false });
       setDeleteTarget(null);
       toast.success("Application deleted", `${removedName} and its tokens were revoked.`);
@@ -183,7 +204,7 @@ export function ApplicationsContent({
         if (scopes.length === 0) return "—";
         return (
           <Inline gap="xs" wrap>
-            {scopes.map((scope) => <Badge key={scope} tone="primary" size="sm">{scope}</Badge>)}
+            {scopes.map((scopeName) => <Badge key={scopeName} tone="primary" size="sm">{scopeName}</Badge>)}
           </Inline>
         );
       },
@@ -231,9 +252,9 @@ export function ApplicationsContent({
     if (showError) return <ErrorAlert message={showError} onRetry={() => void mutate()} />;
     if (displayed.length === 0) {
       if (effectiveSearch) {
-        return <EmptyState message="No applications match your search" cta="Clear search" onCta={() => handleSearchChange("")} />;
+        return <EmptyState message={variant === "serviceAccounts" ? "No service accounts match your search" : "No applications match your search"} cta="Clear search" onCta={() => handleSearchChange("")} />;
       }
-      return <EmptyState message="No OAuth applications" cta="Create Application" ctaHref={createHref} />;
+      return <EmptyState message={variant === "serviceAccounts" ? "No service accounts" : "No OAuth applications"} cta={variant === "serviceAccounts" ? "Create Service Account" : "Create Application"} ctaHref={createHref} />;
     }
     return (
       <DataTable<OAuthClient>
@@ -250,21 +271,30 @@ export function ApplicationsContent({
   return (
     <Stack gap="md">
       <PageIntro
-        title="OAuth Applications"
-        description="Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."
-        info="Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."
+        title={variant === "serviceAccounts" ? "Service Accounts" : "OAuth Applications"}
+        description={variant === "serviceAccounts" ? "Machine principals implemented as OAuth clients using the client credentials flow." : "Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."}
+        info={variant === "serviceAccounts" ? "A service account is an OAuth client whose grant type is client_credentials. System service accounts have no organization reference; tenant service accounts are owned by an organization. Runtime access remains on the standard OAuth client-credentials path." : "Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."}
         actions={
-          <LinkButton href={createHref} iconName="Plus">New App</LinkButton>
+          <LinkButton href={createHref} iconName="Plus">{variant === "serviceAccounts" ? "New Service Account" : "New App"}</LinkButton>
         }
       />
-      <StatGroup columns={4}>
-        <Stat title="Total" value={stats.total} description="applications" tone="primary" />
-        <Stat title="Confidential" value={stats.confidential} description="server apps" />
-        <Stat title="Public" value={stats.public} description="PKCE clients" tone="info" />
-        <Stat title="M2M" value={stats.M2M} description="service clients" tone="warning" />
-      </StatGroup>
+      {variant === "serviceAccounts" ? (
+        <StatGroup columns={4}>
+          <Stat title="Total" value={serviceAccountStats.total} description="service accounts" tone="primary" />
+          <Stat title="System" value={serviceAccountStats.system} description="id-owned" />
+          <Stat title="Tenant" value={serviceAccountStats.tenant} description="org-owned" tone="info" />
+          <Stat title="Disabled" value={serviceAccountStats.disabled} description="blocked" tone={serviceAccountStats.disabled > 0 ? "warning" : "neutral"} />
+        </StatGroup>
+      ) : (
+        <StatGroup columns={4}>
+          <Stat title="Total" value={stats.total} description="applications" tone="primary" />
+          <Stat title="Confidential" value={stats.confidential} description="server apps" />
+          <Stat title="Public" value={stats.public} description="PKCE clients" tone="info" />
+          <Stat title="M2M" value={stats.M2M} description="service clients" tone="warning" />
+        </StatGroup>
+      )}
       <Panel>
-        <SearchInput grow placeholder="Search applications…" value={effectiveSearch} onChange={handleSearchChange} />
+        <SearchInput grow placeholder={variant === "serviceAccounts" ? "Search service accounts…" : "Search applications…"} value={effectiveSearch} onChange={handleSearchChange} />
       </Panel>
 
       <Panel padding={hasRows ? "none" : "md"}>{renderList()}</Panel>

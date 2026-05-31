@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -40,16 +41,18 @@ const defaultActions = {
   deleteResourceServer: deleteResourceServerAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 export type ResourceApiDetailTab = "overview" | "audit";
 
 function formatDate(ms: number | null | undefined): string {
   return typeof ms === "number" ? new Date(ms).toLocaleString() : "Never";
 }
 
-function tabs(id: string) {
+function tabs(routeBasePath: string) {
   return [
-    { id: "overview", href: `/admin/oauth/resource-apis/${id}`, label: "Overview" },
-    { id: "audit", href: `/admin/oauth/resource-apis/${id}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
@@ -57,6 +60,8 @@ function Header({
   resource,
   id,
   activeTab,
+  routeBasePath,
+  backHref,
   onEdit,
   onToggleEnabled,
   onDelete,
@@ -64,6 +69,8 @@ function Header({
   readonly resource: ResourceServer | undefined;
   readonly id: string;
   readonly activeTab: ResourceApiDetailTab;
+  readonly routeBasePath: string;
+  readonly backHref: string;
   readonly onEdit?: () => void;
   readonly onToggleEnabled?: () => void;
   readonly onDelete?: () => void;
@@ -72,7 +79,7 @@ function Header({
     <Stack gap="sm">
       <Inline justify="between">
         <AdminDetailTitleRow
-          backHref="/admin/oauth/resource-apis"
+          backHref={backHref}
           backLabel="Resource APIs"
           title={resource?.name ?? id}
         >
@@ -109,7 +116,7 @@ function Header({
           </Inline>
         ) : null}
       </Inline>
-      <Tabs ariaLabel="Resource API detail tabs" selectedKey={activeTab} items={tabs(id)} />
+      <Tabs ariaLabel="Resource API detail tabs" selectedKey={activeTab} items={tabs(routeBasePath)} />
     </Stack>
   );
 }
@@ -140,6 +147,9 @@ export function ResourceApiDetailContent({
   loading: loadingOverride,
   error: errorOverride,
   onDeleted,
+  scope,
+  routeBasePath,
+  backHref,
   actions = defaultActions,
 }: {
   readonly resourceServerId: string;
@@ -147,8 +157,14 @@ export function ResourceApiDetailContent({
   readonly loading?: boolean;
   readonly error?: string;
   readonly onDeleted?: () => void;
+  readonly scope?: ActiveScope;
+  readonly routeBasePath?: string;
+  readonly backHref?: string;
   readonly actions?: typeof defaultActions;
 }) {
+  const effectiveScope = scope ?? platformScope;
+  const effectiveRouteBasePath = routeBasePath ?? `/admin/oauth/resource-apis/${resourceServerId}`;
+  const effectiveBackHref = backHref ?? "/admin/oauth/resource-apis";
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
   const [disableOpen, setDisableOpen] = useState(false);
@@ -160,8 +176,8 @@ export function ResourceApiDetailContent({
   const { mutate: globalMutate } = useSWRConfig();
 
   const { data, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : resourceServersKey(),
-    () => actions.listResourceServers(),
+    loadingOverride || errorOverride ? null : resourceServersKey(effectiveScope),
+    () => actions.listResourceServers(effectiveScope),
   );
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
@@ -176,7 +192,7 @@ export function ResourceApiDetailContent({
         slug: String(formData.get("slug") ?? "").trim(),
         audience: String(formData.get("audience") ?? "").trim(),
         description: String(formData.get("description") ?? "").trim() || null,
-      });
+      }, effectiveScope);
       await mutate((current) => (current ?? []).map((item) => item.id === updated.id ? updated : item), { revalidate: false });
       setEditOpen(false);
       toast.success("Resource API updated");
@@ -191,7 +207,7 @@ export function ResourceApiDetailContent({
     if (!resource) return false;
     setDisableError(undefined);
     try {
-      const updated = await actions.disableResourceServer(resource.id);
+      const updated = await actions.disableResourceServer(resource.id, effectiveScope);
       await mutate((current) => (current ?? []).map((item) => item.id === updated.id ? updated : item), { revalidate: false });
       setDisableOpen(false);
       toast.success("Resource API disabled", `New tokens for ${resource.name} will be rejected.`);
@@ -206,7 +222,7 @@ export function ResourceApiDetailContent({
     if (!resource) return false;
     setEnableError(undefined);
     try {
-      const updated = await actions.enableResourceServer(resource.id);
+      const updated = await actions.enableResourceServer(resource.id, effectiveScope);
       await mutate((current) => (current ?? []).map((item) => item.id === updated.id ? updated : item), { revalidate: false });
       setEnableOpen(false);
       toast.success("Resource API activated", `${resource.name} can issue tokens again.`);
@@ -221,7 +237,7 @@ export function ResourceApiDetailContent({
     if (!resource) return false;
     setDeleteError(undefined);
     try {
-      await actions.deleteResourceServer(resource.id);
+      await actions.deleteResourceServer(resource.id, effectiveScope);
       await mutate((current) => (current ?? []).filter((item) => item.id !== resource.id), { revalidate: false });
       await globalMutate(isOauthScopesKey, undefined, { revalidate: false });
       await globalMutate(isM2mBindingsKey, undefined, { revalidate: false });
@@ -235,15 +251,17 @@ export function ResourceApiDetailContent({
     }
   }
 
-  if (showLoading) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} /><Skeleton rows={6} /></Stack>;
-  if (showError) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
-  if (!resource) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} /><ErrorAlert message="Resource API not found" onRetry={() => void mutate()} /></Stack>;
+  if (showLoading) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><Skeleton rows={6} /></Stack>;
+  if (showError) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
+  if (!resource) return <Stack gap="md"><Header id={resourceServerId} resource={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><ErrorAlert message="Resource API not found" onRetry={() => void mutate()} /></Stack>;
   return (
     <Stack gap="md">
       <Header
         id={resourceServerId}
         resource={resource}
         activeTab={activeTab}
+        routeBasePath={effectiveRouteBasePath}
+        backHref={effectiveBackHref}
         onEdit={() => setEditOpen(true)}
         onToggleEnabled={() => {
           if (resource.enabled) {

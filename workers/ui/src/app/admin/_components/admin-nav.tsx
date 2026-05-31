@@ -3,9 +3,13 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  Badge,
   Button,
   ConfirmDialog,
   DockLink,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   MobileRouteTabs,
   NavLink,
   NavMenu,
@@ -18,19 +22,26 @@ import {
   TopbarStart,
   ResponsiveBreadcrumb,
 } from "@id/ui";
-import { ADMIN_LOGIN_REDIRECT_URL, MOBILE_NAV, SIDEBAR_NAV, type AdminNavItem } from "@/shared/constants";
+import {
+  ADMIN_LOGIN_REDIRECT_URL,
+  visibleNavSections,
+  type VisibleConsoleNavItem,
+  type VisibleConsoleNavSection,
+} from "@/shared/constants";
 import { signOut } from "../_actions/users";
+import { useAdminScope } from "./admin-scope-provider";
 
 type SidebarGroup = {
   title: string | null;
-  items: AdminNavItem[];
+  items: VisibleConsoleNavItem[];
 };
 
 function isActive(pathname: string, href: string, exact?: boolean): boolean {
-  return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const hrefPath = href.split("?")[0] ?? href;
+  return exact ? pathname === hrefPath : pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
-function getBestActiveItem<TItem extends AdminNavItem>(
+function getBestActiveItem<TItem extends VisibleConsoleNavItem>(
   pathname: string,
   items: readonly TItem[],
 ): TItem | undefined {
@@ -38,9 +49,9 @@ function getBestActiveItem<TItem extends AdminNavItem>(
   let bestScore = -1;
 
   for (const item of items) {
-    if (!isActive(pathname, item.activeHref ?? item.href, item.exact)) continue;
+    if (!isActive(pathname, item.href, item.exact)) continue;
 
-    const score = (item.activeHref ?? item.href).length;
+    const score = item.href.length;
     if (score > bestScore) {
       bestItem = item;
       bestScore = score;
@@ -50,34 +61,24 @@ function getBestActiveItem<TItem extends AdminNavItem>(
   return bestItem;
 }
 
-function getSidebarItems(): AdminNavItem[] {
-  return SIDEBAR_NAV.flatMap((entry) => entry.type === "group" ? entry.items : [entry]);
+function getSidebarItems(groups: readonly SidebarGroup[]): VisibleConsoleNavItem[] {
+  return groups.flatMap((entry) => entry.items);
 }
 
-function getCurrentPageLabel(pathname: string): string {
-  const activeEntry = getBestActiveItem(pathname, getSidebarItems());
+function getCurrentPageLabel(pathname: string, groups: readonly SidebarGroup[]): string {
+  const activeEntry = getBestActiveItem(pathname, getSidebarItems(groups));
   return activeEntry?.label ?? "Dashboard";
 }
 
-function getSidebarNavGroups(): SidebarGroup[] {
-  return SIDEBAR_NAV.filter((entry) => entry.type === "group").map((entry) => ({
+function getSidebarNavGroups(sections: readonly VisibleConsoleNavSection[]): SidebarGroup[] {
+  return sections.map((entry) => ({
     title: entry.label,
     items: [...entry.items],
   }));
 }
 
-function getSectionPrefix(href: string): string {
-  const [, adminSegment, sectionSegment] = href.split("/");
-  return `/${adminSegment}/${sectionSegment}`;
-}
-
-function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKey: string } | null {
-  const groups = getSidebarNavGroups();
-  const activeGroup = groups.find((group) => {
-    const firstItem = group.items[0];
-    if (!firstItem) return false;
-    return isActive(pathname, firstItem.activeHref ?? getSectionPrefix(firstItem.href));
-  });
+function getMobileRouteTabs(pathname: string, groups: readonly SidebarGroup[]): { group: SidebarGroup; selectedKey: string } | null {
+  const activeGroup = groups.find((group) => group.items.some((item) => isActive(pathname, item.href, item.exact)));
 
   if (!activeGroup || activeGroup.items.length < 2) return null;
 
@@ -86,65 +87,102 @@ function getMobileRouteTabs(pathname: string): { group: SidebarGroup; selectedKe
   return { group: activeGroup, selectedKey: selectedItem.href };
 }
 
+function mobileLabel(section: VisibleConsoleNavSection, item: VisibleConsoleNavItem): string {
+  if (section.id === "overview") return "Dash";
+  if (section.id === "identity") return "Identity";
+  if (section.id === "applications") return "Apps";
+  if (section.id === "access") return "Access";
+  if (section.id === "security") return "Security";
+  if (section.id === "system") return "System";
+  return item.label;
+}
+
+function initialsFromEmail(email: string | undefined): string {
+  if (!email) return "AD";
+  const [name] = email.split("@");
+  return (name?.slice(0, 2) || "AD").toUpperCase();
+}
+
+function ScopeSelector() {
+  const { envelope, activeScope, loading, error, switchHref } = useAdminScope();
+  const scopeLabel = loading ? "Loading scope" : activeScope.label;
+
+  return (
+    <MenuTrigger placement="bottom start">
+      <Button variant="secondary" iconName="ChevronDown" iconPosition="right" ariaLabel="Select console scope">
+        {scopeLabel}
+      </Button>
+      <Menu aria-label="Console scopes">
+        {envelope.scopes.map((scope) => (
+          <MenuItem
+            key={scope.id}
+            href={switchHref(scope)}
+            label={scope.label}
+            badge={scope.kind === "platform" ? "Platform" : scope.role}
+          />
+        ))}
+        {envelope.memberships.map((membership) => (
+          <MenuItem
+            key={membership.organizationId}
+            href="/account/organizations"
+            label={membership.label}
+            badge="Member"
+          />
+        ))}
+        {error ? <MenuItem key="scope-error" label="Scope check failed" badge="Retry" /> : null}
+      </Menu>
+    </MenuTrigger>
+  );
+}
+
 export function AdminSidebarNav() {
   const pathname = usePathname();
-  const activeItem = getBestActiveItem(pathname, getSidebarItems());
+  const { activeScope } = useAdminScope();
+  const groups = getSidebarNavGroups(visibleNavSections(activeScope));
+  const activeItem = getBestActiveItem(pathname, getSidebarItems(groups));
 
   return (
     <NavMenu label="Admin sidebar navigation">
-      {SIDEBAR_NAV.map((entry) => {
-        if (entry.type === "group") {
-          return (
-            <NavSection key={entry.label} title={entry.label} collapsible>
-              {entry.items.map((item) => {
-                const active = activeItem?.href === item.href;
-                return (
-                  <NavLink
-                    key={item.href}
-                    href={item.href}
-                    active={active}
-                    current={active ? "page" : undefined}
-                    iconName={item.icon}
-                  >
-                    {item.label}
-                  </NavLink>
-                );
-              })}
-            </NavSection>
-          );
-        }
-
-        const active = activeItem?.href === entry.href;
-        return (
-          <NavLink
-            key={entry.href}
-            href={entry.href}
-            active={active}
-            current={active ? "page" : undefined}
-            iconName={entry.icon}
-          >
-            {entry.label}
-          </NavLink>
-        );
-      })}
+      {groups.map((entry) => (
+        <NavSection key={entry.title} title={entry.title ?? undefined} collapsible>
+          {entry.items.map((item) => {
+            const active = activeItem?.href === item.href;
+            return (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                active={active}
+                current={active ? "page" : undefined}
+                iconName={item.icon}
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
+        </NavSection>
+      ))}
     </NavMenu>
   );
 }
 
 export function AdminMobileNav() {
   const pathname = usePathname();
+  const { activeScope } = useAdminScope();
+  const sections = visibleNavSections(activeScope);
 
   return (
     <>
-      {MOBILE_NAV.map((item) => {
-        const active = isActive(pathname, item.activeHref ?? item.href, item.exact);
+      {sections.map((section) => {
+        const item = section.items.find((entry) => entry.mobile) ?? section.items[0];
+        if (!item) return null;
+        const active = section.items.some((entry) => isActive(pathname, entry.href, entry.exact));
         return (
           <DockLink
-            key={item.href}
+            key={section.id}
             href={item.href}
             current={active ? "page" : undefined}
             active={active}
-            label={item.label}
+            label={mobileLabel(section, item)}
             iconName={item.icon}
           />
         );
@@ -155,7 +193,8 @@ export function AdminMobileNav() {
 
 export function AdminMobileRouteTabs() {
   const pathname = usePathname();
-  const mobileTabs = getMobileRouteTabs(pathname);
+  const { activeScope } = useAdminScope();
+  const mobileTabs = getMobileRouteTabs(pathname, getSidebarNavGroups(visibleNavSections(activeScope)));
 
   if (!mobileTabs) return null;
 
@@ -190,7 +229,8 @@ type AdminTopbarProps = {
 
 export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
   const pathname = usePathname();
-  const currentPageLabel = getCurrentPageLabel(pathname);
+  const { activeScope, envelope } = useAdminScope();
+  const currentPageLabel = getCurrentPageLabel(pathname, getSidebarNavGroups(visibleNavSections(activeScope)));
   const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | undefined>();
@@ -209,14 +249,19 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
   return (
     <>
       <TopbarStart>
-        <TopbarBrandLink href="/admin">id admin</TopbarBrandLink>
-        <ResponsiveBreadcrumb items={["Admin", currentPageLabel]} />
+        <TopbarBrandLink href="/admin">id</TopbarBrandLink>
+        <ScopeSelector />
+        <Badge tone={activeScope.kind === "platform" ? "accent" : "info"} size="sm">
+          {activeScope.kind === "platform" ? "Platform" : "Org"}
+        </Badge>
+        <ResponsiveBreadcrumb items={[activeScope.label, currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
         <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" tooltip="Notifications" tooltipPlacement="bottom" />
         <TopbarAvatarMenu
-          initials="AD"
+          initials={initialsFromEmail(envelope.actor.email)}
           items={[
+            { label: envelope.actor.email ?? "Account", badge: "Account", href: "/account" },
             { label: "Theme", onAction: () => setThemeDialogOpen(true) },
             { label: "Logout", onAction: () => setLogoutOpen(true) },
           ]}

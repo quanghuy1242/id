@@ -90,6 +90,6 @@ describe("ScopeCatalogContent", () => {
     await waitFor(() => screen.getByRole("dialog"));
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(actions.updateScope).toHaveBeenCalledWith("sc_001", expect.objectContaining({ enabled: true })));
+    await waitFor(() => expect(actions.updateScope).toHaveBeenCalledWith("sc_001", expect.objectContaining({ enabled: true }), { kind: "platform" }));
   });
 });

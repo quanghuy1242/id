@@ -6,7 +6,7 @@ import { SecurityShell } from "../_decorators/security-shell";
 
 export default { title: "Admin / Grants & Keys / Tokens" } satisfies StoryDefault;
 
-const ACTIVE = "/admin/security/tokens?type=access";
+const ACTIVE = "/admin/platform/security/tokens?type=access";
 
 function makeActions(access: AdminToken[], refresh: AdminToken[]) {
   return {
@@ -24,7 +24,7 @@ export const Populated: Story = () => (
 );
 
 export const Refresh: Story = () => (
-  <SecurityShell activePath="/admin/security/tokens?type=refresh">
+  <SecurityShell activePath="/admin/platform/security/tokens?type=refresh">
     <TokensContent type="refresh" actions={makeActions(mockTokens, mockRefreshTokens)} />
   </SecurityShell>
 );

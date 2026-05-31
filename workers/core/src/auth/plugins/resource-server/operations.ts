@@ -89,6 +89,78 @@ export async function assertUniqueSlug(
   }
 }
 
+export type EnsureResourceServerBody = Pick<
+  CreateResourceServerBody,
+  "organizationId" | "slug" | "name" | "audience" | "description"
+>;
+
+export type EnsureResourceServerResult = {
+  readonly row: ResourceServerRow;
+  readonly changed: boolean;
+};
+
+type ResourceServerUpdate = {
+  -readonly [Key in keyof ResourceServerRow]?: ResourceServerRow[Key];
+};
+
+/**
+ * Ensures a resource server exists for an audience using the same BA adapter
+ * model and payload helpers as the endpoint path.
+ */
+export async function ensureResourceServerByAudience(
+  adapter: AdapterContext,
+  body: EnsureResourceServerBody,
+  actorId: string,
+): Promise<EnsureResourceServerResult> {
+  const existing = await adapter.findOne<ResourceServerRow>({
+    model: RESOURCE_SERVER_MODEL,
+    where: [{ field: "audience", value: body.audience }],
+  });
+
+  if (!existing) {
+    await assertUniqueSlug(adapter, body.organizationId, body.slug);
+    const created = await adapter.create<ResourceServerRow>({
+      model: RESOURCE_SERVER_MODEL,
+      data: buildCreatePayload(body, actorId),
+    });
+    return { row: created, changed: true };
+  }
+
+  if (existing.slug !== body.slug) {
+    await assertUniqueSlug(adapter, body.organizationId, body.slug, existing.id);
+  }
+
+  const update: ResourceServerUpdate = {};
+  const organizationId = body.organizationId ?? null;
+  if ((existing.organizationId ?? null) !== organizationId) update.organizationId = organizationId;
+  if (existing.slug !== body.slug) update.slug = body.slug;
+  if (existing.name !== body.name) update.name = body.name;
+  if (existing.audience !== body.audience) update.audience = body.audience;
+  if (body.description !== undefined && existing.description !== body.description) {
+    update.description = body.description;
+  }
+  if (!existing.enabled) {
+    update.enabled = true;
+    update.disabledAt = null;
+    update.disabledBy = null;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return { row: existing, changed: false };
+  }
+
+  const row = await adapter.update<ResourceServerRow>({
+    model: RESOURCE_SERVER_MODEL,
+    where: [{ field: "id", value: existing.id }],
+    update: {
+      ...update,
+      updatedBy: actorId,
+      updatedAt: Date.now(),
+    },
+  });
+  return { row, changed: true };
+}
+
 /**
  * Builds the insert payload for a new resource server.
  * Defaults `enabled` to `true`, stamps `createdAt`/`updatedAt`, and resolves

@@ -44,6 +44,19 @@ function adapterContext(adapter: unknown): AdapterContext {
   return adapter as AdapterContext;
 }
 
+function requestedOrganizationId(query: Record<string, unknown> | undefined): string | undefined {
+  return typeof query?.organizationId === "string" && query.organizationId ? query.organizationId : undefined;
+}
+
+function assertRequestedOrganization(
+  ownerOrganizationId: string | null | undefined,
+  requestedOwnerOrganizationId: string | undefined,
+): void {
+  if (requestedOwnerOrganizationId !== undefined && ownerOrganizationId !== requestedOwnerOrganizationId) {
+    throw new APIError("NOT_FOUND");
+  }
+}
+
 /** Better Auth plugin that owns resource-server-bound OAuth scopes and per-(client, resource) scope subsets. */
 export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}): BetterAuthPlugin => ({
   id: "id-oauth-scope-catalog",
@@ -67,6 +80,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           adapterContext(ctx.context.adapter),
           ctx.body.resourceServerId,
         );
+        assertRequestedOrganization(resourceServer.organizationId, requestedOrganizationId(ctx.query));
         await assertCatalogAccess(
           options.authorize,
           resourceServer.organizationId,
@@ -91,6 +105,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
+        const organizationId = requestedOrganizationId(ctx.query);
 
         const rows = await ctx.context.adapter.findMany<OAuthResourceScopeRow>({
           model: OAUTH_RESOURCE_SCOPE_MODEL,
@@ -98,6 +113,9 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         });
         const access = await Promise.all(rows.map(async (row) => {
           const resourceServer = await findResourceServerOrThrow(adapterContext(ctx.context.adapter), row.resourceServerId);
+          if (organizationId !== undefined && resourceServer.organizationId !== organizationId) {
+            return { row, visible: false };
+          }
           try {
             await assertCatalogAccess(
               options.authorize,
@@ -132,6 +150,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         });
         if (!existing) throw new APIError("NOT_FOUND");
         const resourceServer = await findResourceServerOrThrow(adapterContext(ctx.context.adapter), existing.resourceServerId);
+        assertRequestedOrganization(resourceServer.organizationId, requestedOrganizationId(ctx.query));
         await assertCatalogAccess(
           options.authorize,
           resourceServer.organizationId,
@@ -177,6 +196,9 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         );
         await assertGrantScopesExist(adapterContext(ctx.context.adapter), ctx.body.resourceServerId, ctx.body.allowedScopes);
         const client = await assertClientResourceScopeAccess(options, ctx, ctx.body.clientId);
+        const organizationId = requestedOrganizationId(ctx.query);
+        assertRequestedOrganization(client.referenceId ?? null, organizationId);
+        assertRequestedOrganization(resourceServer.organizationId, organizationId);
         if (resourceServer.organizationId !== (client.referenceId ?? null)) {
           throw new APIError("BAD_REQUEST", {
             message: "OAuth client and resource server must belong to the same authorization layer",
@@ -204,6 +226,7 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
       async (ctx) => {
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
+        const organizationId = requestedOrganizationId(ctx.query);
 
         const rows = await ctx.context.adapter.findMany<OAuthClientResourceScopeRow>({
           model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
@@ -211,7 +234,14 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
         });
         const access = await Promise.all(rows.map(async (row) => {
           try {
-            await assertClientResourceScopeAccess(options, ctx, row.clientId);
+            const client = await assertClientResourceScopeAccess(options, ctx, row.clientId);
+            const resourceServer = await findResourceServerOrThrow(adapterContext(ctx.context.adapter), row.resourceServerId);
+            if (
+              organizationId !== undefined
+              && (client.referenceId !== organizationId || resourceServer.organizationId !== organizationId)
+            ) {
+              return { row, visible: false };
+            }
             return { row, visible: true };
           } catch (error) {
             if (!(error instanceof APIError)) throw error;
@@ -242,7 +272,11 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
-        await assertClientResourceScopeAccess(options, ctx, existing.clientId);
+        const client = await assertClientResourceScopeAccess(options, ctx, existing.clientId);
+        const resourceServer = await findResourceServerOrThrow(adapterContext(ctx.context.adapter), existing.resourceServerId);
+        const organizationId = requestedOrganizationId(ctx.query);
+        assertRequestedOrganization(client.referenceId ?? null, organizationId);
+        assertRequestedOrganization(resourceServer.organizationId, organizationId);
         if (ctx.body.allowedScopes) {
           await assertGrantScopesExist(adapterContext(ctx.context.adapter), existing.resourceServerId, ctx.body.allowedScopes);
         }
@@ -274,7 +308,11 @@ export const idOAuthScopeCatalog = (options: OAuthScopeCatalogPluginOptions = {}
           where: [{ field: "id", value: ctx.params?.id }],
         });
         if (!existing) throw new APIError("NOT_FOUND");
-        await assertClientResourceScopeAccess(options, ctx, existing.clientId);
+        const client = await assertClientResourceScopeAccess(options, ctx, existing.clientId);
+        const resourceServer = await findResourceServerOrThrow(adapterContext(ctx.context.adapter), existing.resourceServerId);
+        const organizationId = requestedOrganizationId(ctx.query);
+        assertRequestedOrganization(client.referenceId ?? null, organizationId);
+        assertRequestedOrganization(resourceServer.organizationId, organizationId);
 
         await ctx.context.adapter.delete({
           model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Button,
   CodeBlock,
@@ -34,10 +35,16 @@ const defaultActions = {
   listScopes: listScopesAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 type ApplicationKind = "confidential" | "public" | "M2M";
 
 type ApplicationCreateWizardContentProps = {
+  readonly scope?: ActiveScope;
   readonly onCreated?: (clientId: string) => void;
+  readonly backHref?: string;
+  readonly backLabel?: string;
+  readonly title?: string;
   readonly actions?: typeof defaultActions;
 };
 
@@ -53,7 +60,11 @@ function toNonEmptyArray(values: readonly string[]): NonEmptyStringArray | undef
 }
 
 export function ApplicationCreateWizardContent({
+  scope = platformScope,
   onCreated,
+  backHref = "/admin/oauth/applications",
+  backLabel = "OAuth Applications",
+  title = "New OAuth Application",
   actions = defaultActions,
 }: ApplicationCreateWizardContentProps) {
   const [activeStep, setActiveStep] = useState(0);
@@ -68,9 +79,9 @@ export function ApplicationCreateWizardContent({
   const [revealSecret, setRevealSecret] = useState<string | undefined>();
   const completedRef = useRef(false);
 
-  const { data: catalog } = useSWR(oauthScopesKey(), () => actions.listScopes());
+  const { data: catalog } = useSWR(oauthScopesKey(scope), () => actions.listScopes(scope));
   const suggestions: ScopeSuggestion[] = useMemo(
-    () => (catalog ?? []).map((scope) => ({ value: scope.scope, description: scope.description ?? undefined, group: scope.resourceServerId })),
+    () => (catalog ?? []).map((catalogScope) => ({ value: catalogScope.scope, description: catalogScope.description ?? undefined, group: catalogScope.resourceServerId })),
     [catalog],
   );
 
@@ -105,7 +116,7 @@ export function ApplicationCreateWizardContent({
         redirect_uris: redirectUriInput,
         ...(postLogoutUriInput ? { post_logout_redirect_uris: postLogoutUriInput } : {}),
         scope: scopes.length > 0 ? scopes.join(" ") : undefined,
-      });
+      }, scope);
       completedRef.current = false;
       setCreated(result);
       if (result.client_secret) setRevealSecret(result.client_secret);
@@ -221,9 +232,9 @@ export function ApplicationCreateWizardContent({
   return (
     <Stack gap="md">
       <AdminDetailTitleRow
-        backHref="/admin/oauth/applications"
-        backLabel="OAuth Applications"
-        title="New OAuth Application"
+        backHref={backHref}
+        backLabel={backLabel}
+        title={title}
       />
       {submitError ? <ErrorAlert message={submitError} /> : null}
       <Stepper

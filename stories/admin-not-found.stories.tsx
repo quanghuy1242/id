@@ -7,7 +7,7 @@ export default {
 } satisfies StoryDefault;
 
 export const Default: Story = () => (
-  <AdminShell activePath="/admin/oauth/applications">
+  <AdminShell activePath="/admin/platform/oauth/applications">
     <AdminNotFound />
   </AdminShell>
 );

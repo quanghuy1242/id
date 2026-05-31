@@ -41,6 +41,8 @@ type JwksDetailContentProps = {
   readonly activeTab?: JwksDetailTab;
   readonly loading?: boolean;
   readonly error?: string;
+  readonly routeBasePath?: string;
+  readonly backHref?: string;
   readonly actions?: typeof defaultActions;
 };
 
@@ -48,12 +50,12 @@ function formatDate(ms: number | null): string {
   return ms === null ? "Never" : new Date(ms).toLocaleString();
 }
 
-function tabs(kid: string) {
+function tabs(routeBasePath: string) {
   return [
-    { id: "overview", href: `/admin/security/jwks/${kid}`, label: "Overview" },
-    { id: "public-jwk", href: `/admin/security/jwks/${kid}/public-jwk`, label: "Public JWK" },
-    { id: "metrics", href: `/admin/security/jwks/${kid}/metrics`, label: "Metrics" },
-    { id: "audit", href: `/admin/security/jwks/${kid}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "public-jwk", href: `${routeBasePath}/public-jwk`, label: "Public JWK" },
+    { id: "metrics", href: `${routeBasePath}/metrics`, label: "Metrics" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
@@ -85,22 +87,26 @@ function Header({
   keyRecord,
   kid,
   activeTab,
+  routeBasePath,
+  backHref,
 }: {
   readonly keyRecord: AdminJwk | undefined;
   readonly kid: string;
   readonly activeTab: JwksDetailTab;
+  readonly routeBasePath: string;
+  readonly backHref: string;
 }) {
   const badge = keyRecord ? statusBadge[keyRecord.status] : undefined;
   return (
     <Stack gap="sm">
       <Inline justify="between">
         <Inline gap="sm">
-          <LinkButton href="/admin/security/jwks" variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Signing Keys" tooltip="Back to Signing Keys" />
+          <LinkButton href={backHref} variant="secondary" size="sm" hideOnMobile iconName="ChevronLeft" ariaLabel="Back to Signing Keys" tooltip="Back to Signing Keys" />
           <Text variant="h1">{keyRecord?.id ?? kid}</Text>
           {badge ? <Badge tone={badge.tone}>{badge.label}</Badge> : null}
         </Inline>
       </Inline>
-      <Tabs ariaLabel="Signing key detail tabs" selectedKey={activeTab} items={tabs(kid)} />
+      <Tabs ariaLabel="Signing key detail tabs" selectedKey={activeTab} items={tabs(routeBasePath)} />
     </Stack>
   );
 }
@@ -162,6 +168,8 @@ export function JwksDetailContent({
   activeTab = "overview",
   loading: loadingOverride,
   error: errorOverride,
+  routeBasePath = `/admin/security/jwks/${kid}`,
+  backHref = "/admin/security/jwks",
   actions = defaultActions,
 }: JwksDetailContentProps) {
   const { data: keys, isLoading, error, mutate } = useSWR(
@@ -175,7 +183,7 @@ export function JwksDetailContent({
   if (showLoading) {
     return (
       <Stack gap="md">
-        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} />
+        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} />
         <Skeleton rows={6} height="md" />
       </Stack>
     );
@@ -184,7 +192,7 @@ export function JwksDetailContent({
   if (showError) {
     return (
       <Stack gap="md">
-        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} />
+        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} />
         <ErrorAlert message={showError} onRetry={() => void mutate()} />
       </Stack>
     );
@@ -193,7 +201,7 @@ export function JwksDetailContent({
   if (!keyRecord) {
     return (
       <Stack gap="md">
-        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} />
+        <Header kid={kid} keyRecord={undefined} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} />
         <ErrorAlert message="Signing key not found" onRetry={() => void mutate()} />
       </Stack>
     );
@@ -201,7 +209,7 @@ export function JwksDetailContent({
 
   return (
     <Stack gap="md">
-      <Header kid={kid} keyRecord={keyRecord} activeTab={activeTab} />
+      <Header kid={kid} keyRecord={keyRecord} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} />
       {renderTab(activeTab, keyRecord)}
     </Stack>
   );

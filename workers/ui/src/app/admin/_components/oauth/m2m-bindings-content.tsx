@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -50,6 +51,8 @@ const defaultActions = {
   listScopes: listScopesAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 function toggleScope(list: string[], scope: string, on: boolean): string[] {
   return on ? [...new Set([...list, scope])] : list.filter((s) => s !== scope);
 }
@@ -65,6 +68,7 @@ type M2mBindingsContentProps = {
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
+  scope?: ActiveScope;
   actions?: typeof defaultActions;
 };
 
@@ -75,6 +79,7 @@ export function M2mBindingsContent({
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
+  scope = platformScope,
   actions = defaultActions,
 }: M2mBindingsContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -91,13 +96,13 @@ export function M2mBindingsContent({
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const { data: bindings, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : m2mBindingsKey(),
-    () => actions.listBindings(),
+    loadingOverride || errorOverride ? null : m2mBindingsKey(scope),
+    () => actions.listBindings(scope),
   );
   const skipFetch = loadingOverride || errorOverride;
-  const { data: clients } = useSWR(skipFetch ? null : oauthClientsKey(), () => actions.listClients());
-  const { data: servers } = useSWR(skipFetch ? null : resourceServersKey(), () => actions.listResourceServers());
-  const { data: scopes } = useSWR(skipFetch ? null : oauthScopesKey(), () => actions.listScopes());
+  const { data: clients } = useSWR(skipFetch ? null : oauthClientsKey(scope), () => actions.listClients(scope));
+  const { data: servers } = useSWR(skipFetch ? null : resourceServersKey(scope), () => actions.listResourceServers(scope));
+  const { data: scopes } = useSWR(skipFetch ? null : oauthScopesKey(scope), () => actions.listScopes(scope));
 
   const clientById = useMemo(() => {
     const map = new Map<string, OAuthClient>();
@@ -197,7 +202,7 @@ export function M2mBindingsContent({
     if (!createClientId || !createRsId) { setCreateError("Select a client and a resource API"); return false; }
     if (createScopes.length === 0) { setCreateError("Select at least one scope"); return false; }
     try {
-      await actions.createBinding({ clientId: createClientId, resourceServerId: createRsId, allowedScopes: createScopes });
+      await actions.createBinding({ clientId: createClientId, resourceServerId: createRsId, allowedScopes: createScopes }, scope);
       await mutate();
       setCreateOpen(false);
       toast.success("Binding created", "The client can now request these scopes for this API.");
@@ -212,7 +217,7 @@ export function M2mBindingsContent({
     if (!deleteTarget) return false;
     setDeleteError(undefined);
     try {
-      await actions.deleteBinding(deleteTarget.id);
+      await actions.deleteBinding(deleteTarget.id, scope);
       await mutate((cur) => (cur ?? []).filter((b) => b.id !== deleteTarget.id), { revalidate: false });
       setDeleteTarget(null);
       toast.success("Binding deleted", "The client lost access to these scopes.");

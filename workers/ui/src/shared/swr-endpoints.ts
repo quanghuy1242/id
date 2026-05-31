@@ -10,6 +10,10 @@ export const USER_DETAIL = "/admin/get-user";
 export const USER_SESSIONS = "/admin/list-user-sessions";
 /** The acting admin's own session (impersonation state). */
 export const CURRENT_SESSION = "/get-session";
+/** Current actor's operable console scopes. */
+export const CONSOLE_SCOPES = "/admin/console-scopes";
+/** Derived read-only Access view composed from admin users and org memberships. */
+export const ACCESS_ADMINS_ROLES = "/admin/access/admins-roles-derived";
 /** Organizations list. */
 export const ORGS_LIST = "/organization/list";
 /** Full organization read for the org-detail page. */

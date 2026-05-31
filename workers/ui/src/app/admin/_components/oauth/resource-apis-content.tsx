@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -44,6 +45,8 @@ const defaultActions = {
   listOrganizations: listOrganizationsAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 function formatDate(ms: number | null | undefined): string {
   return typeof ms === "number" ? new Date(ms).toLocaleString() : "Never";
 }
@@ -58,6 +61,7 @@ type ResourceApisContentProps = {
   loading?: boolean;
   error?: string;
   defaultCreateOpen?: boolean;
+  scope?: ActiveScope;
   actions?: typeof defaultActions;
 };
 
@@ -71,6 +75,7 @@ export function ResourceApisContent({
   loading: loadingOverride,
   error: errorOverride,
   defaultCreateOpen = false,
+  scope = platformScope,
   actions = defaultActions,
 }: ResourceApisContentProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -97,8 +102,8 @@ export function ResourceApisContent({
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const { data: allServers, isLoading, error, mutate } = useSWR(
-    loadingOverride || errorOverride ? null : resourceServersKey(),
-    () => actions.listResourceServers(),
+    loadingOverride || errorOverride ? null : resourceServersKey(scope),
+    () => actions.listResourceServers(scope),
   );
 
   // Organizations power the create-modal owner radio; cached + shared with the orgs page.
@@ -205,7 +210,7 @@ export function ResourceApisContent({
         audience: String(formData.get("audience") ?? "").trim(),
         description: String(formData.get("description") ?? "").trim() || undefined,
         ...(createOrgId ? { organizationId: createOrgId } : {}),
-      });
+      }, scope);
       await mutate();
       setCreateOpen(false);
       toast.success("Resource API registered", `Define scopes for ${name} in the Scope Catalog.`);
@@ -221,7 +226,7 @@ export function ResourceApisContent({
     setDisableError(undefined);
     try {
       const name = disableTarget.name;
-      await actions.disableResourceServer(disableTarget.id);
+      await actions.disableResourceServer(disableTarget.id, scope);
       await mutate();
       setDisableTarget(null);
       toast.success("Resource API disabled", `New tokens for ${name} will be rejected.`);
@@ -237,7 +242,7 @@ export function ResourceApisContent({
     setEnableError(undefined);
     try {
       const name = enableTarget.name;
-      await actions.enableResourceServer(enableTarget.id);
+      await actions.enableResourceServer(enableTarget.id, scope);
       await mutate();
       setEnableTarget(null);
       toast.success("Resource API activated", `${name} can issue tokens again.`);
@@ -253,7 +258,7 @@ export function ResourceApisContent({
     setDeleteError(undefined);
     try {
       const name = deleteTarget.name;
-      await actions.deleteResourceServer(deleteTarget.id);
+      await actions.deleteResourceServer(deleteTarget.id, scope);
       await mutate((cur) => (cur ?? []).filter((r) => r.id !== deleteTarget.id), { revalidate: false });
       setDeleteTarget(null);
       toast.success("Resource API deleted", `${name}, its scopes, and issued tokens were removed.`);

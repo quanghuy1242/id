@@ -14,6 +14,7 @@ import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { idAdminAudit } from "./plugins/admin-audit";
 import { idAdminActivityLog } from "./plugins/admin-activity-log";
+import { idConsoleScopes } from "./plugins/console-scopes";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -156,6 +157,9 @@ export function getAuthOptions(
       }),
       idAdminActivityLog({
         authorize: (role) => isPlatformAdmin(role),
+      }),
+      idConsoleScopes({
+        isPlatformAdmin,
       }),
       idScimDirectory({
         issuer,

@@ -66,6 +66,8 @@ function createStoryActions(initialUsers: readonly User[]) {
 
 export default { title: "Admin / Identity / Users" } satisfies StoryDefault;
 
+const usersPath = "/admin/platform/identity/users";
+
 type UserDetailFrameActions =
   NonNullable<Parameters<typeof UserDetailProvider>[0]["actions"]> &
   NonNullable<Parameters<typeof UserDetailHeaderContent>[0]["actions"]>;
@@ -92,7 +94,12 @@ function UserDetailFrame({
       <PageBody>
         <UserDetailProvider userId={userId} loading={loading} error={error} actions={actions}>
           <Stack gap="md">
-            <UserDetailHeaderContent activeTab={activeTab} actions={actions} />
+            <UserDetailHeaderContent
+              activeTab={activeTab}
+              routeBasePath={`${usersPath}/${userId}`}
+              backHref={usersPath}
+              actions={actions}
+            />
             {children}
           </Stack>
         </UserDetailProvider>
@@ -104,7 +111,7 @@ function UserDetailFrame({
 export const Populated: Story = () => {
   const actions = createStoryActions(mockUsers);
   return (
-    <AdminShell activePath="/admin/identity/users">
+    <AdminShell activePath={usersPath}>
       <PageBody>
         <UsersListContent actions={actions} defaultCreateOpen />
       </PageBody>
@@ -115,7 +122,7 @@ export const Populated: Story = () => {
 export const Empty: Story = () => {
   const actions = createStoryActions([]);
   return (
-    <AdminShell activePath="/admin/identity/users">
+    <AdminShell activePath={usersPath}>
       <PageBody>
         <UsersListContent actions={actions} />
       </PageBody>
@@ -126,7 +133,7 @@ export const Empty: Story = () => {
 export const CreateDialog: Story = () => {
   const actions = createStoryActions(mockUsers);
   return (
-    <AdminShell activePath="/admin/identity/users">
+    <AdminShell activePath={usersPath}>
       <PageBody>
         <UsersListContent actions={actions} />
       </PageBody>
@@ -136,7 +143,7 @@ export const CreateDialog: Story = () => {
 
 // loading prop skips internal fetch entirely and shows Skeleton immediately.
 export const Loading: Story = () => (
-  <AdminShell activePath="/admin/identity/users">
+  <AdminShell activePath={usersPath}>
     <PageBody>
       <UsersListContent loading />
     </PageBody>
@@ -145,7 +152,7 @@ export const Loading: Story = () => (
 
 // error prop skips internal fetch entirely and shows ErrorAlert immediately.
 export const Error: Story = () => (
-  <AdminShell activePath="/admin/identity/users">
+  <AdminShell activePath={usersPath}>
     <PageBody>
       <UsersListContent error="Failed to load users: Network error" />
     </PageBody>
@@ -190,7 +197,7 @@ function createDetailActions(user: User, isImpersonating = false) {
 export const UserDetail_Populated: Story = () => {
   const actions = createDetailActions(mockUsers[0]);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001" userId="user_001" activeTab="overview" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001`} userId="user_001" activeTab="overview" actions={actions}>
       <UserDetailOverviewContent />
     </UserDetailFrame>
   );
@@ -200,7 +207,7 @@ UserDetail_Populated.storyName = "User Detail / Populated";
 export const UserDetail_Banned: Story = () => {
   const actions = createDetailActions(mockUsers[1]);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_002" userId="user_002" activeTab="overview" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_002`} userId="user_002" activeTab="overview" actions={actions}>
       <UserDetailOverviewContent />
     </UserDetailFrame>
   );
@@ -208,7 +215,7 @@ export const UserDetail_Banned: Story = () => {
 UserDetail_Banned.storyName = "User Detail / Banned";
 
 export const UserDetail_Loading: Story = () => (
-  <UserDetailFrame activePath="/admin/identity/users/user_001" userId="user_001" activeTab="overview" loading>
+  <UserDetailFrame activePath={`${usersPath}/user_001`} userId="user_001" activeTab="overview" loading>
     <UserDetailOverviewContent />
   </UserDetailFrame>
 );
@@ -216,7 +223,7 @@ UserDetail_Loading.storyName = "User Detail / Loading";
 
 export const UserDetail_Error: Story = () => (
   <UserDetailFrame
-    activePath="/admin/identity/users/user_001"
+    activePath={`${usersPath}/user_001`}
     userId="user_001"
     activeTab="overview"
     error="Failed to load user: 404 Not Found"
@@ -229,7 +236,7 @@ UserDetail_Error.storyName = "User Detail / Error";
 export const UserDetail_Impersonating: Story = () => {
   const actions = createDetailActions(mockUsers[0], true);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001" userId="user_001" activeTab="overview" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001`} userId="user_001" activeTab="overview" actions={actions}>
       <UserDetailOverviewContent />
     </UserDetailFrame>
   );
@@ -260,7 +267,7 @@ function createSessionsActions(user: User, sessions: Session[]) {
 export const UserSessions_Populated: Story = () => {
   const actions = createSessionsActions(mockUsers[0], mockSessions);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/sessions" userId="user_001" activeTab="sessions" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/sessions`} userId="user_001" activeTab="sessions" actions={actions}>
       <UserSessionsContent userId="user_001" userName={mockUsers[0].name} actions={actions} />
     </UserDetailFrame>
   );
@@ -270,7 +277,7 @@ UserSessions_Populated.storyName = "User Sessions / Populated";
 export const UserSessions_Empty: Story = () => {
   const actions = createSessionsActions(mockUsers[0], []);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/sessions" userId="user_001" activeTab="sessions" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/sessions`} userId="user_001" activeTab="sessions" actions={actions}>
       <UserSessionsContent userId="user_001" userName={mockUsers[0].name} actions={actions} />
     </UserDetailFrame>
   );
@@ -278,7 +285,7 @@ export const UserSessions_Empty: Story = () => {
 UserSessions_Empty.storyName = "User Sessions / Empty";
 
 export const UserSessions_Loading: Story = () => (
-  <UserDetailFrame activePath="/admin/identity/users/user_001/sessions" userId="user_001" activeTab="sessions" loading>
+  <UserDetailFrame activePath={`${usersPath}/user_001/sessions`} userId="user_001" activeTab="sessions" loading>
     <UserSessionsContent userId="user_001" loading />
   </UserDetailFrame>
 );
@@ -287,7 +294,7 @@ UserSessions_Loading.storyName = "User Sessions / Loading";
 export const UserSessions_Error: Story = () => {
   const actions = createSessionsActions(mockUsers[0], mockSessions);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/sessions" userId="user_001" activeTab="sessions" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/sessions`} userId="user_001" activeTab="sessions" actions={actions}>
       <UserSessionsContent userId="user_001" userName={mockUsers[0].name} error="Failed to load sessions" />
     </UserDetailFrame>
   );
@@ -309,7 +316,7 @@ function createActivityActions(entries = mockActivities) {
 export const UserAudit_Populated: Story = () => {
   const actions = createDetailActions(mockUsers[0]);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/audit`} userId="user_001" activeTab="audit" actions={actions}>
       <ActivityLogContent targetType="user" targetId="user_001" actions={createActivityActions()} />
     </UserDetailFrame>
   );
@@ -319,7 +326,7 @@ UserAudit_Populated.storyName = "User Audit / Populated";
 export const UserAudit_Empty: Story = () => {
   const actions = createDetailActions(mockUsers[0]);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/audit`} userId="user_001" activeTab="audit" actions={actions}>
       <ActivityLogContent targetType="user" targetId="user_001" actions={createActivityActions([])} />
     </UserDetailFrame>
   );
@@ -327,7 +334,7 @@ export const UserAudit_Empty: Story = () => {
 UserAudit_Empty.storyName = "User Audit / Empty";
 
 export const UserAudit_Loading: Story = () => (
-  <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" loading>
+  <UserDetailFrame activePath={`${usersPath}/user_001/audit`} userId="user_001" activeTab="audit" loading>
     <ActivityLogContent targetType="user" targetId="user_001" loading />
   </UserDetailFrame>
 );
@@ -336,7 +343,7 @@ UserAudit_Loading.storyName = "User Audit / Loading";
 export const UserAudit_Error: Story = () => {
   const actions = createDetailActions(mockUsers[0]);
   return (
-    <UserDetailFrame activePath="/admin/identity/users/user_001/audit" userId="user_001" activeTab="audit" actions={actions}>
+    <UserDetailFrame activePath={`${usersPath}/user_001/audit`} userId="user_001" activeTab="audit" actions={actions}>
       <ActivityLogContent targetType="user" targetId="user_001" error="Failed to load activity" />
     </UserDetailFrame>
   );

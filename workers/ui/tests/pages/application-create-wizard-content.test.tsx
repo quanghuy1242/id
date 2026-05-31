@@ -37,12 +37,15 @@ describe("ApplicationCreateWizardContent", () => {
     fireEvent.click(screen.getByRole("button", { name: /create application/i }));
 
     await waitFor(() => expect(actions.createClient).toHaveBeenCalledTimes(1));
-    expect(actions.createClient).toHaveBeenCalledWith(expect.objectContaining({
-      grant_types: ["client_credentials"],
-      redirect_uris: ["https://service.example.com/callback"],
-      response_types: [],
-      token_endpoint_auth_method: "client_secret_post",
-    }));
+    expect(actions.createClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        grant_types: ["client_credentials"],
+        redirect_uris: ["https://service.example.com/callback"],
+        response_types: [],
+        token_endpoint_auth_method: "client_secret_post",
+      }),
+      { kind: "platform" },
+    );
     expect(actions.createClient.mock.calls[0]?.[0]).not.toHaveProperty("public");
     expect(actions.createClient.mock.calls[0]?.[0]).not.toHaveProperty("post_logout_redirect_uris");
     expect(await screen.findByText("secret_once")).toBeInTheDocument();

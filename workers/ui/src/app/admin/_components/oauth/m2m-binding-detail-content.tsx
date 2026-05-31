@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   Button,
@@ -44,6 +45,8 @@ const defaultActions = {
   deleteBinding: deleteBindingAction,
 };
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 export type M2mBindingDetailTab = "overview" | "audit";
 
 function formatDate(ms: number | null | undefined): string {
@@ -54,23 +57,25 @@ function toggleScope(list: string[], scope: string, on: boolean): string[] {
   return on ? [...new Set([...list, scope])] : list.filter((s) => s !== scope);
 }
 
-function tabs(id: string) {
+function tabs(routeBasePath: string) {
   return [
-    { id: "overview", href: `/admin/oauth/m2m-bindings/${id}`, label: "Overview" },
-    { id: "audit", href: `/admin/oauth/m2m-bindings/${id}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
 function Header({
   binding,
-  id,
   activeTab,
+  routeBasePath,
+  backHref,
   onEdit,
   onDelete,
 }: {
   readonly binding: ClientResourceScope | undefined;
-  readonly id: string;
   readonly activeTab: M2mBindingDetailTab;
+  readonly routeBasePath: string;
+  readonly backHref: string;
   readonly onEdit?: () => void;
   readonly onDelete?: () => void;
 }) {
@@ -78,7 +83,7 @@ function Header({
     <Stack gap="sm">
       <Inline justify="between">
         <AdminDetailTitleRow
-          backHref="/admin/oauth/m2m-bindings"
+          backHref={backHref}
           backLabel="M2M Bindings"
           title="Resource Access Binding"
         >
@@ -105,7 +110,7 @@ function Header({
           </Inline>
         ) : null}
       </Inline>
-      <Tabs ariaLabel="M2M binding detail tabs" selectedKey={activeTab} items={tabs(id)} />
+      <Tabs ariaLabel="M2M binding detail tabs" selectedKey={activeTab} items={tabs(routeBasePath)} />
     </Stack>
   );
 }
@@ -148,6 +153,9 @@ export function M2mBindingDetailContent({
   loading: loadingOverride,
   error: errorOverride,
   onDeleted,
+  scope,
+  routeBasePath,
+  backHref,
   actions = defaultActions,
 }: {
   readonly bindingId: string;
@@ -155,8 +163,14 @@ export function M2mBindingDetailContent({
   readonly loading?: boolean;
   readonly error?: string;
   readonly onDeleted?: () => void;
+  readonly scope?: ActiveScope;
+  readonly routeBasePath?: string;
+  readonly backHref?: string;
   readonly actions?: typeof defaultActions;
 }) {
+  const effectiveScope = scope ?? platformScope;
+  const effectiveRouteBasePath = routeBasePath ?? `/admin/oauth/m2m-bindings/${bindingId}`;
+  const effectiveBackHref = backHref ?? "/admin/oauth/m2m-bindings";
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
   const [editScopes, setEditScopes] = useState<string[]>([]);
@@ -165,16 +179,18 @@ export function M2mBindingDetailContent({
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const skip = loadingOverride || errorOverride;
-  const { data: bindings, isLoading, error, mutate } = useSWR(skip ? null : m2mBindingsKey(), () => actions.listBindings());
-  const { data: clients } = useSWR(skip ? null : oauthClientsKey(), () => actions.listClients());
-  const { data: resources } = useSWR(skip ? null : resourceServersKey(), () => actions.listResourceServers());
-  const { data: scopes } = useSWR(skip ? null : oauthScopesKey(), () => actions.listScopes());
+  const { data: bindings, isLoading, error, mutate } = useSWR(skip ? null : m2mBindingsKey(effectiveScope), () => actions.listBindings(effectiveScope));
+  const { data: clients } = useSWR(skip ? null : oauthClientsKey(effectiveScope), () => actions.listClients(effectiveScope));
+  const { data: resources } = useSWR(skip ? null : resourceServersKey(effectiveScope), () => actions.listResourceServers(effectiveScope));
+  const { data: scopes } = useSWR(skip ? null : oauthScopesKey(effectiveScope), () => actions.listScopes(effectiveScope));
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
   const binding = bindings?.find((item) => item.id === bindingId);
   const client = binding ? clients?.find((item) => item.client_id === binding.clientId) : undefined;
   const resource = binding ? resources?.find((item) => item.id === binding.resourceServerId) : undefined;
-  const editScopeOptions = binding ? (scopes ?? []).filter((scope) => scope.resourceServerId === binding.resourceServerId).map((scope) => scope.scope) : [];
+  const editScopeOptions = binding
+    ? (scopes ?? []).filter((scopeRow) => scopeRow.resourceServerId === binding.resourceServerId).map((scopeRow) => scopeRow.scope)
+    : [];
 
   function openEditDialog() {
     if (!binding) return;
@@ -192,7 +208,7 @@ export function M2mBindingDetailContent({
       return false;
     }
     try {
-      const updated = await actions.updateBinding(binding.id, { allowedScopes: editScopes, enabled: editEnabled });
+      const updated = await actions.updateBinding(binding.id, { allowedScopes: editScopes, enabled: editEnabled }, effectiveScope);
       await mutate((current) => (current ?? []).map((item) => item.id === updated.id ? updated : item), { revalidate: false });
       setEditOpen(false);
       toast.success("Binding updated");
@@ -207,7 +223,7 @@ export function M2mBindingDetailContent({
     if (!binding) return false;
     setDeleteError(undefined);
     try {
-      await actions.deleteBinding(binding.id);
+      await actions.deleteBinding(binding.id, effectiveScope);
       await mutate((current) => (current ?? []).filter((item) => item.id !== binding.id), { revalidate: false });
       setDeleteOpen(false);
       toast.success("Binding deleted", "The client lost access to these scopes.");
@@ -219,15 +235,16 @@ export function M2mBindingDetailContent({
     }
   }
 
-  if (showLoading) return <Stack gap="md"><Header id={bindingId} binding={undefined} activeTab={activeTab} /><Skeleton rows={6} /></Stack>;
-  if (showError) return <Stack gap="md"><Header id={bindingId} binding={undefined} activeTab={activeTab} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
-  if (!binding) return <Stack gap="md"><Header id={bindingId} binding={undefined} activeTab={activeTab} /><ErrorAlert message="M2M binding not found" onRetry={() => void mutate()} /></Stack>;
+  if (showLoading) return <Stack gap="md"><Header binding={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><Skeleton rows={6} /></Stack>;
+  if (showError) return <Stack gap="md"><Header binding={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><ErrorAlert message={showError} onRetry={() => void mutate()} /></Stack>;
+  if (!binding) return <Stack gap="md"><Header binding={undefined} activeTab={activeTab} routeBasePath={effectiveRouteBasePath} backHref={effectiveBackHref} /><ErrorAlert message="M2M binding not found" onRetry={() => void mutate()} /></Stack>;
   return (
     <Stack gap="md">
       <Header
-        id={bindingId}
         binding={binding}
         activeTab={activeTab}
+        routeBasePath={effectiveRouteBasePath}
+        backHref={effectiveBackHref}
         onEdit={openEditDialog}
         onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
       />
@@ -253,8 +270,8 @@ export function M2mBindingDetailContent({
           <Text variant="caption">Allowed Scopes</Text>
           {editScopeOptions.length === 0
             ? <Text variant="caption">No scopes defined for this resource API.</Text>
-            : editScopeOptions.map((scope) => (
-              <Checkbox key={scope} label={scope} name={`scope:${scope}`} selected={editScopes.includes(scope)} onChange={(on) => setEditScopes((current) => toggleScope(current, scope, on))} />
+            : editScopeOptions.map((scopeName) => (
+              <Checkbox key={scopeName} label={scopeName} name={`scope:${scopeName}`} selected={editScopes.includes(scopeName)} onChange={(on) => setEditScopes((current) => toggleScope(current, scopeName, on))} />
             ))}
           <Checkbox label="Enabled" name="enabled" selected={editEnabled} onChange={setEditEnabled} />
         </Stack>

@@ -4,8 +4,8 @@ Identity provider built on Cloudflare Workers, D1, and Better Auth. Provides OAu
 
 This repo implements the first-batch documented scope:
 
-- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
-- `ui-id` Worker — admin UI under `/admin/*` (dashboard stats; identity, OAuth, and security sections; live aggregate sessions/tokens/consents/JWKS backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md); entity Audit tabs backed by `admin-activity-log`; and a standards-based token decoder/introspection console), hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
+- `core-id` Worker — email/password identity, sessions, organizations and teams, OAuth2.1/OIDC provider, DB-backed resource-server scopes, JWKS-verifiable JWT access tokens (`GET /api/auth/jwks`), console scope discovery (`GET /api/auth/admin/console-scopes`), read-only SCIM v2 directory (`/api/auth/scim/v2/…` — users, org users, teams/groups, virtual org-admins group per [docs/017](docs/017_scim-directory-and-m2m-principal-contract.md)), admin API, Better Auth OpenAPI reference (`GET /api/auth/open-api/generate-schema`, `GET /api/auth/reference`).
+- `ui-id` Worker — scoped admin UI under `/admin/*` with canonical platform (`/admin/platform/**`) and organization (`/admin/orgs/:orgId/**`) lenses, a console scope selector, identity/application/access/security surfaces, live aggregate sessions/tokens/consents/JWKS backed by the `admin-audit` plugin per [docs/026](docs/026_admin-oauth-security-screens-and-api-contracts.md), entity Audit tabs backed by `admin-activity-log`, and a standards-based token decoder/introspection console; hosted login/consent pages, UI health at `/ui-health`, client-side assets under `/assets/*`, with a `/admin/api` placeholder for future UI-owned BFF endpoints
 
 ## Contracts
 
@@ -157,6 +157,8 @@ curl -X POST https://id.quanghuy.dev/api/bootstrap/admin \
   -d '{"email":"admin@example.com","password":"long-random-password","name":"Root Admin","organization":{"name":"Default","slug":"default"}}'
 pnpm wrangler secret delete ID_BOOTSTRAP_TOKEN --config workers/core/wrangler.jsonc
 ```
+
+The bootstrap call also seeds the id-owned system resource server and default system scopes (`identity:directory:read`, `oauth:clients:read`) from auth config constants. It does not create infra service-account clients or client-scope bindings; those remain deployment-specific provisioning steps.
 
 After bootstrap, use a Better Auth admin session through the Wrangler-gated generic helper. It refuses to send requests unless `pnpm wrangler whoami` succeeds and it stores only a local session cookie, not an admin API key:
 

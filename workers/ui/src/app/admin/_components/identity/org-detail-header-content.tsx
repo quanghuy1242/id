@@ -33,17 +33,21 @@ const defaultActions = {
 
 type OrgDetailHeaderContentProps = {
   activeTab?: "overview" | "members" | "teams" | "invitations" | "audit";
+  routeBasePath?: string;
+  scopedRoute?: boolean;
+  backHref?: string;
   onNavigateToOrgs?: () => void;
   actions?: typeof defaultActions;
 };
 
-function orgTabs(orgId: string) {
+function orgTabs(orgId: string, routeBasePath = `/admin/identity/organizations/${orgId}`, scopedRoute = false) {
+  const identityBasePath = scopedRoute ? `${routeBasePath}/identity` : routeBasePath;
   return [
-    { id: "overview", href: `/admin/identity/organizations/${orgId}`, label: "Overview" },
-    { id: "members", href: `/admin/identity/organizations/${orgId}/members`, label: "Members" },
-    { id: "teams", href: `/admin/identity/organizations/${orgId}/teams`, label: "Teams" },
-    { id: "invitations", href: `/admin/identity/organizations/${orgId}/invitations`, label: "Invitations" },
-    { id: "audit", href: `/admin/identity/organizations/${orgId}/audit`, label: "Audit" },
+    { id: "overview", href: routeBasePath, label: "Overview" },
+    { id: "members", href: `${identityBasePath}/members`, label: "Members" },
+    { id: "teams", href: `${identityBasePath}/teams`, label: "Teams" },
+    { id: "invitations", href: `${identityBasePath}/invitations`, label: "Invitations" },
+    { id: "audit", href: `${routeBasePath}/audit`, label: "Audit" },
   ];
 }
 
@@ -58,6 +62,9 @@ function isJsonObjectString(value: string): boolean {
 
 export function OrgDetailHeaderContent({
   activeTab = "overview",
+  routeBasePath,
+  scopedRoute = false,
+  backHref = "/admin/identity/organizations",
   onNavigateToOrgs,
   actions = defaultActions,
 }: OrgDetailHeaderContentProps) {
@@ -126,7 +133,7 @@ export function OrgDetailHeaderContent({
     <>
       <Inline justify="between">
         <AdminDetailTitleRow
-          backHref="/admin/identity/organizations"
+          backHref={backHref}
           backLabel="Organizations"
           title={org?.name ?? "Organization unavailable"}
         >
@@ -159,7 +166,7 @@ export function OrgDetailHeaderContent({
       <Tabs
         ariaLabel="Organization detail tabs"
         selectedKey={activeTab}
-        items={orgTabs(orgId)}
+        items={orgTabs(orgId, routeBasePath, scopedRoute)}
       />
 
       <ConfirmDialog

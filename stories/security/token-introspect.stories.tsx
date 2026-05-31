@@ -5,7 +5,7 @@ import { SecurityShell } from "../_decorators/security-shell";
 
 export default { title: "Admin / Grants & Keys / Token Decoder" } satisfies StoryDefault;
 
-const ACTIVE = "/admin/security/introspect";
+const ACTIVE = "/admin/platform/security/introspect";
 
 const actions = {
   introspectToken: async (_input: TokenIntrospectionInput): Promise<TokenIntrospectionResult> => ({

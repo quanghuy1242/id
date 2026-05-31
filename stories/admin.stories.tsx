@@ -1,32 +1,23 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { setMockPathname } from "../.ladle/mocks/next-navigation";
-import AdminLayout from "../workers/ui/src/app/admin/layout";
 import AdminPage from "../workers/ui/src/app/admin/page";
-
-function setMockUrl(pathname: string) {
-  setMockPathname(pathname);
-  if (typeof window === "undefined") return;
-  window.history.replaceState({}, "", pathname);
-}
+import { AdminShell } from "./_decorators/shell";
 
 export default {
   title: "Admin / Dashboard",
 } satisfies StoryDefault;
 
 export const Dashboard: Story = () => {
-  setMockUrl("/admin");
   return (
-    <AdminLayout>
+    <AdminShell activePath="/admin/platform">
       <AdminPage />
-    </AdminLayout>
+    </AdminShell>
   );
 };
 
 export const IdentityUsersShell: Story = () => {
-  setMockUrl("/admin/identity/users");
   return (
-    <AdminLayout>
+    <AdminShell activePath="/admin/platform/identity/users">
       <AdminPage />
-    </AdminLayout>
+    </AdminShell>
   );
 };
