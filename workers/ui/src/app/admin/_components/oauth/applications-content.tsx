@@ -43,7 +43,7 @@ const defaultActions = {
 
 const platformScope: ActiveScope = { kind: "platform" };
 
-const defaultCreateHref = "/admin/oauth/applications/new";
+const defaultCreateHref = "/admin/platform/oauth/applications/new";
 
 const typeBadgeTone: Record<ClientType, "neutral" | "info" | "accent"> = {
   confidential: "neutral",
@@ -114,6 +114,9 @@ export function ApplicationsContent({
 
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
+  const subjectLabel = variant === "serviceAccounts" ? "Service Account" : "Application";
+  const subjectLabelPlural = variant === "serviceAccounts" ? "Service Accounts" : "OAuth Applications";
+  const subjectLower = variant === "serviceAccounts" ? "service account" : "application";
   const stats = useMemo(() => {
     const clients = variant === "serviceAccounts"
       ? (allClients ?? []).filter((client) => clientType(client) === "M2M")
@@ -161,7 +164,7 @@ export function ApplicationsContent({
       await actions.deleteClient(deleteTarget.client_id, scope);
       await mutate((cur) => (cur ?? []).filter((c) => c.client_id !== deleteTarget.client_id), { revalidate: false });
       setDeleteTarget(null);
-      toast.success("Application deleted", `${removedName} and its tokens were revoked.`);
+      toast.success(`${subjectLabel} deleted`, `${removedName} and its tokens were revoked.`);
       return true;
     } catch (err: unknown) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete application");
@@ -172,7 +175,7 @@ export function ApplicationsContent({
   const columns: DataTableColumn<OAuthClient>[] = [
     {
       key: "client_name",
-      label: "Application",
+      label: subjectLabel,
       render: (client) => (
         <Stack gap="xs">
           <Inline gap="sm">
@@ -183,19 +186,31 @@ export function ApplicationsContent({
         </Stack>
       ),
     },
-    {
-      key: "type",
-      label: "Type",
-      render: (client) => {
-        const type = clientType(client);
-        return <Badge tone={typeBadgeTone[type]} size="sm">{typeLabel[type]}</Badge>;
-      },
-    },
-    {
-      key: "redirect_uris",
-      label: "Redirects",
-      render: (client) => client.redirect_uris.length > 0 ? client.redirect_uris.length : "—",
-    },
+    variant === "serviceAccounts"
+      ? {
+          key: "tier",
+          label: "Tier",
+          render: (client) => client.reference_id ? <Badge tone="info" size="sm">Tenant</Badge> : <Badge tone="accent" size="sm">System</Badge>,
+        }
+      : {
+          key: "type",
+          label: "Type",
+          render: (client) => {
+            const type = clientType(client);
+            return <Badge tone={typeBadgeTone[type]} size="sm">{typeLabel[type]}</Badge>;
+          },
+        },
+    variant === "serviceAccounts"
+      ? {
+          key: "owner",
+          label: "Owner",
+          render: (client) => client.reference_id ? <Text variant="caption" mono>{client.reference_id}</Text> : "Platform",
+        }
+      : {
+          key: "redirect_uris",
+          label: "Redirects",
+          render: (client) => client.redirect_uris.length > 0 ? client.redirect_uris.length : "—",
+        },
     {
       key: "scope",
       label: "Scopes",
@@ -239,7 +254,7 @@ export function ApplicationsContent({
             variant: "danger",
             iconName: "Trash2",
             ariaLabel: `Delete ${client.client_name}`,
-            tooltip: "Delete application",
+            tooltip: `Delete ${subjectLower}`,
             onAction: () => { setDeleteError(undefined); setDeleteTarget(client); },
           },
         ];
@@ -271,7 +286,7 @@ export function ApplicationsContent({
   return (
     <Stack gap="md">
       <PageIntro
-        title={variant === "serviceAccounts" ? "Service Accounts" : "OAuth Applications"}
+        title={subjectLabelPlural}
         description={variant === "serviceAccounts" ? "Machine principals implemented as OAuth clients using the client credentials flow." : "Clients that can request tokens from this identity provider — web apps, SPAs, native apps, and machine-to-machine services."}
         info={variant === "serviceAccounts" ? "A service account is an OAuth client whose grant type is client_credentials. System service accounts have no organization reference; tenant service accounts are owned by an organization. Runtime access remains on the standard OAuth client-credentials path." : "Each application is an OAuth 2.0 client with its own ID and (except public SPAs) a secret. Confidential clients use the authorization code flow with a secret; public clients use code + PKCE with no secret; M2M clients use client credentials. Configure redirect URIs, scopes, and metadata per app, and rotate the secret if it leaks."}
         actions={
@@ -313,9 +328,9 @@ export function ApplicationsContent({
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteError(undefined); } }}
-        title="Delete Application"
-        description={`Delete ${deleteTarget?.client_name ?? "this application"}? This invalidates all tokens issued for this client and breaks every integration using it.`}
-        confirmLabel="Delete Application"
+        title={`Delete ${subjectLabel}`}
+        description={`Delete ${deleteTarget?.client_name ?? `this ${subjectLower}`}? This invalidates all tokens issued for this client and breaks every integration using it.`}
+        confirmLabel={`Delete ${subjectLabel}`}
         variant="danger"
         error={deleteError}
         onConfirm={handleDelete}

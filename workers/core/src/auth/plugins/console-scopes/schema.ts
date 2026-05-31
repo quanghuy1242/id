@@ -33,7 +33,7 @@ export const consoleScopeSchema = z.discriminatedUnion("kind", [
     id: z.templateLiteral(["organization:", z.string().min(1)]),
     organizationId: z.string().min(1),
     label: z.string().min(1),
-    role: z.enum(["owner", "admin"]),
+    role: z.enum(["platform-admin", "owner", "admin"]),
     permissions: z.array(z.enum(consolePermissionValues)),
     requiresStepUp: z.boolean(),
   }),
@@ -76,4 +76,3 @@ export const consoleScopesEndpointMetadata = {
     responses,
   },
 };
-

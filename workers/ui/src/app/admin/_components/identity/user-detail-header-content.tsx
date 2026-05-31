@@ -83,7 +83,7 @@ function userDetailTabs(routeBasePath: string) {
 export function UserDetailHeaderContent({
   activeTab = "overview",
   routeBasePath,
-  backHref = "/admin/identity/users",
+  backHref = "/admin/platform/identity/users",
   onImpersonateRedirect,
   onNavigateToUsers,
   actions = defaultActions,
@@ -307,7 +307,7 @@ export function UserDetailHeaderContent({
       <Tabs
         ariaLabel="User detail tabs"
         selectedKey={activeTab}
-        items={userDetailTabs(routeBasePath ?? `/admin/identity/users/${userId}`)}
+        items={userDetailTabs(routeBasePath ?? `/admin/platform/identity/users/${userId}`)}
       />
 
       <ConfirmDialog

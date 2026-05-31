@@ -16,24 +16,24 @@ All components exist in `packages/ui/src/` with the exact props described in thi
 
 **Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, action folding via MenuTrigger, visibility props on Button/LinkButton.
 
-Covers all routes under `/admin/oauth`. Platform admin only — all org-scoped endpoints use the admin session's organization context.
+Covers OAuth application screens under `/admin/platform/oauth/**` and `/admin/orgs/:orgId/oauth/**`, plus Access-owned Resource APIs, Scope Catalog, and M2M Bindings under `/admin/platform/access/**` and `/admin/orgs/:orgId/access/**`. Legacy `/admin/oauth/**` URLs are proxy redirects only; the old route files have been removed.
 
 Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● enabled · ○ disabled · ⊙ disabled
 
 ---
 
-## /admin/oauth (moved → /admin/oauth/applications)
+## /admin/oauth (legacy redirect → /admin/platform/oauth/applications)
 
-The OAuth section root is a legacy entry URL. `/admin/oauth/applications` is the canonical application index so the list always gets the route-backed detail navigation and create wizard.
+The OAuth section root is a legacy entry URL. `/admin/platform/oauth/applications` is the canonical platform application index so the list always gets the route-backed detail navigation and create wizard.
 
 Components:
-  /admin/oauth/page.tsx → permanentRedirect("/admin/oauth/applications")   [Next.js permanent server redirect]
+  Proxy redirect: `/admin/oauth` → `/admin/platform/oauth/applications`
 
 Data: none.
 
 Behavior:
-  - Old links and bookmarks to `/admin/oauth` permanently redirect to `/admin/oauth/applications`.
-  - Desktop and mobile navigation both link directly to `/admin/oauth/applications`.
+  - Old links and bookmarks to `/admin/oauth` redirect to `/admin/platform/oauth/applications`.
+  - Desktop and mobile navigation both link directly to `/admin/platform/oauth/applications`.
 
 ---
 

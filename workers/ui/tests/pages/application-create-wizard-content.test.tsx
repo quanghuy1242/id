@@ -18,6 +18,25 @@ const createdClient: OAuthClient = {
 };
 
 describe("ApplicationCreateWizardContent", () => {
+  it("can default to the service-account creation flow", () => {
+    const actions = {
+      listScopes: vi.fn<() => Promise<OAuthResourceScope[]>>().mockResolvedValue([]),
+      createClient: vi.fn<(input: CreateClientInput) => Promise<OAuthClient>>().mockResolvedValue(createdClient),
+    };
+
+    render(
+      <ApplicationCreateWizardContent
+        actions={actions}
+        defaultKind="M2M"
+        title="New Service Account"
+        completeLabel="Create service account"
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "New Service Account" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Machine-to-machine")).toBeChecked();
+  });
+
   it("navigates once after the one-time secret dialog closes", async () => {
     const onCreated = vi.fn<(clientId: string) => void>();
     const actions = {

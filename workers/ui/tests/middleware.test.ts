@@ -175,6 +175,16 @@ describe("admin middleware", () => {
     expect(location.pathname).toBe("/admin/orgs/org_123");
   });
 
+  it("preserves legacy organization detail routes for org-only admins when authorized", async () => {
+    mockedFetch().mockResolvedValue(Response.json(orgEnvelope));
+
+    const response = await proxy(adminRequest("/admin/identity/organizations/org_123/teams", "id-auth.session_token=org"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/admin/orgs/org_123/identity/teams");
+  });
+
   it("prevents opening an organization route outside the actor's operable scopes", async () => {
     mockedFetch().mockResolvedValue(Response.json(orgEnvelope));
 

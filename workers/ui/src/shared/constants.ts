@@ -76,7 +76,6 @@ export const CONSOLE_NAV_SECTIONS = [
   { id: "applications", label: "Applications" },
   { id: "access", label: "Access" },
   { id: "security", label: "Security" },
-  { id: "system", label: "System" },
   { id: "audit", label: "Audit" },
 ] as const;
 
@@ -161,12 +160,6 @@ export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
     ["security-consents", "Consents", "security", "security-audit:read", "/security/consents", "FileCheck2"],
     ["security-introspection", "Introspection", "security", "security-audit:read", "/security/introspect", "CircleHelp"],
     ["security-jwks", "JWKS", "security", "jwks:read", "/security/jwks", "KeyRound"],
-  ] satisfies readonly NavTuple[]),
-  ...navItems("platform", platformHref, [
-    ["system-issuer-metadata", "Issuer Metadata", "system", "system:read", "/system/issuer-metadata", "Globe"],
-    ["system-scim-status", "SCIM Status", "system", "system:read", "/system/scim-status", "Activity"],
-    ["system-health", "Health", "system", "system:read", "/system/health", "HeartPulse"],
-    ["system-settings", "Settings", "system", "system:write", "/system/settings", "Settings"],
   ] satisfies readonly NavTuple[]),
   ...navItems("both", scopedHref, [
     ["audit", "Audit", "audit", "security-audit:read", "/audit", "History"],

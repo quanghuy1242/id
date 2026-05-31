@@ -559,7 +559,7 @@ clientReference: async ({ session }) =>
 So org-scoped OAuth client create/list/update/delete cannot be fully URL-owned until Better Auth accepts an explicit reference id in those handlers. The first implementation treats `activeOrganizationId` as a narrow bridge confined to OAuth client actions:
 
 1. The URL scope remains the desired context.
-2. Before an org-scoped OAuth client action, the action wrapper calls Better Auth's set-active-organization endpoint for the route org if the session active org does not match.
+2. Before an org-scoped OAuth client action, the action wrapper calls Better Auth's set-active-organization endpoint for the route org. Before a platform-scoped OAuth client action, it clears the active organization with `{ organizationId: null }` so a stale tenant session cannot attach a platform client to an organization.
 3. The action then calls the existing OAuth client endpoint.
 4. The server's `clientPrivileges` and Better Auth ownership checks still validate membership and `referenceId`.
 5. SWR keys include the route org id, never the session active org.

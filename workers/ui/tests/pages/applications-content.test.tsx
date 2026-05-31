@@ -36,7 +36,7 @@ describe("ApplicationsContent", () => {
   it("routes empty-state creation to the dedicated create page", async () => {
     render(<ApplicationsContent actions={makeActions([])} />);
     await waitFor(() => expect(screen.getByText(/no oauth applications/i)).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: /create application/i })).toHaveAttribute("href", "/admin/oauth/applications/new");
+    expect(screen.getByRole("link", { name: /create application/i })).toHaveAttribute("href", "/admin/platform/oauth/applications/new");
     expect(screen.queryByRole("dialog", { name: /create oauth application/i })).not.toBeInTheDocument();
   });
 
@@ -57,7 +57,18 @@ describe("ApplicationsContent", () => {
   it("renders toolbar creation as a link to the dedicated create page", async () => {
     render(<ApplicationsContent actions={makeActions(mockClients)} />);
     await waitFor(() => screen.getByText("Content API"));
-    expect(screen.getByRole("link", { name: /new app/i })).toHaveAttribute("href", "/admin/oauth/applications/new");
+    expect(screen.getByRole("link", { name: /new app/i })).toHaveAttribute("href", "/admin/platform/oauth/applications/new");
+  });
+
+  it("renders service accounts with tier and owner columns", async () => {
+    render(<ApplicationsContent actions={makeActions(mockClients)} variant="serviceAccounts" createHref="/admin/platform/access/service-accounts/new" />);
+    await waitFor(() => screen.getByText("Content API"));
+    expect(screen.getByRole("heading", { name: "Service Accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Service Account" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Tier" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /new service account/i })).toHaveAttribute("href", "/admin/platform/access/service-accounts/new");
+    expect(within(screen.getByText("Content API").closest("tr")!).getByText("System")).toBeInTheDocument();
+    expect(screen.queryByText("Admin Client")).toBeNull();
   });
 
   it("deletes a client", async () => {

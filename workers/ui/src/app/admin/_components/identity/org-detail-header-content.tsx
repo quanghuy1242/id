@@ -40,7 +40,7 @@ type OrgDetailHeaderContentProps = {
   actions?: typeof defaultActions;
 };
 
-function orgTabs(orgId: string, routeBasePath = `/admin/identity/organizations/${orgId}`, scopedRoute = false) {
+function orgTabs(orgId: string, routeBasePath = `/admin/orgs/${orgId}`, scopedRoute = false) {
   const identityBasePath = scopedRoute ? `${routeBasePath}/identity` : routeBasePath;
   return [
     { id: "overview", href: routeBasePath, label: "Overview" },
@@ -64,7 +64,7 @@ export function OrgDetailHeaderContent({
   activeTab = "overview",
   routeBasePath,
   scopedRoute = false,
-  backHref = "/admin/identity/organizations",
+  backHref = "/admin/platform/identity/organizations",
   onNavigateToOrgs,
   actions = defaultActions,
 }: OrgDetailHeaderContentProps) {

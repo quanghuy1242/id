@@ -51,12 +51,7 @@ export const orgMembersKey = (organizationId: string) => [ORG_MEMBERS, { organiz
 export const orgTeamsKey = (organizationId: string) => [ORG_TEAMS, { organizationId }] as const;
 export const orgInvitationsKey = (organizationId: string) => [ORG_INVITATIONS, { organizationId }] as const;
 
-/**
- * OAuth & security keys. Each list is fetched once and filtered/sorted
- * client-side (no server-side search/pagination on these plugin endpoints),
- * so every builder is keyless — the cache slot is identified by the endpoint
- * path alone.
- */
+/** OAuth & security keys. Plugin list screens filter/search client-side, but scope is part of cache identity because platform and organization lenses call different server scopes. */
 export const oauthClientsKey = (scope: ActiveScope = platformScope) => [OAUTH_CLIENTS, scope] as const;
 export const resourceServersKey = (scope: ActiveScope = platformScope) => [RESOURCE_SERVERS, scope] as const;
 export const oauthScopesKey = (scope: ActiveScope = platformScope) => [OAUTH_SCOPES, scope] as const;

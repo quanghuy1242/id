@@ -366,7 +366,33 @@ function renderBindingRoute(context: OAuthRouteContext): ReactNode {
   );
 }
 
+function renderServiceAccountRoute(context: OAuthRouteContext): ReactNode {
+  const { id, navigate, appActions, catalogActions } = context;
+  if (id === "new") {
+    return (
+      <ApplicationCreateWizardContent
+        defaultKind="M2M"
+        title="New Service Account"
+        backHref="/admin/platform/access/service-accounts"
+        backLabel="Service Accounts"
+        completeLabel="Create service account"
+        onCreated={(clientId) => navigate(`/admin/platform/oauth/applications/${clientId}`)}
+        actions={{ createClient: appActions.createClient, listScopes: catalogActions.listScopes }}
+      />
+    );
+  }
+  return (
+    <ApplicationsContent
+      variant="serviceAccounts"
+      createHref="/admin/platform/access/service-accounts/new"
+      actions={appActions}
+      onClientClick={(clientId) => navigate(`/admin/platform/oauth/applications/${clientId}`)}
+    />
+  );
+}
+
 function renderOAuthContent(context: OAuthRouteContext): ReactNode {
+  if (context.route === "service-accounts") return renderServiceAccountRoute(context);
   if (context.route === "resource-apis") return renderResourceRoute(context);
   if (context.route === "scope-catalog") return <ScopeCatalogContent actions={context.catalogActions} />;
   if (context.route === "m2m-bindings") return renderBindingRoute(context);
@@ -415,6 +441,10 @@ export const Applications: Story = () => <OAuthRoutes initialPath="/admin/platfo
 export const ApplicationDetail: Story = () => <OAuthRoutes initialPath="/admin/platform/oauth/applications/cli_contentapi_a1b2c3d4e5f6" />;
 
 export const ApplicationNewWizard: Story = () => <OAuthRoutes initialPath="/admin/platform/oauth/applications/new" />;
+
+export const ServiceAccounts: Story = () => <OAuthRoutes initialPath="/admin/platform/access/service-accounts" />;
+
+export const ServiceAccountNewWizard: Story = () => <OAuthRoutes initialPath="/admin/platform/access/service-accounts/new" />;
 
 export const ResourceAPIs: Story = () => <OAuthRoutes initialPath="/admin/platform/access/resource-apis" />;
 

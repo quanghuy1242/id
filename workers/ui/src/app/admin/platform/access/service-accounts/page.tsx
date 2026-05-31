@@ -11,7 +11,7 @@ export default function PlatformAccessServiceAccountsPage() {
     <PageBody>
       <ApplicationsContent
         variant="serviceAccounts"
-        createHref="/admin/platform/oauth/applications/new"
+        createHref="/admin/platform/access/service-accounts/new"
         onClientClick={(clientId) => router.push(`/admin/platform/oauth/applications/${clientId}`)}
       />
     </PageBody>

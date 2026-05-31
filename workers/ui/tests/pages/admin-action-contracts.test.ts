@@ -70,11 +70,15 @@ describe("admin action contracts", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("matches Better Auth OAuth client runtime shapes", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse(null));
     await expect(listClients()).resolves.toEqual([]);
     expect(lastCall().url).toBe("/api/auth/oauth2/get-clients");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(mockClients[1]));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse(mockClients[1]));
     await createClient({
       client_name: "Admin Client",
       token_endpoint_auth_method: "none",
@@ -91,7 +95,9 @@ describe("admin action contracts", () => {
       response_types: ["code"],
     });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(mockClients[1]));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse(mockClients[1]));
     await updateClient("cli_admin", { redirect_uris: ["https://admin.example.com/callback"] });
     expect(lastCall().url).toBe("/api/auth/oauth2/update-client");
     expect(jsonBody()).toEqual({
@@ -99,17 +105,21 @@ describe("admin action contracts", () => {
       update: { redirect_uris: ["https://admin.example.com/callback"] },
     });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse({ ...mockClients[2], client_secret: "sk-rotated" }));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ ...mockClients[2], client_secret: "sk-rotated" }));
     await expect(rotateClientSecret("cli_portal")).resolves.toMatchObject({ client_secret: "sk-rotated" });
     expect(jsonBody()).toEqual({ client_id: "cli_portal" });
 
-    fetchMock.mockResolvedValueOnce(emptyResponse());
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(emptyResponse());
     await expect(deleteClient("cli_portal")).resolves.toBeUndefined();
     expect(lastCall().url).toBe("/api/auth/oauth2/delete-client");
     expect(jsonBody()).toEqual({ client_id: "cli_portal" });
   });
 
-  it("uses the active-organization bridge only for org-scoped OAuth client actions", async () => {
+  it("syncs the active-organization bridge before OAuth client actions", async () => {
     const orgClients = [
       { ...mockClients[0], reference_id: "org_001" },
       { ...mockClients[1], reference_id: "org_002" },

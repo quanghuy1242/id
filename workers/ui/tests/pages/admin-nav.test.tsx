@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   AdminSidebarNav,
@@ -8,7 +8,6 @@ import {
   AdminMobileRouteTabs,
   AdminTopbar,
 } from "@/app/admin/_components/admin-nav";
-import OAuthLayout from "@/app/admin/oauth/layout";
 import { ADMIN_LOGIN_REDIRECT_URL } from "@/shared/constants";
 
 const navigationMock = vi.hoisted(() => ({ pathname: "/admin" }));
@@ -107,61 +106,19 @@ describe("Admin mobile navigation", () => {
   });
 });
 
-describe("OAuth layout", () => {
-  it("renders configuration tabs on OAuth listing routes only", () => {
-    const cases = [
-      ["/admin/oauth/applications", "Applications"],
-      ["/admin/oauth/resource-apis", "Resource APIs"],
-      ["/admin/oauth/scope-catalog", "Scope Catalog"],
-      ["/admin/oauth/m2m-bindings", "M2M Bindings"],
-    ] as const;
-
-    for (const [pathname, activeLabel] of cases) {
-      navigationMock.pathname = pathname;
-
-      const { unmount } = render(<OAuthLayout><div>{activeLabel} content</div></OAuthLayout>);
-
-      expect(screen.getByRole("tablist", { name: "OAuth configuration" })).toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: activeLabel })).toHaveClass("tab-active");
-
-      unmount();
-    }
-  });
-
-  it("does not render configuration tabs outside OAuth configuration routes", () => {
-    navigationMock.pathname = "/admin/security/sessions";
-
-    render(<OAuthLayout><div>Some other content</div></OAuthLayout>);
-
-    expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
-    expect(screen.getByText("Some other content")).toBeInTheDocument();
-  });
-
-  it("hides configuration tabs on OAuth detail and create routes", () => {
-    const hiddenCases = [
-      ["/admin/oauth", "OAuth redirect"],
-      ["/admin/oauth/applications/new", "Application create"],
-      ["/admin/oauth/applications/cli_123", "Application detail"],
-      ["/admin/oauth/resource-apis/rs_001", "Resource API detail"],
-      ["/admin/oauth/m2m-bindings/bind_001", "M2M binding detail"],
-    ] as const;
-
-    for (const [pathname, label] of hiddenCases) {
-      navigationMock.pathname = pathname;
-
-      const { unmount } = render(<OAuthLayout><div>{label}</div></OAuthLayout>);
-
-      expect(screen.queryByRole("tablist", { name: "OAuth configuration" })).toBeNull();
-      expect(screen.getByText(label)).toBeInTheDocument();
-
-      unmount();
-    }
-  });
-});
-
 describe("Admin topbar", () => {
   it("routes successful admin logout back to the admin login callback", () => {
     expect(ADMIN_LOGIN_REDIRECT_URL).toBe("/login?callbackURL=%2Fadmin");
+  });
+
+  it("renders the scope picker as the first breadcrumb item", () => {
+    navigationMock.pathname = "/admin/platform/access/resource-apis";
+
+    render(<AdminTopbar />);
+
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(breadcrumb).getByRole("button", { name: /select console scope/i })).toHaveTextContent("Platform");
+    expect(breadcrumb).toHaveTextContent("Resource APIs");
   });
 
   it("wires the avatar menu logout action", async () => {

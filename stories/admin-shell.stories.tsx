@@ -13,7 +13,7 @@ const orgPermissions: readonly ConsolePermission[] = [
   "security-audit:read",
 ];
 
-function acmeScope(role: string): ConsoleScope {
+function acmeScope(role: ConsoleScope["role"]): ConsoleScope {
   return {
     kind: "organization",
     id: "organization:org_acme",

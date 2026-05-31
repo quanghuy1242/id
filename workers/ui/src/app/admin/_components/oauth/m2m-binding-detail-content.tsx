@@ -169,8 +169,8 @@ export function M2mBindingDetailContent({
   readonly actions?: typeof defaultActions;
 }) {
   const effectiveScope = scope ?? platformScope;
-  const effectiveRouteBasePath = routeBasePath ?? `/admin/oauth/m2m-bindings/${bindingId}`;
-  const effectiveBackHref = backHref ?? "/admin/oauth/m2m-bindings";
+  const effectiveRouteBasePath = routeBasePath ?? `/admin/platform/access/m2m-bindings/${bindingId}`;
+  const effectiveBackHref = backHref ?? "/admin/platform/access/m2m-bindings";
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
   const [editScopes, setEditScopes] = useState<string[]>([]);

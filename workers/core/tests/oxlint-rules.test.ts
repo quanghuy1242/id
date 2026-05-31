@@ -122,7 +122,7 @@ describe.concurrent("oxlint architecture rules", () => {
   });
 
   it("passes cleanly on valid ui composition files", async () => {
-    const result = await runOxlint("workers/ui/src/app/admin/page.tsx");
+    const result = await runOxlint("workers/ui/src/app/admin/platform/page.tsx");
     expect(result.status).toBe(0);
   });
 });

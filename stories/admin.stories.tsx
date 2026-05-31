@@ -1,5 +1,5 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import AdminPage from "../workers/ui/src/app/admin/page";
+import PlatformDashboardPage from "../workers/ui/src/app/admin/platform/page";
 import { AdminShell } from "./_decorators/shell";
 
 export default {
@@ -9,7 +9,7 @@ export default {
 export const Dashboard: Story = () => {
   return (
     <AdminShell activePath="/admin/platform">
-      <AdminPage />
+      <PlatformDashboardPage />
     </AdminShell>
   );
 };
@@ -17,7 +17,7 @@ export const Dashboard: Story = () => {
 export const IdentityUsersShell: Story = () => {
   return (
     <AdminShell activePath="/admin/platform/identity/users">
-      <AdminPage />
+      <PlatformDashboardPage />
     </AdminShell>
   );
 };

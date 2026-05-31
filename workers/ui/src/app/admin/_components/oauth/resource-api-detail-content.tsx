@@ -163,8 +163,8 @@ export function ResourceApiDetailContent({
   readonly actions?: typeof defaultActions;
 }) {
   const effectiveScope = scope ?? platformScope;
-  const effectiveRouteBasePath = routeBasePath ?? `/admin/oauth/resource-apis/${resourceServerId}`;
-  const effectiveBackHref = backHref ?? "/admin/oauth/resource-apis";
+  const effectiveRouteBasePath = routeBasePath ?? `/admin/platform/access/resource-apis/${resourceServerId}`;
+  const effectiveBackHref = backHref ?? "/admin/platform/access/resource-apis";
   const [editOpen, setEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>();
   const [disableOpen, setDisableOpen] = useState(false);

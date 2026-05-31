@@ -23,6 +23,8 @@ await import("./packages-ui/inline.test");
 await import("./packages-ui/mobile-filter-menu.test");
 await import("./packages-ui/nav-icons.test");
 await import("./packages-ui/responsive-actions.test");
+await import("./packages-ui/responsive-breadcrumb.test");
+await import("./packages-ui/scope-picker-trigger.test");
 await import("./packages-ui/tabs.test");
 await import("./packages-ui/theme-dialog.test");
 await import("./packages-ui/typography.test");

@@ -42,7 +42,9 @@ Add new icons to `iconMap` in `packages/ui/src/nav-icons.tsx` before using them.
 
 ---
 
-Covers all routes under `/admin/identity`. Actor-scoping rules:
+Covers identity screens in their canonical Track A route families: `/admin/platform/identity/**` for platform-only user and organization list surfaces, and `/admin/orgs/:orgId/**` for organization overview/members/teams/invitations/audit. Legacy `/admin/identity/**` URLs are proxy redirects only; the old route files have been removed.
+
+Actor-scoping rules:
 - Platform admin (`user.role = "admin"`) — full access to users and all organizations.
 - Org admin (`member.role = "owner" | "admin"`) — no access to `/admin/identity/users`; directed to their own org detail only.
 
@@ -53,7 +55,7 @@ User and organization detail routes use a nested layout. Stories render the prov
 matching the route file structure. This ensures the shared header, active tab, and child panel are visible in every story state.
 ```tsx
 export const OrgMembers_Populated: Story = () => (
-  <AdminShell activePath="/admin/identity/organizations/org_001/members">
+  <AdminShell activePath="/admin/orgs/org_001/identity/members">
     <PageBody>
       <OrgDetailProvider orgId="org_001" actions={detailActions}>
         <Stack gap="md">
@@ -70,7 +72,7 @@ export const OrgMembers_Populated: Story = () => (
 
 ## /admin/identity/users
 
-Platform admin only. Implemented route: `workers/ui/src/app/admin/identity/users/page.tsx`.
+Platform admin only. Canonical route: `workers/ui/src/app/admin/platform/identity/users/page.tsx`.
 The admin shell is supplied by `workers/ui/src/app/admin/layout.tsx`; this route owns only the `PageBody` content.
 
 ```

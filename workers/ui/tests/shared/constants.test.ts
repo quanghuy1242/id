@@ -42,6 +42,7 @@ describe("constants", () => {
     expect(visible.map((item) => item.id)).toContain("identity-users");
     expect(visible.map((item) => item.id)).toContain("identity-organizations");
     expect(visible.map((item) => item.id)).toContain("security-jwks");
+    expect(visible.map((item) => item.id)).not.toContain("system-health");
     expect(visible.map((item) => item.id)).not.toContain("identity-teams");
   });
 

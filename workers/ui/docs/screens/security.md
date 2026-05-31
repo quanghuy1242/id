@@ -6,19 +6,19 @@ Same component set as identity.md and oauth.md. All components exist in `@id/ui`
 
 **Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, visibility props on Button/LinkButton.
 
-Covers routes under `/admin/security`. Platform admin only.
+Covers platform security routes under `/admin/platform/security/**`. Legacy `/admin/security/**` URLs are proxy redirects only; the old route files have been removed. Platform admin only.
 
 Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no
 
 ## Unified grants section (docs/027 §6)
 
-Sessions, access tokens, refresh tokens, and consents are facets of one concept (live grants), with Signing Keys (JWKS) and the standards-based Token Decoder as siblings. They share one URL-addressable route-tab bar owned by `app/admin/security/layout.tsx`:
+Sessions, access tokens, refresh tokens, and consents are facets of one concept (live grants), with Signing Keys (JWKS) and the standards-based Token Decoder as siblings. Under Track A these are canonical platform routes and the shell's mobile route tabs own section-level navigation:
 
 ```
 Sessions · Access Tokens · Refresh Tokens · Consents · Signing Keys · Token Decoder
 ```
 
-The two token tabs share `/admin/security/tokens` and are distinguished by the `?type=access|refresh` query param. The sidebar carries a single flat "Grants & Keys" entry pointing at `/admin/security/sessions`; the layout tabs own sub-navigation, mirroring the OAuth section. The legacy `/admin/oauth/sessions-tokens` route permanently redirects to `/admin/security/sessions`. All data comes from the read-only `admin-audit` aggregate endpoints — no token bodies or private keys are ever returned.
+The two token tabs share `/admin/platform/security/tokens` and are distinguished by the `?type=access|refresh` query param. The legacy `/admin/oauth/sessions-tokens` route redirects to `/admin/platform/security/sessions`. All data comes from the read-only `admin-audit` aggregate endpoints — no token bodies or private keys are ever returned.
 
 ---
 

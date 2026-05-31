@@ -112,9 +112,6 @@ function legacyPlatformRedirect(request: NextRequest, envelope: ConsoleScopeEnve
   if (pathname === "/admin") {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
   }
-  if (!hasPlatformScope(envelope)) {
-    return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
-  }
   const target = legacyPlatformTarget(pathname);
   if (!canOpenScopedRoute(target, envelope)) {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));

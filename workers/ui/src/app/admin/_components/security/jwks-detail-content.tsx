@@ -168,8 +168,8 @@ export function JwksDetailContent({
   activeTab = "overview",
   loading: loadingOverride,
   error: errorOverride,
-  routeBasePath = `/admin/security/jwks/${kid}`,
-  backHref = "/admin/security/jwks",
+  routeBasePath = `/admin/platform/security/jwks/${kid}`,
+  backHref = "/admin/platform/security/jwks",
   actions = defaultActions,
 }: JwksDetailContentProps) {
   const { data: keys, isLoading, error, mutate } = useSWR(

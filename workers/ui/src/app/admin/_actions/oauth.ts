@@ -22,9 +22,9 @@ function scopedPath(path: string, scope: ActiveScope): string {
 }
 
 async function setActiveOrganizationForOAuth(scope: ActiveScope): Promise<void> {
-  if (scope.kind === "organization") {
-    await authApiPostOrThrow("/organization/set-active", { organizationId: scope.organizationId });
-  }
+  await authApiPostOrThrow("/organization/set-active", {
+    organizationId: scope.kind === "organization" ? scope.organizationId : null,
+  });
 }
 
 export type OAuthClient = {

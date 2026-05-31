@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAuth } from "../../src/auth/get-auth";
+import { consoleScopeEnvelopeSchema } from "../../src/auth/plugins/console-scopes/schema";
 import type { ConsoleScopeEnvelope } from "@id/lib";
 import { signInViaAdminOtp, type TestEnv, createTestEnv } from "./m2m-helpers";
 
@@ -71,7 +72,9 @@ describe("id-console-scopes endpoint", () => {
     });
     const cookie = await signInViaAdminOtp(test.env, { email: "platform@example.test", password: "password12345" });
 
-    await expect(consoleScopes(test, cookie)).resolves.toEqual({
+    const envelope = await consoleScopes(test, cookie);
+    expect(() => consoleScopeEnvelopeSchema.parse(envelope)).not.toThrow();
+    expect(envelope).toEqual({
       actor: { userId, email: "platform@example.test", canEnterConsole: true },
       scopes: [
         expect.objectContaining({

@@ -378,6 +378,8 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 | `TopbarEnd` | `children` | Right section of Topbar |
 | `TopbarBrandLink` | `href`, `children` | Brand/app name link, `btn btn-ghost text-xl font-semibold` |
 | `TopbarBreadcrumb` | `items: string[]` | `breadcrumbs` DaisyUI component |
+| `ResponsiveBreadcrumb` | `items: string[]`, `leadingItem?: ReactNode` | Responsive breadcrumbs with an optional pinned leading selector and overflow menu for collapsed earlier items. |
+| `ScopePickerTrigger` | `label`, `tone: "accent"\|"info"`, `ariaLabel?` | Topbar scope-selector trigger using the normal DaisyUI `btn` height, tighter horizontal padding, and direct badge-tone border/text styling without a nested ghost-button hover. |
 | `TopbarSearchField` | `placeholder?` | React Aria SearchField with Input + clear Button. Styled with DaisyUI `input input-bordered`. Shows `✕` clear button when non-empty. |
 | `TopbarAvatarMenu` | `ariaLabel?`, `initials?`, `items: { label, href, badge? }[]` | Composes `Avatar` (trigger) + RAC `MenuTrigger`/`Menu`/`MenuItem` (dropdown) styled with DaisyUI. |
 | `NavTitle` | `children` | Renders `<li><h2 class="menu-title">` — static section title without collapsible behavior |

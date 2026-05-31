@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  Badge,
   Button,
   ConfirmDialog,
   DockLink,
@@ -14,13 +13,14 @@ import {
   NavLink,
   NavMenu,
   NavSection,
+  ResponsiveBreadcrumb,
+  ScopePickerTrigger,
   Tabs,
   ThemeDialog,
   TopbarAvatarMenu,
   TopbarBrandLink,
   TopbarEnd,
   TopbarStart,
-  ResponsiveBreadcrumb,
 } from "@id/ui";
 import {
   ADMIN_LOGIN_REDIRECT_URL,
@@ -93,7 +93,6 @@ function mobileLabel(section: VisibleConsoleNavSection, item: VisibleConsoleNavI
   if (section.id === "applications") return "Apps";
   if (section.id === "access") return "Access";
   if (section.id === "security") return "Security";
-  if (section.id === "system") return "System";
   return item.label;
 }
 
@@ -103,15 +102,17 @@ function initialsFromEmail(email: string | undefined): string {
   return (name?.slice(0, 2) || "AD").toUpperCase();
 }
 
+function scopeTone(kind: "platform" | "organization"): "accent" | "info" {
+  return kind === "platform" ? "accent" : "info";
+}
+
 function ScopeSelector() {
   const { envelope, activeScope, loading, error, switchHref } = useAdminScope();
   const scopeLabel = loading ? "Loading scope" : activeScope.label;
 
   return (
     <MenuTrigger placement="bottom start">
-      <Button variant="secondary" iconName="ChevronDown" iconPosition="right" ariaLabel="Select console scope">
-        {scopeLabel}
-      </Button>
+      <ScopePickerTrigger label={scopeLabel} tone={scopeTone(activeScope.kind)} />
       <Menu aria-label="Console scopes">
         {envelope.scopes.map((scope) => (
           <MenuItem
@@ -250,11 +251,7 @@ export function AdminTopbar({ onLogout }: AdminTopbarProps = {}) {
     <>
       <TopbarStart>
         <TopbarBrandLink href="/admin">id</TopbarBrandLink>
-        <ScopeSelector />
-        <Badge tone={activeScope.kind === "platform" ? "accent" : "info"} size="sm">
-          {activeScope.kind === "platform" ? "Platform" : "Org"}
-        </Badge>
-        <ResponsiveBreadcrumb items={[activeScope.label, currentPageLabel]} />
+        <ResponsiveBreadcrumb leadingItem={<ScopeSelector />} items={[currentPageLabel]} />
       </TopbarStart>
       <TopbarEnd>
         <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" tooltip="Notifications" tooltipPlacement="bottom" />

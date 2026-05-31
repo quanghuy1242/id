@@ -387,8 +387,8 @@ export function ApplicationDetailContent({
   error: errorOverride,
   onDeleted,
   scope = platformScope,
-  routeBasePath = `/admin/oauth/applications/${clientId}`,
-  backHref = "/admin/oauth/applications",
+  routeBasePath = `/admin/platform/oauth/applications/${clientId}`,
+  backHref = "/admin/platform/oauth/applications",
   backLabel = "OAuth Applications",
   actions = defaultActions,
 }: ApplicationDetailContentProps) {

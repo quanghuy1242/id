@@ -14,7 +14,7 @@ export default function OrgAccessServiceAccountsPage() {
       <ApplicationsContent
         scope={{ kind: "organization", organizationId: orgId }}
         variant="serviceAccounts"
-        createHref={`/admin/orgs/${orgId}/oauth/applications/new`}
+        createHref={`/admin/orgs/${orgId}/access/service-accounts/new`}
         onClientClick={(clientId) => router.push(`/admin/orgs/${orgId}/oauth/applications/${clientId}`)}
       />
     </PageBody>

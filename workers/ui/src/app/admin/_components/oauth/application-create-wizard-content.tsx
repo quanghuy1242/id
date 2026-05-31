@@ -45,6 +45,8 @@ type ApplicationCreateWizardContentProps = {
   readonly backHref?: string;
   readonly backLabel?: string;
   readonly title?: string;
+  readonly defaultKind?: ApplicationKind;
+  readonly completeLabel?: string;
   readonly actions?: typeof defaultActions;
 };
 
@@ -62,13 +64,15 @@ function toNonEmptyArray(values: readonly string[]): NonEmptyStringArray | undef
 export function ApplicationCreateWizardContent({
   scope = platformScope,
   onCreated,
-  backHref = "/admin/oauth/applications",
+  backHref = "/admin/platform/oauth/applications",
   backLabel = "OAuth Applications",
   title = "New OAuth Application",
+  defaultKind = "confidential",
+  completeLabel = "Create application",
   actions = defaultActions,
 }: ApplicationCreateWizardContentProps) {
   const [activeStep, setActiveStep] = useState(0);
-  const [kind, setKind] = useState<ApplicationKind>("confidential");
+  const [kind, setKind] = useState<ApplicationKind>(defaultKind);
   const [name, setName] = useState("");
   const [authMethod, setAuthMethod] = useState("client_secret_post");
   const [redirectUris, setRedirectUris] = useState<string[]>([""]);
@@ -242,7 +246,7 @@ export function ApplicationCreateWizardContent({
         activeStep={activeStep}
         onStepChange={setActiveStep}
         onComplete={handleCreate}
-        completeLabel="Create application"
+        completeLabel={completeLabel}
       />
       <ConfirmDialog
         open={Boolean(revealSecret)}

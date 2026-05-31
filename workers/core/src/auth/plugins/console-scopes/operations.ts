@@ -145,7 +145,7 @@ function organizationConsoleScope(
     organizationId,
     label,
     role,
-    permissions: organizationConsolePermissions,
+    permissions: [...organizationConsolePermissions],
     requiresStepUp: false,
   };
 }
@@ -183,7 +183,7 @@ export async function resolveConsoleScopeEnvelope(params: {
         id: "platform",
         label: "Platform",
         role: "platform-admin",
-        permissions: platformConsolePermissions,
+        permissions: [...platformConsolePermissions],
         requiresStepUp: true,
       }]
     : [];
