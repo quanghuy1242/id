@@ -68,6 +68,7 @@
   - [4.2 Standards Findings](#42-standards-findings)
   - [4.3 External Product Findings](#43-external-product-findings)
   - [4.4 Better Auth Findings](#44-better-auth-findings)
+  - [4.5 Prior Art And Anti-Pattern (Legacy `auther`)](#45-prior-art-and-anti-pattern-legacy-auther)
 - [5. Standards And Capability Classification](#5-standards-and-capability-classification)
 - [6. Target Product Model](#6-target-product-model)
   - [6.1 Registration Entry Points](#61-registration-entry-points)
@@ -221,6 +222,32 @@ Better Auth `signUpEmail` currently cannot be used while `disableSignUp: true` r
 Better Auth OAuth Provider `signup` is specifically tied to `prompt=create` and expects `/oauth2/continue` with `created: true` after signup. This is the correct integration point for client-initiated registration.
 
 Better Auth organization plugin already supports invitations, accepting invitations, organizations, members, teams, and active organization context. Registration should reuse that behavior instead of creating parallel tenant membership tables.
+
+### 4.5 Prior Art And Anti-Pattern (Legacy `auther`)
+
+A previous in-house auth service (`~/pjs/auther`) implemented client-initiated registration in a way this document deliberately rejects. It is recorded here as the concrete anti-pattern to avoid, because the failures are subtle and easy to recreate.
+
+What `auther` did:
+
+- A bespoke `POST /api/auth/signup-intents` endpoint that the *client* (or a resource server) called with its own credentials to mint an HMAC-signed intent token, plus a custom `/sign-up?intent=<token>` page. There was no OIDC `prompt=create`; registration was a private protocol invented in-house.
+- The client passed `requestedGrants` as raw authorization tuples (`{ entityTypeId, relation, entityId }`) that a `user.create.after` hook drained from a pending queue and wrote into the authorization model. In effect the client asserted permissions, gated only by custom policy.
+- Completion was a custom `returnUrl` redirect rather than the standard authorization-code flow. Registration was a side-channel decoupled from `/oauth2/authorize` and token issuance, so tokens did not return through the protocol path tied to the original request.
+- It accreted bespoke surface: registration contexts, signup-intent nonces, platform invites, authorization spaces, client-space links, trigger principals, and an in-house signed-token format.
+
+Why it is "out of place": it reimplemented the protocol. It built a private registration transport, let clients inject grants, and bypassed the authorization-code flow. That is precisely the custom-identity-API path the repository rules forbid.
+
+How this proposal differs, point for point:
+
+| `auther` (rejected) | This proposal |
+|---|---|
+| Custom `signup-intents` API + `/sign-up?intent=` URL; no `prompt=create` | OIDC `prompt=create` at the standard `/oauth2/authorize` |
+| Client mints a signed intent token it carries | `id` creates the intent server-side after validating a standard authorize request; the client never mints it |
+| Client sends `requestedGrants` (authorization tuples) | Client sends OAuth `scope` only; `id` narrows via catalog + policy + consent |
+| Defaults/grants applied from client-supplied data | `defaultRole`/`defaultTeamIds` come only from the server-side policy record, never from client input |
+| Completion via custom `returnUrl` side-channel | Completion via `/oauth2/continue` with `created: true` → normal consent/code/token |
+| Invents registration protocol + token format | One `idRegistration` plugin for *product policy* that surrounds standard mechanisms |
+
+The single most important invariant to hold during implementation, and the exact place `auther` went wrong, is that `defaultRole` and `defaultTeamIds` are admin-configured policy fields, not client-asserted request fields. If that line drifts, this proposal regresses into `auther`.
 
 ## 5. Standards And Capability Classification
 
