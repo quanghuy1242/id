@@ -16,6 +16,7 @@ import { idAdminAudit } from "./plugins/admin-audit";
 import { idAdminActivityLog } from "./plugins/admin-activity-log";
 import { idConsoleScopes } from "./plugins/console-scopes";
 import { idAccountCenter } from "./plugins/account-center";
+import { idRegistration } from "./plugins/registration";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
 import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
@@ -105,7 +106,7 @@ export function getAuthOptions(
     },
     emailAndPassword: {
       enabled: true,
-      disableSignUp: true,
+      disableSignUp: false,
       requireEmailVerification: true,
       sendResetPassword: ({ user, url }) =>
         sendAuthEmail(emailSender, { kind: "password-reset", to: user.email, url }, runtime.backgroundTaskRunner),
@@ -128,6 +129,12 @@ export function getAuthOptions(
         },
       }),
       idOAuthM2MBridge(),
+      idRegistration({
+        authorize: async (organizationId, userId, role, adapter) =>
+          organizationId === null || organizationId === undefined
+            ? isPlatformAdmin(role)
+            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+      }),
       idAdminSignInGuard({
         sendEmail: ({ to, otp }) =>
           sendAuthEmail(emailSender, { kind: "admin-otp", to, otp }),

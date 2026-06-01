@@ -200,6 +200,107 @@ export const jwks = sqliteTable("jwks", {
   expiresAt: integer("expiresAt", { mode: "timestamp_ms" }),
 });
 
+export const registrationPolicy = sqliteTable(
+  "registrationPolicy",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    status: text("status").default("draft").notNull(),
+    mode: text("mode").notNull(),
+    clientId: text("clientId"),
+    organizationId: text("organizationId").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    resourceServerId: text("resourceServerId").references(
+      () => resourceServer.id,
+      { onDelete: "cascade" },
+    ),
+    allowedScopes: text("allowedScopes", { mode: "json" }).notNull(),
+    emailDomains: text("emailDomains", { mode: "json" }).notNull(),
+    defaultRole: text("defaultRole").default("member").notNull(),
+    defaultTeamIds: text("defaultTeamIds", { mode: "json" }).notNull(),
+    quotaLimit: integer("quotaLimit"),
+    quotaTarget: text("quotaTarget").default("memberships").notNull(),
+    requiresEmailVerification: integer("requiresEmailVerification", {
+      mode: "boolean",
+    })
+      .default(true)
+      .notNull(),
+    startsAt: integer("startsAt"),
+    expiresAt: integer("expiresAt"),
+    createdBy: text("createdBy"),
+    updatedBy: text("updatedBy"),
+    createdAt: integer("createdAt").notNull(),
+    updatedAt: integer("updatedAt").notNull(),
+  },
+  (table) => [
+    index("registrationPolicy_status_idx").on(table.status),
+    index("registrationPolicy_clientId_idx").on(table.clientId),
+    index("registrationPolicy_organizationId_idx").on(table.organizationId),
+    index("registrationPolicy_resourceServerId_idx").on(table.resourceServerId),
+  ],
+);
+
+export const registrationIntent = sqliteTable(
+  "registrationIntent",
+  {
+    id: text("id").primaryKey(),
+    policyId: text("policyId")
+      .notNull()
+      .references(() => registrationPolicy.id, { onDelete: "cascade" }),
+    clientId: text("clientId").notNull(),
+    organizationId: text("organizationId"),
+    invitationId: text("invitationId"),
+    requestedScopes: text("requestedScopes", { mode: "json" }).notNull(),
+    allowedScopes: text("allowedScopes", { mode: "json" }).notNull(),
+    resource: text("resource"),
+    oauthQuery: text("oauthQuery").notNull(),
+    oauthQueryHash: text("oauthQueryHash").notNull(),
+    email: text("email"),
+    status: text("status").default("started").notNull(),
+    expiresAt: integer("expiresAt").notNull(),
+    createdAt: integer("createdAt").notNull(),
+    updatedAt: integer("updatedAt").notNull(),
+    completedAt: integer("completedAt"),
+    userId: text("userId"),
+    failureReason: text("failureReason"),
+  },
+  (table) => [
+    index("registrationIntent_policyId_idx").on(table.policyId),
+    index("registrationIntent_clientId_idx").on(table.clientId),
+    index("registrationIntent_organizationId_idx").on(table.organizationId),
+    index("registrationIntent_oauthQueryHash_idx").on(table.oauthQueryHash),
+    index("registrationIntent_email_idx").on(table.email),
+    index("registrationIntent_status_idx").on(table.status),
+    index("registrationIntent_expiresAt_idx").on(table.expiresAt),
+    index("registrationIntent_userId_idx").on(table.userId),
+  ],
+);
+
+export const registrationQuotaReservation = sqliteTable(
+  "registrationQuotaReservation",
+  {
+    id: text("id").primaryKey(),
+    policyId: text("policyId")
+      .notNull()
+      .references(() => registrationPolicy.id, { onDelete: "cascade" }),
+    intentId: text("intentId")
+      .notNull()
+      .unique()
+      .references(() => registrationIntent.id, { onDelete: "cascade" }),
+    status: text("status").default("reserved").notNull(),
+    createdAt: integer("createdAt").notNull(),
+    expiresAt: integer("expiresAt").notNull(),
+    consumedAt: integer("consumedAt"),
+  },
+  (table) => [
+    index("registrationQuotaReservation_policyId_idx").on(table.policyId),
+    index("registrationQuotaReservation_status_idx").on(table.status),
+    index("registrationQuotaReservation_expiresAt_idx").on(table.expiresAt),
+  ],
+);
+
 export const oauthClient = sqliteTable(
   "oauthClient",
   {
@@ -436,6 +537,7 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   teams: many(team),
   members: many(member),
   invitations: many(invitation),
+  registrationPolicys: many(registrationPolicy),
   resourceServers: many(resourceServer),
 }));
 
@@ -479,6 +581,47 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const registrationPolicyRelations = relations(
+  registrationPolicy,
+  ({ one, many }) => ({
+    organization: one(organization, {
+      fields: [registrationPolicy.organizationId],
+      references: [organization.id],
+    }),
+    resourceServer: one(resourceServer, {
+      fields: [registrationPolicy.resourceServerId],
+      references: [resourceServer.id],
+    }),
+    registrationIntents: many(registrationIntent),
+    registrationQuotaReservations: many(registrationQuotaReservation),
+  }),
+);
+
+export const registrationIntentRelations = relations(
+  registrationIntent,
+  ({ one, many }) => ({
+    registrationPolicy: one(registrationPolicy, {
+      fields: [registrationIntent.policyId],
+      references: [registrationPolicy.id],
+    }),
+    registrationQuotaReservation: many(registrationQuotaReservation),
+  }),
+);
+
+export const registrationQuotaReservationRelations = relations(
+  registrationQuotaReservation,
+  ({ one }) => ({
+    registrationPolicy: one(registrationPolicy, {
+      fields: [registrationQuotaReservation.policyId],
+      references: [registrationPolicy.id],
+    }),
+    registrationIntent: one(registrationIntent, {
+      fields: [registrationQuotaReservation.intentId],
+      references: [registrationIntent.id],
+    }),
+  }),
+);
 
 export const oauthClientRelations = relations(oauthClient, ({ one, many }) => ({
   user: one(user, {
@@ -549,6 +692,7 @@ export const resourceServerRelations = relations(
       fields: [resourceServer.organizationId],
       references: [organization.id],
     }),
+    registrationPolicys: many(registrationPolicy),
     oauthResourceScopes: many(oauthResourceScope),
     oauthClientResourceScopes: many(oauthClientResourceScope),
   }),

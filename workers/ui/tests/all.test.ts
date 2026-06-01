@@ -53,6 +53,7 @@ await import("./pages/health-route.test");
 await import("./pages/layout.test");
 await import("./pages/login-form.test");
 await import("./pages/login-page.test");
+await import("./pages/register-form.test");
 await import("./pages/account-center-content.test");
 await import("./pages/account-utility-pages.test");
 await import("./pages/select-context-form.test");

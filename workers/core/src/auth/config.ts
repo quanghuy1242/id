@@ -94,6 +94,18 @@ export const PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES = 128;
 /** Safety multiplier for Node scrypt max-memory calculation. */
 export const PASSWORD_SCRYPT_MAXMEM_MULTIPLIER = 2;
 
+/** Registration intent lifetime, in milliseconds, for hosted `/register` forms. */
+export const REGISTRATION_INTENT_TTL_MS = 15 * 60 * MS_PER_SECOND;
+
+/** Header carrying the server-created registration intent into Better Auth signup. */
+export const REGISTRATION_INTENT_HEADER = "x-id-registration-intent";
+
+/** Radix used when rendering SHA-256 bytes as hexadecimal text. */
+export const HEX_RADIX = 16;
+
+/** Character width for one rendered hexadecimal byte. */
+export const HEX_BYTE_PAD_LENGTH = 2;
+
 export type AuthPluginConfig = {
   readonly issuerPath: string;
   readonly resourceAudienceCacheKey: string;

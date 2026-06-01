@@ -64,6 +64,7 @@ describe("Better Auth core flows", () => {
       }),
     );
     expect(signup.status).toBe(400);
+    await expect(signup.json()).resolves.toMatchObject({ code: "missing_registration_intent" });
 
     await auth.api.createUser({
       body: {

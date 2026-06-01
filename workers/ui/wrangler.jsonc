@@ -9,12 +9,13 @@
     "directory": "dist/client",
     "not_found_handling": "none",
     "binding": "ASSETS",
-    "run_worker_first": ["/login*", "/consent*", "/select-authorization-context*", "/admin*", "/account*", "/forgot-password*", "/reset-password*", "/verify-email*", "/ui-health"]
+    "run_worker_first": ["/login*", "/register*", "/consent*", "/select-authorization-context*", "/admin*", "/account*", "/forgot-password*", "/reset-password*", "/verify-email*", "/ui-health"]
   },
   "routes": [
     // Login and consent pages (OAuth browser flows). These routes must end in *
     // because Cloudflare route matching includes the query string.
     { "pattern": "id.quanghuy.dev/login*", "zone_name": "quanghuy.dev" },
+    { "pattern": "id.quanghuy.dev/register*", "zone_name": "quanghuy.dev" },
     { "pattern": "id.quanghuy.dev/consent*", "zone_name": "quanghuy.dev" },
     { "pattern": "id.quanghuy.dev/select-authorization-context*", "zone_name": "quanghuy.dev" },
     // UI administration pages (management forms)

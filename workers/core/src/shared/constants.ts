@@ -46,6 +46,15 @@ export const OAUTH_CONSENT_MODEL = "oauthConsent" as const;
 /** BA model name for the admin activity-log plugin table. */
 export const ADMIN_ACTIVITY_LOG_MODEL = "adminActivityLog" as const;
 
+/** BA model name for the registration-policy plugin table. */
+export const REGISTRATION_POLICY_MODEL = "registrationPolicy" as const;
+
+/** BA model name for the registration-intent plugin table. */
+export const REGISTRATION_INTENT_MODEL = "registrationIntent" as const;
+
+/** BA model name for the soft registration quota-reservation plugin table. */
+export const REGISTRATION_QUOTA_RESERVATION_MODEL = "registrationQuotaReservation" as const;
+
 /** Sort rank for organization owner memberships in console scope discovery. */
 export const CONSOLE_OWNER_ROLE_RANK = 3;
 

@@ -79,7 +79,7 @@ describe("Better Auth installed contract", () => {
     );
 
     expect(options.basePath).toBe("/api/auth");
-    expect(options.emailAndPassword?.disableSignUp).toBe(true);
+    expect(options.emailAndPassword?.disableSignUp).toBe(false);
     expect(options.advanced?.cookiePrefix).toBe("id-auth");
     expect(options.advanced?.crossSubDomainCookies).toEqual({
       enabled: true,
@@ -89,6 +89,7 @@ describe("Better Auth installed contract", () => {
     expect(options.plugins?.some((plugin) => plugin.id === "id-resource-server")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "id-oauth-scope-catalog")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "id-console-scopes")).toBe(true);
+    expect(options.plugins?.some((plugin) => plugin.id === "id-registration")).toBe(true);
     expect(options.plugins?.some((plugin) => plugin.id === "oauth-provider")).toBe(true);
   });
 

@@ -2,6 +2,7 @@ import type { Story, StoryDefault } from "@ladle/react";
 import ConsentPage from "../workers/ui/src/app/consent/page";
 import ForgotPasswordPage from "../workers/ui/src/app/forgot-password/page";
 import LoginPage from "../workers/ui/src/app/login/page";
+import RegisterPage from "../workers/ui/src/app/register/page";
 import ResetPasswordPage from "../workers/ui/src/app/reset-password/page";
 import SelectAuthorizationContextPage from "../workers/ui/src/app/select-authorization-context/page";
 import VerifyEmailPage from "../workers/ui/src/app/verify-email/page";
@@ -101,6 +102,57 @@ function installOrganizationFetchMock() {
   };
 }
 
+function installRegistrationFetchMock(state: "allowed" | "denied" = "allowed") {
+  if (typeof window === "undefined") return;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+    if (url.startsWith("/api/auth/registration/evaluate")) {
+      return new Response(
+        JSON.stringify(
+          state === "allowed"
+            ? {
+                decision: "allowed",
+                intentId: "regint_story",
+                client: { clientId: "acme-web", clientName: "Acme Web" },
+                organization: { id: "org_acme", name: "Acme Corp" },
+                requestedScopes: ["openid", "profile", "email", "content:read", "content:write"],
+                allowedScopes: ["openid", "profile", "email", "content:read"],
+                expiresAt: Date.now() + 900000,
+              }
+            : {
+                decision: "denied",
+                reason: "quota_full",
+                message: "The beta is full for this application.",
+              },
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url.startsWith("/api/auth/registration/submit")) {
+      return new Response(JSON.stringify({ status: "ready", intentId: "regint_story", email: "story@example.test", continueOAuth: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.startsWith("/api/auth/sign-up/email")) {
+      return new Response(JSON.stringify({ status: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.startsWith("/api/auth/oauth2/continue")) {
+      return new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "Verification required" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    return originalFetch(input, init);
+  };
+}
+
 export default {
   title: "Hosted UI / Auth Flow",
 } satisfies StoryDefault;
@@ -108,6 +160,18 @@ export default {
 export const Login: Story = () => {
   setMockUrl("/login", OAUTH_QUERY);
   return <LoginPage />;
+};
+
+export const Register: Story = () => {
+  setMockUrl("/register", OAUTH_QUERY);
+  installRegistrationFetchMock();
+  return <RegisterPage />;
+};
+
+export const RegisterDenied: Story = () => {
+  setMockUrl("/register", OAUTH_QUERY);
+  installRegistrationFetchMock("denied");
+  return <RegisterPage />;
 };
 
 export const PlatformStepUp: Story = () => {

@@ -40,6 +40,28 @@ When `resource` is present and matches an enabled resource server audience, the 
 
 Production browser OAuth uses `id.quanghuy.dev` and `content.quanghuy.dev` with Better Auth cookies scoped to `.quanghuy.dev` and prefixed with `id-auth`. Preview `*.workers.dev` deployments are API-only; do not register preview callback URLs for browser clients.
 
+## Client-Initiated Registration
+
+Clients that are allowed by an enabled registration policy can request hosted account creation with the OIDC standard `prompt=create` parameter:
+
+```text
+response_type=code
+client_id=<client-id>
+redirect_uri=<registered-redirect-uri>
+scope=openid profile email content:read
+code_challenge=<s256-challenge>
+code_challenge_method=S256
+resource=https://api.example.com
+state=<csrf-state>
+prompt=create
+```
+
+The OAuth Provider redirects the browser to `/register`. The hosted page evaluates the signed OAuth request through `/api/auth/registration/evaluate`, shows only server-trusted client/organization/scope data, creates a registration intent, and submits account creation through Better Auth `POST /api/auth/sign-up/email` with the `x-id-registration-intent` header. Direct signup without that server-created intent remains closed with `400 missing_registration_intent`.
+
+Clients must not assume requested scopes are granted. Registration policy can narrow scopes before normal OAuth consent/token issuance, and the final token response remains the source of truth for issued scope. Default organization membership is policy-owned by `id`; clients cannot submit roles, teams, product permissions, or grants.
+
+First-release quota semantics are soft quota: `id` reserves a short-lived registration slot before signup and consumes it after account creation. Strict atomic quota is intentionally deferred to a separate architecture-approved change.
+
 ## Client Credentials
 
 Machine-to-machine clients use:
@@ -83,4 +105,4 @@ The installed OAuth Provider supports:
 - `selectAccount.page` for `prompt=select_account`
 - `postLogin.page` for organization selection before consent
 
-The first-batch configuration enables `loginPage`, `consentPage`, and the post-login authorization-context hook. Full hosted browser pages for context selection can be expanded later; the API/token contract already distinguishes workspace from direct-share context.
+The first-batch configuration enables `loginPage`, `signup.page` (`/register`), `consentPage`, and the post-login authorization-context hook. The registration page continues with `/api/auth/oauth2/continue` using `created: true` after account creation and email verification/session requirements are satisfied.

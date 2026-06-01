@@ -64,6 +64,13 @@
       "when": 1780285348353,
       "tag": "0008_nervous_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1780295519568,
+      "tag": "0009_thin_hitman",
+      "breakpoints": true
     }
   ]
 }

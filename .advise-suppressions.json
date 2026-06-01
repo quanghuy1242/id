@@ -342,6 +342,29 @@
       "file": "workers/ui/src/app/account/_mocks/account.ts",
       "rule": "code-quality/duplicate-block",
       "reason": "Mock fixture objects (consents) intentionally share the same record shape by design, like other admin _mocks fixtures; explicit per-record data is required."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/core/src/auth/plugins/registration/operations.ts",
+      "rule": "complexity/file-too-large",
+      "reason": "Reviewed: registration operations centralize policy evaluation, intent validation, soft quota reservation, and signup completion inside one Better Auth plugin boundary for the initial D1-D4 rollout; splitting is deferred until D6/D7 add more lifecycle/invite operations."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/register/register-form.tsx",
+      "rule": "complexity/function-too-long",
+      "reason": "Reviewed: hosted registration form owns a single OAuth registration state machine (evaluate, submit, guarded signup, continue/verification notice) analogous to the hosted login form; extracting before the D7 invite flow lands would add premature seams."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/register/register-form.tsx",
+      "rule": "security/hardcoded-secret",
+      "reason": "False positive: matches the 'password' form field name and validation message in the registration form, not a real credential."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/registration/schema.ts|workers/core/src/auth/plugins/resource-server/schema.ts",
+      "reason": "Better Auth plugin schema modules intentionally repeat the endpoint metadata helper shape so each plugin owns its OpenAPI tags, path params, request body, and response schema without a generic CRUD abstraction hiding route contracts."
     }
   ]
 }

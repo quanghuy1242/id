@@ -159,7 +159,7 @@ The original hexagonal/clean architecture is good enough for `core-id`, but thre
    Admin route files must not draw UI directly. The route-file rules are strict and must become a mechanical gate, not just code review guidance.
 
 3. Route ownership boundary:
-   `ui-id` must only define public App Router routes under `/admin/*`, `/account/*`, `/login`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email`, and `/ui-health`. Core auth/API routes remain owned by `core-id`; UI pages call those endpoints directly through same-origin browser requests.
+   `ui-id` must only define public App Router routes under `/admin/*`, `/account/*`, `/login`, `/register`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email`, and `/ui-health`. Core auth/API routes remain owned by `core-id`; UI pages call those endpoints directly through same-origin browser requests.
 
 ## 3. Root Layout
 
@@ -265,6 +265,7 @@ Internet
     ├──> https://id.quanghuy.dev/.well-known/*    ──> core-id worker
     ├──> https://id.quanghuy.dev/api/admin/*      ──> core-id worker
     ├──> https://id.quanghuy.dev/login              ──> ui-id worker (OAuth login page)
+    ├──> https://id.quanghuy.dev/register           ──> ui-id worker (OAuth registration page)
     ├──> https://id.quanghuy.dev/consent            ──> ui-id worker (OAuth consent page)
     ├──> https://id.quanghuy.dev/select-authorization-context ──> ui-id worker
     ├──> https://id.quanghuy.dev/ui-health          ──> ui-id worker
@@ -1267,7 +1268,7 @@ Every rule in this document is mechanically enforced. No convention survives on 
 | Mappers | explicit row/entity conversion | Oxlint mapper rules |
 | Errors | custom errors centralized | Oxlint `no-custom-errors-outside-shared` |
 | Constants | placement and JSDoc rules | Oxlint constants rules |
-| UI route ownership | UI App Router public routes stay under `/admin/**`, `/account/**`, `/login`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email`, and `/ui-health`; root `layout.tsx` and `globals.css` are the only root app exceptions. `/assets/*` is reserved for Vite-generated client bundles and is served by ui-id. | Oxlint `route-path-contract` |
+| UI route ownership | UI App Router public routes stay under `/admin/**`, `/account/**`, `/login`, `/register`, `/consent`, `/select-authorization-context`, `/forgot-password`, `/reset-password`, `/verify-email`, and `/ui-health`; root `layout.tsx` and `globals.css` are the only root app exceptions. `/assets/*` is reserved for Vite-generated client bundles and is served by ui-id. | Oxlint `route-path-contract` |
 | UI route composition | no raw admin route UI | Oxlint `ui-route-composition` through `pnpm lint` |
 | Duplication | <3% mild duplication | `check:dup` |
 | Types | strict and no explicit `any` | TypeScript + oxlint |

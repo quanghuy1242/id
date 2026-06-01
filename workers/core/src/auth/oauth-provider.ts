@@ -67,6 +67,9 @@ export function createOAuthProviderPlugin(
 ) {
   return oauthProvider({
     loginPage: "/login",
+    signup: {
+      page: "/register",
+    },
     consentPage: "/consent",
     silenceWarnings: {
       oauthAuthServerConfig: true,

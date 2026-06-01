@@ -10,6 +10,7 @@ await import("./auth/contracts.test");
 await import("./auth/system-access-seed.test");
 await import("./auth/console-scopes.test");
 await import("./auth/signup-guard-spike.test");
+await import("./auth/registration-plugin.test");
 await import("./auth/cors-rate-contracts.test");
 await import("./auth/jwks-proof.test");
 await import("./auth/jwks.test");
