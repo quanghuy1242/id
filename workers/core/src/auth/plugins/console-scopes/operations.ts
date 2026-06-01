@@ -154,6 +154,8 @@ export async function resolveConsoleScopeEnvelope(params: {
   readonly adapter: ConsoleScopesAdapter;
   readonly user: ConsoleScopeUser;
   readonly isPlatformAdmin: (role: unknown) => boolean;
+  /** Whether the current session already holds a fresh platform step-up proof. */
+  readonly platformStepUpSatisfied: boolean;
 }): Promise<ConsoleScopeEnvelope> {
   const platformAdmin = params.isPlatformAdmin(params.user.role);
   const membershipRows = normalizeMemberships(await params.adapter.findMany<MemberRow>({
@@ -185,6 +187,7 @@ export async function resolveConsoleScopeEnvelope(params: {
         role: "platform-admin",
         permissions: [...platformConsolePermissions],
         requiresStepUp: true,
+        stepUpSatisfied: params.platformStepUpSatisfied,
       }]
     : [];
   const memberships: ConsoleMembershipHint[] = [];

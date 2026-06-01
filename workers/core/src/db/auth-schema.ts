@@ -48,6 +48,7 @@ export const session = sqliteTable(
     activeOrganizationId: text("activeOrganizationId"),
     activeTeamId: text("activeTeamId"),
     impersonatedBy: text("impersonatedBy"),
+    platformStepUpAt: integer("platformStepUpAt"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );

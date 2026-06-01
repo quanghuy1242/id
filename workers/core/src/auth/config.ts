@@ -108,7 +108,6 @@ export type AuthPluginConfig = {
   readonly adminOtpStoragePrefix: string;
   readonly adminOtpGenerateAttemptsPrefix: string;
   readonly adminOtpVerifyAttemptsPrefix: string;
-  readonly adminStepUpStoragePrefix: string;
   readonly jwksPath: string;
   readonly jwksRotationIntervalSeconds: number;
   readonly jwksGracePeriodSeconds: number;
@@ -166,7 +165,6 @@ export const authPluginConfig = {
   adminOtpStoragePrefix: "id-admin-otp:code:",
   adminOtpGenerateAttemptsPrefix: "id-admin-otp:generate:",
   adminOtpVerifyAttemptsPrefix: "id-admin-otp:verify:",
-  adminStepUpStoragePrefix: "id-admin-step-up:session:",
   jwksPath: "/jwks",
   jwksRotationIntervalSeconds: JWKS_ROTATION_INTERVAL_SECONDS,
   jwksGracePeriodSeconds: JWKS_GRACE_PERIOD_SECONDS,
@@ -199,4 +197,16 @@ export function scimDirectoryAudience(baseUrl: string): string {
  */
 export function systemResourceServerAudience(baseUrl: string): string {
   return new URL("/system", baseUrl).toString();
+}
+
+/**
+ * True when a platform step-up proof recorded at `stepUpAtMs` is still within the
+ * `ADMIN_STEP_UP_TTL_SECONDS` freshness window. The proof now lives on the Better Auth
+ * session record (`session.platformStepUpAt`) instead of a KV sidecar, so freshness is
+ * computed at read time rather than enforced by a KV TTL. A future high-impact action gate
+ * can reuse the same stored timestamp with its own shorter window.
+ */
+export function isPlatformStepUpFresh(stepUpAtMs: number | null | undefined, nowMs: number = Date.now()): boolean {
+  if (typeof stepUpAtMs !== "number" || !Number.isFinite(stepUpAtMs)) return false;
+  return nowMs - stepUpAtMs < ADMIN_STEP_UP_TTL_SECONDS * MS_PER_SECOND;
 }

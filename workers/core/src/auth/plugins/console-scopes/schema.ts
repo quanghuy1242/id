@@ -27,6 +27,7 @@ export const consoleScopeSchema = z.discriminatedUnion("kind", [
     role: z.literal("platform-admin"),
     permissions: z.array(z.enum(consolePermissionValues)),
     requiresStepUp: z.boolean(),
+    stepUpSatisfied: z.boolean(),
   }),
   z.object({
     kind: z.literal("organization"),

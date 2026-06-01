@@ -1,5 +1,6 @@
 import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
+import { isPlatformStepUpFresh } from "../../config";
 import { resolveConsoleScopeEnvelope, type ConsoleScopesAdapter } from "./operations";
 import { consoleScopesEndpointMetadata } from "./schema";
 import type { ConsoleScopesPluginOptions } from "./types";
@@ -21,6 +22,7 @@ export const idConsoleScopes = (options: ConsoleScopesPluginOptions = {}): Bette
         const session = ctx.context.session;
         if (!session) throw new APIError("UNAUTHORIZED");
 
+        const platformStepUpAt = (session.session as { platformStepUpAt?: number | null }).platformStepUpAt;
         return ctx.json(await resolveConsoleScopeEnvelope({
           adapter: ctx.context.adapter as ConsoleScopesAdapter,
           user: {
@@ -29,6 +31,7 @@ export const idConsoleScopes = (options: ConsoleScopesPluginOptions = {}): Bette
             role: session.user.role,
           },
           isPlatformAdmin: options.isPlatformAdmin ?? (() => false),
+          platformStepUpSatisfied: isPlatformStepUpFresh(platformStepUpAt ?? null),
         }));
       },
     ),

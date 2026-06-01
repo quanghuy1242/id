@@ -21,7 +21,7 @@ function mockedFetch() {
 const platformEnvelope = {
   actor: { userId: "usr_admin", email: "admin@example.test", canEnterConsole: true },
   scopes: [
-    { kind: "platform", id: "platform", label: "Platform", role: "platform-admin", permissions: ["platform:read"], requiresStepUp: true },
+    { kind: "platform", id: "platform", label: "Platform", role: "platform-admin", permissions: ["platform:read"], requiresStepUp: true, stepUpSatisfied: true },
     {
       kind: "organization",
       id: "organization:org_123",
@@ -126,20 +126,23 @@ describe("admin middleware", () => {
     expect(location.pathname).toBe("/admin/platform");
   });
 
-  it("allows scoped console routes through", async () => {
-    mockedFetch()
-      .mockResolvedValueOnce(Response.json(platformEnvelope))
-      .mockResolvedValueOnce(Response.json({ steppedUp: true }));
+  it("allows scoped console routes through when the envelope marks step-up satisfied", async () => {
+    mockedFetch().mockResolvedValue(Response.json(platformEnvelope));
 
     const response = await proxy(adminRequest("/admin/platform", "id-auth.session_token=admin"));
 
     expect(response.headers.get("x-middleware-next")).toBe("1");
+    // Step-up rides on the console-scopes envelope; there is no second status request.
+    expect(mockedFetch().mock.calls).toHaveLength(1);
   });
 
   it("requires step-up before rendering platform console routes", async () => {
-    mockedFetch()
-      .mockResolvedValueOnce(Response.json(platformEnvelope))
-      .mockResolvedValueOnce(Response.json({ steppedUp: false }));
+    const stepUpPending = {
+      ...platformEnvelope,
+      scopes: platformEnvelope.scopes.map((scope) =>
+        scope.kind === "platform" ? { ...scope, stepUpSatisfied: false } : scope),
+    };
+    mockedFetch().mockResolvedValue(Response.json(stepUpPending));
 
     const response = await proxy(adminRequest("/admin/platform/identity/users", "id-auth.session_token=admin"));
     const location = new URL(response.headers.get("location") ?? "");
@@ -148,6 +151,7 @@ describe("admin middleware", () => {
     expect(location.pathname).toBe("/login");
     expect(location.searchParams.get("callbackURL")).toBe("/admin/platform/identity/users");
     expect(location.searchParams.get("stepUp")).toBe("platform");
+    expect(mockedFetch().mock.calls).toHaveLength(1);
   });
 
   it("allows platform admins to enter organization scopes from the scope envelope", async () => {

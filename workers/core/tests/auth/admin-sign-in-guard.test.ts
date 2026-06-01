@@ -221,6 +221,39 @@ describe("id-admin-sign-in-guard", () => {
       await expect(status.json()).resolves.toEqual({ steppedUp: true });
     });
 
+    it("records the proof on the session record, not a KV sidecar", async () => {
+      const cookie = await signInCookie(harness.auth);
+      await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+      const otp = latestOtp(harness.emailSender);
+      await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp });
+
+      // The only step-up KV writes are the OTP code (now deleted) and rate-limit
+      // counters — never a dedicated step-up status key.
+      const stepUpKeys = [...harness.kv.values.keys()].filter((key) => key.includes("step-up"));
+      expect(stepUpKeys).toEqual([]);
+      const stepUpAt = harness.raw
+        .prepare(`select "platformStepUpAt" as v from "session" order by "createdAt" desc limit 1`)
+        .get() as { v: number | null };
+      expect(typeof stepUpAt.v).toBe("number");
+    });
+
+    it("scopes the proof to the session that completed step-up", async () => {
+      const cookieA = await signInCookie(harness.auth);
+      const cookieB = await signInCookie(harness.auth);
+
+      await authRequest(harness.auth, "/admin/step-up/request", cookieA, {});
+      const otp = latestOtp(harness.emailSender);
+      const verify = await authRequest(harness.auth, "/admin/step-up/verify", cookieA, { otp });
+      expect(verify.status).toBe(200);
+
+      const statusA = await authRequest(harness.auth, "/admin/step-up/status", cookieA);
+      await expect(statusA.json()).resolves.toEqual({ steppedUp: true });
+      // A separate session for the same user does not inherit the proof; a new
+      // session starts unstepped, which is how sign-out/revocation clears it.
+      const statusB = await authRequest(harness.auth, "/admin/step-up/status", cookieB);
+      await expect(statusB.json()).resolves.toEqual({ steppedUp: false });
+    });
+
     it("rejects an invalid or expired step-up OTP", async () => {
       const cookie = await signInCookie(harness.auth);
       await authRequest(harness.auth, "/admin/step-up/request", cookie, {});

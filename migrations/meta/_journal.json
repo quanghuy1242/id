@@ -57,6 +57,13 @@
       "when": 1780137091284,
       "tag": "0007_windy_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1780285348353,
+      "tag": "0008_nervous_agent_zero",
+      "breakpoints": true
     }
   ]
 }

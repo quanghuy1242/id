@@ -1,7 +1,7 @@
 import { APIError, createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import * as z from "zod";
-import { ADMIN_OTP_TTL_SECONDS, ADMIN_STEP_UP_TTL_SECONDS } from "../../config";
+import { ADMIN_OTP_TTL_SECONDS, ADMIN_STEP_UP_TTL_SECONDS, isPlatformStepUpFresh } from "../../config";
 import { readBody, readString } from "../../../shared/request";
 import {
   assertOtpGenerateLimit,
@@ -11,7 +11,6 @@ import {
   maskEmail,
   otpCodeKey,
   otpHmacHex,
-  stepUpSessionKey,
   timingSafeEqualHex,
 } from "./operations";
 import type { AdminSignInGuardOptions } from "./types";
@@ -25,7 +24,12 @@ type StepUpSession = {
   };
   readonly session: {
     readonly token?: string | null;
+    readonly platformStepUpAt?: number | null;
   };
+};
+
+type SessionWriter = {
+  readonly updateSession: (token: string, data: Record<string, unknown>) => Promise<unknown>;
 };
 
 function requireSession(session: unknown): StepUpSession {
@@ -46,9 +50,6 @@ function assertPlatformAdmin(session: StepUpSession, opts: AdminSignInGuardOptio
   }
 }
 
-function stepUpStatus(session: StepUpSession, opts: AdminSignInGuardOptions): Promise<string | null> {
-  return opts.kv.get(stepUpSessionKey(opts.otpHmacSecret, requireSessionToken(session)));
-}
 
 const verifyStepUpBody = z.object({
   otp: z.string().min(1),
@@ -69,6 +70,18 @@ const verifyStepUpBody = z.object({
  */
 export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlugin => ({
   id: "id-admin-sign-in-guard",
+  schema: {
+    session: {
+      fields: {
+        // Session-owned platform step-up proof (epoch ms); `input: false` keeps it server-written.
+        platformStepUpAt: {
+          type: "number",
+          required: false,
+          input: false,
+        },
+      },
+    },
+  },
   endpoints: {
     getAdminStepUpStatus: createAuthEndpoint(
       "/admin/step-up/status",
@@ -78,7 +91,8 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
         if (!(opts.isPlatformAdmin ?? (() => false))(session.user.role)) {
           return ctx.json({ steppedUp: false });
         }
-        return ctx.json({ steppedUp: Boolean(await stepUpStatus(session, opts)) });
+        // Read the proof off the session record (no KV); freshness is computed at read time.
+        return ctx.json({ steppedUp: isPlatformStepUpFresh(session.session.platformStepUpAt ?? null) });
       },
     ),
     requestAdminStepUp: createAuthEndpoint(
@@ -116,9 +130,9 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
           throw new APIError("UNAUTHORIZED", { code: "invalid_otp", message: "Invalid or expired code" });
         }
         await opts.kv.delete(otpCodeKey(session.user.id));
-        await opts.kv.put(stepUpSessionKey(opts.otpHmacSecret, requireSessionToken(session)), "1", {
-          expirationTtl: ADMIN_STEP_UP_TTL_SECONDS,
-        });
+        // Record the proof on the session (write-through to D1 + KV secondary storage).
+        const internalAdapter = ctx.context.internalAdapter as SessionWriter;
+        await internalAdapter.updateSession(requireSessionToken(session), { platformStepUpAt: Date.now() });
         return ctx.json({ steppedUp: true, expiresIn: ADMIN_STEP_UP_TTL_SECONDS });
       },
     ),

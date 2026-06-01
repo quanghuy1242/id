@@ -77,21 +77,14 @@ async function readConsoleScopes(request: NextRequest): Promise<ConsoleScopeEnve
   return (await response.json().catch(() => null)) as ConsoleScopeEnvelope | null;
 }
 
-async function readStepUpStatus(request: NextRequest): Promise<boolean> {
-  const url = new URL("/api/auth/admin/step-up/status", request.url);
-
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      accept: "application/json",
-      cookie: request.headers.get("cookie") ?? "",
-    },
-    redirect: "manual",
-  }).catch(() => null);
-
-  if (!response?.ok) return false;
-  const body = await response.json().catch(() => null) as { readonly steppedUp?: unknown } | null;
-  return body?.steppedUp === true;
+/**
+ * Platform entry requires a fresh step-up proof. The proof now rides on the console-scopes
+ * envelope (the platform scope's `stepUpSatisfied`), so no separate step-up status request
+ * is made per platform navigation.
+ */
+function needsPlatformStepUp(envelope: ConsoleScopeEnvelope): boolean {
+  const platform = envelope.scopes.find((scope) => scope.kind === "platform");
+  return platform?.requiresStepUp === true && platform.stepUpSatisfied !== true;
 }
 
 function defaultAdminTarget(envelope: ConsoleScopeEnvelope): string {
@@ -182,7 +175,7 @@ async function guardAdmin(request: NextRequest) {
   if (!canOpenScopedRoute(request.nextUrl.pathname, envelope)) {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
   }
-  if ((request.nextUrl.pathname === "/admin/platform" || request.nextUrl.pathname.startsWith("/admin/platform/")) && !(await readStepUpStatus(request))) {
+  if ((request.nextUrl.pathname === "/admin/platform" || request.nextUrl.pathname.startsWith("/admin/platform/")) && needsPlatformStepUp(envelope)) {
     return stepUpRedirect(request);
   }
   return NextResponse.next();

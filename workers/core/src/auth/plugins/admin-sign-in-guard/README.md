@@ -81,10 +81,12 @@ The plugin declares the platform step-up endpoints and hooks one existing sign-i
 
 The sign-in hook runs before the stock `signInEmail` body, so a missing context cannot leave a session cookie behind. A truthy `oauth_query` returns immediately because the OAuth provider validates the signed query. Otherwise the request must carry a local `/admin`, `/admin/*`, `/account`, or `/account/*` `callbackURL`.
 
-The step-up endpoints use Better Auth's `sessionMiddleware`. `request` verifies the actor is a platform admin with a verified email, checks the generation throttle, stores a purpose-bound OTP digest in KV for 5 minutes, and awaits transactional email acceptance before returning success. `verify` checks the verification throttle, compares the submitted code in constant time, deletes the OTP digest, and stores a session-bound step-up proof in KV for `ADMIN_STEP_UP_TTL_SECONDS` (2 days).
+The step-up endpoints use Better Auth's `sessionMiddleware`. `request` verifies the actor is a platform admin with a verified email, checks the generation throttle, stores a purpose-bound OTP digest in KV for 5 minutes, and awaits transactional email acceptance before returning success. `verify` checks the verification throttle, compares the submitted code in constant time, deletes the OTP digest, and records the step-up proof on the session record via `internalAdapter.updateSession({ platformStepUpAt })`. Freshness is computed at read time against `ADMIN_STEP_UP_TTL_SECONDS` (2 days) by `isPlatformStepUpFresh` in `auth/config.ts`, so a future high-impact action gate can reuse the same stored timestamp with its own shorter window.
+
+`GET /admin/step-up/status` derives `steppedUp` from the session field — no KV read. The `id-console-scopes` envelope also carries the same freshness on its platform scope as `stepUpSatisfied`, so the UI proxy decides platform entry from the console-scopes response it already fetches, without a separate per-request step-up status call (docs/032 C2).
 
 **Storage.** OTP digests and rate-limit counters live in KV
-(`BetterAuthKvStorage`), keyed by the prefixes in `auth/config.ts`. OTP digests are HMAC-SHA256 values derived from `BETTER_AUTH_SECRET`, the user ID, and the purpose string `admin-login-otp:v1`, so a KV-only leak cannot brute-force the 6-digit code offline. The final step-up proof is bound to the Better Auth session token, so changing sessions requires a new step-up. KV read-modify-write is not atomic, so the rate limits are best-effort backstops; edge WAF remains the primary throttle for password guessing.
+(`BetterAuthKvStorage`), keyed by the prefixes in `auth/config.ts`. OTP digests are HMAC-SHA256 values derived from `BETTER_AUTH_SECRET`, the user ID, and the purpose string `admin-login-otp:v1`, so a KV-only leak cannot brute-force the 6-digit code offline. The step-up proof is the session-owned `platformStepUpAt` column (write-through to D1 + KV secondary storage), so it dies with the session on sign-out/revocation and a new session starts unstepped — replacing the former session-token-keyed KV sidecar. KV read-modify-write is not atomic, so the rate limits are best-effort backstops; edge WAF remains the primary throttle for password guessing.
 
 **File responsibilities.**
 
@@ -95,7 +97,7 @@ The step-up endpoints use Better Auth's `sessionMiddleware`. `request` verifies 
 - `types.ts` — `AdminSignInGuardOptions` (injected `sendEmail`/`kv`/HMAC
   secret) and the narrow `AdminSignInGuardContext`/`AdminSignInGuardUser`
   runtime shapes.
-- `schema.ts` — linter-required marker only; the plugin owns no relational rows.
+- `schema.ts` — linter-required marker only; the plugin owns no relational rows. The session-owned `platformStepUpAt` field is declared inline in the plugin factory's `schema.session.fields`.
 
 **Boundaries & future work.** `sendEmail`, `kv`, and the HMAC secret are injected
 from `get-auth.ts`; the plugin never reaches into the email sender, KV binding,

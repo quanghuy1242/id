@@ -70,16 +70,6 @@ export function otpCodeKey(userId: string): string {
   return `${authPluginConfig.adminOtpStoragePrefix}${userId}`;
 }
 
-/** Session-bound key proving a recent platform-console step-up. */
-export function stepUpSessionKey(secret: string, sessionToken: string): string {
-  const digest = createHmac("sha256", secret)
-    .update("admin-step-up-session:v1")
-    .update("\0")
-    .update(sessionToken)
-    .digest("hex");
-  return `${authPluginConfig.adminStepUpStoragePrefix}${digest}`;
-}
-
 /** Same status and timing posture as the stock `signInEmail` credential errors. */
 export function invalidCredentialsError(): APIError {
   return new APIError("UNAUTHORIZED", {
