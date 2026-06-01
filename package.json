@@ -47,7 +47,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "swr": "2.3.6",
-    "vinext": "0.0.52",
+    "vinext": "0.0.54",
     "zod": "4.4.3"
   },
   "devDependencies": {
