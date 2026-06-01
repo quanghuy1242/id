@@ -46,7 +46,8 @@ The planned `/admin/platform/system/**` rows are registry placeholders only; the
 | `/admin/platform` | Platform dashboard — live users/orgs/apps/grants/JWKS stats plus workflow shortcuts | [shell.md](shell.md) | implemented |
 | `/admin/platform/identity/users` | User list — search by name/email, sort, filter by role/ban status | [identity.md](identity.md#adminidentityusers) | implemented |
 | `/admin/platform/identity/users/:userId[/sessions|/audit]` | User detail tabs — overview, sessions, audit | [identity.md](identity.md#adminidentityusersuserid) | implemented |
-| `/admin/platform/identity/organizations` | Organization list | [identity.md](identity.md#adminidentityorganizations) | implemented |
+| `/admin/platform/identity/organizations` | Organization list | [identity.md](identity.md#adminplatformidentityorganizations) | implemented |
+| `/admin/platform/identity/organizations/:orgId[/members|/teams|/invitations|/audit]` | Platform organization detail tabs — overview, members, teams, invitations, audit | [identity.md](identity.md#adminplatformidentityorganizationsorgid) | implemented |
 | `/admin/platform/oauth/applications` | OAuth client-facing application list | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/platform/oauth/applications/:clientId[/...]` | OAuth application detail tabs — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 | `/admin/platform/access/admins-roles` | Derived admins and roles view — platform admins plus org owner/admin memberships; role management deferred | [access.md](access.md#adminplatformaccessadmins-roles) | implemented |
@@ -77,10 +78,10 @@ Canonical organization console route prefix. The shell renders the selected orga
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/orgs/:orgId` | Organization overview dashboard | [identity.md](identity.md#adminidentityorganizationsorgid) | implemented |
-| `/admin/orgs/:orgId/identity/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminidentityorganizationsorgidmembers) | implemented |
-| `/admin/orgs/:orgId/identity/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminidentityorganizationsorgidteams) | implemented |
-| `/admin/orgs/:orgId/identity/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminidentityorganizationsorgidinvitations) | implemented |
+| `/admin/orgs/:orgId` | Organization overview dashboard | [identity.md](identity.md#adminplatformidentityorganizationsorgid) | implemented |
+| `/admin/orgs/:orgId/identity/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminplatformidentityorganizationsorgidmembers) | implemented |
+| `/admin/orgs/:orgId/identity/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminplatformidentityorganizationsorgidteams) | implemented |
+| `/admin/orgs/:orgId/identity/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminplatformidentityorganizationsorgidinvitations) | implemented |
 | `/admin/orgs/:orgId/oauth/applications` | Org-owned OAuth client-facing applications (`reference_id == orgId`) | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/orgs/:orgId/oauth/applications/:clientId[/...]` | Org-owned OAuth application detail tabs | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
 | `/admin/orgs/:orgId/access/service-accounts` | Tenant service accounts (`client_credentials`, `reference_id == orgId`) | [access.md](access.md#adminorgsorgidaccessservice-accounts) | implemented |
@@ -90,7 +91,7 @@ Canonical organization console route prefix. The shell renders the selected orga
 | `/admin/orgs/:orgId/access/scope-catalog` | Scopes for org-owned resource APIs | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
 | `/admin/orgs/:orgId/access/m2m-bindings` | Org-owned M2M bindings where client and resource server both belong to the org | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
 | `/admin/orgs/:orgId/access/m2m-bindings/:bindingId[/audit]` | Org-owned M2M binding detail tabs | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
-| `/admin/orgs/:orgId/audit` | Organization-scoped audit timeline | [identity.md](identity.md#adminidentityorganizationsorgidaudit) | implemented |
+| `/admin/orgs/:orgId/audit` | Organization-scoped audit timeline | [identity.md](identity.md#adminplatformidentityorganizationsorgidaudit) | implemented |
 
 ---
 
@@ -115,12 +116,12 @@ Platform admin: full list + manage any org. Org admin: own org detail only (dire
 
 | Route | Page | Spec | Status |
 |---|---|---|---|
-| `/admin/identity/organizations` | Organization list | [identity.md](identity.md#adminidentityorganizations) | specced |
-| `/admin/identity/organizations/:orgId` | Org overview — name, slug, logo, metadata, edit, delete | [identity.md](identity.md#adminidentityorganizationsorgid) | specced |
-| `/admin/identity/organizations/:orgId/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminidentityorganizationsorgidmembers) | specced |
-| `/admin/identity/organizations/:orgId/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminidentityorganizationsorgidteams) | specced |
-| `/admin/identity/organizations/:orgId/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminidentityorganizationsorgidinvitations) | specced |
-| `/admin/identity/organizations/:orgId/audit` | Organization audit timeline backed by `admin-activity-log` | [identity.md](identity.md#adminidentityorganizationsorgidaudit) | implemented |
+| `/admin/identity/organizations` | Organization list | [identity.md](identity.md#adminplatformidentityorganizations) | specced |
+| `/admin/identity/organizations/:orgId` | Org overview — name, slug, logo, metadata, edit, delete | [identity.md](identity.md#adminplatformidentityorganizationsorgid) | specced |
+| `/admin/identity/organizations/:orgId/members` | Member list — role assignment, remove member | [identity.md](identity.md#adminplatformidentityorganizationsorgidmembers) | specced |
+| `/admin/identity/organizations/:orgId/teams` | Team list — create, rename, delete team; manage team members | [identity.md](identity.md#adminplatformidentityorganizationsorgidteams) | specced |
+| `/admin/identity/organizations/:orgId/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminplatformidentityorganizationsorgidinvitations) | specced |
+| `/admin/identity/organizations/:orgId/audit` | Organization audit timeline backed by `admin-activity-log` | [identity.md](identity.md#adminplatformidentityorganizationsorgidaudit) | implemented |
 
 ---
 

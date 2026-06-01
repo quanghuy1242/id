@@ -8,7 +8,7 @@ export default function PlatformOrganizationsPage() {
   const router = useRouter();
   return (
     <PageBody>
-      <OrganizationsListContent onRowClick={(id) => router.push(`/admin/orgs/${id}`)} />
+      <OrganizationsListContent onRowClick={(id) => router.push(`/admin/platform/identity/organizations/${id}`)} />
     </PageBody>
   );
 }

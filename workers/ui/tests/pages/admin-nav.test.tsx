@@ -43,22 +43,6 @@ const orgScopeEnvelope: ConsoleScopeEnvelope = {
   ],
 };
 
-const platformOnlyEnvelope: ConsoleScopeEnvelope = {
-  actor: { userId: "user_001", email: "quanghuy1242@gmail.com", canEnterConsole: true },
-  defaultScopeId: "platform",
-  memberships: [],
-  scopes: [
-    {
-      kind: "platform",
-      id: "platform",
-      label: "Platform",
-      role: "platform-admin",
-      permissions: ["platform:read", "organizations:read", "oauth-clients:read", "resource-servers:read", "security-audit:read", "jwks:read"],
-      requiresStepUp: true,
-    },
-  ],
-};
-
 describe("Admin sidebar navigation", () => {
   it("flattens single-item nav groups", () => {
     navigationMock.pathname = "/admin/platform";
@@ -146,7 +130,7 @@ describe("Admin mobile navigation", () => {
   });
 
   it("keeps the section dock item active across sibling mobile routes", () => {
-    navigationMock.pathname = "/admin/platform/identity/organizations";
+    navigationMock.pathname = "/admin/platform/identity/organizations/org_001/members";
 
     render(<AdminMobileNav />);
 
@@ -166,7 +150,7 @@ describe("Admin mobile navigation", () => {
   });
 
   it("selects the most specific mobile section tab", () => {
-    navigationMock.pathname = "/admin/platform/identity/organizations";
+    navigationMock.pathname = "/admin/platform/identity/organizations/org_001/members";
 
     render(<AdminMobileRouteTabs />);
 
@@ -220,8 +204,8 @@ describe("Admin mobile navigation", () => {
 
     render(
       <AdminScopeProvider
-        initialEnvelope={platformOnlyEnvelope}
-        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(platformOnlyEnvelope) }}
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
       >
         <AdminMobileNav />
       </AdminScopeProvider>,
@@ -309,6 +293,16 @@ describe("Admin topbar", () => {
     const platformItem = within(menu).getAllByRole("menuitem").find((item) => item.textContent?.includes("Platform"));
 
     expect(platformItem).toHaveAttribute("href", "/admin/platform/identity/organizations");
+  });
+
+  it("keeps platform organization detail routes in the platform scope picker", async () => {
+    navigationMock.pathname = "/admin/platform/identity/organizations/org_001/members";
+
+    render(<AdminTopbar />);
+
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(breadcrumb).getByRole("button", { name: /select console scope/i })).toHaveTextContent("Platform");
+    expect(breadcrumb).toHaveTextContent("Organizations");
   });
 
   it("wires the avatar menu logout action", async () => {

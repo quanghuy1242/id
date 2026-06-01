@@ -67,6 +67,8 @@ export const activityLogKey = (params: { targetType: string; targetId: string; a
 
 /** Matches every users-list cache slot regardless of filter/sort/page params. */
 export const isUsersListKey = (key: Arguments) => Array.isArray(key) && key[0] === USERS_LIST;
+/** Matches the console scope envelope cache slot. */
+export const isConsoleScopesKey = (key: Arguments) => Array.isArray(key) && key[0] === CONSOLE_SCOPES;
 /** Matches the organizations-list cache slot. */
 export const isOrgsListKey = (key: Arguments) => Array.isArray(key) && key[0] === ORGS_LIST;
 /** Matches the OAuth clients list cache slot. */

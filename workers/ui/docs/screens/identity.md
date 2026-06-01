@@ -42,7 +42,7 @@ Add new icons to `iconMap` in `packages/ui/src/nav-icons.tsx` before using them.
 
 ---
 
-Covers identity screens in their canonical Track A route families: `/admin/platform/identity/**` for platform-only user and organization list surfaces, and `/admin/orgs/:orgId/**` for organization overview/members/teams/invitations/audit. Legacy `/admin/identity/**` URLs are proxy redirects only; the old route files have been removed.
+Covers identity screens in their canonical Track A route families: `/admin/platform/identity/**` for platform user and organization management, and `/admin/orgs/:orgId/**` for the organization console lens. Platform organization rows open `/admin/platform/identity/organizations/:orgId` so the shell remains in the Platform scope; `/admin/orgs/:orgId/**` is reserved for operating inside the selected organization lens. Legacy `/admin/identity/**` URLs are proxy redirects only; the old route files have been removed.
 
 Actor-scoping rules:
 - Platform admin (`user.role = "admin"`) — full access to users and all organizations.
@@ -453,7 +453,7 @@ Data: GET /api/auth/admin/activity-log?targetType=user&targetId=:userId&limit=25
 
 ---
 
-## /admin/identity/organizations
+## /admin/platform/identity/organizations
 
 Platform admin only. Org admins redirected to their own org detail.
 
@@ -500,7 +500,7 @@ Components:
     Panel(padding="none") > DataTable(
       columns=[name(sortable), slug, createdAt(sortable)],
       rows=filteredOrgs, getRowKey=(o)=>o.id,
-      onRowClick=navigate to /admin/identity/organizations/${id},
+      onRowClick=navigate to /admin/platform/identity/organizations/${id},
       sortBy, sortDirection, onSort
     )
     Loading: Skeleton(rows=5)
@@ -515,7 +515,7 @@ Components:
       — Validate as a JSON object on change; show inline error via CodeEditor error prop.
       — Use CodeEditor for all JSON/multiline fields.
     On confirm: POST /api/auth/organization/create { name, slug, logo?, metadata? } where metadata is parsed from editor text and sent as a JSON object
-    On success: navigate to /admin/identity/organizations/${id}
+    On success: navigate to /admin/platform/identity/organizations/${id}
 
 Data: GET /api/auth/organization/list → Organization[]   (no pagination; metadata may be object or string on the wire and the action normalizes it to formatted JSON text)
       POST /api/auth/organization/create → Organization    body: { name, slug, logo?, metadata?: object }
@@ -532,7 +532,7 @@ Behavior:
 
 ---
 
-## /admin/identity/organizations/:orgId
+## /admin/platform/identity/organizations/:orgId
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -582,12 +582,12 @@ Behavior:
 
 Components:
   AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
-  MainContent > organizations/:orgId/layout.tsx
+  MainContent > platform/identity/organizations/:orgId/layout.tsx
     PageBody > OrgDetailProvider > Stack(gap="md")
     OrgDetailHeaderContent:
       Inline(justify="between")
       Inline(gap="sm")
-        LinkButton(href="/admin/platform/identity/organizations", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Organizations") — rendered only when the header is used from the platform organization-list drilldown; the scoped `/admin/orgs/:orgId/**` context hides the back button.
+        LinkButton(href="/admin/platform/identity/organizations", variant="secondary", size="sm", hideOnMobile, iconName="ChevronLeft", ariaLabel="Back to Organizations") — rendered for the platform organization drilldown; the scoped `/admin/orgs/:orgId/**` context hides the back button.
         Text(variant="h1", org.name)
         Badge(tone="neutral", children=`#${org.slug}`)
       Button(variant="danger", onClick=openDeleteModal, "Delete")
@@ -596,18 +596,18 @@ Components:
       ariaLabel="Organization detail tabs",
       selectedKey=activeTab,   — "overview" | "members" | "teams" | "invitations" | "audit"; default "overview"
       items=[
-        {id:"overview", href:`/admin/identity/organizations/${orgId}`, label:"Overview"},
-        {id:"members", href:`/admin/identity/organizations/${orgId}/members`, label:"Members"},
-        {id:"teams", href:`/admin/identity/organizations/${orgId}/teams`, label:"Teams"},
-        {id:"invitations", href:`/admin/identity/organizations/${orgId}/invitations`, label:"Invitations"},
-        {id:"audit", href:`/admin/identity/organizations/${orgId}/audit`, label:"Audit"}
+        {id:"overview", href:`/admin/platform/identity/organizations/${orgId}`, label:"Overview"},
+        {id:"members", href:`/admin/platform/identity/organizations/${orgId}/members`, label:"Members"},
+        {id:"teams", href:`/admin/platform/identity/organizations/${orgId}/teams`, label:"Teams"},
+        {id:"invitations", href:`/admin/platform/identity/organizations/${orgId}/invitations`, label:"Invitations"},
+        {id:"audit", href:`/admin/platform/identity/organizations/${orgId}/audit`, label:"Audit"}
       ]
     )
-    — NOTE: platform organization drilldown renders these entity-local tabs; scoped `/admin/orgs/:orgId/**` hides them on desktop and mobile because the scoped lens uses sidebar/dock navigation.
+    — NOTE: platform organization drilldown renders these entity-local tabs and keeps the shell in Platform scope; scoped `/admin/orgs/:orgId/**` hides them on desktop and mobile because the scoped lens uses sidebar/dock navigation.
     — NOTE: the layout derives activeTab from pathname and renders the shared header once.
       Sub-page route files render only OrganizationMembersContent, OrganizationTeamsContent, or OrganizationInvitationsContent.
 
-    organizations/:orgId/page.tsx:
+    platform/identity/organizations/:orgId/page.tsx:
       OrgDetailOverviewContent
 
     Panel
@@ -628,7 +628,7 @@ Components:
     confirmDisabled=typedSlug !== org.slug, onConfirm)
     Text(variant="body", "This will remove the organization and ALL members, teams, and invitations. This cannot be undone.")
     TextInput(label="Type the slug to confirm", name="confirmSlug")
-    On confirm: POST /api/auth/organization/delete { organizationId }, then navigate to /admin/identity/organizations
+    On confirm: POST /api/auth/organization/delete { organizationId }, then navigate to /admin/platform/identity/organizations
 
 Data: GET /api/auth/organization/get-full-organization → Organization | null (with metadata normalized by the action)
       POST /api/auth/organization/update   body: { organizationId, data: { name?, slug?, logo?, metadata?: object } }
@@ -642,7 +642,7 @@ Notes:
 
 ---
 
-## /admin/identity/organizations/:orgId/members
+## /admin/platform/identity/organizations/:orgId/members
 
 Inherits parent shell + PageHeader + Tabs. Members tab active.
 
@@ -759,7 +759,7 @@ Notes:
 
 ---
 
-## /admin/identity/organizations/:orgId/teams
+## /admin/platform/identity/organizations/:orgId/teams
 
 Inherits parent shell + PageHeader + Tabs. Teams tab active.
 
@@ -887,7 +887,7 @@ Behavior:
 
 ---
 
-## /admin/identity/organizations/:orgId/invitations
+## /admin/platform/identity/organizations/:orgId/invitations
 
 Inherits parent shell + PageHeader + Tabs. Invitations tab active.
 
@@ -1011,7 +1011,7 @@ Behavior:
 
 ---
 
-## /admin/identity/organizations/:orgId/audit
+## /admin/platform/identity/organizations/:orgId/audit
 
 Inherits parent shell + shared `OrgDetailProvider` header. Audit tab active. This route is powered by the append-only `admin-activity-log` plugin from docs/027 §12.
 

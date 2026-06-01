@@ -183,7 +183,7 @@ describe("admin middleware", () => {
       ["/admin/oauth/scope-catalog?q=content", "/admin/platform/access/scope-catalog", "?q=content"],
       ["/admin/oauth/m2m-bindings/bind_001", "/admin/platform/access/m2m-bindings/bind_001", ""],
       ["/admin/security", "/admin/platform/security/sessions", ""],
-      ["/admin/identity/organizations/org_123/teams", "/admin/orgs/org_123/identity/teams", ""],
+      ["/admin/identity/organizations/org_123/teams", "/admin/platform/identity/organizations/org_123/teams", ""],
     ] as const;
 
     for (const [source, expectedPath, expectedSearch] of cases) {
@@ -245,6 +245,22 @@ describe("admin middleware", () => {
 
     expect(response.status).toBe(307);
     expect(location.pathname).toBe("/admin/platform/identity/users");
+  });
+
+  it("canonicalizes legacy organization callbacks to the actor's matching lens", async () => {
+    mockedFetch().mockResolvedValueOnce(Response.json(platformEnvelope));
+
+    const platformResponse = await proxy(
+      loginRequest("?callbackURL=%2Fadmin%2Fidentity%2Forganizations%2Forg_123%2Fteams", "id-auth.session_token=admin"),
+    );
+    expect(new URL(platformResponse.headers.get("location") ?? "").pathname).toBe("/admin/platform/identity/organizations/org_123/teams");
+
+    mockedFetch().mockResolvedValueOnce(Response.json(orgEnvelope));
+
+    const orgResponse = await proxy(
+      loginRequest("?callbackURL=%2Fadmin%2Fidentity%2Forganizations%2Forg_123%2Fteams", "id-auth.session_token=org"),
+    );
+    expect(new URL(orgResponse.headers.get("location") ?? "").pathname).toBe("/admin/orgs/org_123/identity/teams");
   });
 
   it("defaults an authenticated user on /login without a callback to account", async () => {

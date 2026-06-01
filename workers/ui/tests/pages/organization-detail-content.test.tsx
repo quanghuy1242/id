@@ -33,6 +33,8 @@ function renderOrgDetail({
   actions = makeActions(org),
   onNavigateToOrgs,
   scopedRoute,
+  routeBasePath,
+  backHref,
 }: {
   org?: Organization;
   orgId?: string;
@@ -41,11 +43,20 @@ function renderOrgDetail({
   actions?: ReturnType<typeof makeActions>;
   onNavigateToOrgs?: () => void;
   scopedRoute?: boolean;
+  routeBasePath?: string;
+  backHref?: string;
 } = {}) {
   return render(
     <OrgDetailProvider orgId={orgId} loading={loading} error={error} actions={actions}>
       <Stack gap="md">
-        <OrgDetailHeaderContent activeTab="overview" actions={actions} onNavigateToOrgs={onNavigateToOrgs} scopedRoute={scopedRoute} />
+        <OrgDetailHeaderContent
+          activeTab="overview"
+          actions={actions}
+          routeBasePath={routeBasePath}
+          backHref={backHref}
+          onNavigateToOrgs={onNavigateToOrgs}
+          scopedRoute={scopedRoute}
+        />
         <OrgDetailOverviewContent actions={actions} />
       </Stack>
     </OrgDetailProvider>,
@@ -77,6 +88,18 @@ describe("Organization detail nested content", () => {
     await waitFor(() => expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0));
     expect(screen.queryByRole("link", { name: /back to organizations/i })).toBeNull();
     expect(screen.queryByRole("tablist", { name: /organization detail tabs/i })).toBeNull();
+  });
+
+  it("renders platform drilldown tabs without switching to the scoped org lens", async () => {
+    renderOrgDetail({
+      routeBasePath: "/admin/platform/identity/organizations/org_001",
+      backHref: "/admin/platform/identity/organizations",
+    });
+
+    await waitFor(() => expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0));
+    expect(screen.getByRole("link", { name: /back to organizations/i })).toHaveAttribute("href", "/admin/platform/identity/organizations");
+    expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute("href", "/admin/platform/identity/organizations/org_001/members");
+    expect(screen.getByRole("tab", { name: "Teams" })).toHaveAttribute("href", "/admin/platform/identity/organizations/org_001/teams");
   });
 
   it("opens Edit Organization dialog", async () => {

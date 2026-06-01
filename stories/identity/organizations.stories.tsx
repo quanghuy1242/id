@@ -32,6 +32,11 @@ function orgPath(orgId: string, tab: "overview" | "members" | "teams" | "invitat
   return `/admin/orgs/${orgId}/identity/${tab}`;
 }
 
+function platformOrgPath(orgId: string, tab: "overview" | "members" | "teams" | "invitations" | "audit" = "overview") {
+  if (tab === "overview") return `${orgsPath}/${orgId}`;
+  return `${orgsPath}/${orgId}/${tab}`;
+}
+
 function createListActions(orgs: Organization[]) {
   let current = [...orgs];
   return {
@@ -128,6 +133,9 @@ function OrgDetailFrame({
   actions,
   loading,
   error,
+  routeBasePath,
+  backHref = orgsPath,
+  scopedRoute = true,
   children,
 }: {
   activePath: string;
@@ -136,6 +144,9 @@ function OrgDetailFrame({
   actions?: OrgDetailFrameActions;
   loading?: boolean;
   error?: string;
+  routeBasePath?: string;
+  backHref?: string;
+  scopedRoute?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -145,9 +156,9 @@ function OrgDetailFrame({
           <Stack gap="md">
             <OrgDetailHeaderContent
               activeTab={activeTab}
-              routeBasePath={`/admin/orgs/${orgId}`}
-              backHref={orgsPath}
-              scopedRoute
+              routeBasePath={routeBasePath ?? `/admin/orgs/${orgId}`}
+              backHref={backHref}
+              scopedRoute={scopedRoute}
               actions={actions}
             />
             {children}
@@ -157,6 +168,23 @@ function OrgDetailFrame({
     </AdminShell>
   );
 }
+
+export const PlatformOrgOverview_Populated: Story = () => {
+  const actions = createDetailActions(mockOrganizations[0]);
+  return (
+    <OrgDetailFrame
+      activePath={platformOrgPath("org_001")}
+      orgId="org_001"
+      activeTab="overview"
+      actions={actions}
+      routeBasePath={platformOrgPath("org_001")}
+      scopedRoute={false}
+    >
+      <OrgDetailOverviewContent actions={actions} />
+    </OrgDetailFrame>
+  );
+};
+PlatformOrgOverview_Populated.storyName = "Platform Org Overview / Populated";
 
 export const OrgOverview_Populated: Story = () => {
   const actions = createDetailActions(mockOrganizations[0]);
@@ -216,6 +244,24 @@ function createMembersActions(members: Member[]) {
     },
   };
 }
+
+export const PlatformOrgMembers_Populated: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  const actions = createMembersActions(mockMembers);
+  return (
+    <OrgDetailFrame
+      activePath={platformOrgPath("org_001", "members")}
+      orgId="org_001"
+      activeTab="members"
+      actions={detail}
+      routeBasePath={platformOrgPath("org_001")}
+      scopedRoute={false}
+    >
+      <OrganizationMembersContent orgId="org_001" orgName="Acme Corp" actions={actions} />
+    </OrgDetailFrame>
+  );
+};
+PlatformOrgMembers_Populated.storyName = "Platform Org Members / Populated";
 
 export const OrgMembers_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
@@ -286,6 +332,24 @@ function createTeamsActions(teams: Team[]) {
   };
 }
 
+export const PlatformOrgTeams_Populated: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  const actions = createTeamsActions(mockTeams);
+  return (
+    <OrgDetailFrame
+      activePath={platformOrgPath("org_001", "teams")}
+      orgId="org_001"
+      activeTab="teams"
+      actions={detail}
+      routeBasePath={platformOrgPath("org_001")}
+      scopedRoute={false}
+    >
+      <OrganizationTeamsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
+  );
+};
+PlatformOrgTeams_Populated.storyName = "Platform Org Teams / Populated";
+
 export const OrgTeams_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createTeamsActions(mockTeams);
@@ -342,6 +406,24 @@ function createInvsActions(invs: Invitation[]) {
   };
 }
 
+export const PlatformOrgInvitations_Populated: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  const actions = createInvsActions(mockInvitations);
+  return (
+    <OrgDetailFrame
+      activePath={platformOrgPath("org_001", "invitations")}
+      orgId="org_001"
+      activeTab="invitations"
+      actions={detail}
+      routeBasePath={platformOrgPath("org_001")}
+      scopedRoute={false}
+    >
+      <OrganizationInvitationsContent orgId="org_001" actions={actions} />
+    </OrgDetailFrame>
+  );
+};
+PlatformOrgInvitations_Populated.storyName = "Platform Org Invitations / Populated";
+
 export const OrgInvitations_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   const actions = createInvsActions(mockInvitations);
@@ -394,6 +476,23 @@ function createActivityActions(entries = mockActivities) {
     }),
   };
 }
+
+export const PlatformOrgAudit_Populated: Story = () => {
+  const detail = createDetailActions(mockOrganizations[0]);
+  return (
+    <OrgDetailFrame
+      activePath={platformOrgPath("org_001", "audit")}
+      orgId="org_001"
+      activeTab="audit"
+      actions={detail}
+      routeBasePath={platformOrgPath("org_001")}
+      scopedRoute={false}
+    >
+      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions()} />
+    </OrgDetailFrame>
+  );
+};
+PlatformOrgAudit_Populated.storyName = "Platform Org Audit / Populated";
 
 export const OrgAudit_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);

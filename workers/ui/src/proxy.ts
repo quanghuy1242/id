@@ -108,19 +108,24 @@ function routeOrganizationId(pathname: string): string | undefined {
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }
 
-function legacyOrganizationDetailTarget(pathname: string): string | null {
+function legacyOrganizationDetailTarget(pathname: string, lens: "platform" | "organization"): string | null {
   const match = /^\/admin\/identity\/organizations\/([^/]+)\/?(.*)$/u.exec(pathname);
   if (!match?.[1]) return null;
   const organizationId = match[1];
   const tail = match[2] ?? "";
+  if (lens === "platform") {
+    if (!tail) return `/admin/platform/identity/organizations/${organizationId}`;
+    if (tail === "members" || tail === "teams" || tail === "invitations" || tail === "audit") return `/admin/platform/identity/organizations/${organizationId}/${tail}`;
+    return `/admin/platform/identity/organizations/${organizationId}`;
+  }
   if (!tail) return `/admin/orgs/${organizationId}`;
   if (tail === "members" || tail === "teams" || tail === "invitations") return `/admin/orgs/${organizationId}/identity/${tail}`;
   if (tail === "audit") return `/admin/orgs/${organizationId}/audit`;
   return `/admin/orgs/${organizationId}`;
 }
 
-function legacyPlatformTarget(pathname: string): string {
-  const organizationTarget = legacyOrganizationDetailTarget(pathname);
+function legacyPlatformTarget(pathname: string, lens: "platform" | "organization" = "platform"): string {
+  const organizationTarget = legacyOrganizationDetailTarget(pathname, lens);
   if (organizationTarget) return organizationTarget;
   if (pathname === "/admin/oauth" || pathname === "/admin/oauth/") return "/admin/platform/oauth/applications";
   if (pathname.startsWith("/admin/oauth/sessions-tokens")) return "/admin/platform/security/sessions";
@@ -137,7 +142,7 @@ function legacyPlatformRedirect(request: NextRequest, envelope: ConsoleScopeEnve
   if (pathname === "/admin") {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
   }
-  const target = legacyPlatformTarget(pathname);
+  const target = legacyPlatformTarget(pathname, hasPlatformScope(envelope) ? "platform" : "organization");
   if (!canOpenScopedRoute(target, envelope)) {
     return NextResponse.redirect(new URL(defaultAdminTarget(envelope), request.url));
   }
@@ -159,7 +164,11 @@ function canonicalLoginTarget(target: string, request: NextRequest, envelope: Co
   if (isCanonicalAdminPath(url.pathname)) {
     return canOpenScopedRoute(url.pathname, envelope) ? `${url.pathname}${url.search}` : defaultAdminTarget(envelope);
   }
-  if (!hasPlatformScope(envelope)) return defaultAdminTarget(envelope);
+  if (!hasPlatformScope(envelope)) {
+    const organizationTarget = legacyOrganizationDetailTarget(url.pathname, "organization");
+    if (organizationTarget && canOpenScopedRoute(organizationTarget, envelope)) return `${organizationTarget}${url.search}`;
+    return defaultAdminTarget(envelope);
+  }
   const legacyTarget = legacyPlatformTarget(url.pathname);
   return canOpenScopedRoute(legacyTarget, envelope) ? `${legacyTarget}${url.search}` : defaultAdminTarget(envelope);
 }

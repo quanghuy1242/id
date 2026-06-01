@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import {
   Avatar,
   Button,
@@ -28,7 +28,7 @@ import {
   createOrganization as createOrgAction,
   type Organization,
 } from "../../_actions/organizations";
-import { orgsListKey } from "@/app/admin/_data/swr-keys";
+import { isConsoleScopesKey, orgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   listOrganizations: listOrgsAction,
@@ -107,6 +107,7 @@ export function OrganizationsListContent({
 
   // Single server fetch; search and sort are applied client-side, so the key
   // carries no params and typing/sorting triggers zero network calls.
+  const { mutate: globalMutate } = useSWRConfig();
   const { data: allOrgs, isLoading, error, mutate } = useSWR(
     loadingOverride || errorOverride ? null : orgsListKey(),
     () => actions.listOrganizations(),
@@ -157,6 +158,7 @@ export function OrganizationsListContent({
     try {
       const org = await actions.createOrganization({ name, slug, ...(logo ? { logo } : {}), ...(metadata ? { metadata } : {}) });
       await mutate();
+      await globalMutate(isConsoleScopesKey);
       toast.success("Organization created", `${name} is ready. Add members to get started.`);
       onRowClick?.(org.id);
       return true;

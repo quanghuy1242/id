@@ -6,7 +6,7 @@ import {
   getFullOrganization as getFullOrganizationAction,
   type Organization,
 } from "../../_actions/organizations";
-import { orgDetailKey, isOrgsListKey } from "@/app/admin/_data/swr-keys";
+import { isConsoleScopesKey, orgDetailKey, isOrgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultFetchActions = {
   getFullOrganization: getFullOrganizationAction,
@@ -50,6 +50,7 @@ export function OrgDetailProvider({
     (next: Organization) => {
       void mutateOrg(next, { revalidate: false });
       void globalMutate(isOrgsListKey, undefined, { revalidate: false });
+      void globalMutate(isConsoleScopesKey);
     },
     [mutateOrg, globalMutate],
   );

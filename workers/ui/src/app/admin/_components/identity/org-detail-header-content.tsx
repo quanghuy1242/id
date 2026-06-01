@@ -24,7 +24,7 @@ import {
 } from "../../_actions/organizations";
 import { AdminDetailTitleRow } from "../admin-detail-title-row";
 import { useOrgDetail } from "./org-detail-context";
-import { isOrgsListKey } from "@/app/admin/_data/swr-keys";
+import { isConsoleScopesKey, isOrgsListKey } from "@/app/admin/_data/swr-keys";
 
 const defaultActions = {
   updateOrganization: updateOrganizationAction,
@@ -116,6 +116,7 @@ export function OrgDetailHeaderContent({
     try {
       await actions.deleteOrganization(orgId);
       await globalMutate(isOrgsListKey, undefined, { revalidate: false });
+      await globalMutate(isConsoleScopesKey);
       toast.success("Organization deleted", `${org?.name ?? "The organization"} and its memberships were removed.`);
       onNavigateToOrgs?.();
       return true;
