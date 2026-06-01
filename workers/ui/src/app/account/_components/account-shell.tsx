@@ -10,13 +10,11 @@ import {
   DockLink,
   MainContent,
   MobileDock,
-  MobileRouteTabs,
   NavLink,
   NavMenu,
   ResponsiveBreadcrumb,
   Sidebar,
   SidebarLayout,
-  Tabs,
   ThemeDialog,
   ToastRegion,
   Topbar,
@@ -106,14 +104,6 @@ export function AccountShell({
             />
           </TopbarEnd>
         </Topbar>
-        <MobileRouteTabs>
-          <Tabs
-            ariaLabel="Account navigation"
-            items={accountNav.map((item) => ({ id: item.href, href: item.href, label: item.label }))}
-            selectedKey={active.href}
-            size="sm"
-          />
-        </MobileRouteTabs>
         <SidebarLayout>
           <Sidebar>
             <NavMenu label="Account navigation">

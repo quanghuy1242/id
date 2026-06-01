@@ -38,6 +38,7 @@ describe("Account Center content", () => {
     expect(within(dock).getAllByRole("link")).toHaveLength(6);
     expect(within(dock).getByRole("link", { name: "Org" })).toHaveAttribute("href", "/account/organizations");
     expect(within(dock).getByRole("link", { name: "Org" })).toHaveClass("dock-active");
+    expect(screen.queryByRole("tablist", { name: /account navigation/i })).not.toBeInTheDocument();
   });
 
   it("renders overview stats and organization preview from account endpoints", async () => {
