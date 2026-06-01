@@ -189,6 +189,104 @@ Badge mappings:
 
 ---
 
+## /admin/platform/identity/registration-policies and /admin/orgs/:orgId/identity/registration-policies
+
+Canonical route files:
+- `workers/ui/src/app/admin/platform/identity/registration-policies/page.tsx`
+- `workers/ui/src/app/admin/orgs/[orgId]/identity/registration-policies/page.tsx`
+
+Placement decision: registration policies live under Identity because they govern account creation and onboarding admission. Platform scope shows all visible policies. Organization scope filters to that organization and uses the same component/actions with an organization `ActiveScope`.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Registration Policies                                                │
+│ Control which clients or invitations may create accounts.             │
+│ [Search policy/client/org...] [Status: All ▾]                         │
+├─────────────────────────────────────────────────────────────────────┤
+│ Policies  Enabled  Reserved  Used                                    │
+│ 12        5        3         231                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│ Name ↕        Status  Mode             Client        Org   Quota      │
+│ Content beta  Enabled client_initiated content-ui    Acme 231/1000    │
+│ Acme invites  Paused  invite_only      —             Acme 4/50        │
+│ Trial         Draft   public_limited   —             —    —           │
+├─────────────────────────────────────────────────────────────────────┤
+│ Selected Policy                                                       │
+│ Content beta                                                          │
+│ Status enabled · Mode client_initiated · Valid Jun 1 – Jul 1          │
+│ [Enable] [Pause] [Archive]                                            │
+│ Recent Intents                                                        │
+│ Email              Status              Created       Failure           │
+│ new@acme.com       completed           10:01         —                 │
+│ test@acme.com      continuation_failed 10:04         oauth_continue    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Components:
+  Admin layout owns AppShell > Topbar + SidebarLayout(Sidebar + MainContent)
+  Route owns:
+  PageBody
+    Suspense(fallback=<RegistrationPoliciesContent scope loading />)
+      RegistrationPoliciesContent(scope)
+  RegistrationPoliciesContent:
+  Stack(gap="md")
+    PageIntro(title="Registration Policies", description, info)
+    StatGroup(columns=4)
+      Stat(title="Policies")
+      Stat(title="Enabled")
+      Stat(title="Reserved")
+      Stat(title="Used")
+    Panel
+      Inline(gap="sm")
+        SearchInput(grow, placeholder="Search policies…", value, onChange)
+        FilterDropdown(label="Status", options=[all,draft,enabled,paused,archived], value, onChange)
+    Panel(padding="none" when rows exist)
+      DataTable(
+        columns=[name(sortable), status, mode, client, organization, quota, validity],
+        rows, getRowKey=(policy)=>policy.id,
+        onRowClick=select policy,
+        sortBy, sortDirection, onSort
+      )
+      Loading: Skeleton(rows=5)
+      Empty: EmptyState(message="No registration policies")
+      Search/filter empty: EmptyState(message="No registration policies match")
+      Error: ErrorAlert(message=error, onRetry=refetch)
+    Panel(selected detail, shown when a row is selected)
+      Stack(gap="sm")
+        Inline(justify="between")
+          Text(variant="h2", selected.name)
+          Inline(gap="sm")
+            Button(variant="secondary", iconName="Check", onClick=enable, disabled=status==="enabled")
+            Button(variant="secondary", iconName="X", onClick=pause, disabled=status==="paused")
+            Button(variant="danger", iconName="FileText", onClick=archive, disabled=status==="archived")
+        DescriptionList(items=[slug, status, mode, client, organization, resource, domains, quota, validity])
+        Text(variant="h3", children="Recent Intents")
+        DataTable(intent rows: email, status, created, completed, failure)
+
+Data: GET /api/auth/admin/registration-policies → { policies: RegistrationPolicy[] }
+        platform route sends no params; org route sends `organizationId`.
+      POST /api/auth/admin/registration-policies/:id/enable → RegistrationPolicy
+      POST /api/auth/admin/registration-policies/:id/pause → RegistrationPolicy, invalidates active intents
+      POST /api/auth/admin/registration-policies/:id/archive → RegistrationPolicy, invalidates active intents
+      GET /api/auth/admin/registration-policies/:id/intents → { intents: RegistrationIntent[] }
+
+Route URL params: q, status, sortBy, sortDir, selected
+Content defaults: q="", status="all", sortBy="updatedAt", sortDirection="desc"
+
+Behavior:
+  - Route files read URL params with useSearchParams inside PageContent only; outer route owns Suspense.
+  - Search and status filter are client-side over the fetched policy list; the SWR key contains only the active scope.
+  - Row click selects a policy and writes `selected`.
+  - Enable/Pause/Archive call actions, refresh the policy list and selected intent detail, and render toast feedback.
+  - Pause and Archive are operational close-switches: active started/submitted intents become unusable in core before any account can be created.
+  - UI displays client IDs, organization IDs, scopes, domains, and quota values returned by the server; it never trusts OAuth request text or client-supplied display names.
+
+Badge mappings:
+  status: draft→neutral, enabled→success, paused→warning, archived→neutral
+  intent status: completed→success, continuation_failed/failed→error, expired/cancelled→neutral, started/submitted→info
+
+---
+
 ## /admin/identity/users/:userId
 
 ```

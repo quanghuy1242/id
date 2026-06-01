@@ -62,6 +62,13 @@ Clients must not assume requested scopes are granted. Registration policy can na
 
 First-release quota semantics are soft quota: `id` reserves a short-lived registration slot before signup and consumes it after account creation. Strict atomic quota is intentionally deferred to a separate architecture-approved change.
 
+Rollback and retry behavior:
+
+- Operators can pause or archive registration policies to stop self-service admission. Active started/submitted intents become unusable and their quota reservations are released.
+- Removing or disabling the OAuth Provider `signup.page` stops new `prompt=create` redirects, but direct Better Auth signup remains fail-closed without a server-created intent.
+- If account creation succeeds but OAuth continuation fails, the account and any policy/invite membership remain created. The intent records `continuation_failed`; the user can retry by signing in from the client application again.
+- Invite links use `/register/invite/:invitationId` when no OAuth continuation exists and fall back to `/account/organizations` after account creation.
+
 ## Client Credentials
 
 Machine-to-machine clients use:

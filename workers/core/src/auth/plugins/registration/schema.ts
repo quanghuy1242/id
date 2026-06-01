@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  REGISTRATION_CONTINUATION_FAILURE_REASON_MAX_LENGTH,
+} from "../../config";
+import {
   mapZodToBetterAuthFields,
   openApiJsonRequestBody,
   zodSchemaToOpenApi,
@@ -32,6 +35,7 @@ export const registrationIntentStatusSchema = z.enum([
   "cancelled",
   "expired",
   "failed",
+  "continuation_failed",
 ]);
 export const registrationReservationStatusSchema = z.enum(["reserved", "consumed", "released"]);
 
@@ -72,7 +76,7 @@ export const registrationIntentSchema = z.object({
   requestedScopes: z.array(z.string().min(1)),
   allowedScopes: z.array(z.string().min(1)),
   resource: z.string().nullable().optional(),
-  oauthQuery: z.string().min(1),
+  oauthQuery: z.string(),
   oauthQueryHash: z.string().min(1).meta({ betterAuth: { index: true } }),
   email: z.string().email().nullable().optional().meta({ betterAuth: { index: true } }),
   status: z.string().default("started").meta({ betterAuth: { index: true } }),
@@ -122,7 +126,7 @@ export const updateRegistrationPolicyBody = createRegistrationPolicyBody.partial
 }).strict();
 
 export const evaluateRegistrationBody = z.object({
-  oauthQuery: z.string().min(1),
+  oauthQuery: z.string().min(1).nullable().optional(),
   invitationId: z.string().min(1).nullable().optional(),
 }).strict();
 
@@ -137,10 +141,16 @@ export const statusRegistrationBody = z.object({
   intentId: z.string().min(1),
 }).strict();
 
+export const continuationFailureRegistrationBody = z.object({
+  intentId: z.string().min(1),
+  reason: z.string().min(1).max(REGISTRATION_CONTINUATION_FAILURE_REASON_MAX_LENGTH).optional(),
+}).strict();
+
 export type CreateRegistrationPolicyBody = z.infer<typeof createRegistrationPolicyBody>;
 export type UpdateRegistrationPolicyBody = z.infer<typeof updateRegistrationPolicyBody>;
 export type EvaluateRegistrationBody = z.infer<typeof evaluateRegistrationBody>;
 export type SubmitRegistrationBody = z.infer<typeof submitRegistrationBody>;
+export type ContinuationFailureRegistrationBody = z.infer<typeof continuationFailureRegistrationBody>;
 
 export const registrationPolicyBetterAuthFields = mapZodToBetterAuthFields(registrationPolicySchema);
 export const registrationIntentBetterAuthFields = mapZodToBetterAuthFields(registrationIntentSchema);
@@ -155,11 +165,13 @@ export const evaluateRegistrationOpenApiSchema = zodSchemaToOpenApi(
     z.object({
       decision: z.literal("allowed"),
       intentId: z.string(),
-      client: z.object({ clientId: z.string(), clientName: z.string() }),
+      client: z.object({ clientId: z.string(), clientName: z.string() }).nullable(),
       organization: z.object({ id: z.string(), name: z.string() }).nullable(),
+      invitation: z.object({ id: z.string(), email: z.string().email(), role: z.string().nullable() }).nullable(),
       requestedScopes: z.array(z.string()),
       allowedScopes: z.array(z.string()),
       expiresAt: z.number(),
+      continueOAuth: z.boolean(),
     }),
     z.object({
       decision: z.literal("denied"),

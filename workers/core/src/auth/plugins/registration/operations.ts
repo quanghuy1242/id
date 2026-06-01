@@ -1,6 +1,7 @@
 import { APIError } from "better-auth/api";
 import { constantTimeEqual, makeSignature } from "better-auth/crypto";
 import {
+  INVITATION_MODEL,
   MEMBER_MODEL,
   OAUTH_CLIENT_MODEL,
   OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
@@ -15,6 +16,7 @@ import {
 } from "../../../shared/constants";
 import { authPluginConfig, HEX_BYTE_PAD_LENGTH, HEX_RADIX, MS_PER_SECOND, REGISTRATION_INTENT_HEADER, REGISTRATION_INTENT_TTL_MS } from "../../config";
 import {
+  type ContinuationFailureRegistrationBody,
   type CreateRegistrationPolicyBody,
   type EvaluateRegistrationBody,
   type RegistrationIntentRow,
@@ -35,6 +37,16 @@ type OAuthClientRow = {
 type OrganizationRow = {
   readonly id: string;
   readonly name: string;
+};
+
+type InvitationRow = {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly email: string;
+  readonly role?: string | null;
+  readonly teamId?: string | null;
+  readonly status: string;
+  readonly expiresAt: number | Date;
 };
 
 type ResourceServerRow = {
@@ -190,6 +202,21 @@ async function loadOrganization(adapter: RegistrationAdapter, organizationId: st
   });
 }
 
+async function loadInvitation(adapter: RegistrationAdapter, invitationId: string): Promise<InvitationRow | null> {
+  return adapter.findOne<InvitationRow>({
+    model: INVITATION_MODEL,
+    where: [{ field: "id", value: invitationId }],
+  });
+}
+
+function invitationExpiryMs(invitation: InvitationRow): number {
+  return invitation.expiresAt instanceof Date ? invitation.expiresAt.getTime() : invitation.expiresAt;
+}
+
+function invitationIsOpen(invitation: InvitationRow, at: number): boolean {
+  return invitation.status === "pending" && invitationExpiryMs(invitation) > at;
+}
+
 async function findEnabledPolicy(
   adapter: RegistrationAdapter,
   clientId: string,
@@ -205,6 +232,25 @@ async function findEnabledPolicy(
     if (policy.mode !== "client_initiated" && policy.mode !== "public_limited" && policy.mode !== "domain_allowlist") {
       return false;
     }
+    return !policy.clientId || policy.clientId === clientId;
+  }) ?? null;
+}
+
+async function findEnabledInvitePolicy(
+  adapter: RegistrationAdapter,
+  invitation: InvitationRow,
+  clientId: string | null,
+  at: number,
+): Promise<RegistrationPolicyRow | null> {
+  const policies = await adapter.findMany<RegistrationPolicyRow>({
+    model: REGISTRATION_POLICY_MODEL,
+    where: [{ field: "status", value: "enabled" }],
+    sortBy: { field: "createdAt", direction: "desc" },
+  });
+  return policies.find((policy) => {
+    if (!policyIsActive(policy, at)) return false;
+    if (policy.mode !== "invite_only") return false;
+    if (policy.organizationId !== invitation.organizationId) return false;
     return !policy.clientId || policy.clientId === clientId;
   }) ?? null;
 }
@@ -275,25 +321,47 @@ export async function evaluateRegistration(
   ttlMs: number,
   secret: string,
 ) {
-  if (!(await verifySignedOAuthQuery(body.oauthQuery, secret))) {
+  const oauthQuery = body.oauthQuery ?? null;
+  const at = now();
+  let params = new URLSearchParams();
+  let clientId: string | null = null;
+  let client: OAuthClientRow | null = null;
+
+  if (!oauthQuery && !body.invitationId) {
+    return denial("missing_registration_context", "Registration requires an application request or invitation.");
+  }
+
+  if (oauthQuery && !(await verifySignedOAuthQuery(oauthQuery, secret))) {
     return denial("invalid_oauth_query", "Registration requires a valid application request.");
   }
 
-  const params = new URLSearchParams(body.oauthQuery);
-  const clientId = params.get("client_id");
-  if (!clientId) return denial("missing_client", "Registration requires a client.");
+  if (oauthQuery) {
+    params = new URLSearchParams(oauthQuery);
+    clientId = params.get("client_id");
+    if (!clientId) return denial("missing_client", "Registration requires a client.");
 
-  const client = await loadClient(adapter, clientId);
-  if (!client || client.disabled === true) return denial("invalid_client", "Registration is unavailable for this application.");
+    client = await loadClient(adapter, clientId);
+    if (!client || client.disabled === true) return denial("invalid_client", "Registration is unavailable for this application.");
+  }
 
-  const at = now();
-  const policy = await findEnabledPolicy(adapter, clientId, at);
+  const invitation = body.invitationId ? await loadInvitation(adapter, body.invitationId) : null;
+  if (body.invitationId && (!invitation || !invitationIsOpen(invitation, at))) {
+    return denial("invalid_invitation", "This invitation is unavailable or expired.");
+  }
+
+  const policy = invitation
+    ? await findEnabledInvitePolicy(adapter, invitation, clientId, at)
+    : clientId
+      ? await findEnabledPolicy(adapter, clientId, at)
+      : null;
   if (!policy) return denial("no_policy", "Registration is closed for this application.");
 
   try {
     const requestedScopes = splitScopes(params.get("scope"));
     const resource = params.get("resource");
-    const allowedScopes = await assertScopesAllowed(adapter, policy, clientId, requestedScopes, resource);
+    const allowedScopes = clientId
+      ? await assertScopesAllowed(adapter, policy, clientId, requestedScopes, resource)
+      : [];
     if (await quotaFull(adapter, policy, at)) {
       return denial("quota_full", "Registration is full for this application.");
     }
@@ -303,15 +371,15 @@ export async function evaluateRegistration(
       model: REGISTRATION_INTENT_MODEL,
       data: {
         policyId: policy.id,
-        clientId,
+        clientId: clientId ?? `invitation:${invitation?.id ?? "unknown"}`,
         organizationId: policy.organizationId ?? null,
-        invitationId: body.invitationId ?? null,
+        invitationId: invitation?.id ?? null,
         requestedScopes,
         allowedScopes,
         resource,
-        oauthQuery: body.oauthQuery,
-        oauthQueryHash: await sha256Hex(body.oauthQuery),
-        email: null,
+        oauthQuery: oauthQuery ?? "",
+        oauthQueryHash: await sha256Hex(oauthQuery ?? `invitation:${invitation?.id ?? ""}`),
+        email: invitation ? normalizeEmail(invitation.email) : null,
         status: "started",
         expiresAt,
         createdAt: at,
@@ -325,14 +393,16 @@ export async function evaluateRegistration(
     return {
       decision: "allowed" as const,
       intentId: intent.id,
-      client: {
+      client: client && clientId ? {
         clientId,
         clientName: client.name || client.clientName || clientId,
-      },
+      } : null,
       organization: organization ? { id: organization.id, name: organization.name } : null,
+      invitation: invitation ? { id: invitation.id, email: normalizeEmail(invitation.email), role: invitation.role ?? null } : null,
       requestedScopes,
       allowedScopes,
       expiresAt,
+      continueOAuth: Boolean(oauthQuery),
     };
   } catch (error) {
     if (error instanceof APIError) {
@@ -413,9 +483,12 @@ export async function submitRegistration(
   const intent = await loadIntent(adapter, body.intentId);
   const policy = await loadPolicy(adapter, intent.policyId);
   const at = now();
-  assertIntentOpen(intent, policy, at);
+  await assertIntentOpen(adapter, intent, policy, at);
   if (!domainAllowed(policy, body.email)) {
     throw new APIError("BAD_REQUEST", { code: "registration_email_domain_denied", message: "Use an allowed email domain to register" });
+  }
+  if (intent.invitationId && intent.email && intent.email !== normalizeEmail(body.email)) {
+    throw new APIError("BAD_REQUEST", { code: "registration_invitation_email_mismatch", message: "Use the invited email address to register" });
   }
   await ensureReservation(adapter, policy, intent, at);
   await adapter.update<RegistrationIntentRow>({
@@ -423,18 +496,35 @@ export async function submitRegistration(
     where: [{ field: "id", value: intent.id }],
     update: { status: "submitted", email: normalizeEmail(body.email), updatedAt: at },
   });
-  return { status: "ready", intentId: intent.id, email: normalizeEmail(body.email), continueOAuth: true };
+  return { status: "ready", intentId: intent.id, email: normalizeEmail(body.email), continueOAuth: Boolean(intent.oauthQuery) };
 }
 
-function assertIntentOpen(intent: RegistrationIntentRow, policy: RegistrationPolicyRow, at: number): void {
-  if (!policyIsActive(policy, at)) {
-    throw new APIError("BAD_REQUEST", { code: "registration_policy_closed", message: "Registration policy is not active" });
-  }
+async function assertIntentOpen(
+  adapter: RegistrationAdapter,
+  intent: RegistrationIntentRow,
+  policy: RegistrationPolicyRow,
+  at: number,
+): Promise<void> {
   if (intent.expiresAt <= at) {
+    await adapter.update<RegistrationIntentRow>({
+      model: REGISTRATION_INTENT_MODEL,
+      where: [{ field: "id", value: intent.id }],
+      update: { status: "expired", failureReason: "expired", updatedAt: at },
+    });
+    await releaseReservation(adapter, intent.id);
     throw new APIError("BAD_REQUEST", { code: "registration_intent_expired", message: "Registration intent expired" });
   }
   if (intent.status !== "started" && intent.status !== "submitted") {
     throw new APIError("BAD_REQUEST", { code: "registration_intent_used", message: "Registration intent is no longer active" });
+  }
+  if (!policyIsActive(policy, at)) {
+    await adapter.update<RegistrationIntentRow>({
+      model: REGISTRATION_INTENT_MODEL,
+      where: [{ field: "id", value: intent.id }],
+      update: { status: "failed", failureReason: "policy_inactive", updatedAt: at },
+    });
+    await releaseReservation(adapter, intent.id);
+    throw new APIError("BAD_REQUEST", { code: "registration_policy_closed", message: "Registration policy is not active" });
   }
 }
 
@@ -452,10 +542,20 @@ export async function assertSignupAllowed(
   const intent = await loadIntent(adapter, intentId);
   const policy = await loadPolicy(adapter, intent.policyId);
   const at = now();
-  assertIntentOpen(intent, policy, at);
+  await assertIntentOpen(adapter, intent, policy, at);
   const normalizedEmail = normalizeEmail(email);
   if (intent.email && intent.email !== normalizedEmail) {
     throw new APIError("BAD_REQUEST", { code: "registration_email_mismatch", message: "Registration intent email does not match" });
+  }
+  if (intent.invitationId) {
+    const invitation = await loadInvitation(adapter, intent.invitationId);
+    if (!invitation || !invitationIsOpen(invitation, at)) {
+      await releaseReservation(adapter, intent.id);
+      throw new APIError("BAD_REQUEST", { code: "registration_invitation_invalid", message: "This invitation is unavailable or expired" });
+    }
+    if (normalizeEmail(invitation.email) !== normalizedEmail) {
+      throw new APIError("BAD_REQUEST", { code: "registration_invitation_email_mismatch", message: "Use the invited email address to register" });
+    }
   }
   if (!domainAllowed(policy, normalizedEmail)) {
     throw new APIError("BAD_REQUEST", { code: "registration_email_domain_denied", message: "Use an allowed email domain to register" });
@@ -501,7 +601,9 @@ export async function completeSignup(
     return;
   }
   const policy = await loadPolicy(adapter, intent.policyId);
-  if (policy.organizationId) {
+  if (intent.invitationId) {
+    await acceptInvitationMembership(adapter, intent.invitationId, userId);
+  } else if (policy.organizationId) {
     await ensureMembership(adapter, policy, userId);
   }
   await consumeReservation(adapter, intent.id);
@@ -544,6 +646,51 @@ async function ensureMembership(adapter: RegistrationAdapter, policy: Registrati
   }));
 }
 
+async function acceptInvitationMembership(adapter: RegistrationAdapter, invitationId: string, userId: string): Promise<void> {
+  const invitation = await loadInvitation(adapter, invitationId);
+  if (!invitation) {
+    throw new APIError("BAD_REQUEST", { code: "registration_invitation_invalid", message: "This invitation is unavailable" });
+  }
+  const existing = await adapter.findOne<{ readonly id: string }>({
+    model: MEMBER_MODEL,
+    where: [
+      { field: "organizationId", value: invitation.organizationId },
+      { field: "userId", value: userId },
+    ],
+  });
+  if (!existing) {
+    await adapter.create({
+      model: MEMBER_MODEL,
+      data: {
+        organizationId: invitation.organizationId,
+        userId,
+        role: invitation.role || "member",
+        createdAt: now(),
+      },
+    });
+  }
+  if (invitation.teamId) {
+    const existingTeamMember = await adapter.findOne<{ readonly id: string }>({
+      model: TEAM_MEMBER_MODEL,
+      where: [
+        { field: "teamId", value: invitation.teamId },
+        { field: "userId", value: userId },
+      ],
+    });
+    if (!existingTeamMember) {
+      await adapter.create({
+        model: TEAM_MEMBER_MODEL,
+        data: { teamId: invitation.teamId, userId, createdAt: now() },
+      });
+    }
+  }
+  await adapter.update<InvitationRow>({
+    model: INVITATION_MODEL,
+    where: [{ field: "id", value: invitation.id }],
+    update: { status: "accepted" },
+  });
+}
+
 async function consumeReservation(adapter: RegistrationAdapter, intentId: string): Promise<void> {
   const existing = await adapter.findOne<RegistrationQuotaReservationRow>({
     model: REGISTRATION_QUOTA_RESERVATION_MODEL,
@@ -584,6 +731,47 @@ async function releaseReservation(adapter: RegistrationAdapter, intentId: string
   });
 }
 
+export async function invalidateActivePolicyIntents(
+  adapter: RegistrationAdapter,
+  policyId: string,
+  reason: "policy_paused" | "policy_archived",
+): Promise<void> {
+  const intents = await adapter.findMany<RegistrationIntentRow>({
+    model: REGISTRATION_INTENT_MODEL,
+    where: [{ field: "policyId", value: policyId }],
+  });
+  await Promise.all(intents
+    .filter((intent) => intent.status === "started" || intent.status === "submitted")
+    .map(async (intent) => {
+      await adapter.update<RegistrationIntentRow>({
+        model: REGISTRATION_INTENT_MODEL,
+        where: [{ field: "id", value: intent.id }],
+        update: { status: "failed", failureReason: reason, updatedAt: now() },
+      });
+      await releaseReservation(adapter, intent.id);
+    }));
+}
+
+export async function recordContinuationFailure(
+  adapter: RegistrationAdapter,
+  body: ContinuationFailureRegistrationBody,
+): Promise<{ readonly recorded: true; readonly status: "continuation_failed" }> {
+  const intent = await loadIntent(adapter, body.intentId);
+  if (intent.status !== "completed" && intent.status !== "continuation_failed") {
+    throw new APIError("BAD_REQUEST", { code: "registration_not_completed", message: "Registration is not ready for OAuth continuation retry" });
+  }
+  await adapter.update<RegistrationIntentRow>({
+    model: REGISTRATION_INTENT_MODEL,
+    where: [{ field: "id", value: intent.id }],
+    update: {
+      status: "continuation_failed",
+      failureReason: body.reason ?? "oauth_continuation_failed",
+      updatedAt: now(),
+    },
+  });
+  return { recorded: true, status: "continuation_failed" };
+}
+
 export async function policyQuota(adapter: RegistrationAdapter, policyId: string) {
   const policy = await loadPolicy(adapter, policyId);
   const active = await activeReservations(adapter, policyId, now());
@@ -610,9 +798,23 @@ export function statusPayload(intent: RegistrationIntentRow) {
     email: intent.email ?? null,
     expiresAt: intent.expiresAt,
     completedAt: intent.completedAt ?? null,
+    failureReason: intent.failureReason ?? null,
+    continueOAuth: Boolean(intent.oauthQuery),
+    canRetryOAuthContinuation: intent.status === "completed" || intent.status === "continuation_failed",
   };
 }
 
 export async function registrationStatus(adapter: RegistrationAdapter, intentId: string) {
-  return statusPayload(await loadIntent(adapter, intentId));
+  const intent = await loadIntent(adapter, intentId);
+  if ((intent.status === "started" || intent.status === "submitted") && intent.expiresAt <= now()) {
+    const timestamp = now();
+    const expired = await adapter.update<RegistrationIntentRow>({
+      model: REGISTRATION_INTENT_MODEL,
+      where: [{ field: "id", value: intent.id }],
+      update: { status: "expired", failureReason: "expired", updatedAt: timestamp },
+    });
+    await releaseReservation(adapter, intent.id);
+    return statusPayload(expired);
+  }
+  return statusPayload(intent);
 }

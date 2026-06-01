@@ -131,10 +131,23 @@ const identityUsersNavItem: ConsoleNavItem = {
   mobile: true,
 };
 
+const registrationPoliciesNavItem: ConsoleNavItem = {
+  id: "identity-registration-policies",
+  label: "Registration Policies",
+  section: "identity",
+  appliesTo: "both",
+  requiredPermission: { platform: "platform:read", organization: "members:write" },
+  href: (scope) => scope.kind === "platform"
+    ? "/admin/platform/identity/registration-policies"
+    : `/admin/orgs/${scope.organizationId}/identity/registration-policies`,
+  icon: "ListChecks",
+};
+
 /** One declarative console nav definition rendered through platform and organization lenses. */
 export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
   dashboardNavItem,
   identityUsersNavItem,
+  registrationPoliciesNavItem,
   ...navItems("platform", platformHref, [
     ["identity-organizations", "Organizations", "identity", "organizations:read", "/identity/organizations", "Building2"],
   ] satisfies readonly NavTuple[]),

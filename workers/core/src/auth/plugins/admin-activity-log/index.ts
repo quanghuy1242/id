@@ -134,6 +134,11 @@ function activityFromHook(ctx: HookContext): ActivityRecordDraft | null {
   if (path === "/admin/oauth-client-resource-scopes" && method === "POST") return { action: "client_resource_scope.create", targetType: "client_resource_scope", targetId: stringFromReturned(ctx, "id") ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
   if (path === "/admin/oauth-client-resource-scopes/:id" && method === "PATCH") return { action: "client_resource_scope.update", targetType: "client_resource_scope", targetId: id ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
   if (path === "/admin/oauth-client-resource-scopes/:id" && method === "DELETE") return { action: "client_resource_scope.delete", targetType: "client_resource_scope", targetId: id ?? "unknown", before: { id }, metadata: { path } };
+  if (path === "/admin/registration-policies" && method === "POST") return { action: "registration_policy.create", targetType: "registration_policy", targetId: stringFromReturned(ctx, "id") ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
+  if (path === "/admin/registration-policies/:id" && method === "PATCH") return { action: "registration_policy.update", targetType: "registration_policy", targetId: id ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
+  if (path === "/admin/registration-policies/:id/enable") return { action: "registration_policy.enable", targetType: "registration_policy", targetId: id ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
+  if (path === "/admin/registration-policies/:id/pause") return { action: "registration_policy.pause", targetType: "registration_policy", targetId: id ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
+  if (path === "/admin/registration-policies/:id/archive") return { action: "registration_policy.archive", targetType: "registration_policy", targetId: id ?? "unknown", after: returnedRecord(ctx), metadata: { path } };
 
   if (path === "/admin/revoke-consent") return { action: "consent.revoke", targetType: "oauth_consent", targetId: `${readString(body, "clientId") ?? "unknown"}:${readString(body, "userId") ?? "unknown"}`, before: body, metadata: { path } };
   if (path === "/admin/jwks/rotate") return { action: "jwks.rotate", targetType: "jwks", targetId: stringFromReturned(ctx, "id") ?? "unknown", after: returnedRecord(ctx), metadata: { path, reason: readString(body, "reason") } };
@@ -174,6 +179,11 @@ const loggedMutationPaths = new Set([
   "/admin/oauth-scopes/:id",
   "/admin/oauth-client-resource-scopes",
   "/admin/oauth-client-resource-scopes/:id",
+  "/admin/registration-policies",
+  "/admin/registration-policies/:id",
+  "/admin/registration-policies/:id/enable",
+  "/admin/registration-policies/:id/pause",
+  "/admin/registration-policies/:id/archive",
   "/admin/revoke-consent",
   "/admin/jwks/rotate",
   "/admin/create-user",

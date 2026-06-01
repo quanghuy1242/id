@@ -3,6 +3,7 @@ import ConsentPage from "../workers/ui/src/app/consent/page";
 import ForgotPasswordPage from "../workers/ui/src/app/forgot-password/page";
 import LoginPage from "../workers/ui/src/app/login/page";
 import RegisterPage from "../workers/ui/src/app/register/page";
+import InviteRegisterPage from "../workers/ui/src/app/register/invite/[invitationId]/page";
 import ResetPasswordPage from "../workers/ui/src/app/reset-password/page";
 import SelectAuthorizationContextPage from "../workers/ui/src/app/select-authorization-context/page";
 import VerifyEmailPage from "../workers/ui/src/app/verify-email/page";
@@ -102,7 +103,7 @@ function installOrganizationFetchMock() {
   };
 }
 
-function installRegistrationFetchMock(state: "allowed" | "denied" = "allowed") {
+function installRegistrationFetchMock(state: "allowed" | "denied" | "invite" = "allowed") {
   if (typeof window === "undefined") return;
 
   const originalFetch = window.fetch.bind(window);
@@ -117,9 +118,23 @@ function installRegistrationFetchMock(state: "allowed" | "denied" = "allowed") {
                 intentId: "regint_story",
                 client: { clientId: "acme-web", clientName: "Acme Web" },
                 organization: { id: "org_acme", name: "Acme Corp" },
+                invitation: null,
                 requestedScopes: ["openid", "profile", "email", "content:read", "content:write"],
                 allowedScopes: ["openid", "profile", "email", "content:read"],
                 expiresAt: Date.now() + 900000,
+                continueOAuth: true,
+              }
+            : state === "invite"
+              ? {
+                decision: "allowed",
+                intentId: "regint_invite_story",
+                client: null,
+                organization: { id: "org_acme", name: "Acme Corp" },
+                invitation: { id: "inv_story", email: "invitee@acme.com", role: "member" },
+                requestedScopes: [],
+                allowedScopes: [],
+                expiresAt: Date.now() + 900000,
+                continueOAuth: false,
               }
             : {
                 decision: "denied",
@@ -172,6 +187,12 @@ export const RegisterDenied: Story = () => {
   setMockUrl("/register", OAUTH_QUERY);
   installRegistrationFetchMock("denied");
   return <RegisterPage />;
+};
+
+export const RegisterInvite: Story = () => {
+  setMockUrl("/register/invite/inv_story");
+  installRegistrationFetchMock("invite");
+  return <InviteRegisterPage params={{ invitationId: "inv_story" }} />;
 };
 
 export const PlatformStepUp: Story = () => {

@@ -14,15 +14,18 @@ import {
   cancelRegistration,
   completeSignup,
   evaluateRegistration,
+  invalidateActivePolicyIntents,
   intentTtlMs,
   policyQuota,
   presentPolicyWithQuota,
+  recordContinuationFailure,
   registrationIntentHeaderName,
   registrationStatus,
   submitRegistration,
 } from "./operations";
 import {
   createRegistrationPolicyBody,
+  continuationFailureRegistrationBody,
   createRegistrationPolicyOpenApiRequestBody,
   evaluateRegistrationBody,
   evaluateRegistrationOpenApiRequestBody,
@@ -123,6 +126,19 @@ async function setPolicyStatus(
     where: [{ field: "id", value: id }],
     update: { status, updatedBy: userId, updatedAt: timestamp },
   });
+}
+
+async function transitionPolicyStatus(
+  adapter: RegistrationAdapter,
+  policy: RegistrationPolicyRow,
+  status: RegistrationPolicyStatus,
+  userId: string,
+): Promise<Awaited<ReturnType<typeof presentPolicyWithQuota>>> {
+  const updated = await setPolicyStatus(adapter, policy.id, status, userId);
+  if (status === "paused" || status === "archived") {
+    await invalidateActivePolicyIntents(adapter, policy.id, status === "paused" ? "policy_paused" : "policy_archived");
+  }
+  return presentPolicyWithQuota(adapter, updated);
 }
 
 function signUpMutation(ctx: { readonly path?: string; readonly method?: string }): boolean {
@@ -242,7 +258,7 @@ export const idRegistration = (options: RegistrationPluginOptions = {}): BetterA
         const adapter = adapterFrom(ctx);
         const policy = await findPolicy(adapter, ctx.params?.id);
         const user = await requirePolicyAccess(options, adapter, ctx.context.session, policy.organizationId);
-        return ctx.json(await presentPolicyWithQuota(adapter, await setPolicyStatus(adapter, policy.id, "enabled", user.id)));
+        return ctx.json(await transitionPolicyStatus(adapter, policy, "enabled", user.id));
       },
     ),
     pauseRegistrationPolicy: createAuthEndpoint(
@@ -252,7 +268,7 @@ export const idRegistration = (options: RegistrationPluginOptions = {}): BetterA
         const adapter = adapterFrom(ctx);
         const policy = await findPolicy(adapter, ctx.params?.id);
         const user = await requirePolicyAccess(options, adapter, ctx.context.session, policy.organizationId);
-        return ctx.json(await presentPolicyWithQuota(adapter, await setPolicyStatus(adapter, policy.id, "paused", user.id)));
+        return ctx.json(await transitionPolicyStatus(adapter, policy, "paused", user.id));
       },
     ),
     archiveRegistrationPolicy: createAuthEndpoint(
@@ -262,7 +278,7 @@ export const idRegistration = (options: RegistrationPluginOptions = {}): BetterA
         const adapter = adapterFrom(ctx);
         const policy = await findPolicy(adapter, ctx.params?.id);
         const user = await requirePolicyAccess(options, adapter, ctx.context.session, policy.organizationId);
-        return ctx.json(await presentPolicyWithQuota(adapter, await setPolicyStatus(adapter, policy.id, "archived", user.id)));
+        return ctx.json(await transitionPolicyStatus(adapter, policy, "archived", user.id));
       },
     ),
     listRegistrationPolicyIntents: createAuthEndpoint(
@@ -312,6 +328,11 @@ export const idRegistration = (options: RegistrationPluginOptions = {}): BetterA
       "/registration/cancel",
       { method: "POST", body: submitRegistrationBody.pick({ intentId: true }) },
       async (ctx) => ctx.json(await cancelRegistration(adapterFrom(ctx), ctx.body.intentId)),
+    ),
+    markRegistrationContinuationFailed: createAuthEndpoint(
+      "/registration/continuation-failed",
+      { method: "POST", body: continuationFailureRegistrationBody },
+      async (ctx) => ctx.json(await recordContinuationFailure(adapterFrom(ctx), ctx.body)),
     ),
   },
   hooks: {

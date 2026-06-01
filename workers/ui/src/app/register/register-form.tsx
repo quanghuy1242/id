@@ -10,11 +10,13 @@ type RegistrationDecision =
   | {
       readonly decision: "allowed";
       readonly intentId: string;
-      readonly client: { readonly clientId: string; readonly clientName: string };
+      readonly client: { readonly clientId: string; readonly clientName: string } | null;
       readonly organization: { readonly id: string; readonly name: string } | null;
+      readonly invitation: { readonly id: string; readonly email: string; readonly role: string | null } | null;
       readonly requestedScopes: readonly string[];
       readonly allowedScopes: readonly string[];
       readonly expiresAt: number;
+      readonly continueOAuth: boolean;
     }
   | {
       readonly decision: "denied";
@@ -45,7 +47,11 @@ function assignOAuthRedirect(url: string): void {
   window.location.assign(target.href);
 }
 
-export function RegisterForm() {
+type RegisterFormProps = {
+  readonly invitationId?: string;
+};
+
+export function RegisterForm({ invitationId }: RegisterFormProps = {}) {
   const router = useRouter();
   const oauthQuery = useOauthQuery();
   const [decision, setDecision] = useState<RegistrationDecision | null>(null);
@@ -61,12 +67,18 @@ export function RegisterForm() {
   }, [decision]);
 
   useEffect(() => {
-    if (!oauthQuery) return;
+    if (!oauthQuery && !invitationId) return;
     let cancelled = false;
     setLoading(true);
     void (async () => {
       try {
-        const result = await authApiPostOrThrow<RegistrationDecision>("/registration/evaluate", { oauthQuery });
+        const result = await authApiPostOrThrow<RegistrationDecision>(
+          "/registration/evaluate",
+          {
+            ...(oauthQuery ? { oauthQuery } : {}),
+            ...(invitationId ? { invitationId } : {}),
+          },
+        );
         if (!cancelled) setDecision(result);
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Registration is unavailable.");
@@ -77,13 +89,13 @@ export function RegisterForm() {
     return () => {
       cancelled = true;
     };
-  }, [oauthQuery]);
+  }, [invitationId, oauthQuery]);
 
   useEffect(() => {
-    if (oauthQuery) return;
+    if (oauthQuery || invitationId) return;
     setLoading(false);
     setDecision({ decision: "denied", reason: "missing_oauth_query", message: "Registration requires an application request." });
-  }, [oauthQuery]);
+  }, [invitationId, oauthQuery]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,7 +125,7 @@ export function RegisterForm() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          [OAUTH_QUERY_PARAM]: oauthQuery,
+          ...(oauthQuery ? { [OAUTH_QUERY_PARAM]: oauthQuery } : {}),
         },
         { headers: { "x-id-registration-intent": decision.intentId } },
       );
@@ -122,19 +134,27 @@ export function RegisterForm() {
         return;
       }
 
-      const continued = await authApiPost<SignupResponse>("/oauth2/continue", {
-        created: true,
-        [OAUTH_QUERY_PARAM]: oauthQuery,
-      });
-      if (continued.url) {
-        assignOAuthRedirect(continued.url);
+      if (decision.continueOAuth && oauthQuery) {
+        const continued = await authApiPost<SignupResponse>("/oauth2/continue", {
+          created: true,
+          [OAUTH_QUERY_PARAM]: oauthQuery,
+        });
+        if (continued.url) {
+          assignOAuthRedirect(continued.url);
+          return;
+        }
+        if (continued.code === "UNAUTHORIZED" || continued.error === "unauthorized") {
+          setNotice("Check your email to verify the account, then return to the application to continue.");
+          return;
+        }
+        await authApiPost("/registration/continuation-failed", {
+          intentId: decision.intentId,
+          reason: continued.message || continued.error || continued.code || "oauth_continuation_failed",
+        });
+        setNotice("Account created. Sign in again from the application to continue.");
         return;
       }
-      if (continued.code === "UNAUTHORIZED" || continued.error === "unauthorized") {
-        setNotice("Check your email to verify the account, then return to the application to continue.");
-        return;
-      }
-      setNotice("Check your email to verify the account, then return to the application to continue.");
+      router.push("/account/organizations");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -166,8 +186,11 @@ export function RegisterForm() {
       {error ? <Alert tone="error">Registration failed: {error}</Alert> : null}
       {notice ? <Alert tone="success">Account created: {notice}</Alert> : null}
       <Stack gap="sm">
-        <Text variant="caption">{decision.client.clientName} is requesting account creation.</Text>
+        <Text variant="caption">
+          {decision.client ? `${decision.client.clientName} is requesting account creation.` : "Create an account to accept this invitation."}
+        </Text>
         {decision.organization ? <Text variant="caption">{decision.organization.name} workspace</Text> : null}
+        {decision.invitation ? <Text variant="caption">Invitation for {decision.invitation.email}{decision.invitation.role ? ` as ${decision.invitation.role}` : ""}</Text> : null}
         <Inline gap="xs" wrap>
           {decision.allowedScopes.map((scope) => <Badge key={scope} tone="info">{scope}</Badge>)}
         </Inline>

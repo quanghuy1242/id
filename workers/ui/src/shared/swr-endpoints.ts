@@ -24,6 +24,10 @@ export const ORG_MEMBERS = "/organization/list-members";
 export const ORG_TEAMS = "/organization/list-teams";
 /** Organization invitation list. */
 export const ORG_INVITATIONS = "/organization/list-invitations";
+/** Registration policy list. */
+export const REGISTRATION_POLICIES = "/admin/registration-policies";
+/** Registration intent list for one policy. */
+export const REGISTRATION_POLICY_INTENTS = "/admin/registration-policies/:id/intents";
 /** OAuth2 client (application) list — snake_case OAuth2-formatted entities. */
 export const OAUTH_CLIENTS = "/oauth2/get-clients";
 /** OAuth resource server (audience) list. */

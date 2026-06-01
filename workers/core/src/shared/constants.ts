@@ -10,6 +10,9 @@ export const MEMBER_MODEL = "member" as const;
 /** BA model name for the organization table. */
 export const ORGANIZATION_MODEL = "organization" as const;
 
+/** BA model name for Better Auth organization invitations. */
+export const INVITATION_MODEL = "invitation" as const;
+
 /** BA model name for the team table. */
 export const TEAM_MODEL = "team" as const;
 

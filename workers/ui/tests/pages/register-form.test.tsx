@@ -29,9 +29,11 @@ function allowedDecision() {
     intentId: "regint_test",
     client: { clientId: "acme-web", clientName: "Acme Web" },
     organization: { id: "org_acme", name: "Acme Corp" },
+    invitation: null,
     requestedScopes: ["openid", "profile", "email", "content:write"],
     allowedScopes: ["openid", "profile", "email"],
     expiresAt: Date.now() + 900000,
+    continueOAuth: true,
   };
 }
 
@@ -97,5 +99,50 @@ describe("RegisterForm", () => {
       { headers: { "x-id-registration-intent": "regint_test" } },
     );
     expect(await screen.findByRole("alert")).toHaveTextContent("Check your email");
+  });
+
+  it("supports invite-only registration without OAuth continuation", async () => {
+    mockOauthQuery = "";
+    mockAuthApiPostOrThrow.mockImplementation((path: unknown) => {
+      if (path === "/registration/evaluate") {
+        return Promise.resolve({
+          decision: "allowed",
+          intentId: "regint_invite",
+          client: null,
+          organization: { id: "org_acme", name: "Acme Corp" },
+          invitation: { id: "inv_001", email: "invitee@example.test", role: "member" },
+          requestedScopes: [],
+          allowedScopes: [],
+          expiresAt: Date.now() + 900000,
+          continueOAuth: false,
+        });
+      }
+      return Promise.resolve({ status: "ready" });
+    });
+    render(<RegisterForm invitationId="inv_001" />);
+    await waitFor(() => {
+      expect(mockAuthApiPostOrThrow).toHaveBeenCalledWith("/registration/evaluate", { invitationId: "inv_001" });
+    });
+    expect(await screen.findByText(/Create an account to accept this invitation/i)).toBeInTheDocument();
+    expect(screen.getByText(/invitee@example.test/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Invitee" } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "invitee@example.test" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(mockAuthApiPost).toHaveBeenCalledWith(
+        "/sign-up/email",
+        {
+          name: "Invitee",
+          email: "invitee@example.test",
+          password: "password12345",
+        },
+        { headers: { "x-id-registration-intent": "regint_invite" } },
+      );
+    });
+    expect(mockAuthApiPost).not.toHaveBeenCalledWith("/oauth2/continue", expect.anything());
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/account/organizations"));
   });
 });

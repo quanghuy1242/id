@@ -13,6 +13,8 @@ import {
   ORG_MEMBERS,
   ORG_TEAMS,
   ORG_INVITATIONS,
+  REGISTRATION_POLICIES,
+  REGISTRATION_POLICY_INTENTS,
   OAUTH_CLIENTS,
   RESOURCE_SERVERS,
   OAUTH_SCOPES,
@@ -50,6 +52,8 @@ export const orgDetailKey = (organizationId: string) => [ORG_DETAIL, { organizat
 export const orgMembersKey = (organizationId: string) => [ORG_MEMBERS, { organizationId }] as const;
 export const orgTeamsKey = (organizationId: string) => [ORG_TEAMS, { organizationId }] as const;
 export const orgInvitationsKey = (organizationId: string) => [ORG_INVITATIONS, { organizationId }] as const;
+export const registrationPoliciesKey = (scope: ActiveScope = platformScope) => [REGISTRATION_POLICIES, scope] as const;
+export const registrationPolicyIntentsKey = (policyId: string) => [REGISTRATION_POLICY_INTENTS, { policyId }] as const;
 
 /** OAuth & security keys. Plugin list screens filter/search client-side, but scope is part of cache identity because platform and organization lenses call different server scopes. */
 export const oauthClientsKey = (scope: ActiveScope = platformScope) => [OAUTH_CLIENTS, scope] as const;
@@ -71,6 +75,8 @@ export const isUsersListKey = (key: Arguments) => Array.isArray(key) && key[0] =
 export const isConsoleScopesKey = (key: Arguments) => Array.isArray(key) && key[0] === CONSOLE_SCOPES;
 /** Matches the organizations-list cache slot. */
 export const isOrgsListKey = (key: Arguments) => Array.isArray(key) && key[0] === ORGS_LIST;
+/** Matches registration policy list slots. */
+export const isRegistrationPoliciesKey = (key: Arguments) => Array.isArray(key) && key[0] === REGISTRATION_POLICIES;
 /** Matches the OAuth clients list cache slot. */
 export const isOauthClientsKey = (key: Arguments) => Array.isArray(key) && key[0] === OAUTH_CLIENTS;
 /** Matches the resource-servers list cache slot. */

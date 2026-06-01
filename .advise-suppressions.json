@@ -365,6 +365,11 @@
       "tool": "fallow",
       "files": "workers/core/src/auth/plugins/registration/schema.ts|workers/core/src/auth/plugins/resource-server/schema.ts",
       "reason": "Better Auth plugin schema modules intentionally repeat the endpoint metadata helper shape so each plugin owns its OpenAPI tags, path params, request body, and response schema without a generic CRUD abstraction hiding route contracts."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/ui/src/app/admin/orgs/[orgId]/identity/registration-policies/page.tsx|workers/ui/src/app/admin/platform/identity/registration-policies/page.tsx",
+      "reason": "Platform and organization registration-policy route files intentionally mirror the route-bound URL adapter pattern while passing different ActiveScope and routePath values; moving useSearchParams out of route files would violate the admin UI route-boundary rule."
     }
   ]
 }

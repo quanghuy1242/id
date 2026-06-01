@@ -100,6 +100,9 @@ export const REGISTRATION_INTENT_TTL_MS = 15 * 60 * MS_PER_SECOND;
 /** Header carrying the server-created registration intent into Better Auth signup. */
 export const REGISTRATION_INTENT_HEADER = "x-id-registration-intent";
 
+/** Maximum persisted reason length for OAuth continuation failures after signup. */
+export const REGISTRATION_CONTINUATION_FAILURE_REASON_MAX_LENGTH = 160;
+
 /** Radix used when rendering SHA-256 bytes as hexadecimal text. */
 export const HEX_RADIX = 16;
 

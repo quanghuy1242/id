@@ -8,6 +8,8 @@ The plugin is registered in `get-auth.ts` and owns three generated Better Auth t
 
 Registration remains closed until an admin creates and enables a data-backed policy. There are no hard-coded client IDs, organization IDs, client names, or scopes in source.
 
+Operational close-switches are deliberately boring: pause or archive the policy, or disable every enabled policy. Pause/archive invalidates active `started`/`submitted` intents and releases reserved quota before any later signup guard can create an account. Direct `POST /api/auth/sign-up/email` remains guarded even if every OAuth signup page is removed.
+
 ## Usage
 
 ### Admin Policy Management
@@ -85,3 +87,14 @@ Intent-less signup returns `400 missing_registration_intent`; this is the fail-c
 `schema.ts` owns the policy, intent, and reservation schemas plus OpenAPI metadata. `operations.ts` owns data-driven policy evaluation, scope narrowing, soft quota reservation, and post-signup onboarding helpers. `index.ts` declares the Better Auth endpoints and the `/sign-up/email` before/after hooks.
 
 The first quota implementation is soft quota: adapter count plus reservation insert. This matches docs/030 §7.3 and deliberately defers the raw-D1 strict atomic quota exception until a separate architecture-approved change.
+
+Intent lifecycle semantics:
+
+- `started` and `submitted` are the only signup-open states.
+- `cancelled`, `expired`, `failed`, `completed`, and `continuation_failed` cannot create another account.
+- Expiry and cancellation release any reserved quota slot.
+- Pause/archive marks active intents failed with `policy_paused` or `policy_archived` and releases reservations.
+- OAuth continuation failure is recorded separately as `continuation_failed`; the account and membership remain created, and the user can retry by signing in from the client again.
+- Invite-only registration validates the Better Auth organization invitation row, locks the intent to the invited email, creates the account through Better Auth signup, then accepts the invitation against Better Auth's `invitation`/`member` tables instead of a parallel registration-owned membership table.
+
+Public forms should still sit behind the deployment's ordinary WAF/rate-limit controls. The plugin is the authorization gate; edge throttles are abuse protection for the hosted `/register*` routes and `/api/auth/registration/*` endpoints.

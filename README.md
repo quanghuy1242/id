@@ -173,6 +173,8 @@ pnpm auth:api:logout
 
 Raw public `POST /api/auth/sign-up/email` is fail-closed by the `id-registration` guard and returns `400 missing_registration_intent` unless a server-created registration intent is supplied. Admins can still create users through Better Auth Admin `createUser`, then send verification through `/api/auth/send-verification-email` when needed.
 
+Registration rollback is data-first: pause/archive registration policies to invalidate active registration intents and release soft quota reservations. The `/register*` UI route can remain deployed because direct signup still fails closed without an intent; public-form abuse controls belong at the WAF/rate-limit layer in front of `/register*` and `/api/auth/registration/*`.
+
 ## Migrations
 
 Better Auth schema is generated via CLI. Plugin-owned custom tables and their supported field-level indexes are included in the same migration generation step before Drizzle generates migration output; do not hand-edit generated schema, SQL, or snapshots. Generated SQL migrations live under `migrations/`, and `workers/core/wrangler.jsonc` points D1 at that directory with `migrations_dir`.

@@ -121,6 +121,48 @@ async function createEnabledPolicy(auth: TestAuth, cookie: string, clientId: str
   return created.id;
 }
 
+async function createInviteOnlyPolicy(auth: TestAuth, cookie: string): Promise<string> {
+  const create = await auth.handler(
+    new Request("https://id.example.test/api/auth/admin/registration-policies", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        slug: "invite-only",
+        name: "Invite only",
+        mode: "invite_only",
+        organizationId: "org_reg",
+        allowedScopes: [],
+        emailDomains: ["example.test"],
+        defaultRole: "member",
+        defaultTeamIds: [],
+        quotaLimit: 5,
+        quotaTarget: "memberships",
+        requiresEmailVerification: true,
+      }),
+    }),
+  );
+  expect(create.status).toBe(200);
+  const created = (await create.json()) as { readonly id: string };
+  const enable = await auth.handler(
+    new Request(`https://id.example.test/api/auth/admin/registration-policies/${created.id}/enable`, {
+      method: "POST",
+      headers: { cookie },
+    }),
+  );
+  expect(enable.status).toBe(200);
+  return created.id;
+}
+
+function createInvitation(raw: RawSqlite, email = "invitee@example.test"): string {
+  const invitationId = `inv_${email.replace(/[^a-z0-9]/giu, "_")}`;
+  const inviter = raw.prepare(`select "id" from "user" where "email" = ?`).get("root@example.test") as { readonly id: string };
+  raw.prepare(`
+    insert into "invitation" ("id", "organizationId", "email", "role", "teamId", "status", "expiresAt", "createdAt", "inviterId")
+    values (?, 'org_reg', ?, 'member', null, 'pending', ?, ?, ?)
+  `).run(invitationId, email, Date.now() + 86_400_000, Date.now(), inviter.id);
+  return invitationId;
+}
+
 function codeVerifier(): string {
   return randomBytes(48).toString("base64url");
 }
@@ -314,6 +356,167 @@ describe("idRegistration plugin", () => {
     expect(callback.origin).toBe("https://app.example.test");
     expect(callback.searchParams.get("state")).toBe("registration-state");
     expect(callback.searchParams.get("code")).toEqual(expect.any(String));
+  });
+
+  it("expires and invalidates active intents before account creation while releasing quota reservations", async () => {
+    const { auth, raw, emailSender } = await createHarness();
+    const cookie = await signInAdmin(auth, emailSender);
+    const clientId = await createOAuthClient(auth, cookie);
+    const policyId = await createEnabledPolicy(auth, cookie, clientId);
+    const oauthQuery = await signedAuthorizeQuery(auth, clientId);
+
+    const evaluate = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ oauthQuery }),
+      }),
+    );
+    const decision = (await evaluate.json()) as { readonly intentId: string };
+    const submit = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ intentId: decision.intentId, name: "Soon Expired", email: "soon-expired@example.test", password: "password12345" }),
+      }),
+    );
+    expect(submit.status).toBe(200);
+    raw.exec(`update "registrationIntent" set "expiresAt" = 1 where "id" = '${decision.intentId}';`);
+    raw.exec(`update "registrationQuotaReservation" set "expiresAt" = 1 where "intentId" = '${decision.intentId}';`);
+
+    const status = await auth.handler(
+      new Request(`https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`),
+    );
+    expect(status.status).toBe(200);
+    await expect(status.json()).resolves.toMatchObject({ status: "expired", failureReason: "expired" });
+
+    const released = raw.prepare(`select "status" from "registrationQuotaReservation" where "intentId" = ?`).get(decision.intentId) as { readonly status: string };
+    expect(released.status).toBe("released");
+
+    const secondQuery = await signedAuthorizeQuery(auth, clientId);
+    const secondEvaluate = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ oauthQuery: secondQuery }),
+      }),
+    );
+    const secondDecision = (await secondEvaluate.json()) as { readonly intentId: string };
+    await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ intentId: secondDecision.intentId, name: "Paused", email: "paused@example.test", password: "password12345" }),
+      }),
+    );
+
+    const pause = await auth.handler(
+      new Request(`https://id.example.test/api/auth/admin/registration-policies/${policyId}/pause`, {
+        method: "POST",
+        headers: { cookie },
+      }),
+    );
+    expect(pause.status).toBe(200);
+    const signup = await auth.handler(
+      new Request("https://id.example.test/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-id-registration-intent": secondDecision.intentId },
+        body: JSON.stringify({ name: "Paused", email: "paused@example.test", password: "password12345" }),
+      }),
+    );
+    expect(signup.status).toBe(400);
+    await expect(signup.json()).resolves.toMatchObject({ code: "registration_intent_used" });
+    expect(userCount(raw, "paused@example.test")).toBe(0);
+  });
+
+  it("records OAuth continuation failure without blocking retry state", async () => {
+    const { auth, raw, emailSender } = await createHarness();
+    const cookie = await signInAdmin(auth, emailSender);
+    const clientId = await createOAuthClient(auth, cookie);
+    await createEnabledPolicy(auth, cookie, clientId);
+    const oauthQuery = await signedAuthorizeQuery(auth, clientId);
+    const evaluate = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ oauthQuery }),
+      }),
+    );
+    const decision = (await evaluate.json()) as { readonly intentId: string };
+    await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intentId: decision.intentId, name: "Retry User", email: "retry@example.test", password: "password12345" }),
+    }));
+    const signup = await auth.handler(new Request("https://id.example.test/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
+      body: JSON.stringify({ name: "Retry User", email: "retry@example.test", password: "password12345" }),
+    }));
+    expect(signup.status).toBe(200);
+    raw.exec(`update "user" set "emailVerified" = 1 where "email" = 'retry@example.test';`);
+
+    const mark = await auth.handler(new Request("https://id.example.test/api/auth/registration/continuation-failed", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intentId: decision.intentId, reason: "test_failure" }),
+    }));
+    expect(mark.status).toBe(200);
+    const status = await auth.handler(new Request(`https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`));
+    await expect(status.json()).resolves.toMatchObject({
+      status: "continuation_failed",
+      failureReason: "test_failure",
+      canRetryOAuthContinuation: true,
+    });
+  });
+
+  it("creates an invited account only for the invitation email and accepts the Better Auth organization invitation", async () => {
+    const { auth, raw, emailSender } = await createHarness();
+    const cookie = await signInAdmin(auth, emailSender);
+    await createInviteOnlyPolicy(auth, cookie);
+    const invitationId = createInvitation(raw);
+
+    const evaluate = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invitationId }),
+      }),
+    );
+    expect(evaluate.status).toBe(200);
+    const decision = (await evaluate.json()) as { readonly decision: "allowed"; readonly intentId: string; readonly invitation: { readonly email: string }; readonly continueOAuth: boolean };
+    expect(decision).toEqual(expect.objectContaining({
+      decision: "allowed",
+      invitation: expect.objectContaining({ email: "invitee@example.test" }),
+      continueOAuth: false,
+    }));
+
+    const mismatch = await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intentId: decision.intentId, name: "Wrong", email: "wrong@example.test", password: "password12345" }),
+    }));
+    expect(mismatch.status).toBe(400);
+    await expect(mismatch.json()).resolves.toMatchObject({ code: "registration_invitation_email_mismatch" });
+    expect(userCount(raw, "wrong@example.test")).toBe(0);
+
+    const submit = await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intentId: decision.intentId, name: "Invitee", email: "invitee@example.test", password: "password12345" }),
+    }));
+    expect(submit.status).toBe(200);
+    const signup = await auth.handler(new Request("https://id.example.test/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
+      body: JSON.stringify({ name: "Invitee", email: "invitee@example.test", password: "password12345" }),
+    }));
+    expect(signup.status).toBe(200);
+
+    const invitation = raw.prepare(`select "status" from "invitation" where "id" = ?`).get(invitationId) as { readonly status: string };
+    expect(invitation.status).toBe("accepted");
+    const member = raw.prepare(`select "role" from "member" where "organizationId" = 'org_reg' and "userId" = (select "id" from "user" where "email" = 'invitee@example.test')`).get() as { readonly role: string };
+    expect(member.role).toBe("member");
   });
 
   it("requires authority over the existing policy scope before moving it to another organization", async () => {

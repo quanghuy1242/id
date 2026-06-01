@@ -1,5 +1,6 @@
 import type {
   ACCOUNT_MODEL,
+  INVITATION_MODEL,
   MEMBER_MODEL,
   OAUTH_CLIENT_MODEL,
   OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
@@ -15,6 +16,7 @@ import type {
 
 type ModelName =
   | typeof ACCOUNT_MODEL
+  | typeof INVITATION_MODEL
   | typeof MEMBER_MODEL
   | typeof OAUTH_CLIENT_MODEL
   | typeof OAUTH_CLIENT_RESOURCE_SCOPE_MODEL
