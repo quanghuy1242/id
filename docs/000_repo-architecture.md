@@ -145,7 +145,7 @@ These are corrections to facts or wording, not loosened architecture decisions:
 - Better Auth JWT's default JWKS endpoint is `/jwks` relative to the Better Auth base path; with `/api/auth` as base path, the canonical public route is `/api/auth/jwks`. Changing the canonical route through `jwksPath` requires route-map tests.
 - The OAuth Provider sign-up prompt docs show `signUp` in configuration. Do not invent `signup` or other option names.
 - `validAudiences`, custom token claims, JWKS rotation, and route mounting must be proven by the pinned installed packages before feature work proceeds. This proof is required because exact TypeScript option shapes matter, not because the architecture is optional.
-- The root URL `/` should be owned by `core-id` by default. It can redirect to `/admin` or return service metadata, but `ui-id` must not become the default catch-all owner of auth/API paths.
+- The root URL `/` should be owned by `core-id` by default. It redirects to `/account`, but `ui-id` must not become the default catch-all owner of auth/API paths.
 - UI route composition cannot stay review-only. It must be mechanically enforced by an oxlint rule or a dedicated AST script before substantial admin pages merge.
 
 ### 2.3 Architecture Gaps Strengthened
@@ -259,7 +259,7 @@ Two Cloudflare Workers deploy independently on the same public hostname. Route s
 ```text
 Internet
     │
-    ├──> https://id.quanghuy.dev/                 ──> core-id worker
+    ├──> https://id.quanghuy.dev/                 ──> core-id worker (redirects to /account)
     ├──> https://id.quanghuy.dev/api/auth/*       ──> core-id worker
     ├──> https://id.quanghuy.dev/oauth2/*         ──> core-id worker
     ├──> https://id.quanghuy.dev/.well-known/*    ──> core-id worker
@@ -268,11 +268,12 @@ Internet
     ├──> https://id.quanghuy.dev/register           ──> ui-id worker (OAuth registration page)
     ├──> https://id.quanghuy.dev/consent            ──> ui-id worker (OAuth consent page)
     ├──> https://id.quanghuy.dev/select-authorization-context ──> ui-id worker
+    ├──> https://id.quanghuy.dev/account/*          ──> ui-id worker (self-service account)
     ├──> https://id.quanghuy.dev/ui-health          ──> ui-id worker
     ├──> https://id.quanghuy.dev/admin/*            ──> ui-id worker
     └──> https://id.quanghuy.dev/assets/*           ──> ui-id worker (client-side JS/CSS bundles)
 
-Route specificity is part of the architecture. `/admin*`, hosted auth pages with wildcard suffixes, `/ui-health`, and `/assets/*` are the UI Worker. The wildcard suffix is required for query-bearing browser URLs because Cloudflare Worker route matching includes query strings. Auth, OAuth, metadata, core `/health`, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
+Route specificity is part of the architecture. `/admin*`, `/account*`, hosted auth pages with wildcard suffixes, `/ui-health`, and `/assets/*` are the UI Worker. The wildcard suffix is required for query-bearing browser URLs because Cloudflare Worker route matching includes query strings. Root `/`, auth, OAuth, metadata, core `/health`, and admin API routes are the core Worker. `ui-id` must not become a public catch-all proxy for auth or API routes.
 
 ### 4.1 `core-id` — Auth And OAuth Worker
 
@@ -362,7 +363,7 @@ Workers are build-time isolated and runtime-communicating. The rule is absolute.
 
 ### 4.4 Local Multi-Worker Development
 
-Cloudflare route specificity is the production integration boundary: `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`, while `/api/auth/*`, metadata, and core `/health` are served by `core-id`. Local development can run each Worker independently; full same-host routing is verified through deployment smoke tests.
+Cloudflare route specificity is the production integration boundary: `/admin/*`, `/account/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`, while root `/`, `/api/auth/*`, metadata, and core `/health` are served by `core-id`. Local development can run each Worker independently; full same-host routing is verified through deployment smoke tests.
 
 ```json
 {
@@ -379,7 +380,7 @@ Acceptance requirement:
 
 - `dev:ui` proves `/admin` pages render without core bindings.
 - `dev:core` proves auth and API routes run independently.
-- remote smoke proves same-host route ownership for core `/api/*`, core `/health`, UI `/ui-health`, and protected UI `/admin/*`.
+- remote smoke proves same-host route ownership for core `/`, core `/api/*`, core `/health`, UI `/ui-health`, UI `/account/*`, and protected UI `/admin/*`.
 
 ## 5. Shared Packages
 
@@ -1311,8 +1312,8 @@ Acceptance:
 
 - `core-id` starts independently;
 - `ui-id` starts independently;
-- `/admin/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`;
-- `/api/auth/*`, metadata, and `/health` are served by `core-id`;
+- `/admin/*`, `/account/*`, hosted auth pages, `/ui-health`, and `/assets/*` are served by `ui-id`;
+- `/`, `/api/auth/*`, metadata, and `/health` are served by `core-id`;
 - UI App Router route ownership is enforced mechanically so future files cannot create public UI routes outside the explicit UI-owned paths.
 
 ### Spike D: UI Composition Gate
@@ -1431,6 +1432,6 @@ Required auth/platform outcomes:
 
 `id` is a strict two-worker identity-provider monorepo.
 
-`core-id` owns auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`, hosted auth pages, `/ui-health`, and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
+`core-id` owns root `/`, auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`, account presentation under `/account/*`, hosted auth pages, `/ui-health`, and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
 
 The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route ownership/composition enforcement, and strict worker authorization invariant.

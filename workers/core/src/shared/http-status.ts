@@ -1,6 +1,9 @@
 /** Returned for successful operations. */
 export const HTTP_OK = 200;
 
+/** Returned for a temporary redirect. */
+export const HTTP_FOUND = 302;
+
 /** Returned when request input is malformed or unsupported. */
 export const HTTP_BAD_REQUEST = 400;
 

@@ -162,6 +162,25 @@ describe("LoginForm", () => {
     });
   });
 
+  it("keeps OAuth PKCE sign-in independent from account callbacks", async () => {
+    mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/consent" });
+    mockOauthQuery = "client_id=test&scope=openid&code_challenge=abc&code_challenge_method=S256";
+    window.history.replaceState({}, "", "/login?callbackURL=%2Faccount");
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockAuthApiPost).toHaveBeenCalledWith("/sign-in/email", {
+        email: "test@example.com",
+        password: "password12345",
+        oauth_query: "client_id=test&scope=openid&code_challenge=abc&code_challenge_method=S256",
+      });
+    });
+  });
+
   it("passes a safe admin callback URL to Better Auth sign-in", async () => {
     mockAuthApiPost.mockResolvedValue({ redirect: true, url: "/admin/identity/users" });
     window.history.replaceState({}, "", "/login?callbackURL=%2Fadmin%2Fidentity%2Fusers%3Frole%3Dadmin");

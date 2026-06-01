@@ -84,9 +84,9 @@ function loginPayload(data: Record<string, string>): Record<string, string> {
     password: data.password,
     [OAUTH_QUERY_PARAM]: oauthQuery,
   };
-  // Direct logins default to Account Center. OAuth flows never carry a
-  // callbackURL; console/account callbacks are allowed only when local.
-  const callbackURL = oauthQuery ? currentFirstPartyCallbackURL() : (currentFirstPartyCallbackURL() || "/account");
+  // Direct logins default to Account Center. OAuth flows continue only through
+  // the provider-owned oauth_query; first-party callbacks are intentionally ignored.
+  const callbackURL = oauthQuery ? "" : (currentFirstPartyCallbackURL() || "/account");
   if (callbackURL) payload.callbackURL = callbackURL;
   if (data.otp) payload.otp = data.otp;
   return payload;

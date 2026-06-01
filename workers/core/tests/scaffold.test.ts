@@ -14,4 +14,12 @@ describe("core scaffold", () => {
     const body = await res.json();
     expect(body.service).toBe("id-core");
   });
+
+  it("redirects the root domain to account center", async () => {
+    const app = createApp();
+    const res = await app.request("/");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/account");
+  });
 });
