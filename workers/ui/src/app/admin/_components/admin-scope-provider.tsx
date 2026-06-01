@@ -50,6 +50,16 @@ const fallbackPlatformScope: ConsoleScope = {
   requiresStepUp: true,
 };
 
+const routeOrganizationPermissions = [
+  "members:read",
+  "members:write",
+  "oauth-clients:read",
+  "oauth-clients:write",
+  "resource-servers:read",
+  "resource-servers:write",
+  "security-audit:read",
+] as const satisfies readonly ConsolePermission[];
+
 export const fallbackConsoleScopeEnvelope: ConsoleScopeEnvelope = {
   actor: { userId: "unknown", canEnterConsole: true },
   scopes: [fallbackPlatformScope],
@@ -93,10 +103,10 @@ function equivalentTail(tail: string, target: ConsoleScope, currentOrgId: string
   if (tail.startsWith("security/") || tail.startsWith("system/")) return target.kind === "platform" ? tail : "";
   if (tail.startsWith("identity/users")) return target.kind === "platform" ? "identity/users" : "identity/members";
   if (tail.startsWith("identity/organizations")) return target.kind === "platform" ? tail : "";
-  if (tail.startsWith("identity/members")) return target.kind === "platform" && currentOrgId ? `identity/organizations/${currentOrgId}` : "identity/members";
-  if (tail.startsWith("identity/teams")) return target.kind === "platform" && currentOrgId ? `identity/organizations/${currentOrgId}/teams` : "identity/teams";
-  if (tail.startsWith("identity/invitations")) return target.kind === "platform" && currentOrgId ? `identity/organizations/${currentOrgId}/invitations` : "identity/invitations";
-  if (tail.startsWith("audit")) return "audit";
+  if (tail.startsWith("identity/members")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/members";
+  if (tail.startsWith("identity/teams")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/teams";
+  if (tail.startsWith("identity/invitations")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/invitations";
+  if (tail.startsWith("audit")) return target.kind === "platform" ? "" : "audit";
   return "";
 }
 
@@ -111,6 +121,15 @@ function activeScopeFromPath(pathname: string, envelope: ConsoleScopeEnvelope): 
   if (orgId) {
     const orgScope = envelope.scopes.find((scope) => scope.kind === "organization" && scope.organizationId === orgId);
     if (orgScope) return orgScope;
+    return {
+      kind: "organization",
+      id: `organization:${orgId}`,
+      organizationId: orgId,
+      label: "Organization",
+      role: "admin",
+      permissions: routeOrganizationPermissions,
+      requiresStepUp: false,
+    };
   }
 
   if (pathname === "/admin" || pathname === "/admin/" || pathname.startsWith("/admin/platform") || pathname.startsWith("/admin/")) {

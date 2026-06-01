@@ -85,14 +85,78 @@ Carry-forward constraints for D1/D3: (a) global `hooks.before` run ahead of plug
 >
 > _TODO (owner: user): run the 028–031 ⇄ 032 reconciliation and either ticket or explicitly defer each spec'd surface; append further gaps to this note as they are found._
 
-## Deferred (parked — do not build until triggered)
+## Reconciliation Addendum (2026-06-01)
 
-| Item | Trigger to un-defer | Spec |
-|------|---------------------|------|
-| Admins & Roles management screen | v1 is read-only derived view; full role management only when a concrete partial-admin need exists | [031 §4.8](031_platform-access-control.md#48-the-console-access-section), [028 §8.10](028_tenant-scoped-platform-experience.md#810-future-delegated-administration) |
-| `resolvePlatformAuthority` consolidation | do when collapsing the duplicated `authorize()` checks; pure refactor | [031 §11](031_platform-access-control.md#11-consolidation-touchpoints) |
-| Strict atomic quota | only after architecture approval; soft-quota ships first | [030 §7.3](030_client-initiated-registration-and-onboarding.md#73-quota-and-reservation-model) |
-| `idAdminDelegation` plugin | only when owner/admin proves too coarse | [028 §8.10](028_tenant-scoped-platform-experience.md#810-future-delegated-administration) |
+This addendum is append-only. Do not reorder, renumber, or reinterpret Tracks A–D above. The rows below are new follow-on tracks discovered by reconciling 032 against the full text of docs 028–031 and checking the current implementation where the docs needed proof.
+
+Proof notes from the audit:
+
+- D0 proved only the guarded Better Auth `/sign-up/email` mechanism. It did not prove the remaining REG-1 contract from [030 §15 REG-1](030_client-initiated-registration-and-onboarding.md#reg-1-registration-contract-spike): `prompt=create` redirect to `/register` and `/oauth2/continue` with `created: true`. Current code has no `signup.page` in `workers/core/src/auth/oauth-provider.ts`, no `registration/` auth plugin, no `/register` UI route, and no registration-policy screen spec.
+- The organization audit route exists and org scopes include `security-audit:read`, but `idAdminActivityLog` still authorizes reads with platform-admin-only `requireAdmin`, and the activity schema does not carry the 028 audit context fields (`scope`, `organizationId`, actor authority, `steppedUp`).
+- JWKS emergency rotation exists, but the endpoint currently uses `sessionMiddleware` plus platform-admin authorization only. The action-level freshness gate required by [028 §8.8](028_tenant-scoped-platform-experience.md#88-step-up-on-sensitive-scopes-and-actions) is not ticketed.
+- Track B shipped the Account shell, but [029 §12 phase 5](029_account-center-and-self-service-identity.md#12-migration-and-rollout) and [029 §17](029_account-center-and-self-service-identity.md#17-definition-of-done) still require client integration guidance explaining UserInfo vs Account links vs SCIM vs app-local profile fields.
+- A0 seeds the `/system` catalog, but 031 also requires deployment-specific infra service-account provisioning and binding guidance. Some plugin READMEs still describe manual system-scope declaration paths that predate the seed.
+
+## Track D' — Registration Completeness Addendum (030)
+
+| ☐ | # | Ticket | Scope | Dep | Gate | Spec |
+|---|---|--------|-------|-----|------|------|
+| ☐ | D0a | OAuth signup contract proof | Runtime-test Better Auth OAuth Provider `prompt=create` redirect to `/register` and `/oauth2/continue` with `created: true`; keep this separate from the D0 signup-guard proof | D0 | **HARD GATE before D2/D3**; installed-package contract test, not memory | [030 §8.1, §9.4, REG-1](030_client-initiated-registration-and-onboarding.md#reg-1-registration-contract-spike) |
+| ☐ | D5 | Registration policy admin console | Screen spec + Access/Identity placement decision + UI/actions for platform and org registration-policy management: list, status/mode/client/org/quota/validity, enable/pause/archive, intent/audit detail | D1 | admin UI hard gate: screen spec before route files; no raw fetch; UI trusts only server-evaluated client/org/scope names | [030 §10.4](030_client-initiated-registration-and-onboarding.md#104-admin-policy-screens) |
+| ☐ | D6 | Registration intent lifecycle + ops semantics | Make status/cancel/expiry, pause invalidation, OAuth-continuation retry, quota release, and failed-continuation behavior explicit in plugin operations and tests | D1, D3 | no user row before allow decision; expired/paused intent cannot create; abandoned verification releases reservation on TTL | [030 §7.2–7.3, §8.4, §13](030_client-initiated-registration-and-onboarding.md#13-edge-cases-and-failure-modes) |
+| ☐ | D7 | Invite acceptance parity | Hosted invite route, invitation validation, email match/switch-account handling, create-then-accept Better Auth org invitation, safe `/account/organizations` fallback when no OAuth continuation exists | D1, D2, D3 | invite email mismatch test; accepted invite uses Better Auth organization source of truth, not a parallel table | [030 §7.4, §8.2, §10.2](030_client-initiated-registration-and-onboarding.md#82-invite-acceptance-signup) |
+| ☐ | D8 | Registration rollback + route smoke | Operational close-switch: disable policies, disable/remove OAuth `signup.page`, keep direct signup fail-closed, route-smoke `/register*`, and document WAF/throttle handoff for public forms | D3 | direct `/sign-up/email` without intent remains 400 after rollback; README route topology updated if `/register*` ships | [030 §12–§14](030_client-initiated-registration-and-onboarding.md#12-migration-and-rollout) |
+
+## Track E — Console Security, Audit, And Scope Completeness (028 + 031)
+
+| ☐ | # | Ticket | Scope | Dep | Gate | Spec |
+|---|---|--------|-------|-----|------|------|
+| ☐ | E1 | Action-level step-up gates | Require fresh step-up for high-impact actions: JWKS rotation first, then system settings writes and organization deletion when those write paths are exposed | C2 | endpoint tests prove stale/no step-up is challenged; platform-entry 2-day proof remains separate from shorter action freshness | [028 §8.8](028_tenant-scoped-platform-experience.md#88-step-up-on-sensitive-scopes-and-actions) |
+| ☐ | E2 | Scope-aware admin activity/audit | Extend activity recording and read authorization with scope, `organizationId`, actor platform/org authority, and `steppedUp`; allow org owners/admins to read only their org events; platform admins can read all | A1, A4, C2 | org admin can open `/admin/orgs/:orgId/audit`; cross-org audit reads do not reveal other org ids; activity rows carry 028 audit context | [028 §8.9, §13](028_tenant-scoped-platform-experience.md#89-audit-model), [031 §4.1](031_platform-access-control.md#41-the-two-tier-two-principal-kind-matrix) |
+| ☐ | E3 | Org-scoped security read decision | Either implement bounded org-owned-client consent reads/revokes, or explicitly park org Security → Consents; keep org sessions/tokens deferred until a bounded candidate set exists | E2, A5 | no unbounded user scans; no cross-org consent leak; UI nav matches what the API can authorize | [028 §7.6, §9.6](028_tenant-scoped-platform-experience.md#96-security-sessions-tokens-consents-and-jwks) |
+| ☐ | E4 | Dashboard data completeness | Define and implement the platform dashboard contract and the organization overview dashboard: member/team/invitation counts, org-owned applications/resource APIs, shortcuts, and recent scoped audit when E2 lands | A4, A6, E2 | org dashboard shows no global users/keys/system data; platform dashboard remains platform-only and server-authorized | [028 §9.2, §14 phase 4](028_tenant-scoped-platform-experience.md#92-dashboard) |
+
+## Track F — Account Center Follow-Through (029)
+
+| ☐ | # | Ticket | Scope | Dep | Gate | Spec |
+|---|---|--------|-------|-----|------|------|
+| ☐ | F1 | Client integration guide for Account | Update the OAuth/OIDC integration guide with current-user display rules, UserInfo/ID-token claim use, first-party Account links, app-local profile ownership, and when SCIM is appropriate | B4 | docs do not imply `/account` is a standard OIDC endpoint; SCIM remains directory read/query, not browser self-service | [029 §6.2, §12 phase 5, §17](029_account-center-and-self-service-identity.md#17-definition-of-done) |
+| ☐ | F2 | Account future-decision ledger | Explicitly park or ticket user-managed MFA, verified email change, account deletion, external `return_to`, provider-specific account metadata, `idUserProfile`, inbound SCIM provisioning, and current-user security-event feed | B4 | every 029 future-backlog item has a trigger, owner surface, and standards classification before implementation starts | [029 §16](029_account-center-and-self-service-identity.md#16-future-backlog) |
+
+## Track G — Platform Access-Control Consolidation And Provisioning (031)
+
+| ☐ | # | Ticket | Scope | Dep | Gate | Spec |
+|---|---|--------|-------|-----|------|------|
+| ☐ | G1 | Infra service-account provisioning runbook | Document the deployment-specific steps A0 intentionally does not seed: create per-channel infra clients, bind them to seeded system scopes, keep directory and introspection credentials separate, rotate independently | A0, A6 | no hard-coded client ids/secrets; runbook distinguishes `/system` bearer channels from RFC 7662 client authentication | [031 §4.5, §4.7, §13](031_platform-access-control.md#13-definition-of-done) |
+| ☐ | G2 | Plugin README consolidation | Update `oauth-scope-catalog`, `oauth-client-picker`, and `scim-directory` docs to reflect the seeded `/system` catalog, runtime-prefill/tier-classifier role, coarse-scope bright line, and per-channel credential rule | A0 | no stale manual prefill instructions; scope docs do not imply object-level permissions belong in `id` | [031 §11](031_platform-access-control.md#11-consolidation-touchpoints) |
+| ☐ | G3 | Optional authority-helper pull-forward decision | Keep `resolvePlatformAuthority` deferred as a pure refactor unless E2 or another org-authorized read/write path touches the duplicated `authorize()` callbacks; if touched, consolidate then | E2 or next authorization edit | no behavior change; unit tests cover platform/org allow and deny cases | [031 §11](031_platform-access-control.md#11-consolidation-touchpoints) |
+
+## Track H — Identity Events And Deferred Reliability Hooks (029 + 030)
+
+| ☐ | # | Ticket | Scope | Dep | Gate | Spec |
+|---|---|--------|-------|-----|------|------|
+| ☐ | H1 | Registration event plan | Decide whether registration started/denied/completed/quota-full/invite-accepted events join the existing identity-event program now or remain future; if now, define producer payloads before D3 writes production state | D1, D3 | events are not used as synchronous registration authorization; registration stays policy-gated inside `idRegistration` | [030 §16](030_client-initiated-registration-and-onboarding.md#16-future-backlog) |
+| ☐ | H2 | Account security-event feed trigger | Keep current-user security-event feed deferred until identity events exist and the Account shell has a privacy-scoped read contract | H1 or identity-event producer completion | feed is current-user only and does not expose admin audit internals | [029 §16](029_account-center-and-self-service-identity.md#16-future-backlog) |
+
+## Deferred Re-Evaluation
+
+Effort estimates are planning-size estimates, not commitments: XS is focused proof or docs, S is a narrow implementation, M is one bounded feature slice with tests, L crosses UI/API/schema or security behavior, and XL is a new authorization/product subsystem.
+
+| Item | Current verdict | Estimate | Why |
+|------|-----------------|----------|-----|
+| Registration policy admin console | Pull forward now as D5 | L | Shipping D1 without the screen leaves the policy API operable only through raw API calls, while 030 §10.4 names the admin surface that governs which clients may initiate registration. |
+| OAuth signup contract proof | Pull forward now as D0a | S | D0 proved the signup guard only; REG-1 still requires proof of `prompt=create` and `/oauth2/continue` before hosted registration and guarded signup depend on them. |
+| High-impact action step-up | Pull forward now as E1 | M | C2 solved platform-entry proof storage, but 028 also requires shorter-freshness gates for actions such as JWKS rotation. |
+| Scope-aware org audit | Pull forward now as E2 | L | The org audit route/nav exists, but the API is platform-admin-only and does not record the 028 audit context. This is a behavior gap, not polish. |
+| `resolvePlatformAuthority` consolidation | Keep deferred unless E2 touches the same callbacks | S | It is still a pure refactor by itself, but E2 may be the right moment to avoid another copy of platform/org authorization logic. |
+| Strict atomic quota | Keep deferred | L | Soft quota is acceptable first per 030 §7.3; strict quota needs architecture approval for the plugin-owned D1 helper and concurrency tests. |
+| Admins & Roles management screen | Keep deferred | XL | The v1 Access surface is read-only derived view only. Full management needs a concrete partial-admin need and the delegated-admin model, not ad hoc role UI. |
+| `idAdminDelegation` plugin | Keep deferred | XL | Owner/admin remains the approved v1 authority model. Build delegated roles only when a concrete partial-admin need exists. |
+| Org-scoped sessions/tokens | Keep deferred | XL | 028 explicitly blocks these until there is a bounded read model; do not scan all users for org admins. |
+| Org-scoped consents | Reconsider after E2 | M | 028 allows this only if filterable by org-owned clients without user scans. If bounded, it can ship; otherwise explicitly park it in E3. |
+| Account MFA, email change, deletion, external `return_to`, account metadata discovery, `idUserProfile`, inbound SCIM | Keep deferred but explicit via F2 | L–XL | Each item needs a separate lifecycle, standards, or claim contract; none should silently disappear from the backlog. |
+| Registration PAR/RAR, admin approval, waitlist, analytics/abuse dashboards, dynamic client registration | Keep deferred but explicit | M–XL | These are real future product or protocol capabilities, but first release can use `prompt=create`, simple scopes, policy gates, and soft quota. |
+| Registration and account identity events | Reconsider as H1/H2 | M | They are not required for the first guarded signup path, but event payloads are easier to design before D3/D7 start writing irreversible production state. |
 
 ## Cross-Cutting Gates (apply to every ticket)
 

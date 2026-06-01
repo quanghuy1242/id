@@ -161,7 +161,7 @@ export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
     ["security-introspection", "Introspection", "security", "security-audit:read", "/security/introspect", "CircleHelp"],
     ["security-jwks", "JWKS", "security", "jwks:read", "/security/jwks", "KeyRound"],
   ] satisfies readonly NavTuple[]),
-  ...navItems("both", scopedHref, [
+  ...navItems("organization", organizationHref, [
     ["audit", "Audit", "audit", "security-audit:read", "/audit", "History"],
   ] satisfies readonly NavTuple[]),
 ];

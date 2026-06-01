@@ -53,7 +53,11 @@ export function SidebarLayout({ children }: SurfaceProps) {
 }
 
 export function MainContent({ children }: SurfaceProps) {
-  return <main className="flex flex-col flex-1 min-h-0 overflow-y-auto">{children}</main>;
+  return (
+    <main className="flex flex-col flex-1 min-h-0 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] scroll-pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:scroll-pb-0">
+      {children}
+    </main>
+  );
 }
 
 export function MobileRouteTabs({ children }: SurfaceProps) {

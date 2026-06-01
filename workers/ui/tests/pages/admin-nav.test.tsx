@@ -43,6 +43,22 @@ const orgScopeEnvelope: ConsoleScopeEnvelope = {
   ],
 };
 
+const platformOnlyEnvelope: ConsoleScopeEnvelope = {
+  actor: { userId: "user_001", email: "quanghuy1242@gmail.com", canEnterConsole: true },
+  defaultScopeId: "platform",
+  memberships: [],
+  scopes: [
+    {
+      kind: "platform",
+      id: "platform",
+      label: "Platform",
+      role: "platform-admin",
+      permissions: ["platform:read", "organizations:read", "oauth-clients:read", "resource-servers:read", "security-audit:read", "jwks:read"],
+      requiresStepUp: true,
+    },
+  ],
+};
+
 describe("Admin sidebar navigation", () => {
   it("flattens single-item nav groups", () => {
     navigationMock.pathname = "/admin/platform";
@@ -121,6 +137,14 @@ describe("Admin mobile navigation", () => {
     );
   });
 
+  it("does not link the platform dock to an unimplemented audit route", () => {
+    navigationMock.pathname = "/admin/platform";
+
+    render(<AdminMobileNav />);
+
+    expect(screen.queryByRole("link", { name: "Audit" })).toBeNull();
+  });
+
   it("keeps the section dock item active across sibling mobile routes", () => {
     navigationMock.pathname = "/admin/platform/identity/organizations";
 
@@ -190,6 +214,23 @@ describe("Admin mobile navigation", () => {
     expect(screen.getByRole("link", { name: "Overview" })).toHaveClass("dock-active");
     expect(screen.queryByRole("link", { name: "Dash" })).toBeNull();
   });
+
+  it("uses the organization route lens for dock links before the scope envelope includes that org", () => {
+    navigationMock.pathname = "/admin/orgs/org_404";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={platformOnlyEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(platformOnlyEnvelope) }}
+      >
+        <AdminMobileNav />
+      </AdminScopeProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin/orgs/org_404");
+    expect(screen.getByRole("link", { name: "Identity" })).toHaveAttribute("href", "/admin/orgs/org_404/identity/members");
+    expect(screen.queryByRole("link", { name: "Dash" })).toBeNull();
+  });
 });
 
 describe("Admin topbar", () => {
@@ -249,6 +290,25 @@ describe("Admin topbar", () => {
     expect(selectedBadge).toBeDefined();
     expect(selectedBadge!).toHaveClass("badge-accent");
     expect(within(menu).getByText("platform-admin")).toHaveClass("badge-neutral");
+  });
+
+  it("maps org identity scope switching back to the implemented platform organization list", async () => {
+    navigationMock.pathname = "/admin/orgs/org_001/identity/members";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
+      >
+        <AdminTopbar />
+      </AdminScopeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /select console scope/i }));
+    const menu = await screen.findByRole("menu");
+    const platformItem = within(menu).getAllByRole("menuitem").find((item) => item.textContent?.includes("Platform"));
+
+    expect(platformItem).toHaveAttribute("href", "/admin/platform/identity/organizations");
   });
 
   it("wires the avatar menu logout action", async () => {

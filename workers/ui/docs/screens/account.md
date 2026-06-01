@@ -19,18 +19,18 @@ Route files live under `workers/ui/src/app/account/`. `layout.tsx` wraps every p
 |   Connected.. |                                                              |
 |   Organizations|                                                              |
 +----------------+--------------------------------------------------------------+
-| Home  Profile  Security  Sessions  Apps                                       |  MobileDock (lg:hidden)
+| Home  Profile  Security  Sessions  Apps  Org                                  |  MobileDock (lg:hidden)
 +-------------------------------------------------------------------------------+
 ```
 
 Components:
-  AppShell > Topbar(TopbarStart[TopbarBrandLink "id" + TopbarBreadcrumb] + TopbarEnd[Button(iconName="Bell") + TopbarAvatarMenu]) + MobileRouteTabs(Tabs href) + SidebarLayout(Sidebar[NavMenu > NavLink×6] + MainContent) + MobileDock(DockLink×5)
+  AppShell > Topbar(TopbarStart[TopbarBrandLink "id" + ResponsiveBreadcrumb] + TopbarEnd[Button(iconName="Bell") + TopbarAvatarMenu]) + MobileRouteTabs(Tabs href) + SidebarLayout(Sidebar[NavMenu > NavLink×6] + MainContent) + MobileDock(DockLink×6)
   TopbarAvatarMenu items: { email (badge "Account"), Console → /admin, Theme → ThemeDialog, Logout → ConfirmDialog }
   Logout: ConfirmDialog(variant="danger") → signOut() then location.href="/login?callbackURL=/account"
 
 Data: GET /api/auth/account/summary (for avatar initials/email)
 
-Nav: Overview `/account` (exact) · Profile `/account/profile` · Security `/account/security` · Sessions `/account/sessions` · Connected apps `/account/consents` · Organizations `/account/organizations`. MobileDock shows the first five.
+Nav: Overview `/account` (exact) · Profile `/account/profile` · Security `/account/security` · Sessions `/account/sessions` · Connected apps `/account/consents` · Organizations `/account/organizations`. MobileDock shows all six with the compact Organizations label `Org`.
 
 ---
 

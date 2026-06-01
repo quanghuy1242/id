@@ -28,7 +28,6 @@ Applies to all routes under `/admin`. The shell chrome (Topbar, Sidebar, MobileD
 | |   Consents                             | |                   |
 | |   Introspection                        | |                   |
 | |   JWKS                                 | |                   |
-| | Audit                                  | |                   |
 | +----------------------------------------+ |                   |
 +---------------------------------------------+------------------+
 ```
@@ -63,8 +62,8 @@ Components:
   AdminMobileRouteTabs: `MobileRouteTabs` > section-level `Tabs` using URL-route items from the active visible nav section. Empty sections do not render, dashboard hides tabs because its section has one item, and organization-scoped routes render these tabs on mobile only; desktop remains on the sidebar navigation.
   SidebarLayout > Sidebar + MainContent
   Sidebar: AdminSidebarNav ("use client", usePathname for active, hidden on mobile) renders `visibleNavSections(activeScope)` from the single nav definition in `workers/ui/src/shared/constants.ts`; sections with multiple visible items use DaisyUI collapsible `details > summary + ul > li > a`, while single-item sections render as direct menu links so labels like Dashboard, Applications, and Audit are not repeated as group headers. The root scoped-organization route is labeled Overview; platform keeps Dashboard.
-  MainContent: children slot — each page renders content body here; route title lives in the topbar breadcrumb
-  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden) with one section-level entry per visible section, `dock-label` text under a compact glyph; the organization-scope overview entry is labeled Overview instead of Dash.
+  MainContent: children slot — each page renders content body here; route title lives in the topbar breadcrumb. The scroll container includes mobile-only bottom clearance equal to the fixed dock height plus safe-area inset, so the dock does not cover the final content.
+  MobileDock: AdminMobileNav ("use client", usePathname for dock-active, lg:hidden) with one section-level entry per visible section, `dock-label` text under a compact glyph; the organization-scope overview entry is labeled Overview instead of Dash. Platform scope links only implemented platform sections; organization scope adds the organization Audit section.
 
 Active state rules:
   Sidebar items: active item uses the same menu row shape as all other items, with only text emphasis + aria-current; Dashboard uses exact match within the active route scope.

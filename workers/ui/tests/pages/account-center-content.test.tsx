@@ -2,6 +2,7 @@
 
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AccountShell } from "@/app/account/_components/account-shell";
 import { AccountOverviewContent } from "@/app/account/_components/account-overview-content";
 import { AccountProfileContent } from "@/app/account/_components/account-profile-content";
 import { AccountSecurityContent } from "@/app/account/_components/account-security-content";
@@ -11,9 +12,32 @@ import { AccountOrganizationsContent } from "@/app/account/_components/account-o
 import { createMockAccountActions } from "@/app/account/_mocks/account";
 import { renderWithSwr as render } from "../_utils/swr-render";
 
+const navigationMock = vi.hoisted(() => ({ pathname: "/account" }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => navigationMock.pathname,
+}));
+
 describe("Account Center content", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.pathname = "/account";
+  });
+
+  it("renders every account section in the mobile dock", () => {
+    navigationMock.pathname = "/account/organizations";
+
+    render(
+      <AccountShell actions={createMockAccountActions()}>
+        <span>Account content</span>
+      </AccountShell>,
+    );
+
+    const dock = screen.getByRole("navigation", { name: /account mobile navigation/i });
+
+    expect(within(dock).getAllByRole("link")).toHaveLength(6);
+    expect(within(dock).getByRole("link", { name: "Org" })).toHaveAttribute("href", "/account/organizations");
+    expect(within(dock).getByRole("link", { name: "Org" })).toHaveClass("dock-active");
   });
 
   it("renders overview stats and organization preview from account endpoints", async () => {

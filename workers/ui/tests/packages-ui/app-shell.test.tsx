@@ -16,6 +16,7 @@ import {
   AppShell,
   Topbar,
   Sidebar,
+  MainContent,
   MobileRouteTabs,
   MobileDock,
   TopbarAvatarMenu,
@@ -298,6 +299,20 @@ describe("Sidebar", () => {
     render(<Sidebar>Side</Sidebar>);
     const aside = screen.getByText(/side/i).closest("aside");
     expect(aside).toHaveClass("w-72", "bg-base-100", "border-r", "p-4", "overflow-y-auto");
+  });
+});
+
+describe("MainContent", () => {
+  it("adds mobile dock clearance to the scroll container", () => {
+    render(<MainContent>Main</MainContent>);
+    const main = screen.getByText(/main/i).closest("main");
+    expect(main).toHaveClass(
+      "overflow-y-auto",
+      "pb-[calc(4rem+env(safe-area-inset-bottom))]",
+      "scroll-pb-[calc(4rem+env(safe-area-inset-bottom))]",
+      "lg:pb-0",
+      "lg:scroll-pb-0",
+    );
   });
 });
 

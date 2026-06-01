@@ -13,6 +13,7 @@ import {
   MobileRouteTabs,
   NavLink,
   NavMenu,
+  ResponsiveBreadcrumb,
   Sidebar,
   SidebarLayout,
   Tabs,
@@ -23,7 +24,6 @@ import {
   TopbarBrandLink,
   TopbarEnd,
   TopbarStart,
-  TopbarBreadcrumb,
 } from "@id/ui";
 import { accountSummaryKey } from "../_data/swr-keys";
 import { defaultAccountActions, signOut, type AccountActions } from "../_actions/account";
@@ -40,7 +40,7 @@ const accountNav = [
   { href: "/account/security", label: "Security", iconName: "ShieldCheck", exact: false, mobileLabel: "Security" },
   { href: "/account/sessions", label: "Sessions", iconName: "Clock", exact: false, mobileLabel: "Sessions" },
   { href: "/account/consents", label: "Connected apps", iconName: "AppWindow", exact: false, mobileLabel: "Apps" },
-  { href: "/account/organizations", label: "Organizations", iconName: "Building2", exact: false, mobileLabel: "Orgs" },
+  { href: "/account/organizations", label: "Organizations", iconName: "Building2", exact: false, mobileLabel: "Org" },
 ] as const;
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
@@ -91,7 +91,7 @@ export function AccountShell({
         <Topbar>
           <TopbarStart>
             <TopbarBrandLink href="/account">id</TopbarBrandLink>
-            <TopbarBreadcrumb items={[active.label]} />
+            <ResponsiveBreadcrumb items={[active.label]} />
           </TopbarStart>
           <TopbarEnd>
             <Button variant="ghost" size="sm" iconName="Bell" ariaLabel="Notifications" tooltip="Notifications" tooltipPlacement="bottom" />
@@ -133,7 +133,7 @@ export function AccountShell({
           <MainContent>{children}</MainContent>
         </SidebarLayout>
         <MobileDock ariaLabel="Account mobile navigation">
-          {accountNav.slice(0, 5).map((item) => (
+          {accountNav.map((item) => (
             <DockLink
               key={item.href}
               href={item.href}
@@ -160,4 +160,3 @@ export function AccountShell({
     </>
   );
 }
-
