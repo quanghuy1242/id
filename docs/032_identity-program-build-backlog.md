@@ -165,23 +165,7 @@ Status note 2026-06-05 (H done): Track H is complete as a decision/defer track. 
 
 ## Deferred Re-Evaluation
 
-Effort estimates are planning-size estimates, not commitments: XS is focused proof or docs, S is a narrow implementation, M is one bounded feature slice with tests, L crosses UI/API/schema or security behavior, and XL is a new authorization/product subsystem.
-
-| Item | Current verdict | Estimate | Why |
-|------|-----------------|----------|-----|
-| Registration policy admin console | Pull forward now as D5 | L | Shipping D1 without the screen leaves the policy API operable only through raw API calls, while 030 §10.4 names the admin surface that governs which clients may initiate registration. |
-| OAuth signup contract proof | Pull forward now as D0a | S | D0 proved the signup guard only; REG-1 still requires proof of `prompt=create` and `/oauth2/continue` before hosted registration and guarded signup depend on them. |
-| High-impact action step-up | Pull forward now as E1 | M | C2 solved platform-entry proof storage, but 028 also requires shorter-freshness gates for actions such as JWKS rotation. |
-| Scope-aware org audit | Pull forward now as E2 | L | The org audit route/nav exists, but the API is platform-admin-only and does not record the 028 audit context. This is a behavior gap, not polish. |
-| `resolvePlatformAuthority` consolidation | Shipped in G3 | S | E2 left duplicated org-authorized callbacks in `get-auth.ts`; G3 centralizes the human platform/org decision without changing behavior. |
-| Strict atomic quota | Keep deferred | L | Soft quota is acceptable first per 030 §7.3; strict quota needs architecture approval for the plugin-owned D1 helper and concurrency tests. |
-| Admins & Roles management screen | Keep deferred | XL | The v1 Access surface is read-only derived view only. Full management needs a concrete partial-admin need and the delegated-admin model, not ad hoc role UI. |
-| `idAdminDelegation` plugin | Keep deferred | XL | Owner/admin remains the approved v1 authority model. Build delegated roles only when a concrete partial-admin need exists. |
-| Org-scoped sessions/tokens | Keep deferred | XL | 028 explicitly blocks these until there is a bounded read model; do not scan all users for org admins. |
-| Org-scoped consents | Shipped in E3 | M | Implemented only for the bounded case: org reads/revokes resolve org-owned OAuth clients before touching consent rows; org-scoped sessions/tokens remain deferred. |
-| Account MFA, email change, deletion, external `return_to`, account metadata discovery, `idUserProfile`, inbound SCIM | Deferred by the F2 decision ledger | L–XL | Each item now has an explicit trigger, owner surface, standards classification, and boundary contract in 029 §16; none should silently move into implementation. |
-| Registration PAR/RAR, admin approval, waitlist, analytics/abuse dashboards, dynamic client registration | Keep deferred but explicit | M–XL | These are real future product or protocol capabilities, but first release can use `prompt=create`, simple scopes, policy gates, and soft quota. |
-| Registration and account identity events | Deferred by H1/H2 | M | Registration and Account event feeds now have explicit triggers and privacy/producer boundaries; neither is required for synchronous registration/account behavior. |
+Deferred and re-evaluation items now live in [docs/033_identity-deferred-roadmap.md](033_identity-deferred-roadmap.md). Keep this file as the execution tracker for completed and active implementation tracks; use docs/033 for parked roadmap decisions, grouping, and Access-vs-Identity ownership.
 
 ## Cross-Cutting Gates (apply to every ticket)
 
