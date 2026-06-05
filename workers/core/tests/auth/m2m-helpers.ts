@@ -13,17 +13,35 @@ export type TestEnv = {
   readonly app: ReturnType<typeof createApp>;
 };
 
-export function createTestKv(): KVNamespace {
+export type TestKvOperation = {
+  readonly kind: "get" | "put" | "delete";
+  readonly key: string;
+};
+
+export type InspectableTestKv = KVNamespace & {
+  readonly values: Map<string, string>;
+  readonly operations: TestKvOperation[];
+};
+
+export function createTestKv(): InspectableTestKv {
   const values = new Map<string, string>();
+  const operations: TestKvOperation[] = [];
   return {
-    get: async (key: string) => values.get(key) ?? null,
+    values,
+    operations,
+    get: async (key: string) => {
+      operations.push({ kind: "get", key });
+      return values.get(key) ?? null;
+    },
     put: async (key: string, value: string) => {
+      operations.push({ kind: "put", key });
       values.set(key, value);
     },
     delete: async (key: string) => {
+      operations.push({ kind: "delete", key });
       values.delete(key);
     },
-  } as KVNamespace;
+  } as InspectableTestKv;
 }
 
 export async function createTestEnv(): Promise<TestEnv> {

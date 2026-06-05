@@ -121,6 +121,7 @@ export function getAuthOptions(
     },
     session: {
       storeSessionInDatabase: true,
+      deferSessionRefresh: true,
     },
     emailAndPassword: {
       enabled: true,
