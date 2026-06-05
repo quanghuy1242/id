@@ -69,6 +69,7 @@ Last security check date: **2026-05-27**. See [docs/security/](docs/security/) f
 - `hono`
 - `drizzle-orm`
 - `wrangler`
+- `@cloudflare/vite-plugin` (core-id prebuilt Worker output; ui-id through Vinext)
 - `vinext` (ui-id only)
 - `react` / `react-dom` (ui-id only)
 - `swr` (ui-id only — admin client-side data cache; see [docs/025](docs/025_admin-ui-swr-caching-strategy.md))
@@ -218,6 +219,8 @@ pnpm check:dup
 pnpm typecheck
 pnpm test
 pnpm check
+pnpm build
+pnpm deploy:core:dry-run
 pnpm advise
 pnpm smoke:remote
 pnpm auth:api <METHOD> <PATH> [inline-json]
@@ -229,23 +232,24 @@ pnpm auth:api:logout
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
 Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `workers/ui/tests/all.test.ts`) to avoid repeated environment/import setup. Add new test files to the matching barrel instead of widening the project `include` patterns.
 `pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks use `/ui-health` for the public UI Worker liveness probe and `/admin/*` for admin page routing, because production only routes explicit UI paths to `ui-id`.
+`pnpm build` builds core-id through the root `@cloudflare/vite-plugin` config, reads `workers/core/wrangler.jsonc`, and emits the prebuilt Worker config at `dist/id_core/wrangler.json` with `no_bundle: true`. `pnpm deploy:core` runs that build and deploys the generated config; `pnpm deploy:core:dry-run` runs the same Vite build and a Wrangler dry-run against the generated config.
 `pnpm deploy:ui:dry-run` mirrors the Cloudflare deploy path: it builds from `workers/ui`, lets Vinext/@cloudflare/vite-plugin generate `workers/ui/dist/server/wrangler.json`, then runs Wrangler deploy with `--dry-run`.
 `pnpm dev:ladle` serves the shared `@id/ui` component stories from `.ladle/` and `stories/` without booting the full UI worker. `pnpm build:ladle` generates a static Ladle build under `.ladle/build`.
 
 ## Deployment
 
-CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check` + dry-run deployments. Manual dispatch via **Actions → CI & Deploy → Run workflow** with `deploy=true` runs the full deploy pipeline:
+CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check`; push and manual dispatch via **Actions → CI & Deploy → Run workflow** with `deploy=true` run the deploy pipeline:
 
 1. `pnpm check` — lint, dup gate, typecheck, tests
-2. Migration dry-run (local SQLite)
-3. Core + UI dry-run deploys
-4. Set secrets from GitHub → Cloudflare via `wrangler secret put`
-5. `pnpm db:migrate:remote`
-6. `pnpm deploy:core`
-7. `pnpm deploy:ui`
-8. `pnpm smoke:remote`
+2. Validate required deploy secrets
+3. `pnpm db:migrate:remote`
+4. `pnpm build` — builds core-id with Vite and emits `dist/id_core/wrangler.json`
+5. Deploy core-id from `dist/id_core/wrangler.json`; the Wrangler Action uploads Cloudflare secrets from GitHub Secrets before deploy
+6. `pnpm deploy:ui`
 
 All secrets are read from GitHub Secrets at deploy time. No manual `wrangler secret put` needed.
+
+After deployment, run `pnpm smoke:remote` with `ID_CORE_URL` and `ID_UI_URL` set to verify the deployed routes.
 
 **Required GitHub secrets** (set at repo → Settings → Secrets and variables → Actions):
 

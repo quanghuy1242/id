@@ -16,7 +16,11 @@ Pipeline order:
 4. `pnpm deploy:ui`
 5. `pnpm smoke:remote`
 
-The GitHub Actions workflow in `.github/workflows/ci.yml` runs `pnpm check` on push/PR and deploy dry-runs. UI dry-run builds inside `workers/ui`, uses Vinext's generated `dist/server/wrangler.json`, then calls Wrangler deploy with `--dry-run`, matching the real `pnpm deploy:ui` path.
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs `pnpm check` on push/PR. Push deploys and manual deploy runs apply remote D1 migrations, build core-id with Vite, deploy core-id from the generated prebuilt config, then deploy ui-id.
+
+Local dry-run verification mirrors the deploy paths. `pnpm deploy:core:dry-run` builds core-id through Vite, then calls Wrangler against `dist/id_core/wrangler.json` with `--dry-run`. `pnpm deploy:ui:dry-run` builds inside `workers/ui`, uses Vinext's generated `dist/server/wrangler.json`, then calls Wrangler deploy with `--dry-run`, matching the real `pnpm deploy:ui` path.
+
+Core deploys now use the Cloudflare Vite plugin prebuilt path. `pnpm build` reads `workers/core/wrangler.jsonc` through the root `vite.config.ts` and emits `dist/id_core/wrangler.json` with `no_bundle: true`; `pnpm deploy:core` deploys that generated config via `pnpm deploy:prebuilt:core`. CI builds core-id before the Wrangler Action, then runs the action from `dist/id_core` so both secret upload and deploy resolve the generated `wrangler.json`.
 
 Production browser OAuth is supported on the `*.quanghuy.dev` deployment only. Preview `*.workers.dev` URLs are API-only because browsers cannot share Better Auth cookies on the `workers.dev` public suffix.
 

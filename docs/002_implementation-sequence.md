@@ -140,11 +140,11 @@ Before Better Auth can be tested, D1 needs tables. Define the `idResourceServer`
 
 ### 3.1 Multi-Worker Topology (000 Spike D)
 
-- [x] Start/bundle proof for `core-id`: `pnpm wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core` succeeds.
+- [x] Start/bundle proof for `core-id`: `pnpm deploy:core:dry-run` succeeds against the Cloudflare Vite plugin generated `dist/id_core/wrangler.json`.
 - [x] Verify core routes are mounted under `/api/auth/*`; root well-known metadata aliases are mounted for OAuth discovery.
 - [x] Keep `dev:ui`; no separate `check:ui`.
 - [x] Prove UI App Router ownership rejects public routes outside `/admin/**`.
-- [x] Verify React does NOT appear in core-id dry-run output (`rg "react|react-dom" dist/core` returns no matches).
+- [x] Verify React UI dependencies do not leak into core-id runtime ownership; deployment proof now uses the generated Vite prebuilt output rather than the old direct Wrangler bundle.
 - [x] Add `nodejs_compat` to `core-id` after Wrangler surfaced Better Auth's `node:async_hooks` runtime dependency.
 - [x] Document deployment order: `id-core` before `id-ui`.
 

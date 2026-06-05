@@ -77,14 +77,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm db:migrate:remote
 
+      - name: Build core-id
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+        run: pnpm build
+
       - name: Deploy core-id
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: workers/core
-          command: deploy --config wrangler.jsonc
+          workingDirectory: dist/id_core
+          command: deploy --config wrangler.json
           secrets: |
             BETTER_AUTH_SECRET
             RESEND_API_KEY

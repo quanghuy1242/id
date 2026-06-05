@@ -1237,8 +1237,10 @@ packages:
     "db:generate": "npx @better-auth/cli generate --config workers/core/src/auth/cli-auth.ts --output better-auth_migrations/0001_better_auth.sql",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply id --remote --config workers/core/wrangler.jsonc",
-    "deploy:core": "wrangler deploy --config workers/core/wrangler.jsonc",
-    "deploy:core:dry-run": "wrangler deploy --config workers/core/wrangler.jsonc --dry-run --outdir dist/core",
+    "deploy:core": "pnpm build && pnpm deploy:prebuilt:core",
+    "deploy:core:dry-run": "pnpm build && pnpm deploy:prebuilt:core:dry-run",
+    "deploy:prebuilt:core": "wrangler deploy --config dist/id_core/wrangler.json",
+    "deploy:prebuilt:core:dry-run": "wrangler deploy --config dist/id_core/wrangler.json --dry-run --outdir dist/core",
     "deploy:ui": "cd workers/ui && vinext build && wrangler deploy",
     "deploy:ui:dry-run": "cd workers/ui && vinext build && wrangler deploy --dry-run --outdir ../../dist/ui"
   }
