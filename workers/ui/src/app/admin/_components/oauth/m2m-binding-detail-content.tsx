@@ -248,7 +248,13 @@ export function M2mBindingDetailContent({
         onEdit={openEditDialog}
         onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
       />
-      {activeTab === "audit" ? <ActivityLogContent targetType="client_resource_scope" targetId={binding.id} /> : <Overview binding={binding} client={client} resource={resource} />}
+      {activeTab === "audit" ? (
+        <ActivityLogContent
+          organizationId={resource?.organizationId ?? undefined}
+          targetType="client_resource_scope"
+          targetId={binding.id}
+        />
+      ) : <Overview binding={binding} client={client} resource={resource} />}
       <ConfirmDialog
         open={editOpen}
         onOpenChange={(o) => { setEditOpen(o); if (!o) setEditError(undefined); }}

@@ -15,6 +15,10 @@ import { Button } from "./button";
 import { Menu, MenuItem, MenuTrigger } from "./menu";
 
 export type SortDirection = "asc" | "desc";
+export type DataTableLayout = "auto" | "fixed";
+export type DataTableOverflow = "responsive" | "contained";
+export type DataTableColumnWidth = "xs" | "sm" | "md" | "lg" | "xl";
+export type DataTableMinWidth = "none" | "md" | "lg";
 
 type DataTableActionVariant = "primary" | "secondary" | "danger" | "ghost";
 
@@ -34,6 +38,7 @@ export type DataTableColumn<T extends object> = {
   readonly key: string;
   readonly label: string;
   readonly sortable?: boolean;
+  readonly width?: DataTableColumnWidth;
   readonly render?: (row: T) => ReactNode;
   readonly actions?: (row: T) => readonly DataTableAction[];
 };
@@ -54,6 +59,38 @@ type DataTableProps<T extends object> = {
   readonly sortDirection?: SortDirection;
   readonly onSort?: (key: string, direction: SortDirection) => void;
   readonly pagination?: Pagination;
+  readonly layout?: DataTableLayout;
+  readonly overflow?: DataTableOverflow;
+  readonly minWidth?: DataTableMinWidth;
+};
+
+const tableLayoutClass: Record<DataTableLayout, string> = {
+  auto: "",
+  fixed: "table-fixed",
+};
+
+const tableOverflowClass: Record<DataTableOverflow, string> = {
+  responsive: "w-full overflow-x-auto sm:overflow-x-visible data-table-responsive",
+  contained: "w-full min-w-0 max-w-full overflow-x-auto data-table-responsive",
+};
+
+const columnWidthClass: Record<DataTableColumnWidth, string> = {
+  xs: "w-24",
+  sm: "w-32",
+  md: "w-40",
+  lg: "w-52",
+  xl: "w-64",
+};
+
+const tableMinWidthClass: Record<DataTableMinWidth, string> = {
+  none: "",
+  md: "min-w-[60rem]",
+  lg: "min-w-[72rem]",
+};
+
+const cellLayoutClass: Record<DataTableLayout, string> = {
+  auto: "text-sm text-base-content",
+  fixed: "min-w-0 overflow-hidden break-words align-top text-sm text-base-content",
 };
 
 function SortIcon({ direction, active }: { direction?: SortDirection; active: boolean }) {
@@ -153,6 +190,9 @@ export function DataTable<T extends object>({
   sortDirection,
   onSort,
   pagination,
+  layout = "auto",
+  overflow = "responsive",
+  minWidth = "none",
 }: DataTableProps<T>) {
   const sortDescriptor: SortDescriptor | undefined =
     sortBy
@@ -166,10 +206,10 @@ export function DataTable<T extends object>({
   }
 
   return (
-    <div className="w-full overflow-x-auto sm:overflow-x-visible data-table-responsive">
+    <div className={tableOverflowClass[overflow]}>
       <AriaTable
         aria-label="Data table"
-        className="table w-full"
+        className={`table w-full ${tableLayoutClass[layout]} ${tableMinWidthClass[minWidth]}`}
         sortDescriptor={sortDescriptor}
         onSortChange={handleSortChange}
         onRowAction={
@@ -188,7 +228,7 @@ export function DataTable<T extends object>({
               id={col.key}
               isRowHeader={col.key === columns[0]?.key}
               allowsSorting={col.sortable}
-              className="font-medium text-base-content/70 text-xs uppercase tracking-wide"
+              className={`font-medium text-base-content/70 text-xs uppercase tracking-wide ${col.width ? columnWidthClass[col.width] : ""}`}
             >
               <div className="flex items-center gap-1">
                 {col.label}
@@ -209,7 +249,7 @@ export function DataTable<T extends object>({
               className={onRowClick ? "cursor-pointer hover:bg-base-200/60" : ""}
             >
               {columns.map((col) => (
-                <AriaCell key={col.key} className="text-sm text-base-content" data-label={col.label}>
+                <AriaCell key={col.key} className={cellLayoutClass[layout]} data-label={col.label}>
                   {col.actions
                     ? <DataTableActions actions={col.actions(row)} />
                     : col.render

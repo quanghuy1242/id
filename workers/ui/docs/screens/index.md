@@ -91,6 +91,7 @@ Canonical organization console route prefix. The shell renders the selected orga
 | `/admin/orgs/:orgId/access/scope-catalog` | Scopes for org-owned resource APIs | [oauth.md](oauth.md#adminoauthscope-catalog) | implemented |
 | `/admin/orgs/:orgId/access/m2m-bindings` | Org-owned M2M bindings where client and resource server both belong to the org | [oauth.md](oauth.md#adminoauthm2m-bindings) | implemented |
 | `/admin/orgs/:orgId/access/m2m-bindings/:bindingId[/audit]` | Org-owned M2M binding detail tabs | [oauth.md](oauth.md#adminoauthm2m-bindingsbindingid) | implemented |
+| `/admin/orgs/:orgId/security/consents` | Org-owned OAuth consent grants for clients where `reference_id == orgId` | [security.md](security.md#adminorgsorgidsecurityconsents) | implemented |
 | `/admin/orgs/:orgId/audit` | Organization-scoped audit timeline | [identity.md](identity.md#adminplatformidentityorganizationsorgidaudit) | implemented |
 
 ---

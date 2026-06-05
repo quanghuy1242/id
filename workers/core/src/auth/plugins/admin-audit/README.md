@@ -19,9 +19,7 @@ raw Drizzle and never a SQL join. See `docs/026` for the full rationale.
 
 ## Setup
 
-No provisioning. Registered in `get-auth.ts` and available immediately after a
-platform-admin signs in. All endpoints require `role === "admin"` (v1 is
-platform-admin-only; org-scoped variants are deferred — `docs/026` §8).
+No provisioning. Registered in `get-auth.ts` and available immediately after an authorized console session signs in. Sessions, token audit, JWKS reads, and JWKS rotation remain platform-admin only. Consent list/revoke also supports an organization lens: when `organizationId` is supplied, the auth worker authorizes the actor for that organization and bounds rows to OAuth clients whose `referenceId` equals that organization id.
 
 ## Usage
 
@@ -66,7 +64,7 @@ GET /api/auth/admin/list-tokens?type=access&limit=25&offset=0
 
 `type` accepts `access` (default) or `refresh`.
 
-List consents (optionally filtered by client):
+List consents (optionally filtered by client; platform-wide by default):
 
 ```
 GET /api/auth/admin/list-consents?clientId=cli_x&limit=25&offset=0
@@ -76,12 +74,27 @@ GET /api/auth/admin/list-consents?clientId=cli_x&limit=25&offset=0
     "total": 42, "limit": 25, "offset": 0 }
 ```
 
+Organization-scoped consent reads add `organizationId`; the endpoint first finds clients where `oauthClient.referenceId == organizationId`, then reads only matching consent rows. An explicit cross-org `clientId` returns an empty page rather than leaking ownership.
+
+```
+GET /api/auth/admin/list-consents?organizationId=org_1&clientId=cli_x&limit=25&offset=0
+```
+
 Revoke a consent grant (forces re-consent on next authorization):
 
 ```
 POST /api/auth/admin/revoke-consent
 Content-Type: application/json
 { "clientId": "cli_x", "userId": "user_1" }
+→ { "success": true }
+```
+
+Organization-scoped revoke includes `organizationId`. The plugin verifies the client belongs to that organization before deleting the grant and returns `404` for cross-org client ids.
+
+```
+POST /api/auth/admin/revoke-consent
+Content-Type: application/json
+{ "organizationId": "org_1", "clientId": "cli_x", "userId": "user_1" }
 → { "success": true }
 ```
 
@@ -120,12 +133,12 @@ Content-Type: application/json
 | `GET` | `/admin/list-sessions` | Paginated; `limit` (≤100, default 25), `offset`, optional `userId`; strips session token |
 | `POST` | `/admin/revoke-session` | Body `{ sessionId }`; resolves token server-side |
 | `GET` | `/admin/list-tokens` | Paginated; `type=access\|refresh`; strips token value |
-| `GET` | `/admin/list-consents` | Paginated; optional `clientId` filter |
-| `POST` | `/admin/revoke-consent` | Body `{ clientId, userId }` |
+| `GET` | `/admin/list-consents` | Paginated; optional `clientId` and `organizationId` filters; org reads are bounded to org-owned clients |
+| `POST` | `/admin/revoke-consent` | Body `{ clientId, userId, organizationId? }`; org revoke verifies client ownership |
 | `GET` | `/admin/jwks` | Strips `privateKey`; derives status |
 | `POST` | `/admin/jwks/rotate` | Emergency rotate via Better Auth JWT key generation; public material only |
 
-All return `401` without a session and `403` for non-admin roles.
+All return `401` without a session and `403` when the actor lacks the requested platform or organization authority.
 
 ## Technical detail
 
@@ -145,6 +158,7 @@ All return `401` without a session and `403` for non-admin roles.
   batched `findMany({ where:[{ field, operator:"in", value: ids }] })` per
   referenced model and zipped in memory. Joined-field *search* (e.g. by email)
   is intentionally deferred (`docs/026` §4.3).
+- **Consent scoping.** Org consent reads never scan all users. They first resolve the bounded client set from `oauthClient.referenceId` and then query `oauthConsent` by `clientId in (...)`; revoke validates the client ownership tuple before deleting.
 - **Present and strip.** `presentSession` returns the row id but never the
   Better Auth session token; `presentToken` returns only `tokenPrefix`, never the
   token; `presentJwk` never reads or returns `privateKey`. The revoke-session

@@ -7,8 +7,19 @@ import { Stack } from "@id/ui";
 import { OrgDetailProvider } from "@/app/admin/_components/identity/org-detail-context";
 import { OrgDetailHeaderContent } from "@/app/admin/_components/identity/org-detail-header-content";
 import { OrgDetailOverviewContent } from "@/app/admin/_components/identity/org-detail-overview-content";
-import { mockOrganizations } from "@/app/admin/_mocks/organizations";
+import {
+  mockInvitations,
+  mockMembers,
+  mockOrganizations,
+  mockTeams,
+} from "@/app/admin/_mocks/organizations";
+import { mockActivities } from "@/app/admin/_mocks/audit";
+import { mockBindings, mockClients, mockResourceServers, mockScopes } from "@/app/admin/_mocks/oauth";
+import { mockConsents } from "@/app/admin/_mocks/security";
+import type { AdminActivity, AdminConsent, Paginated } from "@/app/admin/_actions/audit";
+import type { ActiveScope } from "@id/lib";
 import type { Organization } from "@/app/admin/_actions/organizations";
+import type { ClientResourceScope, OAuthClient, OAuthResourceScope, ResourceServer } from "@/app/admin/_actions/oauth";
 
 const baseOrg = mockOrganizations[0];
 
@@ -22,6 +33,25 @@ function makeActions(org: Organization) {
         return current;
       }),
     deleteOrganization: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    listMembers: vi.fn<() => Promise<typeof mockMembers>>().mockResolvedValue(mockMembers),
+    listTeams: vi.fn<() => Promise<typeof mockTeams>>().mockResolvedValue(mockTeams),
+    listInvitations: vi.fn<() => Promise<typeof mockInvitations>>().mockResolvedValue(mockInvitations),
+    listClients: vi.fn<(scope?: ActiveScope) => Promise<OAuthClient[]>>().mockResolvedValue(mockClients),
+    listResourceServers: vi.fn<(scope?: ActiveScope) => Promise<ResourceServer[]>>().mockResolvedValue(mockResourceServers.filter((server) => server.organizationId === "org_001")),
+    listScopes: vi.fn<(scope?: ActiveScope) => Promise<OAuthResourceScope[]>>().mockResolvedValue(mockScopes),
+    listBindings: vi.fn<(scope?: ActiveScope) => Promise<ClientResourceScope[]>>().mockResolvedValue(mockBindings),
+    listAdminConsents: vi.fn<(params: { limit: number; offset: number; organizationId?: string }) => Promise<Paginated<"consents", AdminConsent>>>().mockResolvedValue({
+      consents: mockConsents.slice(0, 1),
+      total: mockConsents.length,
+      limit: 1,
+      offset: 0,
+    }),
+    listActivityLog: vi.fn<(params: { limit: number; offset: number; organizationId?: string }) => Promise<Paginated<"entries", AdminActivity>>>().mockResolvedValue({
+      entries: mockActivities.slice(0, 1),
+      total: mockActivities.length,
+      limit: 1,
+      offset: 0,
+    }),
   };
 }
 
@@ -81,6 +111,36 @@ describe("Organization detail nested content", () => {
     expect(screen.getByText("#acme")).toBeInTheDocument();
     expect(screen.getByText("Metadata")).toBeInTheDocument();
     expect(screen.getByText(/"plan":/)).toBeInTheDocument();
+  });
+
+  it("renders organization overview counts and scoped workflow links", async () => {
+    const actions = makeActions(baseOrg);
+    renderOrgDetail({ actions, scopedRoute: true });
+
+    await waitFor(() => expect(screen.getByText("collaboration groups")).toBeInTheDocument());
+    expect(screen.getByText(/pending invites/)).toBeInTheDocument();
+    expect(screen.getByText("org-owned client grants")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: /open/i }).some((link) =>
+        link.getAttribute("href") === "/admin/orgs/org_001/security/consents",
+      ),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(actions.listAdminConsents).toHaveBeenCalledWith({
+        limit: 1,
+        offset: 0,
+        organizationId: "org_001",
+      }),
+    );
+    expect(actions.listClients).toHaveBeenCalledWith({
+      kind: "organization",
+      organizationId: "org_001",
+    });
+    expect(actions.listActivityLog).toHaveBeenCalledWith({
+      limit: 1,
+      offset: 0,
+      organizationId: "org_001",
+    });
   });
 
   it("hides the back button in scoped organization context", async () => {

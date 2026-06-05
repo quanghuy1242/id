@@ -86,11 +86,13 @@ export const adminConsentsKey = (params: {
   limit: number;
   offset: number;
   clientId?: string;
+  organizationId?: string;
 }) => [ADMIN_CONSENTS, params] as const;
 export const adminJwksKey = () => [ADMIN_JWKS] as const;
 export const activityLogKey = (params: {
-  targetType: string;
-  targetId: string;
+  organizationId?: string;
+  targetType?: string;
+  targetId?: string;
   action?: string;
   actorId?: string;
   limit: number;

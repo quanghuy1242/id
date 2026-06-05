@@ -205,11 +205,27 @@ export function getAuthOptions(
       }),
       idOAuthClientPicker({ issuer }),
       idAdminAudit({
-        authorize: (role) => isPlatformAdmin(role),
+        authorize: async (organizationId, userId, role, adapter) =>
+          organizationId === null || organizationId === undefined
+            ? isPlatformAdmin(role)
+            : isPlatformAdmin(role) ||
+              (await hasOrganizationAccess(
+                adapter as AdminDbAdapter,
+                userId,
+                organizationId,
+              )),
         jwksGracePeriodMs: authPluginConfig.jwksGracePeriodMs,
       }),
       idAdminActivityLog({
-        authorize: (role) => isPlatformAdmin(role),
+        authorize: async (organizationId, userId, role, adapter) =>
+          organizationId === null || organizationId === undefined
+            ? isPlatformAdmin(role)
+            : isPlatformAdmin(role) ||
+              (await hasOrganizationAccess(
+                adapter as AdminDbAdapter,
+                userId,
+                organizationId,
+              )),
       }),
       idConsoleScopes({
         isPlatformAdmin,

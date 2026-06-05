@@ -27,6 +27,17 @@ Response:
       "action": "oauth_client.update",
       "targetType": "oauth_client",
       "targetId": "cli_content",
+      "scope": "organization",
+      "organizationId": "org_1",
+      "actorPlatformRole": null,
+      "actorOrganizationRole": "owner",
+      "steppedUp": false,
+      "summary": "Updated OAuth client cli_content: scope",
+      "details": {
+        "path": "/oauth2/update-client",
+        "clientId": "cli_content",
+        "changedFields": ["scope"]
+      },
       "before": null,
       "after": { "scope": "openid profile" },
       "metadata": { "path": "/oauth2/update-client" },
@@ -43,8 +54,8 @@ Response:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/admin/activity-log` | Platform-admin activity read with filters: `targetType`, `targetId`, `action`, `actorId`, `limit`, `offset` |
+| `GET` | `/admin/activity-log` | Platform or org activity read with filters: `organizationId`, `targetType`, `targetId`, `action`, `actorId`, `limit`, `offset` |
 
 ## Technical Detail
 
-The plugin is append-only from the UI perspective: no update or delete endpoints exist. Mutation logging is attached as Better Auth `hooks.after` handlers for stock Better Auth admin/organization/OAuth endpoints and custom plugin endpoints. Payloads pass through `stripActivitySecrets` before persistence, removing OAuth client secrets, tokens, JWKS private keys, passwords, and verification values recursively.
+The plugin is append-only from the UI perspective: no update or delete endpoints exist. Mutation logging is attached as Better Auth `hooks.after` handlers for stock Better Auth admin/organization/OAuth endpoints and custom plugin endpoints. Payloads pass through `stripActivitySecrets` before persistence, removing OAuth client secrets, tokens, JWKS private keys, passwords, and verification values recursively. New activity rows carry a semantic `summary` plus structured `details` so the UI can answer what happened without reducing the event to an endpoint path; old rows may have `null` for those columns and still expose `before`, `after`, and `metadata`. Activity rows also carry the 028 audit context fields: platform vs organization scope, `organizationId`, actor platform role, actor organization role, and whether the actor had fresh platform step-up at write time. Platform admins can read all rows; org owners/admins can read only rows for their organization.

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import type { ActiveScope } from "@id/lib";
 import {
   Badge,
   ConfirmDialog,
@@ -27,6 +28,8 @@ import { listClients as listClientsAction } from "../../_actions/oauth";
 import { adminConsentsKey, oauthClientsKey } from "@/app/admin/_data/swr-keys";
 import { ADMIN_AUDIT_PAGE_SIZE } from "@/shared/constants";
 
+const platformScope: ActiveScope = { kind: "platform" };
+
 const defaultActions = {
   listAdminConsents: listAdminConsentsAction,
   revokeConsent: revokeConsentAction,
@@ -34,6 +37,7 @@ const defaultActions = {
 };
 
 type ConsentsContentProps = {
+  scope?: ActiveScope;
   loading?: boolean;
   error?: string;
   actions?: typeof defaultActions;
@@ -43,24 +47,34 @@ function formatDate(ms: number | null): string {
   return ms === null ? "—" : new Date(ms).toLocaleDateString();
 }
 
-export function ConsentsContent({ loading, error, actions = defaultActions }: ConsentsContentProps) {
+export function ConsentsContent({ scope, loading, error, actions = defaultActions }: ConsentsContentProps) {
   const [offset, setOffset] = useState(0);
   const [clientFilter, setClientFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [revokeTarget, setRevokeTarget] = useState<AdminConsent | null>(null);
   const [revokeError, setRevokeError] = useState<string | undefined>();
+  const effectiveScope = scope ?? platformScope;
+  const organizationId =
+    effectiveScope.kind === "organization"
+      ? effectiveScope.organizationId
+      : undefined;
 
   const params = useMemo(
-    () => ({ limit: ADMIN_AUDIT_PAGE_SIZE, offset, ...(clientFilter !== "all" ? { clientId: clientFilter } : {}) }),
-    [offset, clientFilter],
+    () => ({
+      limit: ADMIN_AUDIT_PAGE_SIZE,
+      offset,
+      ...(clientFilter !== "all" ? { clientId: clientFilter } : {}),
+      ...(organizationId ? { organizationId } : {}),
+    }),
+    [offset, clientFilter, organizationId],
   );
   const { data, isLoading, error: swrError, mutate } = useSWR(
     loading || error ? null : adminConsentsKey(params),
     () => actions.listAdminConsents(params),
   );
   const { data: clients } = useSWR(
-    loading || error ? null : oauthClientsKey(),
-    () => actions.listClients(),
+    loading || error ? null : oauthClientsKey(effectiveScope),
+    () => actions.listClients(effectiveScope),
   );
 
   const clientOptions = useMemo(
@@ -88,7 +102,15 @@ export function ConsentsContent({ loading, error, actions = defaultActions }: Co
     try {
       const who = revokeTarget.userEmail ?? "the user";
       const what = revokeTarget.clientName ?? "the client";
-      await actions.revokeConsent(revokeTarget.clientId, revokeTarget.userId);
+      if (organizationId) {
+        await actions.revokeConsent(
+          revokeTarget.clientId,
+          revokeTarget.userId,
+          organizationId,
+        );
+      } else {
+        await actions.revokeConsent(revokeTarget.clientId, revokeTarget.userId);
+      }
       await mutate();
       setRevokeTarget(null);
       toast.success("Consent revoked", `${who} will be asked to re-approve ${what}.`);

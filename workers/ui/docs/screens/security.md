@@ -6,7 +6,7 @@ Same component set as identity.md and oauth.md. All components exist in `@id/ui`
 
 **Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, visibility props on Button/LinkButton.
 
-Covers platform security routes under `/admin/platform/security/**`. Legacy `/admin/security/**` URLs are proxy redirects only; the old route files have been removed. Platform admin only.
+Covers platform security routes under `/admin/platform/security/**` plus the bounded org consent route under `/admin/orgs/:orgId/security/consents`. Legacy `/admin/security/**` URLs are proxy redirects only; the old route files have been removed. Sessions, token audit, JWKS, and introspection remain platform-only.
 
 Box-drawing key: ┌─┐ top · └─┘ bottom · ├─┤ mid · │ vertical · ↕ sortable · ▸ active · ● on · ○ off · ✓ yes · ✗ no
 
@@ -163,7 +163,7 @@ Deep-linkable public-key detail route. The detail route has its own tabs; the se
 │   (sidebar)      │ Overview: DescriptionList + [Download public JWK]  │
 │                  │ Public JWK: JsonViewer + [Copy] [Download]         │
 │                  │ Metrics: EmptyState(per-key usage not collected)   │
-│                  │ Audit: Timeline(targetType="jwks", targetId=kid)   │
+│                  │ Audit: DataTable(summary + payload details)        │
 └──────────────────┴────────────────────────────────────────────────────┘
 ```
 
@@ -177,7 +177,7 @@ Components:
     Audit: ActivityLogContent(targetType="jwks", targetId=kid)
 
 Data: GET /api/auth/admin/jwks → { keys: AdminJwk[] } selected client-side by `kid`.
-      GET /api/auth/admin/activity-log?targetType=jwks&targetId=:kid → Timeline entries.
+      GET /api/auth/admin/activity-log?targetType=jwks&targetId=:kid → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.
 
 Behavior:
   - Missing `kid` shows ErrorAlert("Signing key not found") with the back button still available.
@@ -187,7 +187,7 @@ Behavior:
 
 ## /admin/security/consents
 
-Read-only view of OAuth consent grants across all users.
+OAuth consent grants across all users in the platform lens. Platform admins can revoke any single consent grant, forcing the user to re-consent on the next authorization request.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -250,37 +250,57 @@ Components:
 
   Revoke modal: ConfirmDialog(title="Revoke Consent", confirmLabel="Revoke", variant="danger", onConfirm)
     Text(variant="body", "The user will need to re-consent on next authorization request.")
-    On confirm: POST /api/auth/oauth2/revoke-consent { clientId, userId }
+    On confirm: POST /api/auth/admin/revoke-consent { clientId, userId }
 
 Data:
-  — Note: No admin endpoint to list all consents exists in the current API.
-    The `oauthConsent` table stores per-user, per-client consent records.
-    **This screen requires a new aggregate admin endpoint.**
-    Document as "API Gap" for first implementation.
-    Options: (a) placeholder page with "Coming soon",
-    (b) implement admin consent list endpoint reading from D1 `oauthConsent` table,
-    (c) per-user consent lookup.
-
-  If/when available:
-    GET /api/auth/admin/list-consents → { consents: OAuthConsent[] }
-      query params: clientId?, limit?, offset?
-    POST /api/auth/oauth2/revoke-consent → { success: boolean }
-      body: { clientId, userId }
+  GET /api/auth/admin/list-consents → { consents, total, limit, offset }
+    query params: clientId?, limit?, offset?
+  POST /api/auth/admin/revoke-consent → { success: boolean }
+    body: { clientId, userId }
 
   OAuthConsent shape: { id, clientId, userId, referenceId?, scopes: string[], createdAt, updatedAt }
 
 Notes:
-  - This screen is deferred — it requires API support that doesn't exist yet.
-  - First implementation: show "Coming Soon" placeholder with description.
-  - Future: list all consents with client-side filtering by client and user email.
-  - User email lookup: requires join with `user` table. Without join, display userId.
+  - `admin-audit` owns the aggregate endpoint and enriches user email and client name with batched adapter reads.
   - Revoke consent: removes the consent record; user re-prompted on next authz request.
-  - For now the route file renders a simple placeholder Panel:
-    ```
-    PageBody
-      PageHeader > Text(variant="h1", "Consents")
-      Panel > Text(variant="body", "Consent management is coming soon. The consent viewer will show all OAuth authorization grants across all users and clients.")
-    ```
+
+---
+
+## /admin/orgs/:orgId/security/consents
+
+Organization-scoped OAuth consent grants for org-owned clients. This is intentionally narrower than the platform security section: sessions, tokens, JWKS, and token introspection do not render in the organization lens because they require a bounded candidate set or platform-level key authority.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ ◈ id admin  ▸ Acme ▸ Consents                                      │
+├──────────────────┬────────────────────────────────────────────────────┤
+│   (org nav)      │ Consents                                           │
+│                  │ [🔍 Search by email…] [Client ▾ All clients]       │
+│                  │ ┌──────────────────────────────────────────────┐   │
+│                  │ │ User Email       Client        Scopes  Grant │   │
+│                  │ │ owner@acme.com   Content API   [read]  01/15 │   │
+│                  │ └──────────────────────────────────────────────┘   │
+│                  │ ┌ empty ─ No OAuth consent records ─┐             │
+│                  │ ┌ revoke modal: client + user grant ┐             │
+└──────────────────┴────────────────────────────────────────────────────┘
+```
+
+Components:
+  PageBody > ConsentsContent(scope={ kind: "organization", organizationId: orgId })
+    Stack(gap="md")
+      PageIntro(title="Consents", description, info)
+      Panel > Inline(SearchInput + FilterDropdown(Client))
+      Panel(padding=none|md) > DataTable<AdminConsent>(columns=[userEmail, clientName, scopes, createdAt, actions], pagination)
+      Revoke: ConfirmDialog(variant="danger") → revokeConsent(clientId, userId, organizationId) → mutate()
+
+Data: GET /api/auth/admin/list-consents?organizationId=:orgId&clientId?&limit&offset → { consents, total, limit, offset }
+      POST /api/auth/admin/revoke-consent body: { organizationId: orgId, clientId, userId } → { success: true }
+      GET /api/auth/oauth2/get-clients after `organization/set-active` → client filter list, client-side filtered to `reference_id == orgId`
+
+Behavior:
+  - The endpoint first authorizes the actor for `organizationId`, then bounds reads to clients where `oauthClient.referenceId == organizationId`; an explicit `clientId` outside that set returns an empty page.
+  - Revoke verifies the submitted `clientId` is owned by the same organization before deleting the consent row; cross-org revoke returns `404`.
+  - The organization nav exposes only Consents under Security. Platform-only security siblings remain hidden in the org lens.
 
 ---
 

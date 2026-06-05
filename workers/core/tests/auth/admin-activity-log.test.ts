@@ -55,9 +55,11 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   };
   const raw = new Database(":memory:");
   applyAuthMigrations(raw);
-  raw.exec(
-    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`,
-  );
+  raw.exec(`
+    insert into "organization" ("id", "name", "slug", "createdAt") values
+      ('org_1', 'Acme', 'acme', 1700000000000),
+      ('org_2', 'Beta', 'beta', 1700000000000);
+  `);
   return raw;
 }
 
@@ -78,6 +80,28 @@ async function signInSuperadmin(auth: TestAuth): Promise<string> {
   return r.headers.get("set-cookie") ?? "";
 }
 
+async function signInOrgOwner(
+  raw: RawSqlite,
+  auth: TestAuth,
+): Promise<{ cookie: string; userId: string }> {
+  const created = await auth.api.createUser({
+    body: {
+      name: "Org Owner",
+      email: "owner@example.test",
+      password: "password123",
+      data: { emailVerified: true },
+    },
+  });
+  raw.exec(
+    `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('mem_owner_1', 'org_1', '${created.user.id}', 'owner', 1700000000000);`,
+  );
+  const r = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "owner@example.test",
+    password: "password123",
+  });
+  return { cookie: r.headers.get("set-cookie") ?? "", userId: created.user.id };
+}
+
 describe("admin-activity-log plugin", () => {
   it("derives Better Auth fields from the canonical schema", () => {
     expect(adminActivityLogBetterAuthFields.actorId).toEqual(
@@ -85,6 +109,22 @@ describe("admin-activity-log plugin", () => {
     );
     expect(adminActivityLogBetterAuthFields.targetType).toEqual(
       expect.objectContaining({ type: "string", required: true, index: true }),
+    );
+    expect(adminActivityLogBetterAuthFields.organizationId).toEqual(
+      expect.objectContaining({ type: "string", required: false, index: true }),
+    );
+    expect(adminActivityLogBetterAuthFields.steppedUp).toEqual(
+      expect.objectContaining({
+        type: "boolean",
+        required: false,
+        index: true,
+      }),
+    );
+    expect(adminActivityLogBetterAuthFields.summary).toEqual(
+      expect.objectContaining({ type: "string", required: false }),
+    );
+    expect(adminActivityLogBetterAuthFields.details).toEqual(
+      expect.objectContaining({ type: "string", required: false }),
     );
     expect(adminActivityLogBetterAuthFields.before).toEqual(
       expect.objectContaining({ type: "string", required: false }),
@@ -155,6 +195,61 @@ describe("admin-activity-log plugin", () => {
     expect(text).not.toContain(created.client_secret);
     expect(text).not.toContain('"client_secret"');
     expect(text).toContain("oauth_client.create");
+    expect(text).toContain(`Created OAuth client ${created.client_id}`);
+  });
+
+  it("records semantic details for user bans", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+    const created = await auth.api.createUser({
+      body: {
+        name: "Banned User",
+        email: "banned@example.test",
+        password: "password123",
+        data: { emailVerified: true },
+      },
+    });
+
+    const ban = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/ban-user`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          userId: created.user.id,
+          banReason: "Abuse report",
+          banExpiresIn: 604_800,
+        }),
+      }),
+    );
+    expect(ban.status).toBe(200);
+
+    const list = await auth.handler(
+      new Request(
+        `${BASE}/api/auth/admin/activity-log?targetType=user&targetId=${created.user.id}&action=user.ban`,
+        {
+          method: "GET",
+          headers: { cookie },
+        },
+      ),
+    );
+    expect(list.status).toBe(200);
+    const body = (await list.json()) as {
+      entries: Array<{
+        summary: string | null;
+        details: Record<string, unknown> | null;
+      }>;
+    };
+    expect(body.entries).toEqual([
+      expect.objectContaining({
+        summary: `Banned user ${created.user.id} 7 days: Abuse report`,
+        details: expect.objectContaining({
+          userId: created.user.id,
+          reason: "Abuse report",
+          banExpiresIn: 604_800,
+        }),
+      }),
+    ]);
   });
 
   it("logs organization creation through the Better Auth organization route", async () => {
@@ -183,14 +278,68 @@ describe("admin-activity-log plugin", () => {
     );
     expect(list.status).toBe(200);
     const body = (await list.json()) as {
-      entries: Array<{ action: string; targetId: string; actorId: string }>;
+      entries: Array<{
+        action: string;
+        targetId: string;
+        actorId: string;
+        scope: string | null;
+        organizationId: string | null;
+        actorPlatformRole: string | null;
+        steppedUp: boolean | null;
+        summary: string | null;
+        details: Record<string, unknown> | null;
+      }>;
     };
     expect(body.entries).toEqual([
       expect.objectContaining({
         action: "organization.create",
         targetId: created.id,
         actorId: expect.any(String),
+        scope: "organization",
+        organizationId: created.id,
+        actorPlatformRole: "admin",
+        steppedUp: false,
+        summary: `Created organization ${created.id}`,
+        details: expect.objectContaining({ organizationId: created.id }),
       }),
     ]);
+  });
+
+  it("allows org owners to read only their organization activity", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const { cookie, userId } = await signInOrgOwner(raw, auth);
+    raw.exec(`
+      insert into "adminActivityLog"
+        ("id", "actorId", "actorType", "action", "targetType", "targetId", "scope", "organizationId", "actorOrganizationRole", "steppedUp", "createdAt")
+      values
+        ('act_org_1', '${userId}', 'user', 'organization.update', 'organization', 'org_1', 'organization', 'org_1', 'owner', 0, 1700000000000),
+        ('act_org_2', '${userId}', 'user', 'organization.update', 'organization', 'org_2', 'organization', 'org_2', null, 0, 1700000000001);
+    `);
+
+    const own = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/activity-log?organizationId=org_1`, {
+        method: "GET",
+        headers: { cookie },
+      }),
+    );
+    expect(own.status).toBe(200);
+    const ownBody = (await own.json()) as {
+      entries: Array<{ targetId: string; organizationId: string | null }>;
+    };
+    expect(ownBody.entries).toEqual([
+      expect.objectContaining({
+        targetId: "org_1",
+        organizationId: "org_1",
+      }),
+    ]);
+
+    const crossOrg = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/activity-log?organizationId=org_2`, {
+        method: "GET",
+        headers: { cookie },
+      }),
+    );
+    expect(crossOrg.status).toBe(403);
   });
 });

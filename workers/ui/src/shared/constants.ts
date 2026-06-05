@@ -297,6 +297,14 @@ export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
     ],
   ] satisfies readonly NavTuple[]),
   ...navItems("organization", organizationHref, [
+    [
+      "security-consents",
+      "Consents",
+      "security",
+      "security-audit:read",
+      "/security/consents",
+      "FileCheck2",
+    ],
     ["audit", "Audit", "audit", "security-audit:read", "/audit", "History"],
   ] satisfies readonly NavTuple[]),
 ];

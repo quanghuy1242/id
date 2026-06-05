@@ -9,7 +9,7 @@ import { mockClients } from "@/app/admin/_mocks/oauth";
 import { mockOrganizations } from "@/app/admin/_mocks/organizations";
 import { mockConsents, mockAdminJwks } from "@/app/admin/_mocks/security";
 import { mockUsers } from "@/app/admin/_mocks/users";
-import type { AdminConsent, AdminJwk, AdminSession, AdminToken, PageParams, Paginated } from "@/app/admin/_actions/audit";
+import type { AdminConsent, AdminJwk, AdminSession, AdminToken, ConsentListParams, PageParams, Paginated } from "@/app/admin/_actions/audit";
 import type { OAuthClient } from "@/app/admin/_actions/oauth";
 import type { Organization } from "@/app/admin/_actions/organizations";
 import type { ListUsersParams, ListUsersResponse } from "@/app/admin/_actions/users";
@@ -24,7 +24,7 @@ function makeActions() {
       const rows = params.type === "refresh" ? mockRefreshTokens : mockTokens;
       return Promise.resolve({ tokens: rows.slice(0, params.limit), total: rows.length, limit: params.limit, offset: params.offset });
     }),
-    listAdminConsents: vi.fn<(params: PageParams & { clientId?: string }) => Promise<Paginated<"consents", AdminConsent>>>().mockImplementation((params) => Promise.resolve({ consents: mockConsents.slice(0, params.limit), total: mockConsents.length, limit: params.limit, offset: params.offset })),
+    listAdminConsents: vi.fn<(params: ConsentListParams) => Promise<Paginated<"consents", AdminConsent>>>().mockImplementation((params) => Promise.resolve({ consents: mockConsents.slice(0, params.limit), total: mockConsents.length, limit: params.limit, offset: params.offset })),
     listAdminJwks: vi.fn<() => Promise<AdminJwk[]>>().mockResolvedValue(mockAdminJwks),
   };
 }

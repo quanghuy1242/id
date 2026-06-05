@@ -74,4 +74,28 @@ describe("JwksContent", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /rotate key/i }));
     await waitFor(() => expect(actions.rotateJwks).toHaveBeenCalledWith("compromise drill"));
   });
+
+  it("routes to step-up when emergency rotate needs fresh verification", async () => {
+    const actions = makeActions(mockAdminJwks);
+    const stepUpError = Object.assign(
+      new Error("Fresh platform verification is required for this action"),
+      { status: 403, code: "platform_action_step_up_required" },
+    );
+    actions.rotateJwks.mockRejectedValueOnce(
+      stepUpError,
+    );
+    const onStepUpRequired = vi.fn<() => void>();
+    render(
+      <JwksContent
+        actions={actions}
+        onStepUpRequired={onStepUpRequired}
+      />,
+    );
+    await waitFor(() => screen.getByText("abc123def456"));
+    fireEvent.click(screen.getByRole("button", { name: /emergency rotate/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/reason/i), { target: { value: "compromise drill" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /rotate key/i }));
+    await waitFor(() => expect(onStepUpRequired).toHaveBeenCalledTimes(1));
+  });
 });

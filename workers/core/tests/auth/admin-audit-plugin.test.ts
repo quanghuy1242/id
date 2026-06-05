@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
+import { ADMIN_ACTION_STEP_UP_TTL_SECONDS } from "../../src/auth/config";
 import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
-import { adminOtpSignIn } from "./admin-otp-sign-in";
+import { adminOtpSignIn, latestAdminOtp } from "./admin-otp-sign-in";
 
 const capturedEmailSender = createCapturedAuthEmailSender();
 
@@ -78,7 +79,11 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   const raw = new Database(":memory:");
   applyAuthMigrations(raw);
   raw.exec(
-    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`,
+    `
+      insert into "organization" ("id", "name", "slug", "createdAt") values
+      ('org_1', 'Acme', 'acme', 1700000000000),
+      ('org_2', 'Beta', 'beta', 1700000000000);
+    `,
   );
   return raw;
 }
@@ -100,6 +105,28 @@ async function signInSuperadmin(auth: TestAuth): Promise<string> {
   return r.headers.get("set-cookie") ?? "";
 }
 
+async function completePlatformStepUp(
+  auth: TestAuth,
+  cookie: string,
+): Promise<void> {
+  const request = await auth.handler(
+    new Request(`${BASE}/api/auth/admin/step-up/request`, {
+      method: "POST",
+      headers: { cookie },
+    }),
+  );
+  expect(request.status).toBe(200);
+
+  const verify = await auth.handler(
+    new Request(`${BASE}/api/auth/admin/step-up/verify`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ otp: latestAdminOtp(capturedEmailSender) }),
+    }),
+  );
+  expect(verify.status).toBe(200);
+}
+
 async function signInRegularUser(auth: TestAuth): Promise<string> {
   // All sign-ins flow through the admin-OTP guard; a default-role user signed
   // in this way still carries role "user", so the audit endpoints must 403.
@@ -113,6 +140,25 @@ async function signInRegularUser(auth: TestAuth): Promise<string> {
   });
   const r = await adminOtpSignIn(auth, capturedEmailSender, {
     email: "joe@example.test",
+    password: "password123",
+  });
+  return r.headers.get("set-cookie") ?? "";
+}
+
+async function signInOrgOwner(raw: RawSqlite, auth: TestAuth): Promise<string> {
+  const created = await auth.api.createUser({
+    body: {
+      name: "Org Owner",
+      email: "owner@example.test",
+      password: "password123",
+      data: { emailVerified: true },
+    },
+  });
+  raw.exec(
+    `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('mem_owner_1', 'org_1', '${created.user.id}', 'owner', 1700000000000);`,
+  );
+  const r = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "owner@example.test",
     password: "password123",
   });
   return r.headers.get("set-cookie") ?? "";
@@ -141,7 +187,31 @@ function seedAuditData(raw: RawSqlite): void {
   );
 }
 
+function seedOrgConsentData(raw: RawSqlite): void {
+  raw.exec(
+    `insert into "user" ("id","name","email","emailVerified","createdAt","updatedAt") values ('u_org_seed','Org Seed','org-seed@example.test',1,1700000000000,1700000000000);`,
+  );
+  raw.exec(
+    `
+      insert into "oauthClient" ("id","clientId","name","redirectUris","referenceId","createdAt","updatedAt") values
+      ('oc_org_1','cli_org_1','Org One App','[]','org_1',1700000000000,1700000000000),
+      ('oc_org_2','cli_org_2','Org Two App','[]','org_2',1700000000000,1700000000000);
+    `,
+  );
+  raw.exec(
+    `
+      insert into "oauthConsent" ("id","clientId","userId","scopes","createdAt","updatedAt") values
+      ('cons_org_1','cli_org_1','u_org_seed','["openid","profile"]',1700000000000,1700000000000),
+      ('cons_org_2','cli_org_2','u_org_seed','["openid","email"]',1700000000000,1700000000000);
+    `,
+  );
+}
+
 describe("admin-audit plugin", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("exports the safe session contract in OpenAPI", async () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
@@ -175,6 +245,17 @@ describe("admin-audit plugin", () => {
       ]?.schema?.properties ?? {};
     expect(revokeSessionProps).toHaveProperty("sessionId");
     expect(revokeSessionProps).not.toHaveProperty("sessionToken");
+
+    expect(
+      schema.paths["/admin/list-consents"]?.get?.parameters,
+    ).toContainEqual(
+      expect.objectContaining({ name: "organizationId", in: "query" }),
+    );
+    const revokeConsentProps =
+      schema.paths["/admin/revoke-consent"]?.post?.requestBody?.content?.[
+        "application/json"
+      ]?.schema?.properties ?? {};
+    expect(revokeConsentProps).toHaveProperty("organizationId");
   });
 
   it("rejects unauthenticated and non-admin callers", async () => {
@@ -328,6 +409,91 @@ describe("admin-audit plugin", () => {
     expect(afterBody.total).toBe(0);
   });
 
+  it("lets org owners list only consent grants for org-owned clients", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInOrgOwner(raw, auth);
+    seedOrgConsentData(raw);
+
+    const list = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/list-consents?organizationId=org_1`, {
+        method: "GET",
+        headers: { cookie },
+      }),
+    );
+    expect(list.status).toBe(200);
+    const body = (await list.json()) as {
+      consents: Array<{ clientId: string; clientName: string | null }>;
+      total: number;
+    };
+    expect(body.total).toBe(1);
+    expect(body.consents).toEqual([
+      expect.objectContaining({
+        clientId: "cli_org_1",
+        clientName: "Org One App",
+      }),
+    ]);
+
+    const hiddenClient = await auth.handler(
+      new Request(
+        `${BASE}/api/auth/admin/list-consents?organizationId=org_1&clientId=cli_org_2`,
+        {
+          method: "GET",
+          headers: { cookie },
+        },
+      ),
+    );
+    expect(hiddenClient.status).toBe(200);
+    await expect(hiddenClient.json()).resolves.toMatchObject({
+      consents: [],
+      total: 0,
+    });
+  });
+
+  it("lets org owners revoke only consent grants for org-owned clients", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInOrgOwner(raw, auth);
+    seedOrgConsentData(raw);
+
+    const crossOrg = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/revoke-consent`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          organizationId: "org_1",
+          clientId: "cli_org_2",
+          userId: "u_org_seed",
+        }),
+      }),
+    );
+    expect(crossOrg.status).toBe(404);
+
+    const revoke = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/revoke-consent`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          organizationId: "org_1",
+          clientId: "cli_org_1",
+          userId: "u_org_seed",
+        }),
+      }),
+    );
+    expect(revoke.status).toBe(200);
+
+    const after = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/list-consents?organizationId=org_1`, {
+        method: "GET",
+        headers: { cookie },
+      }),
+    );
+    await expect(after.json()).resolves.toMatchObject({
+      consents: [],
+      total: 0,
+    });
+  });
+
   it("returns JWKS metadata without the private key", async () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
@@ -356,10 +522,53 @@ describe("admin-audit plugin", () => {
     expect(body.keys[0].publicJwk).not.toHaveProperty("d"); // Ed25519 private scalar
   });
 
-  it("emergency-rotates JWKS and records public-only activity", async () => {
+  it("challenges emergency JWKS rotation without fresh action step-up", async () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
     const cookie = await signInSuperadmin(auth);
+
+    const rotate = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/jwks/rotate`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ reason: "compromise drill" }),
+      }),
+    );
+    expect(rotate.status).toBe(403);
+    await expect(rotate.json()).resolves.toMatchObject({
+      code: "platform_action_step_up_required",
+    });
+  });
+
+  it("challenges emergency JWKS rotation with stale action step-up", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+    await completePlatformStepUp(auth, cookie);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(
+      Date.now() + (ADMIN_ACTION_STEP_UP_TTL_SECONDS + 1) * 1000,
+    );
+
+    const rotate = await auth.handler(
+      new Request(`${BASE}/api/auth/admin/jwks/rotate`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ reason: "compromise drill" }),
+      }),
+    );
+    expect(rotate.status).toBe(403);
+    await expect(rotate.json()).resolves.toMatchObject({
+      code: "platform_action_step_up_required",
+    });
+  });
+
+  it("emergency-rotates JWKS after fresh step-up and records public-only activity", async () => {
+    const raw = await createMemoryDatabase();
+    const auth = await createAuth(raw);
+    const cookie = await signInSuperadmin(auth);
+    await completePlatformStepUp(auth, cookie);
 
     const rotate = await auth.handler(
       new Request(`${BASE}/api/auth/admin/jwks/rotate`, {

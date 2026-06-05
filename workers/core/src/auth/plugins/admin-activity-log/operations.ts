@@ -81,6 +81,18 @@ export function parsePayload(
   }
 }
 
+function presentScope(
+  value: AdminActivityLogRow["scope"],
+): "platform" | "organization" | null {
+  return value === "platform" || value === "organization" ? value : null;
+}
+
+function presentOrganizationRole(
+  value: AdminActivityLogRow["actorOrganizationRole"],
+): "owner" | "admin" | null {
+  return value === "owner" || value === "admin" ? value : null;
+}
+
 export function parseActivityPageParams(
   query: { limit?: unknown; offset?: unknown } | undefined,
 ): ActivityPageParams {
@@ -124,6 +136,13 @@ export async function appendActivityLog(
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
+      scope: input.scope ?? null,
+      organizationId: input.organizationId ?? null,
+      actorPlatformRole: input.actorPlatformRole ?? null,
+      actorOrganizationRole: input.actorOrganizationRole ?? null,
+      steppedUp: input.steppedUp ?? null,
+      summary: input.summary ?? null,
+      details: stringifyPayload(input.details),
       before: stringifyPayload(input.before),
       after: stringifyPayload(input.after),
       metadata: stringifyPayload(input.metadata),
@@ -144,6 +163,13 @@ export function presentActivity(
     action: row.action,
     targetType: row.targetType,
     targetId: row.targetId,
+    scope: presentScope(row.scope),
+    organizationId: row.organizationId ?? null,
+    actorPlatformRole: row.actorPlatformRole ?? null,
+    actorOrganizationRole: presentOrganizationRole(row.actorOrganizationRole),
+    steppedUp: row.steppedUp ?? null,
+    summary: row.summary ?? null,
+    details: parsePayload(row.details),
     before: parsePayload(row.before),
     after: parsePayload(row.after),
     metadata: parsePayload(row.metadata),

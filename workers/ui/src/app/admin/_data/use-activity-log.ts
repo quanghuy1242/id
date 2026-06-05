@@ -16,8 +16,9 @@ const defaultActions = {
 export type ActivityLogActions = typeof defaultActions;
 
 export type UseActivityLogOptions = {
-  readonly targetType: string;
-  readonly targetId: string;
+  readonly organizationId?: string;
+  readonly targetType?: string;
+  readonly targetId?: string;
   readonly action?: string;
   readonly actorId?: string;
   readonly limit?: number;
@@ -40,6 +41,7 @@ export type ActivityLogResult = {
 export function useActivityLog({
   targetType,
   targetId,
+  organizationId,
   action,
   actorId,
   limit = 25,
@@ -49,6 +51,7 @@ export function useActivityLog({
   actions = defaultActions,
 }: UseActivityLogOptions): ActivityLogResult {
   const params: ActivityLogParams = {
+    organizationId,
     targetType,
     targetId,
     action,
@@ -57,7 +60,9 @@ export function useActivityLog({
     offset,
   };
   const skip = Boolean(
-    loadingOverride || errorOverride || !targetType || !targetId,
+    loadingOverride ||
+    errorOverride ||
+    (!organizationId && (!targetType || !targetId)),
   );
   const { data, isLoading, error, mutate } = useSWR<
     Paginated<"entries", AdminActivity>

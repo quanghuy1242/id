@@ -357,15 +357,24 @@ describe("admin action contracts", () => {
       jsonResponse({ consents: [], total: 0, limit: 25, offset: 0 }),
     );
     await expect(
-      listAdminConsents({ limit: 25, offset: 0, clientId: "cli_admin" }),
+      listAdminConsents({
+        limit: 25,
+        offset: 0,
+        clientId: "cli_admin",
+        organizationId: "org_001",
+      }),
     ).resolves.toMatchObject({ consents: [], total: 0 });
     expect(lastCall().url).toBe(
-      "/api/auth/admin/list-consents?limit=25&offset=0&clientId=cli_admin",
+      "/api/auth/admin/list-consents?limit=25&offset=0&clientId=cli_admin&organizationId=org_001",
     );
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
-    await revokeConsent("cli_admin", "user_001");
-    expect(jsonBody()).toEqual({ clientId: "cli_admin", userId: "user_001" });
+    await revokeConsent("cli_admin", "user_001", "org_001");
+    expect(jsonBody()).toEqual({
+      clientId: "cli_admin",
+      userId: "user_001",
+      organizationId: "org_001",
+    });
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ keys: [] }));
     await expect(listAdminJwks()).resolves.toEqual([]);

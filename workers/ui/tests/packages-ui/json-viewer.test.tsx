@@ -29,4 +29,10 @@ describe("JsonViewer", () => {
     expect(screen.getByText("Public JWK")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
   });
+
+  it("contains wide payloads within the parent width", () => {
+    const { container } = render(<JsonViewer value={{ token: "x".repeat(200) }} />);
+    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0", "max-w-full", "overflow-hidden");
+    expect(container.querySelector("pre")).toHaveClass("overflow-auto", "whitespace-pre");
+  });
 });

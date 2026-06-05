@@ -27,5 +27,5 @@ const sizeClass: Record<BadgeSize, string> = {
 };
 
 export function Badge({ tone = "neutral", size = "md", children }: BadgeProps) {
-  return <span className={`badge ${sizeClass[size]} badge-outline ${badgeClass[tone]}`.trim()}>{children}</span>;
+  return <span className={`badge whitespace-nowrap ${sizeClass[size]} badge-outline ${badgeClass[tone]}`.trim()}>{children}</span>;
 }

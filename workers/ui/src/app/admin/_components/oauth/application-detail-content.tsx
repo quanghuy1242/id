@@ -376,7 +376,14 @@ function renderTab(activeTab: ApplicationDetailTab, client: OAuthClient, actions
   if (activeTab === "scopes") return <ScopesAndGrants client={client} />;
   if (activeTab === "connections") return <Connections client={client} actions={actions} scope={scope} />;
   if (activeTab === "quickstart") return <Quickstart client={client} />;
-  if (activeTab === "audit") return <ActivityLogContent targetType="oauth_client" targetId={client.client_id} />;
+  if (activeTab === "audit")
+    return (
+      <ActivityLogContent
+        organizationId={scope.kind === "organization" ? scope.organizationId : undefined}
+        targetType="oauth_client"
+        targetId={client.client_id}
+      />
+    );
   return <Overview client={client} />;
 }
 

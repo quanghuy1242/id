@@ -274,7 +274,13 @@ export function ResourceApiDetailContent({
         }}
         onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
       />
-      {activeTab === "audit" ? <ActivityLogContent targetType="resource_server" targetId={resource.id} /> : <Overview resource={resource} />}
+      {activeTab === "audit" ? (
+        <ActivityLogContent
+          organizationId={resource.organizationId ?? undefined}
+          targetType="resource_server"
+          targetId={resource.id}
+        />
+      ) : <Overview resource={resource} />}
       <ConfirmDialog
         open={editOpen}
         onOpenChange={(o) => { setEditOpen(o); if (!o) setEditError(undefined); }}

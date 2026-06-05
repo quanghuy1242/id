@@ -129,6 +129,20 @@ describe("DataTable", () => {
     expect(screen.getByText("$2.00")).toBeInTheDocument();
   });
 
+  it("supports fixed layout with contained overflow", () => {
+    const fixedColumns: DataTableColumn<Item>[] = [
+      { key: "name", label: "Name", width: "sm" },
+      { key: "value", label: "Value" },
+    ];
+    const { container } = render(
+      <DataTable columns={fixedColumns} rows={rows} getRowKey={(r) => r.id} layout="fixed" overflow="contained" minWidth="md" />,
+    );
+    expect(container.firstElementChild).toHaveClass("overflow-x-auto", "min-w-0", "max-w-full");
+    expect(container.querySelector("table")).toHaveClass("table-fixed", "min-w-[60rem]");
+    expect(screen.getByRole("columnheader", { name: "Name" })).toHaveClass("w-32");
+    expect(screen.getByText("Alpha").closest("td")).toHaveClass("overflow-hidden", "break-words", "align-top");
+  });
+
   it("renders a single action directly", () => {
     const onOpen = vi.fn<(id: string) => void>();
     const actionColumns: DataTableColumn<Item>[] = [

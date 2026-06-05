@@ -71,6 +71,20 @@
       "when": 1780295519568,
       "tag": "0009_thin_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1780649931931,
+      "tag": "0010_slippery_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1780654732591,
+      "tag": "0011_wooden_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

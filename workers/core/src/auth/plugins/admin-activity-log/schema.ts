@@ -4,9 +4,10 @@ import { mapZodToBetterAuthFields, zodSchemaToOpenApi } from "../../openapi";
 /**
  * Schema surface for the append-only admin activity log.
  *
- * The persisted `before`/`after`/`metadata` fields are JSON strings because the
- * Better Auth plugin field map only exposes portable primitive types. The public
- * read endpoint parses them back into objects after secret stripping.
+ * The persisted `details`/`before`/`after`/`metadata` fields are JSON strings
+ * because the Better Auth plugin field map only exposes portable primitive
+ * types. The public read endpoint parses them back into objects after secret
+ * stripping.
  */
 
 const actorTypeSchema = z.string().min(1).meta({
@@ -16,6 +17,9 @@ const actorTypeSchema = z.string().min(1).meta({
 const jsonStringSchema = z.string().nullable().optional().meta({
   description: "JSON-serialized object payload; parsed by the presenter.",
 });
+
+const scopeSchema = z.enum(["platform", "organization"]);
+const organizationRoleSchema = z.enum(["owner", "admin"]);
 
 export const adminActivityLogSchema = z
   .object({
@@ -53,6 +57,44 @@ export const adminActivityLogSchema = z
         description: "Identifier of the changed target",
         betterAuth: { index: true },
       }),
+    scope: z
+      .string()
+      .nullable()
+      .optional()
+      .meta({
+        description: "Console scope in which the action was performed",
+        betterAuth: { index: true },
+      }),
+    organizationId: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .meta({
+        description:
+          "Organization scope identifier when the action targeted an organization lens",
+        betterAuth: { index: true },
+      }),
+    actorPlatformRole: z.string().nullable().optional().meta({
+      description: "Platform role held by the actor, if any",
+    }),
+    actorOrganizationRole: z.string().nullable().optional().meta({
+      description: "Organization owner/admin role held by the actor, if any",
+    }),
+    steppedUp: z
+      .boolean()
+      .nullable()
+      .optional()
+      .meta({
+        description:
+          "Whether the actor held fresh platform step-up proof for this action",
+        betterAuth: { index: true },
+      }),
+    summary: z.string().nullable().optional().meta({
+      description:
+        "Human-readable summary of the business fact recorded by this activity",
+    }),
+    details: jsonStringSchema,
     before: jsonStringSchema,
     after: jsonStringSchema,
     metadata: jsonStringSchema,
@@ -75,6 +117,13 @@ export type PresentedActivity = {
   action: string;
   targetType: string;
   targetId: string;
+  scope: "platform" | "organization" | null;
+  organizationId: string | null;
+  actorPlatformRole: string | null;
+  actorOrganizationRole: "owner" | "admin" | null;
+  steppedUp: boolean | null;
+  summary: string | null;
+  details: Record<string, unknown> | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
@@ -99,6 +148,13 @@ const presentedActivitySchema = z
     action: z.string(),
     targetType: z.string(),
     targetId: z.string(),
+    scope: scopeSchema.nullable(),
+    organizationId: z.string().nullable(),
+    actorPlatformRole: z.string().nullable(),
+    actorOrganizationRole: organizationRoleSchema.nullable(),
+    steppedUp: z.boolean().nullable(),
+    summary: z.string().nullable(),
+    details: activityPayloadSchema,
     before: activityPayloadSchema,
     after: activityPayloadSchema,
     metadata: activityPayloadSchema,
@@ -127,6 +183,13 @@ type QueryParameter = {
 };
 
 const queryParameters: QueryParameter[] = [
+  {
+    name: "organizationId",
+    in: "query",
+    required: false,
+    schema: { type: "string" },
+    description: "Filter by organization scope",
+  },
   {
     name: "targetType",
     in: "query",

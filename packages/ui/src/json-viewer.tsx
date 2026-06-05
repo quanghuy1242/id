@@ -55,7 +55,7 @@ export function JsonViewer({ value, label, maxHeight = "md", action }: JsonViewe
   }
 
   return (
-    <div className="overflow-hidden rounded-box border border-base-300 bg-base-200">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-box border border-base-300 bg-base-200">
       {label || action ? (
         <div className="flex items-center justify-between gap-3 border-b border-base-300 px-3 py-2">
           {label ? <span className="text-sm font-medium text-base-content">{label}</span> : <span />}

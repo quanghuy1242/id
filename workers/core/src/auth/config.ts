@@ -19,6 +19,12 @@ export const JWKS_GRACE_PERIOD_SECONDS = 1_209_600;
 /** Milliseconds per second, for second→ms conversions of named time policies. */
 export const MS_PER_SECOND = 1_000;
 
+/** Seconds per hour, for operator-facing duration labels. */
+export const SECONDS_PER_HOUR = 3_600;
+
+/** Seconds per day, for operator-facing duration labels. */
+export const SECONDS_PER_DAY = 86_400;
+
 /** JWKS retired-key grace period, in milliseconds (admin-audit key status derivation). */
 export const JWKS_GRACE_PERIOD_MS = JWKS_GRACE_PERIOD_SECONDS * MS_PER_SECOND;
 
@@ -48,6 +54,9 @@ export const ADMIN_OTP_TTL_SECONDS = 300;
 
 /** Session-bound platform-console step-up proof lifetime, in seconds. */
 export const ADMIN_STEP_UP_TTL_SECONDS = 60 * 60 * 24 * 2;
+
+/** Freshness window for high-impact platform actions after step-up, in seconds. */
+export const ADMIN_ACTION_STEP_UP_TTL_SECONDS = 15 * 60;
 
 /** Maximum admin-login OTP emails per generation window. */
 export const ADMIN_OTP_GENERATE_MAX_ATTEMPTS = 3;
@@ -240,4 +249,17 @@ export function isPlatformStepUpFresh(
   if (typeof stepUpAtMs !== "number" || !Number.isFinite(stepUpAtMs))
     return false;
   return nowMs - stepUpAtMs < ADMIN_STEP_UP_TTL_SECONDS * MS_PER_SECOND;
+}
+
+/**
+ * True when the same session-bound step-up proof is fresh enough for a
+ * high-impact action such as emergency JWKS rotation.
+ */
+export function isActionStepUpFresh(
+  stepUpAtMs: number | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (typeof stepUpAtMs !== "number" || !Number.isFinite(stepUpAtMs))
+    return false;
+  return nowMs - stepUpAtMs < ADMIN_ACTION_STEP_UP_TTL_SECONDS * MS_PER_SECOND;
 }

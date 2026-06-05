@@ -227,7 +227,7 @@ Deep-linkable OAuth client detail route backed by `GET /api/auth/oauth2/get-clie
 │                  │ Scopes & Grants: scope/grant badges                │
 │                  │ Connections: effective-access stats + M2M bindings │
 │                  │ Quickstart: authorize/token/discovery snippets     │
-│                  │ Audit: Timeline(targetType="oauth_client")         │
+│                  │ Audit: DataTable(summary + payload details)        │
 └──────────────────┴────────────────────────────────────────────────────┘
 ```
 
@@ -243,7 +243,7 @@ Components:
     Quickstart: CodeBlock snippets derived from `client_id`
     Audit: ActivityLogContent(targetType="oauth_client", targetId=clientId)
 
-Data: GET /api/auth/oauth2/get-clients → OAuthClient[] | null (UI action normalizes null to []); GET /api/auth/admin/oauth-client-resource-scopes → { oauthClientResourceScopes: ClientResourceScope[] }; GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer[] }; GET /api/auth/admin/activity-log?targetType=oauth_client&targetId=:clientId → { entries, total, limit, offset }.
+Data: GET /api/auth/oauth2/get-clients → OAuthClient[] | null (UI action normalizes null to []); GET /api/auth/admin/oauth-client-resource-scopes → { oauthClientResourceScopes: ClientResourceScope[] }; GET /api/auth/admin/resource-servers → { resourceServers: ResourceServer[] }; GET /api/auth/admin/activity-log?targetType=oauth_client&targetId=:clientId → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.
 
 Behavior:
   - Missing `clientId` shows ErrorAlert("Application not found").
@@ -435,7 +435,7 @@ Resource API detail route with Overview and Audit tabs over existing list endpoi
 Content API  [Enabled] [System]
 [ Overview | Audit ]
 Overview: DescriptionList(name, slug, audience, status, created/updated by)
-Audit: Timeline(targetType="resource_server", targetId=:resourceServerId)
+Audit: DataTable(summary + payload details, targetType="resource_server", targetId=:resourceServerId)
 ```
 
 Components:
@@ -445,7 +445,7 @@ Components:
     Overview: Panel > DescriptionList(columns=2)
     Audit: ActivityLogContent(targetType="resource_server", targetId=resourceServerId)
 
-Data: GET /api/auth/admin/resource-servers → select by id; GET /api/auth/admin/activity-log?targetType=resource_server&targetId=:resourceServerId.
+Data: GET /api/auth/admin/resource-servers → select by id; GET /api/auth/admin/activity-log?targetType=resource_server&targetId=:resourceServerId → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.
 
 ---
 
@@ -552,7 +552,7 @@ M2M binding detail route with Overview and Audit tabs over existing list endpoin
 Content API -> Content API  [Active]
 [ Overview | Audit ]
 Overview: client, resource API, scopes, enabled, created/updated by
-Audit: Timeline(targetType="client_resource_scope", targetId=:bindingId)
+Audit: DataTable(summary + payload details, targetType="client_resource_scope", targetId=:bindingId)
 ```
 
 Components:
@@ -562,7 +562,7 @@ Components:
     Overview: Panel > DescriptionList + scope Badge row
     Audit: ActivityLogContent(targetType="client_resource_scope", targetId=bindingId)
 
-Data: GET /api/auth/admin/oauth-client-resource-scopes → select by id; GET /api/auth/oauth2/get-clients and GET /api/auth/admin/resource-servers for labels; GET /api/auth/admin/activity-log?targetType=client_resource_scope&targetId=:bindingId.
+Data: GET /api/auth/admin/oauth-client-resource-scopes → select by id; GET /api/auth/oauth2/get-clients and GET /api/auth/admin/resource-servers for labels; GET /api/auth/admin/activity-log?targetType=client_resource_scope&targetId=:bindingId → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.
 
 ---
 

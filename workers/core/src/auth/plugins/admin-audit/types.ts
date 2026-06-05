@@ -10,11 +10,16 @@
 /** Options accepted by the `idAdminAudit` BA plugin factory. */
 export type AdminAuditPluginOptions = {
   /**
-   * Returns whether the acting session role may read the platform-wide audit
-   * surfaces (sessions, tokens, consents, JWKS metadata). v1 is platform-admin
-   * only (docs/026 §8); org-scoped variants are deferred.
+   * Returns whether the acting session may read or mutate the requested audit
+   * lens. `null` means platform-wide; an organization id means the caller is
+   * bounded to rows owned by that organization.
    */
-  readonly authorize?: (role: string | null | undefined) => boolean;
+  readonly authorize?: (
+    organizationId: string | null | undefined,
+    userId: string,
+    role: string | null | undefined,
+    adapter: AuditAdapter,
+  ) => Promise<boolean>;
   /** JWKS grace window in milliseconds, used to derive the rotated/expired status. */
   readonly jwksGracePeriodMs?: number;
 };

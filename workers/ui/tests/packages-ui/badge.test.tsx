@@ -9,7 +9,7 @@ describe("Badge", () => {
     render(<Badge>Default</Badge>);
     const badge = screen.getByText(/default/i);
     expect(badge.tagName.toLowerCase()).toBe("span");
-    expect(badge).toHaveClass("badge", "badge-outline", "badge-neutral");
+    expect(badge).toHaveClass("badge", "whitespace-nowrap", "badge-outline", "badge-neutral");
     expect(badge).not.toHaveClass("badge-sm");
   });
 

@@ -21,6 +21,15 @@ import {
 } from "../../workers/ui/src/app/admin/_mocks/organizations";
 import { mockUsers } from "../../workers/ui/src/app/admin/_mocks/users";
 import { mockActivities } from "../../workers/ui/src/app/admin/_mocks/audit";
+import type { ActivityLogParams, AdminActivity } from "../../workers/ui/src/app/admin/_actions/audit";
+import {
+  mockBindings,
+  mockClients,
+  mockResourceServers,
+  mockScopes,
+} from "../../workers/ui/src/app/admin/_mocks/oauth";
+import { mockConsents } from "../../workers/ui/src/app/admin/_mocks/security";
+import type { ActiveScope } from "@id/lib";
 
 export default { title: "Admin / Identity / Organizations" } satisfies StoryDefault;
 
@@ -112,6 +121,13 @@ OrgList_Error.storyName = "Org List / Error";
 
 function createDetailActions(org: Organization) {
   let current = { ...org };
+  const hasOrgData = org.id === "org_001";
+  const orgClients = mockClients.map((client) =>
+    Object.assign({}, client, { reference_id: org.id }),
+  );
+  const orgActivities = mockActivities.filter(
+    (entry) => entry.organizationId === org.id || entry.targetId === org.id,
+  );
   return {
     getFullOrganization: async (_id: string) => current,
     updateOrganization: async (_id: string, data: Partial<{ name: string; slug: string; logo: string; metadata: string }>) => {
@@ -119,6 +135,32 @@ function createDetailActions(org: Organization) {
       return current;
     },
     deleteOrganization: async (_id: string) => undefined,
+    listMembers: async () => (hasOrgData ? mockMembers : []),
+    listTeams: async () => (hasOrgData ? mockTeams : []),
+    listInvitations: async () => (hasOrgData ? mockInvitations : []),
+    listClients: async (_scope?: ActiveScope) => (hasOrgData ? orgClients : []),
+    listResourceServers: async (_scope?: ActiveScope) =>
+      hasOrgData
+        ? mockResourceServers.filter((server) => server.organizationId === org.id)
+        : [],
+    listScopes: async (_scope?: ActiveScope) => (hasOrgData ? mockScopes : []),
+    listBindings: async (_scope?: ActiveScope) =>
+      hasOrgData ? mockBindings : [],
+    listAdminConsents: async (params: { limit: number; offset: number }) => {
+      const rows = hasOrgData ? mockConsents : [];
+      return {
+        consents: rows.slice(params.offset, params.offset + params.limit),
+        total: rows.length,
+        limit: params.limit,
+        offset: params.offset,
+      };
+    },
+    listActivityLog: async (params: { limit: number; offset: number }) => ({
+      entries: orgActivities.slice(params.offset, params.offset + params.limit),
+      total: orgActivities.length,
+      limit: params.limit,
+      offset: params.offset,
+    }),
   };
 }
 
@@ -465,15 +507,26 @@ export const OrgInvitations_Error: Story = () => (
 );
 OrgInvitations_Error.storyName = "Org Invitations / Error";
 
-function createActivityActions(entries = mockActivities) {
-  const orgEntries = entries.filter((entry) => entry.targetType === "organization");
+function platformOrgAuditEntries(orgId: string, entries: AdminActivity[] = mockActivities) {
+  return entries.filter((entry) => entry.targetType === "organization" && entry.targetId === orgId);
+}
+
+function orgTimelineEntries(orgId: string, entries: AdminActivity[] = mockActivities) {
+  return entries.filter((entry) => entry.organizationId === orgId || (entry.targetType === "organization" && entry.targetId === orgId));
+}
+
+function createActivityActions(entries: AdminActivity[] = mockActivities) {
   return {
-    listActivityLog: async () => ({
-      entries: orgEntries,
-      total: orgEntries.length,
-      limit: 25,
-      offset: 0,
-    }),
+    listActivityLog: async (params: ActivityLogParams) => {
+      const offset = params.offset ?? 0;
+      const limit = params.limit ?? 25;
+      return {
+        entries: entries.slice(offset, offset + limit),
+        total: entries.length,
+        limit,
+        offset,
+      };
+    },
   };
 }
 
@@ -488,7 +541,7 @@ export const PlatformOrgAudit_Populated: Story = () => {
       routeBasePath={platformOrgPath("org_001")}
       scopedRoute={false}
     >
-      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions()} />
+      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions(platformOrgAuditEntries("org_001"))} />
     </OrgDetailFrame>
   );
 };
@@ -498,7 +551,7 @@ export const OrgAudit_Populated: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   return (
     <OrgDetailFrame activePath={orgPath("org_001", "audit")} orgId="org_001" activeTab="audit" actions={detail}>
-      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions()} />
+      <ActivityLogContent organizationId="org_001" actions={createActivityActions(orgTimelineEntries("org_001"))} />
     </OrgDetailFrame>
   );
 };
@@ -508,7 +561,7 @@ export const OrgAudit_Empty: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   return (
     <OrgDetailFrame activePath={orgPath("org_001", "audit")} orgId="org_001" activeTab="audit" actions={detail}>
-      <ActivityLogContent targetType="organization" targetId="org_001" actions={createActivityActions([])} />
+      <ActivityLogContent organizationId="org_001" actions={createActivityActions([])} />
     </OrgDetailFrame>
   );
 };
@@ -516,7 +569,7 @@ OrgAudit_Empty.storyName = "Org Audit / Empty";
 
 export const OrgAudit_Loading: Story = () => (
   <OrgDetailFrame activePath={orgPath("org_001", "audit")} orgId="org_001" activeTab="audit" loading>
-    <ActivityLogContent targetType="organization" targetId="org_001" loading />
+    <ActivityLogContent organizationId="org_001" loading />
   </OrgDetailFrame>
 );
 OrgAudit_Loading.storyName = "Org Audit / Loading";
@@ -525,7 +578,7 @@ export const OrgAudit_Error: Story = () => {
   const detail = createDetailActions(mockOrganizations[0]);
   return (
     <OrgDetailFrame activePath={orgPath("org_001", "audit")} orgId="org_001" activeTab="audit" actions={detail}>
-      <ActivityLogContent targetType="organization" targetId="org_001" error="Failed to load activity" />
+      <ActivityLogContent organizationId="org_001" error="Failed to load activity" />
     </OrgDetailFrame>
   );
 };

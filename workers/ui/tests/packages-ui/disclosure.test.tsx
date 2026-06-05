@@ -62,6 +62,16 @@ describe("Disclosure", () => {
     expect(container.querySelector(".collapse-title svg")).toBeInTheDocument();
   });
 
+  it("can contain wide panel content", () => {
+    const { container } = render(
+      <Disclosure title="Payload" width="contained" defaultExpanded>
+        <pre>{"x".repeat(200)}</pre>
+      </Disclosure>,
+    );
+    expect(container.querySelector(".collapse")).toHaveClass("w-full", "min-w-0", "max-w-full");
+    expect(container.querySelector(".collapse-content")).toHaveClass("min-w-0", "overflow-hidden");
+  });
+
   it("renders multiple disclosures inside a group", () => {
     render(
       <DisclosureGroup allowsMultiple>

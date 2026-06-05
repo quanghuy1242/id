@@ -28,6 +28,7 @@ import {
   listConsentsOpenApiSchema,
   listSessionsOpenApiSchema,
   listTokensOpenApiSchema,
+  type ClientRow,
   jwksOpenApiSchema,
   revokeConsentBody,
   revokeConsentOpenApiRequestBody,
@@ -47,12 +48,17 @@ import {
 import {
   JWKS_GRACE_PERIOD_MS,
   JWKS_ROTATION_INTERVAL_SECONDS,
+  isActionStepUpFresh,
 } from "../../config";
 
 export type { AdminAuditPluginOptions } from "./types";
 
 type UserRow = { id: string; email?: string | null };
-type ClientRow = { clientId: string; name?: string | null };
+type SessionUser = { id: string; role?: string | null };
+type AuditSession = {
+  readonly session?: { readonly platformStepUpAt?: number | null };
+  readonly user?: unknown;
+};
 type InternalSessionAdapter = {
   readonly deleteSession: (sessionToken: string) => Promise<unknown>;
 };
@@ -73,14 +79,32 @@ function internalSessionAdapter(ctx: {
   return ctx.context.internalAdapter as InternalSessionAdapter;
 }
 
-/** Asserts an authenticated platform-admin session. */
-function requireAdmin(
+function sessionUser(session: { user: unknown } | null): SessionUser {
+  const user = session?.user as SessionUser | null | undefined;
+  if (!user?.id) throw new APIError("UNAUTHORIZED");
+  return user;
+}
+
+async function requireAuditAccess(
   authorize: AdminAuditPluginOptions["authorize"],
+  adapter: AuditAdapter,
   session: { user: unknown } | null,
-): void {
-  if (!session) throw new APIError("UNAUTHORIZED");
-  const role = (session.user as { role?: string | null } | null)?.role;
-  if (!authorize || !authorize(role)) throw new APIError("FORBIDDEN");
+  organizationId: string | null | undefined,
+): Promise<SessionUser> {
+  const user = sessionUser(session);
+  if (!authorize) throw new APIError("FORBIDDEN");
+  const allowed = await authorize(organizationId, user.id, user.role, adapter);
+  if (!allowed) throw new APIError("FORBIDDEN");
+  return user;
+}
+
+function requireFreshActionStepUp(session: AuditSession | null): void {
+  if (!isActionStepUpFresh(session?.session?.platformStepUpAt ?? null)) {
+    throw new APIError("FORBIDDEN", {
+      code: "platform_action_step_up_required",
+      message: "Fresh platform verification is required for this action",
+    });
+  }
 }
 
 /** Loads a `userId -> email` map for the referenced users in one batched `in` query. */
@@ -96,6 +120,52 @@ async function emailMap(
   const map = new Map<string, string>();
   for (const u of users) if (u.email) map.set(u.id, u.email);
   return map;
+}
+
+function queryString(
+  query: Record<string, unknown> | undefined,
+  field: string,
+): string | undefined {
+  const value = query?.[field];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+async function organizationClientRows(
+  adapter: AuditAdapter,
+  organizationId: string,
+): Promise<ClientRow[]> {
+  return adapter.findMany<ClientRow>({
+    model: OAUTH_CLIENT_MODEL,
+    where: [{ field: "referenceId", value: organizationId }],
+  });
+}
+
+async function requireClientOwnedByOrganization(
+  adapter: AuditAdapter,
+  clientId: string,
+  organizationId: string,
+): Promise<void> {
+  const client = await adapter.findOne<ClientRow>({
+    model: OAUTH_CLIENT_MODEL,
+    where: [
+      { field: "clientId", value: clientId },
+      { field: "referenceId", value: organizationId },
+    ],
+  });
+  if (!client) throw new APIError("NOT_FOUND");
+}
+
+function consentWhere(
+  organizationClientIds: readonly string[] | undefined,
+  clientId: string | undefined,
+): Array<{ field: string; value: unknown; operator?: string }> | undefined {
+  if (organizationClientIds !== undefined) {
+    if (clientId) return [{ field: "clientId", value: clientId }];
+    return [
+      { field: "clientId", value: organizationClientIds, operator: "in" },
+    ];
+  }
+  return clientId ? [{ field: "clientId", value: clientId }] : undefined;
 }
 
 /** Loads a `clientId -> name` map for the referenced clients in one batched `in` query. */
@@ -151,7 +221,7 @@ const listTokensMeta = adminAuditEndpointMeta({
 
 const listConsentsMeta = adminAuditEndpointMeta({
   description:
-    "List OAuth consent grants across all users (platform admin only)",
+    "List OAuth consent grants across all users or for one organization-owned client set",
   pagination: true,
   extraParameters: [
     {
@@ -160,6 +230,14 @@ const listConsentsMeta = adminAuditEndpointMeta({
       required: false,
       schema: { type: "string" },
       description: "Filter to a single client",
+    },
+    {
+      name: "organizationId",
+      in: "query",
+      required: false,
+      schema: { type: "string" },
+      description:
+        "Limit results to consent grants for clients owned by this organization",
     },
   ],
   responseSchema: listConsentsOpenApiSchema,
@@ -237,8 +315,13 @@ export const idAdminAudit = (
         "/admin/list-sessions",
         { method: "GET", use: [sessionMiddleware], metadata: listSessionsMeta },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            null,
+          );
           const { limit, offset } = parsePageParams(ctx.query);
           const userId =
             typeof ctx.query?.userId === "string" && ctx.query.userId
@@ -280,8 +363,13 @@ export const idAdminAudit = (
           metadata: revokeSessionMeta,
         },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            null,
+          );
           const row = await adapter.findOne<SessionRow>({
             model: SESSION_MODEL,
             where: [{ field: "id", value: ctx.body.sessionId }],
@@ -297,8 +385,13 @@ export const idAdminAudit = (
         "/admin/list-tokens",
         { method: "GET", use: [sessionMiddleware], metadata: listTokensMeta },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            null,
+          );
           const { limit, offset } = parsePageParams(ctx.query);
           const type = ctx.query?.type === "refresh" ? "refresh" : "access";
           const model =
@@ -336,16 +429,32 @@ export const idAdminAudit = (
         "/admin/list-consents",
         { method: "GET", use: [sessionMiddleware], metadata: listConsentsMeta },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          const organizationId = queryString(ctx.query, "organizationId");
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            organizationId ?? null,
+          );
           const { limit, offset } = parsePageParams(ctx.query);
-          const clientId =
-            typeof ctx.query?.clientId === "string" && ctx.query.clientId
-              ? ctx.query.clientId
-              : undefined;
-          const where = clientId
-            ? [{ field: "clientId", value: clientId }]
+          const clientId = queryString(ctx.query, "clientId");
+          const organizationClients = organizationId
+            ? await organizationClientRows(adapter, organizationId)
             : undefined;
+          const organizationClientIds = organizationClients?.map(
+            (client) => client.clientId,
+          );
+
+          if (
+            organizationClientIds !== undefined &&
+            (organizationClientIds.length === 0 ||
+              (clientId && !organizationClientIds.includes(clientId)))
+          ) {
+            return ctx.json({ consents: [], total: 0, limit, offset });
+          }
+
+          const where = consentWhere(organizationClientIds, clientId);
 
           const total = Number(
             await adapter.count({ model: OAUTH_CONSENT_MODEL, where }),
@@ -385,8 +494,20 @@ export const idAdminAudit = (
           metadata: revokeConsentMeta,
         },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            ctx.body.organizationId ?? null,
+          );
+          if (ctx.body.organizationId) {
+            await requireClientOwnedByOrganization(
+              adapter,
+              ctx.body.clientId,
+              ctx.body.organizationId,
+            );
+          }
           await adapter.delete({
             model: OAUTH_CONSENT_MODEL,
             where: [
@@ -402,8 +523,13 @@ export const idAdminAudit = (
         "/admin/jwks",
         { method: "GET", use: [sessionMiddleware], metadata: jwksMeta },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            null,
+          );
           const rows = await adapter.findMany<JwksRow>({
             model: JWKS_MODEL,
             sortBy: { field: "createdAt", direction: "desc" },
@@ -424,7 +550,14 @@ export const idAdminAudit = (
           metadata: rotateJwksMeta,
         },
         async (ctx) => {
-          requireAdmin(options.authorize, ctx.context.session);
+          const adapter = auditAdapter(ctx);
+          await requireAuditAccess(
+            options.authorize,
+            adapter,
+            ctx.context.session,
+            null,
+          );
+          requireFreshActionStepUp(ctx.context.session as AuditSession | null);
           const row = await createSigningJwk(ctx);
           const response: RotateJwksResponse = {
             ...presentJwk(row, Date.now(), graceMs),

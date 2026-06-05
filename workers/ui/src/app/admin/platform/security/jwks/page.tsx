@@ -9,7 +9,14 @@ export default function PlatformSecurityJwksPage() {
 
   return (
     <PageBody>
-      <JwksContent onKeyClick={(kid) => router.push(`/admin/platform/security/jwks/${kid}`)} />
+      <JwksContent
+        onKeyClick={(kid) => router.push(`/admin/platform/security/jwks/${kid}`)}
+        onStepUpRequired={() =>
+          router.push(
+            `/login?callbackURL=${encodeURIComponent("/admin/platform/security/jwks")}&stepUp=platform`,
+          )
+        }
+      />
     </PageBody>
   );
 }

@@ -53,6 +53,12 @@ export type ConsentRow = {
   updatedAt?: unknown;
 };
 
+export type ClientRow = {
+  clientId: string;
+  name?: string | null;
+  referenceId?: string | null;
+};
+
 export type JwksRow = {
   id: string;
   publicKey?: unknown;
@@ -179,6 +185,7 @@ export const revokeConsentBody = z
   .object({
     clientId: z.string().min(1),
     userId: z.string().min(1),
+    organizationId: z.string().min(1).optional(),
   })
   .strict();
 

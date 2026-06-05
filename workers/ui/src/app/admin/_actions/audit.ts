@@ -70,6 +70,13 @@ export type AdminActivity = {
   action: string;
   targetType: string;
   targetId: string;
+  scope: "platform" | "organization" | null;
+  organizationId: string | null;
+  actorPlatformRole: string | null;
+  actorOrganizationRole: "owner" | "admin" | null;
+  steppedUp: boolean | null;
+  summary: string | null;
+  details: Record<string, unknown> | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
@@ -102,9 +109,14 @@ export type Paginated<K extends string, T> = {
 
 export type PageParams = { limit: number; offset: number };
 export type SessionListParams = PageParams & { userId?: string };
+export type ConsentListParams = PageParams & {
+  clientId?: string;
+  organizationId?: string;
+};
 export type ActivityLogParams = PageParams & {
-  targetType: string;
-  targetId: string;
+  organizationId?: string;
+  targetType?: string;
+  targetId?: string;
   action?: string;
   actorId?: string;
 };
@@ -133,7 +145,7 @@ export async function listAdminTokens(
 }
 
 export async function listAdminConsents(
-  params: PageParams & { clientId?: string },
+  params: ConsentListParams,
 ): Promise<Paginated<"consents", AdminConsent>> {
   return authApiGetOrThrow<Paginated<"consents", AdminConsent>>(
     "/admin/list-consents",
@@ -144,8 +156,13 @@ export async function listAdminConsents(
 export async function revokeConsent(
   clientId: string,
   userId: string,
+  organizationId?: string,
 ): Promise<void> {
-  await authApiPostOrThrow("/admin/revoke-consent", { clientId, userId });
+  await authApiPostOrThrow("/admin/revoke-consent", {
+    clientId,
+    userId,
+    ...(organizationId ? { organizationId } : {}),
+  });
 }
 
 export async function listAdminJwks(): Promise<AdminJwk[]> {

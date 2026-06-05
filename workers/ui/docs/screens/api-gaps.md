@@ -54,30 +54,30 @@
 
 **Needed for:** `/admin/security/consents`
 
-**What exists:** `oauthConsent` table exists in D1 schema but has no admin listing endpoint.
+**Status:** Implemented by `id-admin-audit`.
 
-**What's missing:** Global admin endpoint listing all consent records with optional filters (client, user) and pagination. User email requires a join or separate lookup.
+**What exists:** Platform reads list all consent records with optional `clientId`, `limit`, and `offset`. Organization reads add `organizationId`, authorize against that organization, and bound rows to OAuth clients where `oauthClient.referenceId == organizationId` before reading `oauthConsent`; cross-org `clientId` filters return an empty page.
 
-**Request:** `GET /api/auth/admin/list-consents?limit=25&offset=0&clientId=optional`
+**Request:** `GET /api/auth/admin/list-consents?limit=25&offset=0&clientId=optional&organizationId=optional`
 **Response:** `{ consents: Array<{ id, clientId, clientName, userId, userEmail, scopes: string[], createdAt, updatedAt }>, total, limit, offset }`
 
-**Fallback:** Show a "Coming Soon" placeholder page until implemented.
+**Fallback:** None; the platform and org consent screens are live.
 
 ---
 
-### 4. `POST /api/auth/oauth2/revoke-consent` — consent revocation
+### 4. `POST /api/auth/admin/revoke-consent` — consent revocation
 
 **Needed for:** `/admin/security/consents` (revoke action)
 
-**What exists:** Nothing. No endpoint to revoke a single consent record.
+**Status:** Implemented by `id-admin-audit`.
 
-**What's missing:** Admin endpoint to delete a consent record, forcing the user to re-consent on next authorization request.
+**What exists:** Admin endpoint to delete a consent record, forcing the user to re-consent on next authorization request. Organization calls include `organizationId`; the auth worker verifies the submitted client belongs to that organization and returns `404` for cross-org client ids.
 
-**Request:** `POST /api/auth/oauth2/revoke-consent`
-**Body:** `{ clientId: string, userId: string }`
+**Request:** `POST /api/auth/admin/revoke-consent`
+**Body:** `{ clientId: string, userId: string, organizationId?: string }`
 **Response:** `{ success: boolean }`
 
-**Fallback:** Revoke button hidden until endpoint exists.
+**Fallback:** None; revoke is live for platform and bounded organization consent rows.
 
 ---
 

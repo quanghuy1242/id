@@ -542,12 +542,13 @@ Components:
   users/:userId/audit/page.tsx
     ActivityLogContent(targetType="user", targetId=userId)
   ActivityLogContent:
-    Panel > Stack(gap="md") > Text(variant="h2", "Audit") + Timeline(items)
+    Panel > DataTable(Event, Actor, Scope, Time, Details)
+    Details cell renders semantic summary first, target type/id second, and Disclosure(title="Payload") with JsonViewer(details/before/after/metadata) when payload exists.
     Loading: Skeleton(rows=5)
     Empty: EmptyState(message="No activity recorded for this resource")
     Error: ErrorAlert(message, onRetry)
 
-Data: GET /api/auth/admin/activity-log?targetType=user&targetId=:userId&limit=25&offset=0 → { entries, total, limit, offset }
+Data: GET /api/auth/admin/activity-log?targetType=user&targetId=:userId&limit=25&offset=0 → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.
 
 ---
 
@@ -708,11 +709,12 @@ Components:
     platform/identity/organizations/:orgId/page.tsx:
       OrgDetailOverviewContent
 
-    Panel
-      Stack(gap="xs") label/value pairs using Text(variant="caption") / Text(variant="body")
-      Panel(tone="muted", padding="sm") for formatted metadata
-      Inline(justify="end")
-        Button(variant="secondary", onClick=openEditModal, "Edit Organization")
+    OrgDetailOverviewContent:
+      StatSummaryGroup
+        StatGroup(columns=4): Members + pending invitations, Teams, Applications + service accounts, Resource APIs + enabled count
+        StatGroup(columns=4): Scopes + enabled count, M2M Bindings + enabled count, Consents, Audit Events
+      Panel > DescriptionList(columns=2, items=[Name, Slug, Logo URL, Created]) + JsonViewer(label="Metadata") when metadata exists
+      Grid(columns="three") of workflow panels linking to scoped org routes: Members, Applications, Service Accounts, Resource APIs, Consents, Audit
 
   Edit modal: ConfirmDialog(title="Edit Organization", confirmLabel="Save", onConfirm)
     TextInput(label="Name", name="name", defaultValue=org.name)
@@ -729,10 +731,20 @@ Components:
     On confirm: POST /api/auth/organization/delete { organizationId }, then navigate to /admin/platform/identity/organizations
 
 Data: GET /api/auth/organization/get-full-organization → Organization | null (with metadata normalized by the action)
+      GET /api/auth/organization/list-members?organizationId=:orgId → Member[]
+      GET /api/auth/organization/list-teams?organizationId=:orgId → Team[]
+      GET /api/auth/organization/list-invitations?organizationId=:orgId → Invitation[]
+      GET /api/auth/oauth2/get-clients after `organization/set-active` → OAuthClient[] client-side filtered to `reference_id == orgId`
+      GET /api/auth/admin/resource-servers?organizationId=:orgId → { resourceServers }
+      GET /api/auth/admin/oauth-scopes?organizationId=:orgId → { oauthScopes }
+      GET /api/auth/admin/oauth-client-resource-scopes?organizationId=:orgId → { oauthClientResourceScopes }
+      GET /api/auth/admin/list-consents?organizationId=:orgId&limit=1&offset=0 → { consents, total, limit, offset }
+      GET /api/auth/admin/activity-log?organizationId=:orgId&limit=1&offset=0 → { entries, total, limit, offset }
       POST /api/auth/organization/update   body: { organizationId, data: { name?, slug?, logo?, metadata?: object } }
       POST /api/auth/organization/delete   body: { organizationId }
 
 Notes:
+  - Platform organization drilldown and scoped organization overview share `OrgDetailOverviewContent`; the data contract is organization-bounded in both cases and never calls platform-wide sessions, tokens, users, or JWKS.
   - Slug validation on blur in edit modal (same as create, skip if unchanged).
   - Metadata displayed as a `<pre>` block with `JSON.stringify(JSON.parse(...), null, 2)` formatting for readability.
     Use CSS vars `var(--color-base-200)` for background and `var(--radius-box)` for border-radius.
@@ -1132,9 +1144,10 @@ Components:
   organizations/:orgId/audit/page.tsx
     ActivityLogContent(targetType="organization", targetId=orgId)
   ActivityLogContent:
-    Panel > Stack(gap="md") > Text(variant="h2", "Audit") + Timeline(items)
+    Panel > DataTable(Event, Actor, Scope, Time, Details)
+    Details cell renders semantic summary first, target type/id second, and Disclosure(title="Payload") with JsonViewer(details/before/after/metadata) when payload exists.
     Loading: Skeleton(rows=5)
     Empty: EmptyState(message="No activity recorded for this resource")
     Error: ErrorAlert(message, onRetry)
 
-Data: GET /api/auth/admin/activity-log?targetType=organization&targetId=:orgId&limit=25&offset=0 → { entries, total, limit, offset }
+Data: GET /api/auth/admin/activity-log?targetType=organization&targetId=:orgId&limit=25&offset=0 → { entries, total, limit, offset } where new entries include nullable `summary` and structured `details`.

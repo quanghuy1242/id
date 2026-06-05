@@ -552,17 +552,18 @@ adminActivityLog {
   id, actorId, actorType("user"|"system"),
   action ("oauth_client.update" | "jwks.rotate" | "scope.disable" | "user.ban" | "team.add_member" | …),
   targetType ("oauth_client"|"jwks"|"oauth_scope"|"client_resource_scope"|"resource_server"|"user"|"organization"|"team"),
-  targetId, before(json|null), after(json|null), metadata(json|null /* ip, userAgent, requestId, reason? */),
+  targetId, summary(text|null), details(json|null),
+  before(json|null), after(json|null), metadata(json|null /* ip, userAgent, requestId, reason? */),
   createdAt
 }  // indexes: (targetType, targetId), (actorId), (createdAt)
 ```
 
 Contract:
 
-- **Write path:** mutation use cases append one row on create/update/delete/rotate/enable/disable/ban/add-member. Append-only; the UI never edits/deletes rows. Secrets, private keys, and token bodies are **never** written — only identifiers and non-sensitive field diffs (presenter-stripped, asserted by tests, mirroring [admin-audit/schema.ts](../workers/core/src/auth/plugins/admin-audit/schema.ts)).
+- **Write path:** mutation use cases append one row on create/update/delete/rotate/enable/disable/ban/add-member. Append-only; the UI never edits/deletes rows. New rows must include a semantic `summary` and structured `details` that answer what changed, who/what was affected, reason/duration/context when available, and the stable identifiers needed for follow-up. Secrets, private keys, and token bodies are **never** written — only identifiers and non-sensitive field diffs (presenter-stripped, asserted by tests, mirroring [admin-audit/schema.ts](../workers/core/src/auth/plugins/admin-audit/schema.ts)).
 - **Read path:** `GET /api/auth/admin/activity-log?targetType=&targetId=&action=&actorId=&limit=&offset=` — adapter reads only, actor-scoped in the `where` clause, `count`-based pagination, batched `in` enrichment for actor email (docs/026 §4 approach).
 - **Response:** `{ entries: PresentedActivity[], total, limit, offset }`.
-- **UI consumption:** a shared `useActivityLog(targetType, targetId)` hook (in `_data/`) feeds every Audit tab's `Timeline`.
+- **UI consumption:** a shared `useActivityLog(targetType, targetId)` hook (in `_data/`) feeds every Audit tab's `ActivityLogContent`, which renders the semantic summary first and keeps `details`/`before`/`after`/`metadata` inspectable as JSON.
 
 ## 13. Net-New Surfaces
 

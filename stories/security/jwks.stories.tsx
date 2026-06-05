@@ -40,6 +40,24 @@ export const Error: Story = () => (
   </SecurityShell>
 );
 
+export const RotateNeedsStepUp: Story = () => (
+  <SecurityShell activePath={ACTIVE}>
+    <JwksContent
+      actions={{
+        listJwks: async () => mockAdminJwks,
+        rotateJwks: async () => {
+          throw Object.assign(
+            new Error("Fresh platform verification is required for this action"),
+            { status: 403, code: "platform_action_step_up_required" },
+          );
+        },
+      }}
+      defaultRotateOpen
+      onStepUpRequired={() => undefined}
+    />
+  </SecurityShell>
+);
+
 export const DetailOverview: Story = () => (
   <SecurityShell activePath="/admin/platform/security/jwks/abc123def456">
     <JwksDetailContent kid="abc123def456" actions={makeActions(mockAdminJwks)} />

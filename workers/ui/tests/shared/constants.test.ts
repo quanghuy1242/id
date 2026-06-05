@@ -76,6 +76,12 @@ describe("constants", () => {
     });
     expect(visible.map((item) => item.id)).toContain("identity-teams");
     expect(visible.map((item) => item.id)).toContain("access-resource-apis");
+    expect(
+      visible.find((item) => item.id === "security-consents"),
+    ).toMatchObject({
+      label: "Consents",
+      href: "/admin/orgs/org_123/security/consents",
+    });
     expect(visible.map((item) => item.id)).not.toContain(
       "identity-organizations",
     );

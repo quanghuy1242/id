@@ -183,6 +183,24 @@ describe("Admin mobile navigation", () => {
     expect(screen.getByRole("tab", { name: "Invitations" })).toHaveClass("tab-active");
   });
 
+  it("renders organization security consent navigation without platform-only security siblings", () => {
+    navigationMock.pathname = "/admin/orgs/org_001/security/consents";
+
+    render(
+      <AdminScopeProvider
+        initialEnvelope={orgScopeEnvelope}
+        actions={{ getConsoleScopes: vi.fn<() => Promise<ConsoleScopeEnvelope>>().mockResolvedValue(orgScopeEnvelope) }}
+      >
+        <AdminSidebarNav />
+        <AdminMobileNav />
+      </AdminScopeProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Consents" })).toHaveAttribute("href", "/admin/orgs/org_001/security/consents");
+    expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute("href", "/admin/orgs/org_001/security/consents");
+    expect(screen.queryByRole("link", { name: "JWKS" })).toBeNull();
+  });
+
   it("labels the scoped organization dock entry as overview", () => {
     navigationMock.pathname = "/admin/orgs/org_001";
 

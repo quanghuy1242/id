@@ -9,7 +9,9 @@ import { ActivityLogContent } from "../../../_components/activity-log-content";
 function OrgAuditContent() {
   const { orgId } = useOrgDetail();
 
-  return <ActivityLogContent targetType="organization" targetId={orgId} />;
+  return (
+    <ActivityLogContent organizationId={orgId} />
+  );
 }
 
 export default function OrgLensAuditPage() {

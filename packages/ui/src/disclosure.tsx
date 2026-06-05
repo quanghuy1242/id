@@ -13,6 +13,7 @@ import {
 import { NavIcon } from "./nav-icons";
 
 export type DisclosureIcon = "chevron" | "plus";
+export type DisclosureWidth = "auto" | "contained";
 
 type DisclosureProps = {
   readonly title: ReactNode;
@@ -23,6 +24,12 @@ type DisclosureProps = {
   readonly onExpandedChange?: (isExpanded: boolean) => void;
   readonly icon?: DisclosureIcon;
   readonly disabled?: boolean;
+  readonly width?: DisclosureWidth;
+};
+
+const disclosureWidthClass: Record<DisclosureWidth, string> = {
+  auto: "",
+  contained: "w-full min-w-0 max-w-full",
 };
 
 function iconName(icon: DisclosureIcon, isExpanded: boolean): string {
@@ -41,6 +48,7 @@ export function Disclosure({
   onExpandedChange,
   icon = "chevron",
   disabled,
+  width = "auto",
 }: DisclosureProps) {
   return (
     <AriaDisclosure
@@ -52,7 +60,7 @@ export function Disclosure({
     >
       {({ isExpanded }) => (
         <div
-          className={`collapse border border-base-300 bg-base-100 ${
+          className={`collapse border border-base-300 bg-base-100 ${disclosureWidthClass[width]} ${
             isExpanded ? "collapse-open" : "collapse-close"
           }`}
         >
@@ -67,8 +75,10 @@ export function Disclosure({
               </span>
             </AriaButton>
           </Heading>
-          <AriaDisclosurePanel className="collapse-content text-base-content/80">
-            <div className="pt-1">{children}</div>
+          <AriaDisclosurePanel
+            className={`collapse-content text-base-content/80 ${width === "contained" ? "min-w-0 overflow-hidden" : ""}`}
+          >
+            <div className={width === "contained" ? "min-w-0 overflow-hidden pt-1" : "pt-1"}>{children}</div>
           </AriaDisclosurePanel>
         </div>
       )}

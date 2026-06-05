@@ -28,6 +28,13 @@ export type ActivityRecordInput = {
   readonly action: string;
   readonly targetType: string;
   readonly targetId: string;
+  readonly scope?: "platform" | "organization" | null;
+  readonly organizationId?: string | null;
+  readonly actorPlatformRole?: string | null;
+  readonly actorOrganizationRole?: "owner" | "admin" | null;
+  readonly steppedUp?: boolean | null;
+  readonly summary: string;
+  readonly details: Record<string, unknown> | null;
   readonly before?: unknown;
   readonly after?: unknown;
   readonly metadata?: Record<string, unknown> | null;
@@ -39,5 +46,10 @@ export type ActivityRecordDraft = Omit<
 >;
 
 export type AdminActivityLogPluginOptions = {
-  readonly authorize?: (role: string | null | undefined) => boolean;
+  readonly authorize?: (
+    organizationId: string | null | undefined,
+    userId: string,
+    role: string | null | undefined,
+    adapter: unknown,
+  ) => Promise<boolean>;
 };

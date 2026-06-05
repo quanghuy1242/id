@@ -41,20 +41,30 @@ function formatDate(ms: number | null): string {
   return ms === null ? "Never" : new Date(ms).toLocaleString();
 }
 
+function errorCode(err: unknown): string | undefined {
+  return err && typeof err === "object" && "code" in err
+    ? (err as { code?: string }).code
+    : undefined;
+}
+
 type JwksContentProps = {
   loading?: boolean;
   error?: string;
+  defaultRotateOpen?: boolean;
   onKeyClick?: (kid: string) => void;
+  onStepUpRequired?: () => void;
   actions?: typeof defaultActions;
 };
 
 export function JwksContent({
   loading: loadingOverride,
   error: errorOverride,
+  defaultRotateOpen = false,
   onKeyClick,
+  onStepUpRequired,
   actions = defaultActions,
 }: JwksContentProps) {
-  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(defaultRotateOpen);
   const [rotateError, setRotateError] = useState<string | undefined>();
 
   const { data: keys, isLoading, error, mutate } = useSWR(
@@ -103,6 +113,15 @@ export function JwksContent({
       toast.success("Signing key rotated", "A new public key is now available in JWKS.");
       return true;
     } catch (err: unknown) {
+      if (errorCode(err) === "platform_action_step_up_required") {
+        if (onStepUpRequired) {
+          setRotateOpen(false);
+          onStepUpRequired();
+          return true;
+        }
+        setRotateError("Fresh platform verification is required before rotating signing keys.");
+        return false;
+      }
       setRotateError(err instanceof Error ? err.message : "Failed to rotate signing key");
       return false;
     }
@@ -149,7 +168,7 @@ export function JwksContent({
         open={rotateOpen}
         onOpenChange={(open) => { setRotateOpen(open); if (!open) setRotateError(undefined); }}
         title="Emergency rotate signing keys"
-        description="Create and promote a new signing key. Existing keys remain published through their grace window so currently issued tokens can still verify."
+        description="Create and promote a new signing key. This high-impact action requires fresh platform verification before it can continue."
         confirmLabel="Rotate key"
         variant="danger"
         error={rotateError}
