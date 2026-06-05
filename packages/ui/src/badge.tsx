@@ -7,7 +7,7 @@ type BadgeSize = "sm" | "md";
 type BadgeProps = {
   readonly tone?: BadgeTone;
   readonly size?: BadgeSize;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 const badgeClass: Record<BadgeTone, string> = {

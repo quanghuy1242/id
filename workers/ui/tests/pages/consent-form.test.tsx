@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ConsentForm } from "@/app/consent/consent-form";
 
 const mockPush = vi.fn<() => void>();
-const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 let mockOauthQuery = "";
 
 vi.mock("next/navigation", () => ({

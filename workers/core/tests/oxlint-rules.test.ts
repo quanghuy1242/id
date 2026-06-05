@@ -8,21 +8,30 @@ afterAll(() => {
   rmSync(WORKSPACE, { force: true, recursive: true });
 });
 
-function writeFixture(testDir: string, relPath: string, content: string): string {
+function writeFixture(
+  testDir: string,
+  relPath: string,
+  content: string,
+): string {
   const full = `${WORKSPACE}/${testDir}/${relPath}`;
   mkdirSync(full.slice(0, full.lastIndexOf("/")), { recursive: true });
   writeFileSync(full, content);
   return full;
 }
 
-function runOxlint(path: string): Promise<{ readonly status: number; readonly output: string }> {
+function runOxlint(
+  path: string,
+): Promise<{ readonly status: number; readonly output: string }> {
   return new Promise((resolve) => {
     execFile(
       "node_modules/.bin/oxlint",
       ["--no-ignore", "-c", ".oxlintrc.json", path],
       { encoding: "utf8" },
       (err, stdout, stderr) => {
-        resolve({ status: err ? ((err as { code?: number }).code ?? 1) : 0, output: stdout + stderr });
+        resolve({
+          status: err ? ((err as { code?: number }).code ?? 1) : 0,
+          output: stdout + stderr,
+        });
       },
     );
   });
@@ -117,12 +126,16 @@ describe.concurrent("oxlint architecture rules", () => {
   });
 
   it("passes cleanly on valid files", async () => {
-    const result = await runOxlint("workers/core/src/composition/create-app.ts");
+    const result = await runOxlint(
+      "workers/core/src/composition/create-app.ts",
+    );
     expect(result.status).toBe(0);
   });
 
   it("passes cleanly on valid ui composition files", async () => {
-    const result = await runOxlint("workers/ui/src/app/admin/platform/page.tsx");
+    const result = await runOxlint(
+      "workers/ui/src/app/admin/platform/page.tsx",
+    );
     expect(result.status).toBe(0);
   });
 });

@@ -1,15 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
+import type Database from "better-sqlite3";
 
-type RawStatement = {
-  readonly all: (...bindings: unknown[]) => unknown[];
-  readonly get: (...bindings: unknown[]) => unknown;
-  readonly run: (...bindings: unknown[]) => { readonly changes: number; readonly lastInsertRowid: number | bigint };
-};
-
-export type RawSqlite = {
-  readonly exec: (sql: string) => void;
-  readonly prepare: (sql: string) => RawStatement;
-};
+export type RawSqlite = Database.Database;
 
 export function applyAuthMigrations(raw: RawSqlite): void {
   const migrations = readdirSync("migrations")
@@ -36,12 +28,14 @@ class TestD1PreparedStatement implements D1PreparedStatement {
   }
 
   async first<T = unknown>(colName?: string): Promise<T | null> {
-    const row = this.sqlite.prepare(this.sql).get(...this.bindings) as Record<string, T> | undefined;
+    const row = this.sqlite.prepare(this.sql).get(...this.bindings) as
+      | Record<string, T>
+      | undefined;
     if (!row) {
       return null;
     }
 
-    return colName ? row[colName] ?? null : (row as T);
+    return colName ? (row[colName] ?? null) : (row as T);
   }
 
   async run<T = unknown>(): Promise<D1Result<T>> {
@@ -72,12 +66,16 @@ class TestD1PreparedStatement implements D1PreparedStatement {
           size_after: 0,
           rows_read: 0,
           rows_written: 0,
+          last_row_id: 0,
           changed_db: false,
           changes: 0,
         },
       };
     } catch (error) {
-      if (!(error instanceof TypeError) || !error.message.includes("does not return data")) {
+      if (
+        !(error instanceof TypeError) ||
+        !error.message.includes("does not return data")
+      ) {
         throw error;
       }
     }
@@ -90,18 +88,34 @@ class TestD1PreparedStatement implements D1PreparedStatement {
         size_after: 0,
         rows_read: 0,
         rows_written: result.changes,
+        last_row_id: Number(result.lastInsertRowid),
         changed_db: result.changes > 0,
         changes: result.changes,
       },
     };
   }
 
-  async raw<T = unknown[]>(): Promise<T[]> {
-    return this.sqlite.prepare(this.sql).all(...this.bindings) as T[];
+  raw<T = unknown[]>(options: {
+    columnNames: true;
+  }): Promise<[string[], ...T[]]>;
+  raw<T = unknown[]>(options?: { columnNames?: false }): Promise<T[]>;
+  async raw<T = unknown[]>(options?: {
+    columnNames?: boolean;
+  }): Promise<T[] | [string[], ...T[]]> {
+    const statement = this.sqlite.prepare(this.sql);
+    if (options?.columnNames) {
+      const columnNames = statement.columns().map((column) => column.name);
+      const rows = statement.raw(true).all(...this.bindings) as T[];
+      return [columnNames, ...rows];
+    }
+    return statement.raw(true).all(...this.bindings) as T[];
   }
 }
 
-export async function createMemoryD1(): Promise<{ readonly db: D1Database; readonly raw: RawSqlite }> {
+export async function createMemoryD1(): Promise<{
+  readonly db: D1Database;
+  readonly raw: RawSqlite;
+}> {
   const sqliteModuleName = "better-sqlite3";
   const { default: Database } = (await import(sqliteModuleName)) as {
     readonly default: new (path: string) => RawSqlite;
@@ -113,7 +127,9 @@ export async function createMemoryD1(): Promise<{ readonly db: D1Database; reado
     prepare(query) {
       return new TestD1PreparedStatement(raw, query);
     },
-    async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    async batch<T = unknown>(
+      statements: D1PreparedStatement[],
+    ): Promise<D1Result<T>[]> {
       return Promise.all(statements.map((statement) => statement.run<T>()));
     },
     async exec(query): Promise<D1ExecResult> {

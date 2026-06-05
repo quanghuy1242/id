@@ -8,6 +8,9 @@ describe("Health route", () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, service: "id-ui" });
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      service: "id-ui",
+    });
   });
 });

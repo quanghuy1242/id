@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { REDACTED_LOG_VALUE, redactLogFields, structuredLog } from "../../src/shared/log-redaction";
+import {
+  REDACTED_LOG_VALUE,
+  redactLogFields,
+  structuredLog,
+} from "../../src/shared/log-redaction";
 
 describe("log redaction", () => {
   it("redacts token and secret-bearing fields before structured logging", () => {
@@ -25,4 +29,3 @@ describe("log redaction", () => {
     });
   });
 });
-

@@ -30,7 +30,11 @@ function createKv() {
   const values = new Map<string, StoredValue>();
   const kv = {
     get: async (key: string) => values.get(key)?.value ?? null,
-    put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+    put: async (
+      key: string,
+      value: string,
+      options?: { expirationTtl?: number },
+    ) => {
       values.set(key, { value, ttl: options?.expirationTtl });
     },
     delete: async (key: string) => {
@@ -44,10 +48,18 @@ function createKv() {
 describe("OAuth scope catalog schema", () => {
   it("derives Better Auth fields from canonical Zod schemas", () => {
     expect(oauthResourceScopeBetterAuthFields.resourceServerId).toEqual(
-      expect.objectContaining({ type: "string", required: true, references: { model: "resourceServer", field: "id" } }),
+      expect.objectContaining({
+        type: "string",
+        required: true,
+        references: { model: "resourceServer", field: "id" },
+      }),
     );
     expect(oauthResourceScopeBetterAuthFields.enabled).toEqual(
-      expect.objectContaining({ type: "boolean", required: true, defaultValue: true }),
+      expect.objectContaining({
+        type: "boolean",
+        required: true,
+        defaultValue: true,
+      }),
     );
     expect(oauthResourceScopeBetterAuthFields.resourceScopeKey).toEqual(
       expect.objectContaining({ type: "string", required: true, unique: true }),
@@ -72,7 +84,14 @@ describe("OAuth scope catalog cache", () => {
   it("loads enabled scopes from KV without hitting the store", async () => {
     const { kv, values } = createKv();
     values.set(authPluginConfig.oauthScopeCacheKey, {
-      value: JSON.stringify([{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read", system: false }]),
+      value: JSON.stringify([
+        {
+          resourceServerId: "rs_1",
+          audience: "https://api.example.test",
+          scope: "content:read",
+          system: false,
+        },
+      ]),
     });
 
     const result = await loadOAuthScopesFromCache(kv, async () => {
@@ -80,7 +99,14 @@ describe("OAuth scope catalog cache", () => {
     });
 
     expect(result).toEqual({
-      rows: [{ resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:read", system: false }],
+      rows: [
+        {
+          resourceServerId: "rs_1",
+          audience: "https://api.example.test",
+          scope: "content:read",
+          system: false,
+        },
+      ],
       scopes: ["content:read"],
       source: "cache",
     });
@@ -99,8 +125,18 @@ describe("OAuth scope catalog cache", () => {
             return {
               all: async () => ({
                 results: [
-                  { resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write", organizationId: "org_1" },
-                  { resourceServerId: "rs_system", audience: "https://id.example.test/system", scope: "oauth:clients:read", organizationId: null },
+                  {
+                    resourceServerId: "rs_1",
+                    audience: "https://api.example.test",
+                    scope: "content:write",
+                    organizationId: "org_1",
+                  },
+                  {
+                    resourceServerId: "rs_system",
+                    audience: "https://id.example.test/system",
+                    scope: "oauth:clients:read",
+                    organizationId: null,
+                  },
                 ],
               }),
             };
@@ -111,8 +147,18 @@ describe("OAuth scope catalog cache", () => {
 
     await expect(loadOAuthResourceScopes({ DB: db, KV: kv })).resolves.toEqual({
       rows: [
-        { resourceServerId: "rs_1", audience: "https://api.example.test", scope: "content:write", system: false },
-        { resourceServerId: "rs_system", audience: "https://id.example.test/system", scope: "oauth:clients:read", system: true },
+        {
+          resourceServerId: "rs_1",
+          audience: "https://api.example.test",
+          scope: "content:write",
+          system: false,
+        },
+        {
+          resourceServerId: "rs_system",
+          audience: "https://id.example.test/system",
+          scope: "oauth:clients:read",
+          system: true,
+        },
       ],
       scopes: ["content:write", "oauth:clients:read"],
       source: "store",
@@ -141,29 +187,31 @@ describe("OAuth client resource-scope cache", () => {
           all: async () => {
             reads.push(clientId);
             return {
-              results: [{
-                id: `rs_scope_${clientId}`,
-                clientId,
-                resourceServerId: "rs_1",
-                audience: "https://api.example.test",
-                allowedScopes: JSON.stringify(["content:write"]),
-                enabled: 1,
-              }],
+              results: [
+                {
+                  id: `rs_scope_${clientId}`,
+                  clientId,
+                  resourceServerId: "rs_1",
+                  audience: "https://api.example.test",
+                  allowedScopes: JSON.stringify(["content:write"]),
+                  enabled: 1,
+                },
+              ],
             };
           },
         }),
       }),
     } as unknown as D1Database;
 
-    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
-      expect.objectContaining({ clientId: "client_a" }),
-    ]);
-    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_b")).resolves.toEqual([
-      expect.objectContaining({ clientId: "client_b" }),
-    ]);
-    await expect(loadClientResourceScopes({ DB: db, KV: kv }, "client_a")).resolves.toEqual([
-      expect.objectContaining({ clientId: "client_a" }),
-    ]);
+    await expect(
+      loadClientResourceScopes({ DB: db, KV: kv }, "client_a"),
+    ).resolves.toEqual([expect.objectContaining({ clientId: "client_a" })]);
+    await expect(
+      loadClientResourceScopes({ DB: db, KV: kv }, "client_b"),
+    ).resolves.toEqual([expect.objectContaining({ clientId: "client_b" })]);
+    await expect(
+      loadClientResourceScopes({ DB: db, KV: kv }, "client_a"),
+    ).resolves.toEqual([expect.objectContaining({ clientId: "client_a" })]);
     expect(reads).toEqual(["client_a", "client_b"]);
   });
 
@@ -179,14 +227,16 @@ describe("OAuth client resource-scope cache", () => {
       prepare: () => ({
         bind: (clientId: string) => ({
           all: async () => ({
-            results: [{
-              id: `rs_scope_${clientId}`,
-              clientId,
-              resourceServerId: "rs_1",
-              audience: "https://api.example.test",
-              allowedScopes: JSON.stringify(["content:write"]),
-              enabled: 1,
-            }],
+            results: [
+              {
+                id: `rs_scope_${clientId}`,
+                clientId,
+                resourceServerId: "rs_1",
+                audience: "https://api.example.test",
+                allowedScopes: JSON.stringify(["content:write"]),
+                enabled: 1,
+              },
+            ],
           }),
         }),
       }),
@@ -198,7 +248,9 @@ describe("OAuth client resource-scope cache", () => {
       { waitUntil: (task) => waited.push(task) },
     );
 
-    expect(result).toEqual([expect.objectContaining({ clientId: "client_background" })]);
+    expect(result).toEqual([
+      expect.objectContaining({ clientId: "client_background" }),
+    ]);
     expect(waited).toHaveLength(1);
   });
 });
@@ -206,9 +258,24 @@ describe("OAuth client resource-scope cache", () => {
 describe("OAuth scope issuance assertions", () => {
   const catalog = {
     scopeRows: [
-      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:read", system: false },
-      { resourceServerId: "rs_content", audience: "https://content.example.test", scope: "content:share", system: false },
-      { resourceServerId: "rs_other", audience: "https://other.example.test", scope: "content:read", system: false },
+      {
+        resourceServerId: "rs_content",
+        audience: "https://content.example.test",
+        scope: "content:read",
+        system: false,
+      },
+      {
+        resourceServerId: "rs_content",
+        audience: "https://content.example.test",
+        scope: "content:share",
+        system: false,
+      },
+      {
+        resourceServerId: "rs_other",
+        audience: "https://other.example.test",
+        scope: "content:read",
+        system: false,
+      },
     ],
   };
 
@@ -218,7 +285,8 @@ describe("OAuth scope issuance assertions", () => {
         catalog,
         resource: "https://content.example.test",
         scopes: ["openid", "content:read"],
-      })).not.toThrow();
+      }),
+    ).not.toThrow();
   });
 
   it("rejects unknown, disabled, or wrong-audience scopes before token issuance", () => {
@@ -227,7 +295,8 @@ describe("OAuth scope issuance assertions", () => {
         catalog,
         resource: "https://other.example.test",
         scopes: ["content:share"],
-      })).toThrow(APIError);
+      }),
+    ).toThrow(APIError);
   });
 
   it("rejects direct-share requests for workspace-only scopes", () => {
@@ -236,7 +305,10 @@ describe("OAuth scope issuance assertions", () => {
   });
 
   it("fails closed instead of truncating oversized team claims", () => {
-    const teamIds = Array.from({ length: authPluginConfig.maxTokenTeamIds + 1 }, (_, index) => `team_${index}`);
+    const teamIds = Array.from(
+      { length: authPluginConfig.maxTokenTeamIds + 1 },
+      (_, index) => `team_${index}`,
+    );
 
     expect(() => assertTeamIdsWithinTokenLimit(teamIds)).toThrow(APIError);
   });
@@ -251,7 +323,10 @@ describe("OAuth scope issuance assertions", () => {
             expect(values).toEqual(["user_1", "org_1"]);
             return {
               all: async () => ({
-                results: [{ teamId: "team_editorial" }, { teamId: "team_editorial" }],
+                results: [
+                  { teamId: "team_editorial" },
+                  { teamId: "team_editorial" },
+                ],
               }),
             };
           },
@@ -259,8 +334,8 @@ describe("OAuth scope issuance assertions", () => {
       },
     } as unknown as D1Database;
 
-    await expect(loadUserTeamIdsForOrganization({ DB: db, KV: kv }, "user_1", "org_1")).resolves.toEqual([
-      "team_editorial",
-    ]);
+    await expect(
+      loadUserTeamIdsForOrganization({ DB: db, KV: kv }, "user_1", "org_1"),
+    ).resolves.toEqual(["team_editorial"]);
   });
 });

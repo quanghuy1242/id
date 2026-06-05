@@ -81,11 +81,18 @@ function normalizeUserEnvelope(value: unknown): UserEnvelope {
   throw new TypeError("Expected user response from Better Auth");
 }
 
-export async function listUsers(params: ListUsersParams): Promise<ListUsersResponse> {
-  return authApiGetOrThrow<ListUsersResponse>("/admin/list-users", params as Record<string, string | number | undefined>);
+export async function listUsers(
+  params: ListUsersParams,
+): Promise<ListUsersResponse> {
+  return authApiGetOrThrow<ListUsersResponse>(
+    "/admin/list-users",
+    params as Record<string, string | number | undefined>,
+  );
 }
 
-export async function createUser(body: CreateUserBody): Promise<{ user: User }> {
+export async function createUser(
+  body: CreateUserBody,
+): Promise<{ user: User }> {
   return authApiPostOrThrow<{ user: User }>("/admin/create-user", body);
 }
 
@@ -94,66 +101,126 @@ export async function getUser(userId: string): Promise<{ user: User }> {
   return { user };
 }
 
-export async function updateUser(userId: string, data: Partial<{ name: string; email: string; image: string }>): Promise<{ user: User }> {
-  return normalizeUserEnvelope(await authApiPostOrThrow<unknown>("/admin/update-user", { userId, data }));
+export async function updateUser(
+  userId: string,
+  data: Partial<{ name: string; email: string; image: string }>,
+): Promise<{ user: User }> {
+  return normalizeUserEnvelope(
+    await authApiPostOrThrow<unknown>("/admin/update-user", { userId, data }),
+  );
 }
 
-export async function setRole(userId: string, role: string): Promise<{ user: User }> {
-  return authApiPostOrThrow<{ user: User }>("/admin/set-role", { userId, role });
+export async function setRole(
+  userId: string,
+  role: string,
+): Promise<{ user: User }> {
+  return authApiPostOrThrow<{ user: User }>("/admin/set-role", {
+    userId,
+    role,
+  });
 }
 
-export async function setUserPassword(userId: string, newPassword: string): Promise<{ status: boolean }> {
-  return authApiPostOrThrow<{ status: boolean }>("/admin/set-user-password", { newPassword, userId });
+export async function setUserPassword(
+  userId: string,
+  newPassword: string,
+): Promise<{ status: boolean }> {
+  return authApiPostOrThrow<{ status: boolean }>("/admin/set-user-password", {
+    newPassword,
+    userId,
+  });
 }
 
-export async function banUser(userId: string, banReason?: string, banExpiresIn?: number): Promise<{ user: User }> {
-  return authApiPostOrThrow<{ user: User }>("/admin/ban-user", { userId, ...(banReason ? { banReason } : {}), ...(banExpiresIn ? { banExpiresIn } : {}) });
+export async function banUser(
+  userId: string,
+  banReason?: string,
+  banExpiresIn?: number,
+): Promise<{ user: User }> {
+  return authApiPostOrThrow<{ user: User }>("/admin/ban-user", {
+    userId,
+    ...(banReason ? { banReason } : {}),
+    ...(banExpiresIn ? { banExpiresIn } : {}),
+  });
 }
 
 export async function unbanUser(userId: string): Promise<{ user: User }> {
   return authApiPostOrThrow<{ user: User }>("/admin/unban-user", { userId });
 }
 
-export async function impersonateUser(userId: string): Promise<{ session: unknown; user: User }> {
-  return authApiPostOrThrow<{ session: unknown; user: User }>("/admin/impersonate-user", { userId });
+export async function impersonateUser(
+  userId: string,
+): Promise<{ session: unknown; user: User }> {
+  return authApiPostOrThrow<{ session: unknown; user: User }>(
+    "/admin/impersonate-user",
+    { userId },
+  );
 }
 
 export async function stopImpersonating(): Promise<void> {
   await authApiPostOrThrow("/admin/stop-impersonating", {});
 }
 
-export async function removeUser(userId: string): Promise<{ success: boolean }> {
-  return authApiPostOrThrow<{ success: boolean }>("/admin/remove-user", { userId });
+export async function removeUser(
+  userId: string,
+): Promise<{ success: boolean }> {
+  return authApiPostOrThrow<{ success: boolean }>("/admin/remove-user", {
+    userId,
+  });
 }
 
-export async function listUserSessions(userId: string): Promise<{ sessions: Session[] }> {
+export async function listUserSessions(
+  userId: string,
+): Promise<{ sessions: Session[] }> {
   const pageLimit = 100;
-  const firstPage = await listAdminSessions({ limit: pageLimit, offset: 0, userId });
+  const firstPage = await listAdminSessions({
+    limit: pageLimit,
+    offset: 0,
+    userId,
+  });
   const stride = firstPage.limit > 0 ? firstPage.limit : pageLimit;
   const offsets: number[] = [];
-  for (let offset = stride; offset < firstPage.total; offset += stride) offsets.push(offset);
+  for (let offset = stride; offset < firstPage.total; offset += stride)
+    offsets.push(offset);
 
-  const rest = await Promise.all(offsets.map((offset) => listAdminSessions({ limit: pageLimit, offset, userId })));
+  const rest = await Promise.all(
+    offsets.map((offset) =>
+      listAdminSessions({ limit: pageLimit, offset, userId }),
+    ),
+  );
   return { sessions: [firstPage, ...rest].flatMap((page) => page.sessions) };
 }
 
-export async function revokeUserSession(sessionId: string): Promise<{ success: boolean }> {
+export async function revokeUserSession(
+  sessionId: string,
+): Promise<{ success: boolean }> {
   await revokeAdminSession(sessionId);
   return { success: true };
 }
 
-export async function revokeUserSessions(userId: string): Promise<{ success: boolean }> {
-  return authApiPostOrThrow<{ success: boolean }>("/admin/revoke-user-sessions", { userId });
+export async function revokeUserSessions(
+  userId: string,
+): Promise<{ success: boolean }> {
+  return authApiPostOrThrow<{ success: boolean }>(
+    "/admin/revoke-user-sessions",
+    { userId },
+  );
 }
 
 export async function getCurrentSession(): Promise<CurrentSession> {
   try {
-    return await authApiGetOrThrow<CurrentSession>("/get-session", { disableRefresh: "true", disableCookieCache: "true" }, { cache: "no-store", credentials: "include" });
+    return await authApiGetOrThrow<CurrentSession>(
+      "/get-session",
+      { disableRefresh: "true", disableCookieCache: "true" },
+      { cache: "no-store", credentials: "include" },
+    );
   } catch {
     return null;
   }
 }
 
 export async function signOut(): Promise<void> {
-  await authApiPostOrThrow("/sign-out", {}, { cache: "no-store", credentials: "include" });
+  await authApiPostOrThrow(
+    "/sign-out",
+    {},
+    { cache: "no-store", credentials: "include" },
+  );
 }

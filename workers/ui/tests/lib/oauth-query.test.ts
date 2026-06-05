@@ -60,28 +60,32 @@ describe("useOauthRequestDescription", () => {
 
   it("uses client_id in description", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("client_id=abc123&scope=openid")
+      useOauthRequestDescription("client_id=abc123&scope=openid"),
     );
-    expect(result.current).toBe("Client abc123 is requesting access. Scopes: openid");
+    expect(result.current).toBe(
+      "Client abc123 is requesting access. Scopes: openid",
+    );
   });
 
   it("falls back to default when client_id is not available", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("scope=openid")
+      useOauthRequestDescription("scope=openid"),
     );
-    expect(result.current).toBe("Client this application is requesting access. Scopes: openid");
+    expect(result.current).toBe(
+      "Client this application is requesting access. Scopes: openid",
+    );
   });
 
   it("includes scopes when present", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("client_id=abc123&scope=openid profile email")
+      useOauthRequestDescription("client_id=abc123&scope=openid profile email"),
     );
     expect(result.current).toContain("Scopes: openid profile email");
   });
 
   it("does not include scopes when empty", () => {
     const { result } = renderHook(() =>
-      useOauthRequestDescription("client_id=abc123")
+      useOauthRequestDescription("client_id=abc123"),
     );
     expect(result.current).not.toContain("Scopes:");
   });

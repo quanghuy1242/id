@@ -16,50 +16,62 @@ import {
  */
 
 /** Canonical Zod schema for a resource-server row returned by the BA adapter. */
-export const resourceServerSchema = z.object({
-  id: z.string().meta({
-    description: "Unique identifier of the resource server",
-    example: "rs_123456",
-  }),
-  organizationId: z.string().min(1).nullable().optional().meta({
-    description: "The organization ID that owns this resource server; null for the id-owned system audience",
-    betterAuth: { index: true, references: { model: "organization", field: "id" } },
-  }),
-  slug: z.string().min(1).meta({
-    description: "URL-friendly unique slug for the resource server inside the organization",
-  }),
-  name: z.string().min(1).meta({
-    description: "User-friendly name of the resource server",
-  }),
-  audience: z.url().meta({
-    description: "Audience URI of the resource server",
-    betterAuth: { unique: true },
-  }),
-  description: z.string().optional().meta({
-    description: "Optional description of the resource server",
-  }),
-  enabled: z.boolean().default(true).meta({
-    description: "Whether the resource server is active and issuing tokens",
-  }),
-  createdBy: z.string().optional().meta({
-    description: "User ID of the creator",
-  }),
-  updatedBy: z.string().optional().meta({
-    description: "User ID of the last updater",
-  }),
-  disabledAt: z.number().nullable().optional().meta({
-    description: "Timestamp (ms) when the resource server was disabled",
-  }),
-  disabledBy: z.string().nullable().optional().meta({
-    description: "User ID who disabled the resource server",
-  }),
-  createdAt: z.number().meta({
-    description: "Timestamp (ms) of creation",
-  }),
-  updatedAt: z.number().meta({
-    description: "Timestamp (ms) of last update",
-  }),
-}).meta({ id: "ResourceServer" });
+export const resourceServerSchema = z
+  .object({
+    id: z.string().meta({
+      description: "Unique identifier of the resource server",
+      example: "rs_123456",
+    }),
+    organizationId: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .meta({
+        description:
+          "The organization ID that owns this resource server; null for the id-owned system audience",
+        betterAuth: {
+          index: true,
+          references: { model: "organization", field: "id" },
+        },
+      }),
+    slug: z.string().min(1).meta({
+      description:
+        "URL-friendly unique slug for the resource server inside the organization",
+    }),
+    name: z.string().min(1).meta({
+      description: "User-friendly name of the resource server",
+    }),
+    audience: z.url().meta({
+      description: "Audience URI of the resource server",
+      betterAuth: { unique: true },
+    }),
+    description: z.string().optional().meta({
+      description: "Optional description of the resource server",
+    }),
+    enabled: z.boolean().default(true).meta({
+      description: "Whether the resource server is active and issuing tokens",
+    }),
+    createdBy: z.string().optional().meta({
+      description: "User ID of the creator",
+    }),
+    updatedBy: z.string().optional().meta({
+      description: "User ID of the last updater",
+    }),
+    disabledAt: z.number().nullable().optional().meta({
+      description: "Timestamp (ms) when the resource server was disabled",
+    }),
+    disabledBy: z.string().nullable().optional().meta({
+      description: "User ID who disabled the resource server",
+    }),
+    createdAt: z.number().meta({
+      description: "Timestamp (ms) of creation",
+    }),
+    updatedAt: z.number().meta({
+      description: "Timestamp (ms) of last update",
+    }),
+  })
+  .meta({ id: "ResourceServer" });
 
 /** Inferred adapter row type for the plugin-owned `resourceServer` model. */
 export type ResourceServerRow = Readonly<z.infer<typeof resourceServerSchema>>;
@@ -89,18 +101,24 @@ export type CreateResourceServerBody = z.infer<typeof createResourceServerBody>;
 export type UpdateResourceServerBody = z.infer<typeof updateResourceServerBody>;
 
 /** Precomputed BA field map for the plugin schema block. */
-export const resourceServerBetterAuthFields = mapZodToBetterAuthFields(resourceServerSchema);
+export const resourceServerBetterAuthFields =
+  mapZodToBetterAuthFields(resourceServerSchema);
 
 /** Precomputed OpenAPI response schemas. */
-export const resourceServerOpenApiSchema = zodSchemaToOpenApi(resourceServerSchema);
+export const resourceServerOpenApiSchema =
+  zodSchemaToOpenApi(resourceServerSchema);
 export const listResourceServersOpenApiSchema = zodSchemaToOpenApi(
   z.object({ resourceServers: z.array(resourceServerSchema) }),
 );
 export const deleteResourceServerOpenApiSchema = zodSchemaToOpenApi(
   z.object({ deleted: z.boolean() }),
 );
-export const createResourceServerOpenApiRequestBody = openApiJsonRequestBody(createResourceServerBody);
-export const updateResourceServerOpenApiRequestBody = openApiJsonRequestBody(updateResourceServerBody);
+export const createResourceServerOpenApiRequestBody = openApiJsonRequestBody(
+  createResourceServerBody,
+);
+export const updateResourceServerOpenApiRequestBody = openApiJsonRequestBody(
+  updateResourceServerBody,
+);
 
 /** Utility for the static OpenAPI metadata attached to resource-server endpoints. */
 export function resourceServerEndpointMeta(options: {

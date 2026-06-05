@@ -35,11 +35,13 @@ type ScopeCacheOptions = {
   readonly backgroundTaskRunner?: BackgroundTaskRunner;
 };
 
-const memoryScopeCatalogCache = createMemoryTtlCache<readonly OAuthRuntimeScopeRow[]>(
-  OAUTH_SCOPE_CATALOG_MEMORY_CACHE_TTL_MS,
-);
+const memoryScopeCatalogCache = createMemoryTtlCache<
+  readonly OAuthRuntimeScopeRow[]
+>(OAUTH_SCOPE_CATALOG_MEMORY_CACHE_TTL_MS);
 
-function parseCachedScopeRows(value: string | null): readonly OAuthRuntimeScopeRow[] | null {
+function parseCachedScopeRows(
+  value: string | null,
+): readonly OAuthRuntimeScopeRow[] | null {
   if (value === null) return null;
 
   let parsed: unknown;
@@ -50,14 +52,16 @@ function parseCachedScopeRows(value: string | null): readonly OAuthRuntimeScopeR
   }
 
   if (
-    !Array.isArray(parsed)
-    || !parsed.every((item): item is OAuthRuntimeScopeRow =>
-      Boolean(item)
-      && typeof item === "object"
-      && typeof (item as OAuthRuntimeScopeRow).resourceServerId === "string"
-      && typeof (item as OAuthRuntimeScopeRow).audience === "string"
-      && typeof (item as OAuthRuntimeScopeRow).scope === "string"
-      && typeof (item as OAuthRuntimeScopeRow).system === "boolean")
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (item): item is OAuthRuntimeScopeRow =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        typeof (item as OAuthRuntimeScopeRow).resourceServerId === "string" &&
+        typeof (item as OAuthRuntimeScopeRow).audience === "string" &&
+        typeof (item as OAuthRuntimeScopeRow).scope === "string" &&
+        typeof (item as OAuthRuntimeScopeRow).system === "boolean",
+    )
   ) {
     return null;
   }
@@ -65,16 +69,23 @@ function parseCachedScopeRows(value: string | null): readonly OAuthRuntimeScopeR
   return parsed;
 }
 
-function normalizeRows(rows: readonly OAuthRuntimeScopeRow[]): readonly OAuthRuntimeScopeRow[] {
+function normalizeRows(
+  rows: readonly OAuthRuntimeScopeRow[],
+): readonly OAuthRuntimeScopeRow[] {
   const keyed = new Map<string, OAuthRuntimeScopeRow>();
   for (const row of rows) {
     keyed.set(`${row.resourceServerId}\0${row.audience}\0${row.scope}`, row);
   }
   return [...keyed.values()].sort((left, right) =>
-    `${left.audience}:${left.scope}`.localeCompare(`${right.audience}:${right.scope}`));
+    `${left.audience}:${left.scope}`.localeCompare(
+      `${right.audience}:${right.scope}`,
+    ),
+  );
 }
 
-export function uniqueRuntimeScopes(rows: readonly OAuthRuntimeScopeRow[]): readonly string[] {
+export function uniqueRuntimeScopes(
+  rows: readonly OAuthRuntimeScopeRow[],
+): readonly string[] {
   return [...new Set(rows.map((row) => row.scope))].sort();
 }
 
@@ -90,7 +101,9 @@ type RawRuntimeScopeRow = Omit<OAuthRuntimeScopeRow, "system"> & {
   readonly organizationId: string | null;
 };
 
-async function loadEnabledScopeRows(db: CoreEnv["DB"]): Promise<readonly OAuthRuntimeScopeRow[]> {
+async function loadEnabledScopeRows(
+  db: CoreEnv["DB"],
+): Promise<readonly OAuthRuntimeScopeRow[]> {
   const result = await db
     .prepare(
       `select s."resourceServerId", r."audience", s."scope", r."organizationId"
@@ -118,7 +131,11 @@ export async function loadOAuthScopesFromCache(
   const now = Date.now();
   const memoryCached = memoryScopeCatalogCache.get(now);
   if (memoryCached) {
-    return { rows: memoryCached, scopes: uniqueRuntimeScopes(memoryCached), source: "memory" };
+    return {
+      rows: memoryCached,
+      scopes: uniqueRuntimeScopes(memoryCached),
+      source: "memory",
+    };
   }
 
   const cached = parseCachedScopeRows(
@@ -135,9 +152,13 @@ export async function loadOAuthScopesFromCache(
   const rows = normalizeRows(await loadRows());
   memoryScopeCatalogCache.set(rows, now);
 
-  const cacheWrite = kv.put(authPluginConfig.oauthScopeCacheKey, JSON.stringify(rows), {
-    expirationTtl: authPluginConfig.oauthScopeCacheTtlSeconds,
-  });
+  const cacheWrite = kv.put(
+    authPluginConfig.oauthScopeCacheKey,
+    JSON.stringify(rows),
+    {
+      expirationTtl: authPluginConfig.oauthScopeCacheTtlSeconds,
+    },
+  );
 
   if (options.backgroundTaskRunner) {
     options.backgroundTaskRunner.waitUntil(cacheWrite.catch(() => undefined));
@@ -152,7 +173,9 @@ export function loadOAuthResourceScopes(
   env: ScopeCatalogEnv,
   backgroundTaskRunner?: BackgroundTaskRunner,
 ): Promise<OAuthScopeCatalogLoadResult> {
-  return loadOAuthScopesFromCache(env.KV, () => loadEnabledScopeRows(env.DB), { backgroundTaskRunner });
+  return loadOAuthScopesFromCache(env.KV, () => loadEnabledScopeRows(env.DB), {
+    backgroundTaskRunner,
+  });
 }
 
 export async function invalidateOAuthResourceScopes(
@@ -174,11 +197,14 @@ export function assertRequestedResourceScopesAllowed(params: {
   readonly resource?: string;
 }): void {
   const protocolScopes = protocolScopeSet();
-  const productScopes = params.scopes.filter((scope) => !protocolScopes.has(scope));
+  const productScopes = params.scopes.filter(
+    (scope) => !protocolScopes.has(scope),
+  );
   if (productScopes.length === 0) return;
   if (!params.resource) {
     throw new APIError("BAD_REQUEST", {
-      error_description: "resource is required for resource-server OAuth scopes",
+      error_description:
+        "resource is required for resource-server OAuth scopes",
       error: "invalid_scope",
     });
   }
@@ -188,7 +214,9 @@ export function assertRequestedResourceScopesAllowed(params: {
       .filter((row) => row.audience === params.resource)
       .map((row) => row.scope),
   );
-  const invalid = productScopes.filter((scope) => !allowedForAudience.has(scope));
+  const invalid = productScopes.filter(
+    (scope) => !allowedForAudience.has(scope),
+  );
   if (invalid.length > 0) {
     throw new APIError("BAD_REQUEST", {
       error_description: `scope not enabled for requested resource: ${invalid.join(", ")}`,
@@ -199,7 +227,9 @@ export function assertRequestedResourceScopesAllowed(params: {
 
 export function assertDirectShareScopes(scopes: readonly string[]): void {
   const workspaceOnlyScopes = workspaceOnlyScopeSet();
-  const workspaceOnly = scopes.filter((scope) => workspaceOnlyScopes.has(scope));
+  const workspaceOnly = scopes.filter((scope) =>
+    workspaceOnlyScopes.has(scope),
+  );
   if (workspaceOnly.length > 0) {
     throw new APIError("BAD_REQUEST", {
       error_description: `workspace context required for scope: ${workspaceOnly.join(", ")}`,

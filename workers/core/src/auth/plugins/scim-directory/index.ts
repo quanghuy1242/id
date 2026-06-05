@@ -40,7 +40,9 @@ import type { ScimAdapter, ScimDirectoryPluginOptions } from "./types";
 
 export type { ScimDirectoryPluginOptions } from "./types";
 
-function requireHeaders(ctx: { readonly request?: { readonly headers: Headers } | undefined }): Headers {
+function requireHeaders(ctx: {
+  readonly request?: { readonly headers: Headers } | undefined;
+}): Headers {
   if (!ctx.request?.headers) throw new APIError("UNAUTHORIZED");
   return ctx.request.headers;
 }
@@ -70,46 +72,60 @@ async function assertScimCaller(
 /** Response for unsupported SCIM mutation methods (POST/PUT/PATCH/DELETE). */
 function scimMethodNotAllowed(): Response {
   return new Response(
-    JSON.stringify(scimError(SCIM_HTTP_METHOD_NOT_ALLOWED, "This SCIM server is read-only. Provisioning operations are not supported.")),
-    { status: SCIM_HTTP_METHOD_NOT_ALLOWED, headers: { "Content-Type": "application/scim+json", Allow: "GET" } },
+    JSON.stringify(
+      scimError(
+        SCIM_HTTP_METHOD_NOT_ALLOWED,
+        "This SCIM server is read-only. Provisioning operations are not supported.",
+      ),
+    ),
+    {
+      status: SCIM_HTTP_METHOD_NOT_ALLOWED,
+      headers: { "Content-Type": "application/scim+json", Allow: "GET" },
+    },
   );
 }
 
 // ── Precomputed endpoint metadata ─────────────────────────────────────────────
 
 const scimServiceProviderConfigMetadata = scimEndpointMeta({
-  description: "SCIM ServiceProviderConfig (RFC 7643 §5). Advertises read-only support and filter capabilities.",
+  description:
+    "SCIM ServiceProviderConfig (RFC 7643 §5). Advertises read-only support and filter capabilities.",
   responseSchema: { type: "object" },
   responseDescription: "ServiceProviderConfig document",
 });
 
 const scimSchemasMetadata = scimEndpointMeta({
-  description: "SCIM Schemas list (RFC 7643 §7). Describes User, Group, and TenantMembership schemas.",
+  description:
+    "SCIM Schemas list (RFC 7643 §7). Describes User, Group, and TenantMembership schemas.",
   responseSchema: { type: "array", items: { type: "object" } },
   responseDescription: "SCIM schema definitions",
 });
 
 const scimResourceTypesMetadata = scimEndpointMeta({
-  description: "SCIM ResourceTypes list (RFC 7644 §6). Describes available resource type endpoints.",
+  description:
+    "SCIM ResourceTypes list (RFC 7644 §6). Describes available resource type endpoints.",
   responseSchema: { type: "array", items: { type: "object" } },
   responseDescription: "SCIM resource type definitions",
 });
 
 const scimGetUserMetadata = scimEndpointMeta({
-  description: "Retrieve a global SCIM User by ID. Returns active:false for banned users per RFC 7644.",
+  description:
+    "Retrieve a global SCIM User by ID. Returns active:false for banned users per RFC 7644.",
   pathParams: [{ name: "userId", description: "User ID" }],
   responseSchema: scimUserOpenApiSchema,
   responseDescription: "SCIM User resource",
 });
 
 const scimListUsersMetadata = scimEndpointMeta({
-  description: "Query global SCIM Users. Supported filters: id eq and userName eq.",
+  description:
+    "Query global SCIM Users. Supported filters: id eq and userName eq.",
   responseSchema: scimListResponseOpenApiSchema,
   responseDescription: "SCIM ListResponse of User resources",
 });
 
 const scimGetOrgUserMetadata = scimEndpointMeta({
-  description: "Retrieve an org-scoped SCIM User. Returns 404 when the user is not a member of the org.",
+  description:
+    "Retrieve an org-scoped SCIM User. Returns 404 when the user is not a member of the org.",
   pathParams: [
     { name: "orgId", description: "Organization ID" },
     { name: "userId", description: "User ID" },
@@ -119,7 +135,8 @@ const scimGetOrgUserMetadata = scimEndpointMeta({
 });
 
 const scimGetOrgGroupMetadata = scimEndpointMeta({
-  description: "Retrieve a tenant SCIM Group by ID. Use groupId=org-admins for the virtual administrators group.",
+  description:
+    "Retrieve a tenant SCIM Group by ID. Use groupId=org-admins for the virtual administrators group.",
   pathParams: [
     { name: "orgId", description: "Organization ID" },
     { name: "groupId", description: "Team ID or the sentinel 'org-admins'" },
@@ -129,7 +146,8 @@ const scimGetOrgGroupMetadata = scimEndpointMeta({
 });
 
 const scimListOrgGroupsMetadata = scimEndpointMeta({
-  description: "Query tenant SCIM Groups. Supported filters: id eq and compound id+members.value eq for membership checks.",
+  description:
+    "Query tenant SCIM Groups. Supported filters: id eq and compound id+members.value eq for membership checks.",
   pathParams: [{ name: "orgId", description: "Organization ID" }],
   responseSchema: scimListResponseOpenApiSchema,
   responseDescription: "SCIM ListResponse of Group resources",
@@ -142,20 +160,68 @@ const scimErrorMetadata = scimEndpointMeta({
 });
 
 /** Mutation-rejection stubs that return 405 for every read-only SCIM resource. */
-const scimMutationRejections: readonly { readonly key: string; readonly path: string; readonly method: "POST" | "PUT" | "PATCH" | "DELETE" }[] = [
+const scimMutationRejections: readonly {
+  readonly key: string;
+  readonly path: string;
+  readonly method: "POST" | "PUT" | "PATCH" | "DELETE";
+}[] = [
   { key: "scimCreateUserNotAllowed", path: "/scim/v2/Users", method: "POST" },
-  { key: "scimReplaceUserNotAllowed", path: "/scim/v2/Users/:userId", method: "PUT" },
-  { key: "scimPatchUserNotAllowed", path: "/scim/v2/Users/:userId", method: "PATCH" },
-  { key: "scimDeleteUserNotAllowed", path: "/scim/v2/Users/:userId", method: "DELETE" },
-  { key: "scimCreateOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users", method: "POST" },
-  { key: "scimReplaceOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "PUT" },
-  { key: "scimPatchOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "PATCH" },
-  { key: "scimDeleteOrgUserNotAllowed", path: "/scim/v2/tenants/:orgId/Users/:userId", method: "DELETE" },
+  {
+    key: "scimReplaceUserNotAllowed",
+    path: "/scim/v2/Users/:userId",
+    method: "PUT",
+  },
+  {
+    key: "scimPatchUserNotAllowed",
+    path: "/scim/v2/Users/:userId",
+    method: "PATCH",
+  },
+  {
+    key: "scimDeleteUserNotAllowed",
+    path: "/scim/v2/Users/:userId",
+    method: "DELETE",
+  },
+  {
+    key: "scimCreateOrgUserNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Users",
+    method: "POST",
+  },
+  {
+    key: "scimReplaceOrgUserNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Users/:userId",
+    method: "PUT",
+  },
+  {
+    key: "scimPatchOrgUserNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Users/:userId",
+    method: "PATCH",
+  },
+  {
+    key: "scimDeleteOrgUserNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Users/:userId",
+    method: "DELETE",
+  },
   { key: "scimBulkNotAllowed", path: "/scim/v2/Bulk", method: "POST" },
-  { key: "scimCreateGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups", method: "POST" },
-  { key: "scimReplaceGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "PUT" },
-  { key: "scimPatchGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "PATCH" },
-  { key: "scimDeleteGroupNotAllowed", path: "/scim/v2/tenants/:orgId/Groups/:groupId", method: "DELETE" },
+  {
+    key: "scimCreateGroupNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Groups",
+    method: "POST",
+  },
+  {
+    key: "scimReplaceGroupNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Groups/:groupId",
+    method: "PUT",
+  },
+  {
+    key: "scimPatchGroupNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Groups/:groupId",
+    method: "PATCH",
+  },
+  {
+    key: "scimDeleteGroupNotAllowed",
+    path: "/scim/v2/tenants/:orgId/Groups/:groupId",
+    method: "DELETE",
+  },
 ];
 
 /**
@@ -173,7 +239,9 @@ const scimMutationRejections: readonly { readonly key: string; readonly path: st
  * so a single M2M token serves both SCIM reads and OAuth client lookups
  * (see doc 020 §2). The original per-doc-017 `/scim` audience is no longer used.
  */
-export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuthPlugin => ({
+export const idScimDirectory = (
+  options: ScimDirectoryPluginOptions,
+): BetterAuthPlugin => ({
   id: "id-scim-directory",
   endpoints: {
     // ── Discovery endpoints (no auth required) ───────────────────────────────
@@ -181,7 +249,8 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
     scimServiceProviderConfig: createAuthEndpoint(
       "/scim/v2/ServiceProviderConfig",
       { method: "GET", metadata: scimServiceProviderConfigMetadata },
-      async (ctx) => scimJsonResponse(buildServiceProviderConfig(ctx.context.baseURL)),
+      async (ctx) =>
+        scimJsonResponse(buildServiceProviderConfig(ctx.context.baseURL)),
     ),
 
     scimSchemas: createAuthEndpoint(
@@ -205,10 +274,18 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
       async (ctx) => {
         const adapter = await assertScimCaller(ctx, options);
         const userId = ctx.params?.userId as string | undefined;
-        if (!userId) return scimJsonResponse(scimError(SCIM_HTTP_BAD_REQUEST, "Missing userId"), SCIM_HTTP_BAD_REQUEST);
+        if (!userId)
+          return scimJsonResponse(
+            scimError(SCIM_HTTP_BAD_REQUEST, "Missing userId"),
+            SCIM_HTTP_BAD_REQUEST,
+          );
 
         const user = await findUser(adapter, userId);
-        if (!user) return scimJsonResponse(scimError(SCIM_HTTP_NOT_FOUND, "User not found"), SCIM_HTTP_NOT_FOUND);
+        if (!user)
+          return scimJsonResponse(
+            scimError(SCIM_HTTP_NOT_FOUND, "User not found"),
+            SCIM_HTTP_NOT_FOUND,
+          );
 
         return scimJsonResponse(toScimUser(user, ctx.context.baseURL));
       },
@@ -229,14 +306,19 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
       { method: "GET", metadata: scimListUsersMetadata },
       async (ctx) => {
         const adapter = await assertScimCaller(ctx, options);
-        const rawFilter = typeof ctx.query?.filter === "string" ? ctx.query.filter : undefined;
+        const rawFilter =
+          typeof ctx.query?.filter === "string" ? ctx.query.filter : undefined;
 
         let parsed;
         try {
           parsed = parseScimFilter(rawFilter);
         } catch {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_BAD_REQUEST, "Unsupported filter expression", "invalidFilter"),
+            scimError(
+              SCIM_HTTP_BAD_REQUEST,
+              "Unsupported filter expression",
+              "invalidFilter",
+            ),
             SCIM_HTTP_BAD_REQUEST,
           );
         }
@@ -247,7 +329,11 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
 
         if (parsed.kind !== "single") {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_BAD_REQUEST, "Compound filters are not supported on /Users", "invalidFilter"),
+            scimError(
+              SCIM_HTTP_BAD_REQUEST,
+              "Compound filters are not supported on /Users",
+              "invalidFilter",
+            ),
             SCIM_HTTP_BAD_REQUEST,
           );
         }
@@ -255,7 +341,11 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         const { field, value } = parsed.clause;
         if (field !== "id" && field !== "userName") {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_BAD_REQUEST, `Filter field '${field}' is not supported on /Users`, "invalidFilter"),
+            scimError(
+              SCIM_HTTP_BAD_REQUEST,
+              `Filter field '${field}' is not supported on /Users`,
+              "invalidFilter",
+            ),
             SCIM_HTTP_BAD_REQUEST,
           );
         }
@@ -266,7 +356,9 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         const user = await findUser(adapter, value);
         if (!user) return scimJsonResponse(toScimListResponse([]));
 
-        return scimJsonResponse(toScimListResponse([toScimUser(user, ctx.context.baseURL)]));
+        return scimJsonResponse(
+          toScimListResponse([toScimUser(user, ctx.context.baseURL)]),
+        );
       },
     ),
 
@@ -286,18 +378,26 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         const orgId = ctx.params?.orgId as string | undefined;
         const userId = ctx.params?.userId as string | undefined;
         if (!orgId || !userId) {
-          return scimJsonResponse(scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId or userId"), SCIM_HTTP_BAD_REQUEST);
+          return scimJsonResponse(
+            scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId or userId"),
+            SCIM_HTTP_BAD_REQUEST,
+          );
         }
 
         const result = await findOrgUser(adapter, userId, orgId);
         if (!result) {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_NOT_FOUND, "User not found in this organization"),
+            scimError(
+              SCIM_HTTP_NOT_FOUND,
+              "User not found in this organization",
+            ),
             SCIM_HTTP_NOT_FOUND,
           );
         }
 
-        return scimJsonResponse(toScimOrgUser(result.user, result.member, orgId, ctx.context.baseURL));
+        return scimJsonResponse(
+          toScimOrgUser(result.user, result.member, orgId, ctx.context.baseURL),
+        );
       },
     ),
 
@@ -318,18 +418,26 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         const orgId = ctx.params?.orgId as string | undefined;
         const groupId = ctx.params?.groupId as string | undefined;
         if (!orgId || !groupId) {
-          return scimJsonResponse(scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId or groupId"), SCIM_HTTP_BAD_REQUEST);
+          return scimJsonResponse(
+            scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId or groupId"),
+            SCIM_HTTP_BAD_REQUEST,
+          );
         }
 
         if (groupId === SCIM_ORG_ADMINS_GROUP_ID) {
           const admins = await findOrgAdmins(adapter, orgId);
-          return scimJsonResponse(toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL));
+          return scimJsonResponse(
+            toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL),
+          );
         }
 
         const team = await findTeam(adapter, groupId, orgId);
         if (!team) {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_NOT_FOUND, "Group not found in this organization"),
+            scimError(
+              SCIM_HTTP_NOT_FOUND,
+              "Group not found in this organization",
+            ),
             SCIM_HTTP_NOT_FOUND,
           );
         }
@@ -353,17 +461,25 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         const adapter = await assertScimCaller(ctx, options);
         const orgId = ctx.params?.orgId as string | undefined;
         if (!orgId) {
-          return scimJsonResponse(scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId"), SCIM_HTTP_BAD_REQUEST);
+          return scimJsonResponse(
+            scimError(SCIM_HTTP_BAD_REQUEST, "Missing orgId"),
+            SCIM_HTTP_BAD_REQUEST,
+          );
         }
 
-        const rawFilter = typeof ctx.query?.filter === "string" ? ctx.query.filter : undefined;
+        const rawFilter =
+          typeof ctx.query?.filter === "string" ? ctx.query.filter : undefined;
 
         let parsed;
         try {
           parsed = parseScimFilter(rawFilter);
         } catch {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_BAD_REQUEST, "Unsupported filter expression", "invalidFilter"),
+            scimError(
+              SCIM_HTTP_BAD_REQUEST,
+              "Unsupported filter expression",
+              "invalidFilter",
+            ),
             SCIM_HTTP_BAD_REQUEST,
           );
         }
@@ -375,19 +491,33 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
         // Compound filter: `id eq "org-admins" and members.value eq "userId"` — membership check.
         if (parsed.kind === "and") {
           const { left, right } = parsed;
-          const idClause = left.field === "id" ? left : right.field === "id" ? right : null;
-          const memberClause = left.field === "members.value" ? left : right.field === "members.value" ? right : null;
+          const idClause =
+            left.field === "id" ? left : right.field === "id" ? right : null;
+          const memberClause =
+            left.field === "members.value"
+              ? left
+              : right.field === "members.value"
+                ? right
+                : null;
 
           if (!idClause || !memberClause) {
             return scimJsonResponse(
-              scimError(SCIM_HTTP_BAD_REQUEST, "Compound filter must combine 'id eq' and 'members.value eq'", "invalidFilter"),
+              scimError(
+                SCIM_HTTP_BAD_REQUEST,
+                "Compound filter must combine 'id eq' and 'members.value eq'",
+                "invalidFilter",
+              ),
               SCIM_HTTP_BAD_REQUEST,
             );
           }
 
           if (idClause.value !== SCIM_ORG_ADMINS_GROUP_ID) {
             return scimJsonResponse(
-              scimError(SCIM_HTTP_BAD_REQUEST, "members.value filter is only supported for org-admins group", "invalidFilter"),
+              scimError(
+                SCIM_HTTP_BAD_REQUEST,
+                "members.value filter is only supported for org-admins group",
+                "invalidFilter",
+              ),
               SCIM_HTTP_BAD_REQUEST,
             );
           }
@@ -396,7 +526,11 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
           if (!admin) return scimJsonResponse(toScimListResponse([]));
 
           const admins = await findOrgAdmins(adapter, orgId);
-          return scimJsonResponse(toScimListResponse([toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL)]));
+          return scimJsonResponse(
+            toScimListResponse([
+              toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL),
+            ]),
+          );
         }
 
         // Single filter.
@@ -404,30 +538,46 @@ export const idScimDirectory = (options: ScimDirectoryPluginOptions): BetterAuth
 
         if (field !== "id") {
           return scimJsonResponse(
-            scimError(SCIM_HTTP_BAD_REQUEST, `Filter field '${field}' is not supported on Groups`, "invalidFilter"),
+            scimError(
+              SCIM_HTTP_BAD_REQUEST,
+              `Filter field '${field}' is not supported on Groups`,
+              "invalidFilter",
+            ),
             SCIM_HTTP_BAD_REQUEST,
           );
         }
 
         if (value === SCIM_ORG_ADMINS_GROUP_ID) {
           const admins = await findOrgAdmins(adapter, orgId);
-          return scimJsonResponse(toScimListResponse([toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL)]));
+          return scimJsonResponse(
+            toScimListResponse([
+              toScimOrgAdminsGroup(admins, orgId, ctx.context.baseURL),
+            ]),
+          );
         }
 
         const team = await findTeam(adapter, value, orgId);
         if (!team) return scimJsonResponse(toScimListResponse([]));
 
-        return scimJsonResponse(toScimListResponse([toScimTeamGroup(team, ctx.context.baseURL)]));
+        return scimJsonResponse(
+          toScimListResponse([toScimTeamGroup(team, ctx.context.baseURL)]),
+        );
       },
     ),
 
-    ...Object.fromEntries(scimMutationRejections.map((stub) => [
-      stub.key,
-      createAuthEndpoint(
-        stub.path,
-        { method: stub.method, disableBody: true, metadata: scimErrorMetadata },
-        async () => scimMethodNotAllowed(),
-      ),
-    ])),
+    ...Object.fromEntries(
+      scimMutationRejections.map((stub) => [
+        stub.key,
+        createAuthEndpoint(
+          stub.path,
+          {
+            method: stub.method,
+            disableBody: true,
+            metadata: scimErrorMetadata,
+          },
+          async () => scimMethodNotAllowed(),
+        ),
+      ]),
+    ),
   },
 });

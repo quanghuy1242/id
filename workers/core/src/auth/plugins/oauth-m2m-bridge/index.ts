@@ -1,12 +1,18 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
-import { OAUTH_CLIENT_GRANT_TYPE_M2M, OAUTH_CLIENT_MODEL } from "../../../shared/constants";
+import {
+  OAUTH_CLIENT_GRANT_TYPE_M2M,
+  OAUTH_CLIENT_MODEL,
+} from "../../../shared/constants";
 import { readBody } from "../../../shared/request";
 import { clientHasGrantType } from "./operations";
 import type { OAuthClientRow, OAuthM2MBridgeAdapter } from "./types";
 
 function pathMatches(ctx: { readonly path?: string }, suffix: string): boolean {
-  return typeof ctx.path === "string" && (ctx.path === suffix || ctx.path.endsWith(suffix));
+  return (
+    typeof ctx.path === "string" &&
+    (ctx.path === suffix || ctx.path.endsWith(suffix))
+  );
 }
 
 /**
@@ -22,19 +28,22 @@ export const idOAuthM2MBridge = (): BetterAuthPlugin => ({
     before: [
       {
         matcher: (ctx) =>
-          pathMatches(ctx, "/oauth2/update-client")
-          || pathMatches(ctx, "/oauth2/admin/update-client")
-          || pathMatches(ctx, "/admin/oauth2/update-client"),
+          pathMatches(ctx, "/oauth2/update-client") ||
+          pathMatches(ctx, "/oauth2/admin/update-client") ||
+          pathMatches(ctx, "/admin/oauth2/update-client"),
         handler: createAuthMiddleware(async (ctx) => {
           const body = readBody(ctx);
-          const proposed = typeof body.reference_id === "string" || body.reference_id === null
-            ? (body.reference_id as string | null | undefined)
-            : undefined;
+          const proposed =
+            typeof body.reference_id === "string" || body.reference_id === null
+              ? (body.reference_id as string | null | undefined)
+              : undefined;
           if (proposed === undefined) return;
-          const clientId = typeof body.client_id === "string" ? body.client_id : undefined;
+          const clientId =
+            typeof body.client_id === "string" ? body.client_id : undefined;
           if (!clientId) return;
 
-          const adapter = (ctx.context.adapter as unknown) as OAuthM2MBridgeAdapter;
+          const adapter = ctx.context
+            .adapter as unknown as OAuthM2MBridgeAdapter;
           const client = await adapter.findOne<OAuthClientRow>({
             model: OAUTH_CLIENT_MODEL,
             where: [{ field: "clientId", value: clientId }],

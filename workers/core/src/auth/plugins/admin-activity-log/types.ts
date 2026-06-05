@@ -5,7 +5,10 @@ export type ActivityAdapterWhere = {
 };
 
 export type ActivityAdapter = {
-  readonly create: <T>(query: { model: string; data: Record<string, unknown> }) => Promise<T>;
+  readonly create: <T>(query: {
+    model: string;
+    data: Record<string, unknown>;
+  }) => Promise<T>;
   readonly findMany: <T>(query: {
     model: string;
     where?: ActivityAdapterWhere[];
@@ -13,7 +16,10 @@ export type ActivityAdapter = {
     offset?: number;
     sortBy?: { field: string; direction: "asc" | "desc" };
   }) => Promise<T[]>;
-  readonly count: (query: { model: string; where?: ActivityAdapterWhere[] }) => Promise<number>;
+  readonly count: (query: {
+    model: string;
+    where?: ActivityAdapterWhere[];
+  }) => Promise<number>;
 };
 
 export type ActivityRecordInput = {
@@ -27,7 +33,10 @@ export type ActivityRecordInput = {
   readonly metadata?: Record<string, unknown> | null;
 };
 
-export type ActivityRecordDraft = Omit<ActivityRecordInput, "actorId" | "actorType">;
+export type ActivityRecordDraft = Omit<
+  ActivityRecordInput,
+  "actorId" | "actorType"
+>;
 
 export type AdminActivityLogPluginOptions = {
   readonly authorize?: (role: string | null | undefined) => boolean;

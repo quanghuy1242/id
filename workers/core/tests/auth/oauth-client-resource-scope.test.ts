@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
+import {
+  authPluginConfig,
+  systemResourceServerAudience,
+} from "../../src/auth/config";
 import {
   clientResourceKey,
   resourceScopeKey,
@@ -15,7 +18,11 @@ import {
 
 const SYSTEM_AUDIENCE = systemResourceServerAudience("https://id.example.test");
 
-async function withOrg(test: Awaited<ReturnType<typeof createTestEnv>>, id: string, slug: string): Promise<void> {
+async function withOrg(
+  test: Awaited<ReturnType<typeof createTestEnv>>,
+  id: string,
+  slug: string,
+): Promise<void> {
   test.raw.exec(
     `insert into "organization" ("id", "name", "slug", "createdAt") values ('${id}', '${id}', '${slug}', 1700000000000);`,
   );
@@ -34,9 +41,16 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       name: "Content A",
       audience: "https://content-a.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId: resourceServerA, scope: "content:read" });
+    await createOAuthScope(test, cookie, {
+      resourceServerId: resourceServerA,
+      scope: "content:read",
+    });
 
-    const clientB = await createM2MClient(test, cookie, { name: "B client", scope: "content:read", referenceId: "org_b" });
+    const clientB = await createM2MClient(test, cookie, {
+      name: "B client",
+      scope: "content:read",
+      referenceId: "org_b",
+    });
     const attach = await attachClientResourceScope(test, cookie, {
       clientId: clientB.clientId,
       resourceServerId: resourceServerA,
@@ -55,9 +69,16 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       name: "Content",
       audience: "https://content.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId, scope: "content:read" });
+    await createOAuthScope(test, cookie, {
+      resourceServerId,
+      scope: "content:read",
+    });
 
-    const client = await createM2MClient(test, cookie, { name: "C", scope: "content:read", referenceId: "org_default" });
+    const client = await createM2MClient(test, cookie, {
+      name: "C",
+      scope: "content:read",
+      referenceId: "org_default",
+    });
     const attach = await attachClientResourceScope(test, cookie, {
       clientId: client.clientId,
       resourceServerId,
@@ -87,11 +108,16 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     );
     expect(createResponse.status).toBe(200);
     expect(await createResponse.json()).not.toHaveProperty("resourceScopeKey");
-    const duplicateKey = resourceScopeKey(resourceServerId, "content:read").replaceAll("'", "''");
+    const duplicateKey = resourceScopeKey(
+      resourceServerId,
+      "content:read",
+    ).replaceAll("'", "''");
 
-    expect(() => test.raw.exec(
-      `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_duplicate', '${resourceServerId}', 'content:read', '${duplicateKey}', 1, 1700000000000, 1700000000000);`,
-    )).toThrow(/UNIQUE constraint failed/u);
+    expect(() =>
+      test.raw.exec(
+        `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_duplicate', '${resourceServerId}', 'content:read', '${duplicateKey}', 1, 1700000000000, 1700000000000);`,
+      ),
+    ).toThrow(/UNIQUE constraint failed/u);
   });
 
   it("updates the persisted natural key when a catalog scope is renamed", async () => {
@@ -128,10 +154,15 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     expect(updateResponse.status).toBe(200);
     expect(await updateResponse.json()).not.toHaveProperty("resourceScopeKey");
 
-    const renamedKey = resourceScopeKey(resourceServerId, "content:write").replaceAll("'", "''");
-    expect(() => test.raw.exec(
-      `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_renamed_duplicate', '${resourceServerId}', 'content:write', '${renamedKey}', 1, 1700000000000, 1700000000000);`,
-    )).toThrow(/UNIQUE constraint failed/u);
+    const renamedKey = resourceScopeKey(
+      resourceServerId,
+      "content:write",
+    ).replaceAll("'", "''");
+    expect(() =>
+      test.raw.exec(
+        `insert into "oauthResourceScope" ("id", "resourceServerId", "scope", "resourceScopeKey", "enabled", "createdAt", "updatedAt") values ('scope_renamed_duplicate', '${resourceServerId}', 'content:write', '${renamedKey}', 1, 1700000000000, 1700000000000);`,
+      ),
+    ).toThrow(/UNIQUE constraint failed/u);
   });
 
   it("rejects duplicate (clientId, resourceServerId) on second create", async () => {
@@ -144,9 +175,16 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       name: "Content",
       audience: "https://content.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId, scope: "content:read" });
+    await createOAuthScope(test, cookie, {
+      resourceServerId,
+      scope: "content:read",
+    });
 
-    const client = await createM2MClient(test, cookie, { name: "C", scope: "content:read", referenceId: "org_default" });
+    const client = await createM2MClient(test, cookie, {
+      name: "C",
+      scope: "content:read",
+      referenceId: "org_default",
+    });
     const first = await attachClientResourceScope(test, cookie, {
       clientId: client.clientId,
       resourceServerId,
@@ -159,8 +197,12 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       test.env,
     );
     expect(listResponse.status).toBe(200);
-    const listBody = (await listResponse.json()) as { readonly oauthClientResourceScopes: readonly Record<string, unknown>[] };
-    expect(listBody.oauthClientResourceScopes[0]).not.toHaveProperty("clientResourceKey");
+    const listBody = (await listResponse.json()) as {
+      readonly oauthClientResourceScopes: readonly Record<string, unknown>[];
+    };
+    expect(listBody.oauthClientResourceScopes[0]).not.toHaveProperty(
+      "clientResourceKey",
+    );
     const dup = await attachClientResourceScope(test, cookie, {
       clientId: client.clientId,
       resourceServerId,
@@ -168,10 +210,15 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     });
     expect(dup.status).toBe(400);
 
-    const duplicateKey = clientResourceKey(client.clientId, resourceServerId).replaceAll("'", "''");
-    expect(() => test.raw.exec(
-      `insert into "oauthClientResourceScope" ("id", "clientId", "resourceServerId", "clientResourceKey", "allowedScopes", "enabled", "createdAt", "updatedAt") values ('crs_duplicate', '${client.clientId}', '${resourceServerId}', '${duplicateKey}', '["content:read"]', 1, 1700000000000, 1700000000000);`,
-    )).toThrow(/UNIQUE constraint failed/u);
+    const duplicateKey = clientResourceKey(
+      client.clientId,
+      resourceServerId,
+    ).replaceAll("'", "''");
+    expect(() =>
+      test.raw.exec(
+        `insert into "oauthClientResourceScope" ("id", "clientId", "resourceServerId", "clientResourceKey", "allowedScopes", "enabled", "createdAt", "updatedAt") values ('crs_duplicate', '${client.clientId}', '${resourceServerId}', '${duplicateKey}', '["content:read"]', 1, 1700000000000, 1700000000000);`,
+      ),
+    ).toThrow(/UNIQUE constraint failed/u);
   });
 
   it("rejects attaching an infrastructure client to a tenant resource server", async () => {
@@ -184,8 +231,15 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       name: "Content",
       audience: "https://content.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId, scope: "content:read" });
-    const infra = await createM2MClient(test, cookie, { name: "Infra", scope: "content:read", referenceId: null });
+    await createOAuthScope(test, cookie, {
+      resourceServerId,
+      scope: "content:read",
+    });
+    const infra = await createM2MClient(test, cookie, {
+      name: "Infra",
+      scope: "content:read",
+      referenceId: null,
+    });
 
     const attach = await attachClientResourceScope(test, cookie, {
       clientId: infra.clientId,
@@ -268,17 +322,28 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       name: "Content B",
       audience: "https://content-b.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId: resourceA, scope: "content:read" });
-    await createOAuthScope(test, cookie, { resourceServerId: resourceB, scope: "content:read" });
+    await createOAuthScope(test, cookie, {
+      resourceServerId: resourceA,
+      scope: "content:read",
+    });
+    await createOAuthScope(test, cookie, {
+      resourceServerId: resourceB,
+      scope: "content:read",
+    });
     const scopeB = test.raw
-      .prepare(`select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`)
+      .prepare(
+        `select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`,
+      )
       .get(resourceB, "content:read") as { readonly id: string };
     const crossOrgScopeCreate = await test.app.request(
       "/api/auth/admin/oauth-scopes?organizationId=org_a",
       {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ resourceServerId: resourceB, scope: "content:write" }),
+        body: JSON.stringify({
+          resourceServerId: resourceB,
+          scope: "content:write",
+        }),
       },
       test.env,
     );
@@ -293,8 +358,16 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       test.env,
     );
     expect(crossOrgScopeUpdate.status).toBe(404);
-    const clientA = await createM2MClient(test, cookie, { name: "A client", scope: "content:read", referenceId: "org_a" });
-    const clientB = await createM2MClient(test, cookie, { name: "B client", scope: "content:read", referenceId: "org_b" });
+    const clientA = await createM2MClient(test, cookie, {
+      name: "A client",
+      scope: "content:read",
+      referenceId: "org_a",
+    });
+    const clientB = await createM2MClient(test, cookie, {
+      name: "B client",
+      scope: "content:read",
+      referenceId: "org_b",
+    });
     const bindingA = await attachClientResourceScope(test, cookie, {
       clientId: clientA.clientId,
       resourceServerId: resourceA,
@@ -320,8 +393,12 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
       test.env,
     );
     expect(scopes.status).toBe(200);
-    const scopesBody = (await scopes.json()) as { readonly oauthScopes: readonly { readonly resourceServerId: string }[] };
-    expect(scopesBody.oauthScopes).toEqual([expect.objectContaining({ resourceServerId: resourceA })]);
+    const scopesBody = (await scopes.json()) as {
+      readonly oauthScopes: readonly { readonly resourceServerId: string }[];
+    };
+    expect(scopesBody.oauthScopes).toEqual([
+      expect.objectContaining({ resourceServerId: resourceA }),
+    ]);
 
     const bindings = await test.app.request(
       "/api/auth/admin/oauth-client-resource-scopes?organizationId=org_a",
@@ -330,10 +407,18 @@ describe("oauthClientResourceScope CRUD + invariants", () => {
     );
     expect(bindings.status).toBe(200);
     const bindingsBody = (await bindings.json()) as {
-      readonly oauthClientResourceScopes: readonly { readonly id: string; readonly clientId: string; readonly resourceServerId: string }[];
+      readonly oauthClientResourceScopes: readonly {
+        readonly id: string;
+        readonly clientId: string;
+        readonly resourceServerId: string;
+      }[];
     };
     expect(bindingsBody.oauthClientResourceScopes).toEqual([
-      expect.objectContaining({ id: bindingA.id, clientId: clientA.clientId, resourceServerId: resourceA }),
+      expect.objectContaining({
+        id: bindingA.id,
+        clientId: clientA.clientId,
+        resourceServerId: resourceA,
+      }),
     ]);
   });
 });

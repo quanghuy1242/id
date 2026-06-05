@@ -9,7 +9,7 @@ type Padding = "none" | "sm" | "md" | "lg";
 type SurfaceTone = "base" | "muted";
 
 type SurfaceProps = {
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 type PageProps = SurfaceProps & {

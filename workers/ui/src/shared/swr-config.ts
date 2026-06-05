@@ -39,5 +39,7 @@ export const ADMIN_SWR_CONFIG: SWRConfiguration = {
 function isRateLimited(error: unknown): boolean {
   if (error instanceof AuthApiError && error.status === 429) return true;
   const message = error instanceof Error ? error.message : String(error);
-  return /\b429\b/.test(message) || /too many requests|rate limit/i.test(message);
+  return (
+    /\b429\b/.test(message) || /too many requests|rate limit/i.test(message)
+  );
 }

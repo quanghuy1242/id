@@ -20,17 +20,33 @@ import type {
   AccountUserRow,
 } from "./schema";
 
-type AdapterWhere = { readonly field: string; readonly value: unknown; readonly operator?: "in" };
+type AdapterWhere = {
+  readonly field: string;
+  readonly value: unknown;
+  readonly operator?: "in";
+};
 
 export type AccountCenterAdapter = {
-  readonly findOne: <T>(query: { readonly model: string; readonly where?: readonly AdapterWhere[] }) => Promise<T | null>;
+  readonly findOne: <T>(query: {
+    readonly model: string;
+    readonly where?: readonly AdapterWhere[];
+  }) => Promise<T | null>;
   readonly findMany: <T>(query: {
     readonly model: string;
     readonly where?: readonly AdapterWhere[];
-    readonly sortBy?: { readonly field: string; readonly direction: "asc" | "desc" };
+    readonly sortBy?: {
+      readonly field: string;
+      readonly direction: "asc" | "desc";
+    };
   }) => Promise<T[]>;
-  readonly count: (query: { readonly model: string; readonly where?: readonly AdapterWhere[] }) => Promise<number | string | bigint>;
-  readonly delete: (query: { readonly model: string; readonly where: readonly AdapterWhere[] }) => Promise<unknown>;
+  readonly count: (query: {
+    readonly model: string;
+    readonly where?: readonly AdapterWhere[];
+  }) => Promise<number | string | bigint>;
+  readonly delete: (query: {
+    readonly model: string;
+    readonly where: readonly AdapterWhere[];
+  }) => Promise<unknown>;
 };
 
 export type PresentedAccountUser = {
@@ -93,7 +109,9 @@ function isActiveSession(row: AccountSessionRow, nowMs = Date.now()): boolean {
 function normalizeScopes(scopes: unknown): string[] {
   if (Array.isArray(scopes)) return scopes.map(String).filter(Boolean);
   if (typeof scopes === "string") {
-    const parsed = scopes.trim().startsWith("[") ? parseJsonArray(scopes) : null;
+    const parsed = scopes.trim().startsWith("[")
+      ? parseJsonArray(scopes)
+      : null;
     return parsed ?? scopes.split(/[\s,]+/u).filter(Boolean);
   }
   return [];
@@ -109,15 +127,29 @@ function parseJsonArray(value: string): string[] | null {
 }
 
 function membershipRole(value: unknown): MembershipRole | null {
-  return value === "owner" || value === "admin" || value === "member" ? value : null;
+  return value === "owner" || value === "admin" || value === "member"
+    ? value
+    : null;
 }
 
-function organizationName(row: AccountOrganizationRow | undefined, organizationId: string): string {
+function organizationName(
+  row: AccountOrganizationRow | undefined,
+  organizationId: string,
+): string {
   return row?.name?.trim() || organizationId;
 }
 
-function uniqueStrings(values: readonly (string | null | undefined)[]): string[] {
-  return [...new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0))];
+function uniqueStrings(
+  values: readonly (string | null | undefined)[],
+): string[] {
+  return [
+    ...new Set(
+      values.filter(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0,
+      ),
+    ),
+  ];
 }
 
 export function presentAccountUser(row: AccountUserRow): PresentedAccountUser {
@@ -203,10 +235,12 @@ export async function loadConnectedApplicationCount(
   adapter: AccountCenterAdapter,
   userId: string,
 ): Promise<number> {
-  return Number(await adapter.count({
-    model: OAUTH_CONSENT_MODEL,
-    where: [{ field: "userId", value: userId }],
-  }));
+  return Number(
+    await adapter.count({
+      model: OAUTH_CONSENT_MODEL,
+      where: [{ field: "userId", value: userId }],
+    }),
+  );
 }
 
 export async function loadAccountConsents(
@@ -218,7 +252,10 @@ export async function loadAccountConsents(
     where: [{ field: "userId", value: userId }],
     sortBy: { field: "updatedAt", direction: "desc" },
   });
-  const clients = await loadClientRows(adapter, uniqueStrings(rows.map((row) => row.clientId)));
+  const clients = await loadClientRows(
+    adapter,
+    uniqueStrings(rows.map((row) => row.clientId)),
+  );
   return rows.map((row) => presentAccountConsent(row, clients));
 }
 
@@ -247,7 +284,9 @@ async function loadOrganizationRows(
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-async function loadAllOrganizationRows(adapter: AccountCenterAdapter): Promise<readonly AccountOrganizationRow[]> {
+async function loadAllOrganizationRows(
+  adapter: AccountCenterAdapter,
+): Promise<readonly AccountOrganizationRow[]> {
   return adapter.findMany<AccountOrganizationRow>({
     model: ORGANIZATION_MODEL,
     sortBy: { field: "name", direction: "asc" },
@@ -278,7 +317,10 @@ export async function loadAccountOrganizations(params: {
   readonly isPlatformAdmin: (role: unknown) => boolean;
 }): Promise<readonly PresentedAccountOrganization[]> {
   const platformAdmin = params.isPlatformAdmin(params.role);
-  const memberships = await loadCurrentUserMemberships(params.adapter, params.userId);
+  const memberships = await loadCurrentUserMemberships(
+    params.adapter,
+    params.userId,
+  );
   const teams = await loadTeamRows(params.adapter, params.userId);
   const teamsByOrganization = new Map<string, AccountTeamRow[]>();
   for (const team of teams) {
@@ -294,13 +336,19 @@ export async function loadAccountOrganizations(params: {
       name: organizationName(organization, organization.id),
       slug: organization.slug?.trim() || null,
       role: "platform-admin",
-      teams: (teamsByOrganization.get(organization.id) ?? []).map((team) => ({ id: team.id, name: team.name?.trim() || team.id })),
+      teams: (teamsByOrganization.get(organization.id) ?? []).map((team) => ({
+        id: team.id,
+        name: team.name?.trim() || team.id,
+      })),
       canOpenConsole: true,
       consoleHref: `/admin/orgs/${encodeURIComponent(organization.id)}`,
     }));
   }
 
-  const organizationRows = await loadOrganizationRows(params.adapter, memberships.map((row) => row.organizationId));
+  const organizationRows = await loadOrganizationRows(
+    params.adapter,
+    memberships.map((row) => row.organizationId),
+  );
   return memberships
     .map((membership): PresentedAccountOrganization | null => {
       const role = membershipRole(membership.role);
@@ -312,11 +360,21 @@ export async function loadAccountOrganizations(params: {
         name: organizationName(row, membership.organizationId),
         slug: row?.slug?.trim() || null,
         role,
-        teams: (teamsByOrganization.get(membership.organizationId) ?? []).map((team) => ({ id: team.id, name: team.name?.trim() || team.id })),
+        teams: (teamsByOrganization.get(membership.organizationId) ?? []).map(
+          (team) => ({ id: team.id, name: team.name?.trim() || team.id }),
+        ),
         canOpenConsole,
-        consoleHref: canOpenConsole ? `/admin/orgs/${encodeURIComponent(membership.organizationId)}` : null,
+        consoleHref: canOpenConsole
+          ? `/admin/orgs/${encodeURIComponent(membership.organizationId)}`
+          : null,
       };
     })
-    .filter((organization): organization is PresentedAccountOrganization => organization !== null)
-    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+    .filter(
+      (organization): organization is PresentedAccountOrganization =>
+        organization !== null,
+    )
+    .sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
+    );
 }

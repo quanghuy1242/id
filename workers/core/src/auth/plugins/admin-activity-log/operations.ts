@@ -1,11 +1,13 @@
-import {
-  ADMIN_ACTIVITY_LOG_MODEL,
-} from "../../../shared/constants";
+import { ADMIN_ACTIVITY_LOG_MODEL } from "../../../shared/constants";
 import {
   ADMIN_AUDIT_DEFAULT_PAGE_LIMIT,
   ADMIN_AUDIT_MAX_PAGE_LIMIT,
 } from "../../config";
-import type { ActivityAdapter, ActivityAdapterWhere, ActivityRecordInput } from "./types";
+import type {
+  ActivityAdapter,
+  ActivityAdapterWhere,
+  ActivityRecordInput,
+} from "./types";
 import type { AdminActivityLogRow, PresentedActivity } from "./schema";
 
 export type ActivityPageParams = { limit: number; offset: number };
@@ -31,7 +33,11 @@ function normalizeKey(key: string): string {
 
 function isSensitiveKey(key: string): boolean {
   const normalized = normalizeKey(key);
-  return sensitiveKeys.has(normalized) || normalized.endsWith("secret") || normalized.endsWith("password");
+  return (
+    sensitiveKeys.has(normalized) ||
+    normalized.endsWith("secret") ||
+    normalized.endsWith("password")
+  );
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -63,7 +69,9 @@ function stringifyPayload(value: unknown): string | null {
   return JSON.stringify(stripActivitySecrets(value));
 }
 
-export function parsePayload(value: string | null | undefined): Record<string, unknown> | null {
+export function parsePayload(
+  value: string | null | undefined,
+): Record<string, unknown> | null {
   if (!value) return null;
   try {
     const parsed: unknown = JSON.parse(value);
@@ -73,19 +81,33 @@ export function parsePayload(value: string | null | undefined): Record<string, u
   }
 }
 
-export function parseActivityPageParams(query: { limit?: unknown; offset?: unknown } | undefined): ActivityPageParams {
+export function parseActivityPageParams(
+  query: { limit?: unknown; offset?: unknown } | undefined,
+): ActivityPageParams {
   const rawLimit = Number(query?.limit);
   const rawOffset = Number(query?.offset);
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), ADMIN_AUDIT_MAX_PAGE_LIMIT) : ADMIN_AUDIT_DEFAULT_PAGE_LIMIT;
-  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(Math.floor(rawLimit), ADMIN_AUDIT_MAX_PAGE_LIMIT)
+      : ADMIN_AUDIT_DEFAULT_PAGE_LIMIT;
+  const offset =
+    Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
   return { limit, offset };
 }
 
-export function activityFilters(query: Record<string, unknown> | undefined): ActivityAdapterWhere[] | undefined {
+export function activityFilters(
+  query: Record<string, unknown> | undefined,
+): ActivityAdapterWhere[] | undefined {
   const where: ActivityAdapterWhere[] = [];
-  for (const field of ["targetType", "targetId", "action", "actorId"] as const) {
+  for (const field of [
+    "targetType",
+    "targetId",
+    "action",
+    "actorId",
+  ] as const) {
     const value = query?.[field];
-    if (typeof value === "string" && value.length > 0) where.push({ field, value });
+    if (typeof value === "string" && value.length > 0)
+      where.push({ field, value });
   }
   return where.length > 0 ? where : undefined;
 }
@@ -110,7 +132,10 @@ export async function appendActivityLog(
   });
 }
 
-export function presentActivity(row: AdminActivityLogRow, actorEmails: Map<string, string>): PresentedActivity {
+export function presentActivity(
+  row: AdminActivityLogRow,
+  actorEmails: Map<string, string>,
+): PresentedActivity {
   return {
     id: row.id,
     actorId: row.actorId,
@@ -126,7 +151,9 @@ export function presentActivity(row: AdminActivityLogRow, actorEmails: Map<strin
   };
 }
 
-export function uniqueActorIds(rows: readonly Pick<AdminActivityLogRow, "actorId" | "actorType">[]): string[] {
+export function uniqueActorIds(
+  rows: readonly Pick<AdminActivityLogRow, "actorId" | "actorType">[],
+): string[] {
   const ids = new Set<string>();
   for (const row of rows) {
     if (row.actorType === "user") ids.add(row.actorId);

@@ -16,7 +16,11 @@ export class ResendEmailError extends Error {
   readonly status: number;
   readonly rateLimit: EmailRateLimitMetadata;
 
-  constructor(message: string, status: number, rateLimit: EmailRateLimitMetadata = {}) {
+  constructor(
+    message: string,
+    status: number,
+    rateLimit: EmailRateLimitMetadata = {},
+  ) {
     super(message);
     this.name = "ResendEmailError";
     this.status = status;

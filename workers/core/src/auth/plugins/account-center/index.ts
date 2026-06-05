@@ -1,9 +1,11 @@
-import { APIError, createAuthEndpoint, sensitiveSessionMiddleware, sessionMiddleware } from "better-auth/api";
-import type { BetterAuthPlugin } from "better-auth";
 import {
-  OAUTH_CONSENT_MODEL,
-  SESSION_MODEL,
-} from "../../../shared/constants";
+  APIError,
+  createAuthEndpoint,
+  sensitiveSessionMiddleware,
+  sessionMiddleware,
+} from "better-auth/api";
+import type { BetterAuthPlugin } from "better-auth";
+import { OAUTH_CONSENT_MODEL, SESSION_MODEL } from "../../../shared/constants";
 import {
   loadAccountConsents,
   loadAccountOrganizations,
@@ -46,16 +48,25 @@ type InternalSessionAdapter = {
   readonly deleteSessions: (userId: string) => Promise<unknown>;
 };
 
-function accountAdapter(ctx: { context: { adapter: unknown } }): AccountCenterAdapter {
+function accountAdapter(ctx: {
+  context: { adapter: unknown };
+}): AccountCenterAdapter {
   return ctx.context.adapter as AccountCenterAdapter;
 }
 
-function internalSessionAdapter(ctx: { context: { internalAdapter: unknown } }): InternalSessionAdapter {
+function internalSessionAdapter(ctx: {
+  context: { internalAdapter: unknown };
+}): InternalSessionAdapter {
   return ctx.context.internalAdapter as InternalSessionAdapter;
 }
 
 function requireCurrentSession(session: unknown): AuthenticatedSession {
-  if (!session || typeof session !== "object" || !("user" in session) || !("session" in session)) {
+  if (
+    !session ||
+    typeof session !== "object" ||
+    !("user" in session) ||
+    !("session" in session)
+  ) {
     throw new APIError("UNAUTHORIZED");
   }
   return session as AuthenticatedSession;
@@ -79,19 +90,22 @@ const revokeSessionMeta = accountCenterEndpointMeta({
 });
 
 const revokeOthersMeta = accountCenterEndpointMeta({
-  description: "Revoke every current-user browser session except this request's session",
+  description:
+    "Revoke every current-user browser session except this request's session",
   responseSchema: revokeOthersOpenApiSchema,
   responseDescription: "Other sessions revoked",
 });
 
 const revokeAllMeta = accountCenterEndpointMeta({
-  description: "Revoke every current-user browser session, including this request's session",
+  description:
+    "Revoke every current-user browser session, including this request's session",
   responseSchema: accountSuccessOpenApiSchema,
   responseDescription: "All sessions revoked",
 });
 
 const consentsMeta = accountCenterEndpointMeta({
-  description: "List current-user OAuth consent grants with client display metadata",
+  description:
+    "List current-user OAuth consent grants with client display metadata",
   responseSchema: accountConsentsOpenApiSchema,
 });
 
@@ -103,11 +117,14 @@ const revokeConsentMeta = accountCenterEndpointMeta({
 });
 
 const organizationsMeta = accountCenterEndpointMeta({
-  description: "List the current user's organizations and console links computed from account authority",
+  description:
+    "List the current user's organizations and console links computed from account authority",
   responseSchema: accountOrganizationsOpenApiSchema,
 });
 
-export const idAccountCenter = (options: AccountCenterPluginOptions = {}): BetterAuthPlugin => ({
+export const idAccountCenter = (
+  options: AccountCenterPluginOptions = {},
+): BetterAuthPlugin => ({
   id: "id-account-center",
   endpoints: {
     getAccountSummary: createAuthEndpoint(
@@ -116,7 +133,12 @@ export const idAccountCenter = (options: AccountCenterPluginOptions = {}): Bette
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
         const adapter = accountAdapter(ctx);
-        const [passwordEnabled, activeSessions, connectedApplications, organizations] = await Promise.all([
+        const [
+          passwordEnabled,
+          activeSessions,
+          connectedApplications,
+          organizations,
+        ] = await Promise.all([
           loadPasswordEnabled(adapter, session.user.id),
           loadActiveSessions(adapter, session.user.id),
           loadConnectedApplicationCount(adapter, session.user.id),
@@ -149,16 +171,26 @@ export const idAccountCenter = (options: AccountCenterPluginOptions = {}): Bette
       { method: "GET", use: [sessionMiddleware], metadata: sessionsMeta },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
-        const rows = await loadActiveSessions(accountAdapter(ctx), session.user.id);
+        const rows = await loadActiveSessions(
+          accountAdapter(ctx),
+          session.user.id,
+        );
         return ctx.json({
-          sessions: rows.map((row) => presentAccountSession(row, session.session.id)),
+          sessions: rows.map((row) =>
+            presentAccountSession(row, session.session.id),
+          ),
         });
       },
     ),
 
     revokeAccountSession: createAuthEndpoint(
       "/account/sessions/revoke",
-      { method: "POST", use: [sensitiveSessionMiddleware], body: revokeAccountSessionBody, metadata: revokeSessionMeta },
+      {
+        method: "POST",
+        use: [sensitiveSessionMiddleware],
+        body: revokeAccountSessionBody,
+        metadata: revokeSessionMeta,
+      },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
         const row = await accountAdapter(ctx).findOne<AccountSessionRow>({
@@ -177,19 +209,36 @@ export const idAccountCenter = (options: AccountCenterPluginOptions = {}): Bette
 
     revokeOtherAccountSessions: createAuthEndpoint(
       "/account/sessions/revoke-others",
-      { method: "POST", use: [sensitiveSessionMiddleware], metadata: revokeOthersMeta },
+      {
+        method: "POST",
+        use: [sensitiveSessionMiddleware],
+        metadata: revokeOthersMeta,
+      },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
-        const rows = await loadActiveSessions(accountAdapter(ctx), session.user.id);
-        const otherRows = rows.filter((row) => row.token !== session.session.token);
-        await Promise.all(otherRows.map((row) => internalSessionAdapter(ctx).deleteSession(row.token)));
+        const rows = await loadActiveSessions(
+          accountAdapter(ctx),
+          session.user.id,
+        );
+        const otherRows = rows.filter(
+          (row) => row.token !== session.session.token,
+        );
+        await Promise.all(
+          otherRows.map((row) =>
+            internalSessionAdapter(ctx).deleteSession(row.token),
+          ),
+        );
         return ctx.json({ status: true, revoked: otherRows.length });
       },
     ),
 
     revokeAllAccountSessions: createAuthEndpoint(
       "/account/sessions/revoke-all",
-      { method: "POST", use: [sensitiveSessionMiddleware], metadata: revokeAllMeta },
+      {
+        method: "POST",
+        use: [sensitiveSessionMiddleware],
+        metadata: revokeAllMeta,
+      },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
         await internalSessionAdapter(ctx).deleteSessions(session.user.id);
@@ -202,13 +251,23 @@ export const idAccountCenter = (options: AccountCenterPluginOptions = {}): Bette
       { method: "GET", use: [sessionMiddleware], metadata: consentsMeta },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
-        return ctx.json({ consents: await loadAccountConsents(accountAdapter(ctx), session.user.id) });
+        return ctx.json({
+          consents: await loadAccountConsents(
+            accountAdapter(ctx),
+            session.user.id,
+          ),
+        });
       },
     ),
 
     revokeAccountConsent: createAuthEndpoint(
       "/account/consents/revoke",
-      { method: "POST", use: [sensitiveSessionMiddleware], body: revokeAccountConsentBody, metadata: revokeConsentMeta },
+      {
+        method: "POST",
+        use: [sensitiveSessionMiddleware],
+        body: revokeAccountConsentBody,
+        metadata: revokeConsentMeta,
+      },
       async (ctx) => {
         const session = requireCurrentSession(ctx.context.session);
         await accountAdapter(ctx).delete({

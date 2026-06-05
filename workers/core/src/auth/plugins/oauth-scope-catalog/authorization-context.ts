@@ -35,7 +35,12 @@ function isD1Database(value: unknown): value is D1Database {
 }
 
 function isAdapterLike(value: unknown): value is AdapterLike {
-  return typeof value === "object" && value !== null && "findOne" in value && "findMany" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "findOne" in value &&
+    "findMany" in value
+  );
 }
 
 /**
@@ -50,8 +55,9 @@ export async function canManageOrganizationOAuthClients(
 ): Promise<boolean> {
   let roles: readonly MembershipRoleRow[] = [];
   if (isD1Database(env.DB)) {
-    const member = await env.DB
-      .prepare(`select "role" from "member" where "userId" = ? and "organizationId" = ? limit 1`)
+    const member = await env.DB.prepare(
+      `select "role" from "member" where "userId" = ? and "organizationId" = ? limit 1`,
+    )
       .bind(userId, organizationId)
       .first<MembershipRoleRow>();
     roles = member ? [member] : [];
@@ -64,7 +70,9 @@ export async function canManageOrganizationOAuthClients(
       ],
     });
   }
-  return roles.some((membership) => membership.role === "owner" || membership.role === "admin");
+  return roles.some(
+    (membership) => membership.role === "owner" || membership.role === "admin",
+  );
 }
 
 export async function assertUserBelongsToOrganization(
@@ -74,8 +82,9 @@ export async function assertUserBelongsToOrganization(
 ): Promise<void> {
   let member: MembershipRow | null = null;
   if (isD1Database(env.DB)) {
-    member = await env.DB
-      .prepare(`select "id" from "member" where "userId" = ? and "organizationId" = ? limit 1`)
+    member = await env.DB.prepare(
+      `select "id" from "member" where "userId" = ? and "organizationId" = ? limit 1`,
+    )
       .bind(userId, organizationId)
       .first<MembershipRow>();
   } else if (isAdapterLike(env.DB)) {
@@ -88,7 +97,9 @@ export async function assertUserBelongsToOrganization(
     });
   }
   if (!member) {
-    throw new APIError("FORBIDDEN", { error_description: "user is not a member of selected organization" });
+    throw new APIError("FORBIDDEN", {
+      error_description: "user is not a member of selected organization",
+    });
   }
 }
 
@@ -99,14 +110,13 @@ export async function loadUserTeamIdsForOrganization(
 ): Promise<readonly string[]> {
   let rows: readonly TeamIdRow[] = [];
   if (isD1Database(env.DB)) {
-    const result = await env.DB
-      .prepare(
-        `select tm."teamId"
+    const result = await env.DB.prepare(
+      `select tm."teamId"
          from "teamMember" tm
          join "team" t on t."id" = tm."teamId"
          where tm."userId" = ? and t."organizationId" = ?
          order by tm."teamId" asc`,
-      )
+    )
       .bind(userId, organizationId)
       .all<TeamIdRow>();
     rows = result.results ?? [];
@@ -126,9 +136,13 @@ export async function loadUserTeamIdsForOrganization(
   return teamIds;
 }
 
-export function assertTeamIdsWithinTokenLimit(teamIds: readonly string[]): void {
+export function assertTeamIdsWithinTokenLimit(
+  teamIds: readonly string[],
+): void {
   if (teamIds.length > authPluginConfig.maxTokenTeamIds) {
-    throw new APIError("FORBIDDEN", { error_description: "too many teams for token claim" });
+    throw new APIError("FORBIDDEN", {
+      error_description: "too many teams for token claim",
+    });
   }
 }
 
@@ -137,5 +151,7 @@ export async function invalidateUserTeamIds(
   userId: string,
   organizationId: string,
 ): Promise<void> {
-  await env.KV.delete(`${authPluginConfig.teamMembershipCachePrefix}${organizationId}:${userId}`);
+  await env.KV.delete(
+    `${authPluginConfig.teamMembershipCachePrefix}${organizationId}:${userId}`,
+  );
 }

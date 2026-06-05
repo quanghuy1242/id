@@ -5,17 +5,24 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
 import RootLayout from "@/app/layout";
 
+type CookieStore = Awaited<ReturnType<typeof import("next/headers").cookies>>;
+type Cookies = () => Promise<CookieStore>;
+
 vi.mock("next/headers", () => ({
-  cookies: vi.fn<() => Promise<{ get: (name: string) => { name: string; value: string } | undefined }>>(),
+  cookies: vi.fn<Cookies>(),
 }));
 
 import { cookies } from "next/headers";
 const mockCookies = vi.mocked(cookies);
 
-function withThemeCookie(value: string) {
-  mockCookies.mockResolvedValue({
+function createCookieStore(value?: string): CookieStore {
+  return {
     get: (name: string) => (name === "lumina-theme" ? { name, value } : undefined),
-  });
+  } as CookieStore;
+}
+
+function withThemeCookie(value: string) {
+  mockCookies.mockResolvedValue(createCookieStore(value));
 }
 
 async function renderLayout(children: ReactNode) {
@@ -25,7 +32,7 @@ async function renderLayout(children: ReactNode) {
 
 describe("RootLayout", () => {
   beforeEach(() => {
-    mockCookies.mockResolvedValue({ get: () => undefined });
+    mockCookies.mockResolvedValue(createCookieStore());
   });
 
   it("sets data-theme lumina-light when cookie is light", async () => {

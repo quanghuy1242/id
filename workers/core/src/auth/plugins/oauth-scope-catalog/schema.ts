@@ -9,60 +9,109 @@ import {
 const oauthScopePattern = /^[a-z][a-z0-9:_-]*$/u;
 
 const actorAuditFields = {
-  createdBy: z.string().optional().meta({ description: "User ID of the creator" }),
-  updatedBy: z.string().optional().meta({ description: "User ID of the last updater" }),
+  createdBy: z
+    .string()
+    .optional()
+    .meta({ description: "User ID of the creator" }),
+  updatedBy: z
+    .string()
+    .optional()
+    .meta({ description: "User ID of the last updater" }),
   createdAt: z.number().meta({ description: "Timestamp (ms) of creation" }),
   updatedAt: z.number().meta({ description: "Timestamp (ms) of last update" }),
 };
 
-const oauthClientIdField = z.string().min(1).meta({
-  description: "OAuth client ID / service-account principal ID",
-  betterAuth: { index: true },
-});
+const oauthClientIdField = z
+  .string()
+  .min(1)
+  .meta({
+    description: "OAuth client ID / service-account principal ID",
+    betterAuth: { index: true },
+  });
 
-const allowedScopesField = z.array(z.string().min(1).regex(oauthScopePattern)).meta({
-  description: "Resource-server-bound OAuth scopes this client may request",
-});
+const allowedScopesField = z
+  .array(z.string().min(1).regex(oauthScopePattern))
+  .meta({
+    description: "Resource-server-bound OAuth scopes this client may request",
+  });
 
 function resourceServerReferenceField(description: string) {
-  return z.string().min(1).meta({
-    description,
-    betterAuth: { index: true, references: { model: "resourceServer", field: "id" } },
-  });
+  return z
+    .string()
+    .min(1)
+    .meta({
+      description,
+      betterAuth: {
+        index: true,
+        references: { model: "resourceServer", field: "id" },
+      },
+    });
 }
 
 /** Canonical Zod schema for a resource-server-bound OAuth scope row. */
-export const oauthResourceScopeSchema = z.object({
-  id: z.string().meta({ description: "Unique identifier of the OAuth resource scope" }),
-  resourceServerId: resourceServerReferenceField("Resource-server row that owns this OAuth scope"),
-  scope: z.string().min(1).regex(oauthScopePattern).meta({
-    description: "OAuth scope string owned by the resource server",
-  }),
-  resourceScopeKey: z.string().min(1).meta({
-    description: "Internal uniqueness key for resourceServerId and scope",
-    betterAuth: { unique: true },
-  }),
-  description: z.string().optional().meta({ description: "Optional admin-facing description" }),
-  enabled: z.boolean().default(true).meta({ description: "Whether this scope can be issued" }),
-  ...actorAuditFields,
-}).meta({ id: "OAuthResourceScope" });
+export const oauthResourceScopeSchema = z
+  .object({
+    id: z
+      .string()
+      .meta({ description: "Unique identifier of the OAuth resource scope" }),
+    resourceServerId: resourceServerReferenceField(
+      "Resource-server row that owns this OAuth scope",
+    ),
+    scope: z.string().min(1).regex(oauthScopePattern).meta({
+      description: "OAuth scope string owned by the resource server",
+    }),
+    resourceScopeKey: z
+      .string()
+      .min(1)
+      .meta({
+        description: "Internal uniqueness key for resourceServerId and scope",
+        betterAuth: { unique: true },
+      }),
+    description: z
+      .string()
+      .optional()
+      .meta({ description: "Optional admin-facing description" }),
+    enabled: z
+      .boolean()
+      .default(true)
+      .meta({ description: "Whether this scope can be issued" }),
+    ...actorAuditFields,
+  })
+  .meta({ id: "OAuthResourceScope" });
 
 /** Canonical Zod schema for a per-(client, resource-server) scope-subset row. */
-export const oauthClientResourceScopeSchema = z.object({
-  id: z.string().meta({ description: "Unique identifier of the OAuth client resource-scope row" }),
-  clientId: oauthClientIdField,
-  resourceServerId: resourceServerReferenceField("Resource server for which this client's scope subset applies"),
-  clientResourceKey: z.string().min(1).meta({
-    description: "Internal uniqueness key for clientId and resourceServerId",
-    betterAuth: { unique: true },
-  }),
-  allowedScopes: allowedScopesField,
-  enabled: z.boolean().default(true).meta({ description: "Whether this resource-scope row can be used" }),
-  ...actorAuditFields,
-}).meta({ id: "OAuthClientResourceScope" });
+export const oauthClientResourceScopeSchema = z
+  .object({
+    id: z.string().meta({
+      description: "Unique identifier of the OAuth client resource-scope row",
+    }),
+    clientId: oauthClientIdField,
+    resourceServerId: resourceServerReferenceField(
+      "Resource server for which this client's scope subset applies",
+    ),
+    clientResourceKey: z
+      .string()
+      .min(1)
+      .meta({
+        description:
+          "Internal uniqueness key for clientId and resourceServerId",
+        betterAuth: { unique: true },
+      }),
+    allowedScopes: allowedScopesField,
+    enabled: z
+      .boolean()
+      .default(true)
+      .meta({ description: "Whether this resource-scope row can be used" }),
+    ...actorAuditFields,
+  })
+  .meta({ id: "OAuthClientResourceScope" });
 
-export type OAuthResourceScopeRow = Readonly<z.infer<typeof oauthResourceScopeSchema>>;
-export type OAuthClientResourceScopeRow = Readonly<z.infer<typeof oauthClientResourceScopeSchema>>;
+export type OAuthResourceScopeRow = Readonly<
+  z.infer<typeof oauthResourceScopeSchema>
+>;
+export type OAuthClientResourceScopeRow = Readonly<
+  z.infer<typeof oauthClientResourceScopeSchema>
+>;
 
 export const createOAuthResourceScopeBody = z
   .object({
@@ -90,21 +139,36 @@ export const createOAuthClientResourceScopeBody = z
 
 export const updateOAuthClientResourceScopeBody = z
   .object({
-    allowedScopes: oauthClientResourceScopeSchema.shape.allowedScopes.optional(),
+    allowedScopes:
+      oauthClientResourceScopeSchema.shape.allowedScopes.optional(),
     enabled: z.boolean().optional(),
   })
   .strict();
 
-export type CreateOAuthResourceScopeBody = z.infer<typeof createOAuthResourceScopeBody>;
-export type UpdateOAuthResourceScopeBody = z.infer<typeof updateOAuthResourceScopeBody>;
-export type CreateOAuthClientResourceScopeBody = z.infer<typeof createOAuthClientResourceScopeBody>;
-export type UpdateOAuthClientResourceScopeBody = z.infer<typeof updateOAuthClientResourceScopeBody>;
+export type CreateOAuthResourceScopeBody = z.infer<
+  typeof createOAuthResourceScopeBody
+>;
+export type UpdateOAuthResourceScopeBody = z.infer<
+  typeof updateOAuthResourceScopeBody
+>;
+export type CreateOAuthClientResourceScopeBody = z.infer<
+  typeof createOAuthClientResourceScopeBody
+>;
+export type UpdateOAuthClientResourceScopeBody = z.infer<
+  typeof updateOAuthClientResourceScopeBody
+>;
 
-export const oauthResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthResourceScopeSchema);
-export const oauthClientResourceScopeBetterAuthFields = mapZodToBetterAuthFields(oauthClientResourceScopeSchema);
+export const oauthResourceScopeBetterAuthFields = mapZodToBetterAuthFields(
+  oauthResourceScopeSchema,
+);
+export const oauthClientResourceScopeBetterAuthFields =
+  mapZodToBetterAuthFields(oauthClientResourceScopeSchema);
 
-const publicOAuthResourceScopeSchema = oauthResourceScopeSchema.omit({ resourceScopeKey: true });
-const publicOAuthClientResourceScopeSchema = oauthClientResourceScopeSchema.omit({ clientResourceKey: true });
+const publicOAuthResourceScopeSchema = oauthResourceScopeSchema.omit({
+  resourceScopeKey: true,
+});
+const publicOAuthClientResourceScopeSchema =
+  oauthClientResourceScopeSchema.omit({ clientResourceKey: true });
 
 /** Removes the plugin-internal uniqueness key from an OAuth scope response. */
 export function presentOAuthResourceScope(row: OAuthResourceScopeRow) {
@@ -113,21 +177,27 @@ export function presentOAuthResourceScope(row: OAuthResourceScopeRow) {
 }
 
 /** Removes the plugin-internal uniqueness key from a client resource-scope response. */
-export function presentOAuthClientResourceScope(row: OAuthClientResourceScopeRow) {
+export function presentOAuthClientResourceScope(
+  row: OAuthClientResourceScopeRow,
+) {
   const { clientResourceKey: _clientResourceKey, ...response } = row;
   return response;
 }
 
-export const oauthResourceScopeOpenApiSchema = zodSchemaToOpenApi(publicOAuthResourceScopeSchema);
-export const oauthClientResourceScopeOpenApiSchema = zodSchemaToOpenApi(publicOAuthClientResourceScopeSchema);
-export const createOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(createOAuthResourceScopeBody);
-export const updateOAuthResourceScopeOpenApiRequestBody = openApiJsonRequestBody(updateOAuthResourceScopeBody);
-export const createOAuthClientResourceScopeOpenApiRequestBody = openApiJsonRequestBody(
-  createOAuthClientResourceScopeBody,
+export const oauthResourceScopeOpenApiSchema = zodSchemaToOpenApi(
+  publicOAuthResourceScopeSchema,
 );
-export const updateOAuthClientResourceScopeOpenApiRequestBody = openApiJsonRequestBody(
-  updateOAuthClientResourceScopeBody,
+export const oauthClientResourceScopeOpenApiSchema = zodSchemaToOpenApi(
+  publicOAuthClientResourceScopeSchema,
 );
+export const createOAuthResourceScopeOpenApiRequestBody =
+  openApiJsonRequestBody(createOAuthResourceScopeBody);
+export const updateOAuthResourceScopeOpenApiRequestBody =
+  openApiJsonRequestBody(updateOAuthResourceScopeBody);
+export const createOAuthClientResourceScopeOpenApiRequestBody =
+  openApiJsonRequestBody(createOAuthClientResourceScopeBody);
+export const updateOAuthClientResourceScopeOpenApiRequestBody =
+  openApiJsonRequestBody(updateOAuthClientResourceScopeBody);
 
 export type EndpointMetaOptions = {
   description: string;
@@ -139,9 +209,22 @@ export type EndpointMetaOptions = {
 
 export function oauthScopeCatalogEndpointMeta(options: EndpointMetaOptions) {
   const parameters = options.hasIdParam
-    ? [{ name: "id", in: "path" as const, required: true, schema: { type: "string" as const } }]
+    ? [
+        {
+          name: "id",
+          in: "path" as const,
+          required: true,
+          schema: { type: "string" as const },
+        },
+      ]
     : undefined;
-  const responses: Record<string, { description: string; content?: { "application/json"?: { schema: Record<string, unknown> } } }> = {};
+  const responses: Record<
+    string,
+    {
+      description: string;
+      content?: { "application/json"?: { schema: Record<string, unknown> } };
+    }
+  > = {};
   if (options.responseSchema) {
     responses["200"] = {
       description: options.responseDescription ?? "Success",
@@ -188,7 +271,8 @@ export const createClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
 });
 
 export const listClientResourceScopeMetadata = oauthScopeCatalogEndpointMeta({
-  description: "List all per-client OAuth resource-scope rows visible to the requester",
+  description:
+    "List all per-client OAuth resource-scope rows visible to the requester",
   responseSchema: oauthClientResourceScopeOpenApiSchema,
   responseDescription: "List of visible OAuth client resource-scope rows",
 });

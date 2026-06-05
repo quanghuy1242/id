@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
+import {
+  authPluginConfig,
+  systemResourceServerAudience,
+} from "../../src/auth/config";
 import { clientResourceKey } from "../../src/auth/plugins/oauth-scope-catalog/operations";
 import {
   attachClientResourceScope,
@@ -54,16 +57,25 @@ describe("Infrastructure M2M client D7 invariants", () => {
     const test = await createTestEnv();
     const cookie = await bootstrapAdmin(test);
 
-    test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_default', 'Default Org', 'org-default', 1700000000000);`);
+    test.raw.exec(
+      `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_default', 'Default Org', 'org-default', 1700000000000);`,
+    );
     const tenantRsId = await createResourceServer(test, cookie, {
       organizationId: "org_default",
       slug: "content",
       name: "Content",
       audience: "https://content.example.test",
     });
-    await createOAuthScope(test, cookie, { resourceServerId: tenantRsId, scope: "content:read" });
+    await createOAuthScope(test, cookie, {
+      resourceServerId: tenantRsId,
+      scope: "content:read",
+    });
 
-    const infra = await createM2MClient(test, cookie, { name: "infra", scope: "content:read", referenceId: null });
+    const infra = await createM2MClient(test, cookie, {
+      name: "infra",
+      scope: "content:read",
+      referenceId: null,
+    });
     const rejectedAttach = await attachClientResourceScope(test, cookie, {
       clientId: infra.clientId,
       resourceServerId: tenantRsId,
@@ -72,11 +84,16 @@ describe("Infrastructure M2M client D7 invariants", () => {
     expect(rejectedAttach.status).toBe(400);
     // Bypass the structural guard to prove token issuance also rejects a
     // corrupted cross-layer row.
-    const forgedKey = clientResourceKey(infra.clientId, tenantRsId).replaceAll("'", "''");
+    const forgedKey = clientResourceKey(infra.clientId, tenantRsId).replaceAll(
+      "'",
+      "''",
+    );
     test.raw.exec(
       `insert into "oauthClientResourceScope" ("id", "clientId", "resourceServerId", "clientResourceKey", "allowedScopes", "enabled", "createdAt", "updatedAt") values ('crs_forged_infra', '${infra.clientId}', '${tenantRsId}', '${forgedKey}', '["content:read"]', 1, 1700000000000, 1700000000000);`,
     );
-    test.raw.exec(`update "oauthClient" set "metadata" = '{"id_client_id":"${infra.clientId}"}' where "clientId" = '${infra.clientId}';`);
+    test.raw.exec(
+      `update "oauthClient" set "metadata" = '{"id_client_id":"${infra.clientId}"}' where "clientId" = '${infra.clientId}';`,
+    );
 
     const response = await tokenRequest(test, {
       clientId: infra.clientId,
@@ -104,7 +121,9 @@ describe("Infrastructure M2M client D7 invariants", () => {
       scope: authPluginConfig.systemOAuthClientPickerScope,
     });
 
-    test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_tenant', 'Tenant', 'tenant', 1700000000000);`);
+    test.raw.exec(
+      `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_tenant', 'Tenant', 'tenant', 1700000000000);`,
+    );
     const tenant = await createM2MClient(test, cookie, {
       name: "tenant",
       scope: authPluginConfig.systemOAuthClientPickerScope,
@@ -119,11 +138,16 @@ describe("Infrastructure M2M client D7 invariants", () => {
     // Splice in a resource-scope row pointing at the system RS — would normally be
     // blocked by the create endpoint, so we insert directly to model a forged
     // configuration. The runtime D7 check is the defense in depth.
-    const forgedKey = clientResourceKey(tenant.clientId, systemRsId).replaceAll("'", "''");
+    const forgedKey = clientResourceKey(tenant.clientId, systemRsId).replaceAll(
+      "'",
+      "''",
+    );
     test.raw.exec(
       `insert into "oauthClientResourceScope" ("id", "clientId", "resourceServerId", "clientResourceKey", "allowedScopes", "enabled", "createdAt", "updatedAt") values ('crs_forged', '${tenant.clientId}', '${systemRsId}', '${forgedKey}', '["${authPluginConfig.systemOAuthClientPickerScope}"]', 1, 1700000000000, 1700000000000);`,
     );
-    test.raw.exec(`update "oauthClient" set "metadata" = '{"id_client_id":"${tenant.clientId}"}' where "clientId" = '${tenant.clientId}';`);
+    test.raw.exec(
+      `update "oauthClient" set "metadata" = '{"id_client_id":"${tenant.clientId}"}' where "clientId" = '${tenant.clientId}';`,
+    );
 
     const response = await tokenRequest(test, {
       clientId: tenant.clientId,

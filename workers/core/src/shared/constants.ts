@@ -29,7 +29,8 @@ export const RESOURCE_SERVER_MODEL = "resourceServer" as const;
 export const OAUTH_RESOURCE_SCOPE_MODEL = "oauthResourceScope" as const;
 
 /** BA model name for per-(client, resource-server) OAuth scope-subset rows. */
-export const OAUTH_CLIENT_RESOURCE_SCOPE_MODEL = "oauthClientResourceScope" as const;
+export const OAUTH_CLIENT_RESOURCE_SCOPE_MODEL =
+  "oauthClientResourceScope" as const;
 
 /** BA model name for the OAuth client table maintained by `@better-auth/oauth-provider`. */
 export const OAUTH_CLIENT_MODEL = "oauthClient" as const;
@@ -56,7 +57,8 @@ export const REGISTRATION_POLICY_MODEL = "registrationPolicy" as const;
 export const REGISTRATION_INTENT_MODEL = "registrationIntent" as const;
 
 /** BA model name for the soft registration quota-reservation plugin table. */
-export const REGISTRATION_QUOTA_RESERVATION_MODEL = "registrationQuotaReservation" as const;
+export const REGISTRATION_QUOTA_RESERVATION_MODEL =
+  "registrationQuotaReservation" as const;
 
 /** Sort rank for organization owner memberships in console scope discovery. */
 export const CONSOLE_OWNER_ROLE_RANK = 3;
@@ -92,26 +94,34 @@ export const BOOTSTRAP_LOCK_TTL_SECONDS = 30;
 export const OAUTH_CLIENT_GRANT_TYPE_M2M = "client_credentials" as const;
 
 /** SCIM core User schema URN (RFC 7643 §4.1). */
-export const SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User" as const;
+export const SCIM_USER_SCHEMA =
+  "urn:ietf:params:scim:schemas:core:2.0:User" as const;
 /** SCIM core Group schema URN (RFC 7643 §4.2). */
-export const SCIM_GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group" as const;
+export const SCIM_GROUP_SCHEMA =
+  "urn:ietf:params:scim:schemas:core:2.0:Group" as const;
 /** SCIM ListResponse message schema URN (RFC 7644 §3.9). */
-export const SCIM_LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse" as const;
+export const SCIM_LIST_RESPONSE_SCHEMA =
+  "urn:ietf:params:scim:api:messages:2.0:ListResponse" as const;
 /** SCIM Error message schema URN (RFC 7644 §3.12). */
-export const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error" as const;
+export const SCIM_ERROR_SCHEMA =
+  "urn:ietf:params:scim:api:messages:2.0:Error" as const;
 /** SCIM ServiceProviderConfig schema URN (RFC 7643 §5). */
-export const SCIM_SERVICE_PROVIDER_CONFIG_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig" as const;
+export const SCIM_SERVICE_PROVIDER_CONFIG_SCHEMA =
+  "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig" as const;
 /** SCIM Schema schema URN (RFC 7643 §7). */
-export const SCIM_SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema" as const;
+export const SCIM_SCHEMA_SCHEMA =
+  "urn:ietf:params:scim:schemas:core:2.0:Schema" as const;
 /** SCIM ResourceType schema URN (RFC 7644 §6). */
-export const SCIM_RESOURCE_TYPE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ResourceType" as const;
+export const SCIM_RESOURCE_TYPE_SCHEMA =
+  "urn:ietf:params:scim:schemas:core:2.0:ResourceType" as const;
 
 /**
  * Repository-specific SCIM extension schema URI for tenant (organization) membership.
  * Returned alongside the core User schema on tenant-path User responses.
  * Classified as a repository-specific URL convention (not a SCIM-native construct).
  */
-export const SCIM_TENANT_MEMBERSHIP_SCHEMA = "https://id/scim/schemas/tenant-membership" as const;
+export const SCIM_TENANT_MEMBERSHIP_SCHEMA =
+  "https://id/scim/schemas/tenant-membership" as const;
 
 /** Virtual SCIM Group ID representing the owner/admin members of an organization. No DB row backing. */
 export const SCIM_ORG_ADMINS_GROUP_ID = "org-admins" as const;

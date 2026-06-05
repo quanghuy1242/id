@@ -2,11 +2,17 @@
 export type ScimAdapter = {
   readonly findOne: <T>(query: {
     readonly model: string;
-    readonly where: readonly { readonly field: string; readonly value: unknown }[];
+    readonly where: readonly {
+      readonly field: string;
+      readonly value: unknown;
+    }[];
   }) => Promise<T | null>;
   readonly findMany: <T>(query: {
     readonly model: string;
-    readonly where?: readonly { readonly field: string; readonly value: unknown }[];
+    readonly where?: readonly {
+      readonly field: string;
+      readonly value: unknown;
+    }[];
   }) => Promise<T[]>;
 };
 
@@ -33,4 +39,8 @@ export type ScimFilterClause = {
 /** Parsed SCIM filter — either a single clause or a compound AND of two clauses. */
 export type ParsedScimFilter =
   | { readonly kind: "single"; readonly clause: ScimFilterClause }
-  | { readonly kind: "and"; readonly left: ScimFilterClause; readonly right: ScimFilterClause };
+  | {
+      readonly kind: "and";
+      readonly left: ScimFilterClause;
+      readonly right: ScimFilterClause;
+    };

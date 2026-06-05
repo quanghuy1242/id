@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { getAuth } from "../../src/auth/get-auth";
-import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import type { CoreEnv } from "../../src/config/env";
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import { adminOtpSignIn } from "./admin-otp-sign-in";
@@ -13,20 +12,33 @@ type OAuthAdminApi = {
   readonly adminCreateOAuthClient: (params: {
     readonly headers: Headers;
     readonly body: Record<string, unknown>;
-  }) => Promise<{ readonly client_id: string; readonly client_secret?: string }>;
+  }) => Promise<{
+    readonly client_id: string;
+    readonly client_secret?: string;
+  }>;
 };
 
-function createKv(): BetterAuthKvStorage {
+function createKv(): KVNamespace {
   const values = new Map<string, string>();
   return {
-    get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => {
+    get: async (key: string) => values.get(key) ?? null,
+    getWithMetadata: async (key: string) => ({
+      value: values.get(key) ?? null,
+      metadata: null,
+    }),
+    put: async (
+      key: string,
+      value: string | ArrayBuffer | ArrayBufferView | ReadableStream,
+    ) => {
+      if (typeof value !== "string")
+        throw new TypeError("test KV only stores strings");
       values.set(key, value);
     },
-    delete: async (key) => {
+    delete: async (key: string) => {
       values.delete(key);
     },
-  };
+    list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+  } as unknown as KVNamespace;
 }
 
 async function createHarness(): Promise<{
@@ -42,7 +54,9 @@ async function createHarness(): Promise<{
     DB: db,
     KV: createKv(),
   };
-  raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_reg', 'Registration Org', 'registration-org', 1700000000000);`);
+  raw.exec(
+    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_reg', 'Registration Org', 'registration-org', 1700000000000);`,
+  );
   return {
     raw,
     emailSender,
@@ -50,7 +64,10 @@ async function createHarness(): Promise<{
   };
 }
 
-async function signInAdmin(auth: TestAuth, emailSender: ReturnType<typeof createCapturedAuthEmailSender>): Promise<string> {
+async function signInAdmin(
+  auth: TestAuth,
+  emailSender: ReturnType<typeof createCapturedAuthEmailSender>,
+): Promise<string> {
   await auth.api.createUser({
     body: {
       name: "Root Admin",
@@ -68,7 +85,10 @@ async function signInAdmin(auth: TestAuth, emailSender: ReturnType<typeof create
   return response.headers.get("set-cookie") ?? "";
 }
 
-async function createOAuthClient(auth: TestAuth, cookie: string): Promise<string> {
+async function createOAuthClient(
+  auth: TestAuth,
+  cookie: string,
+): Promise<string> {
   const api = auth.api as unknown as OAuthAdminApi;
   const client = await api.adminCreateOAuthClient({
     headers: new Headers({ cookie }),
@@ -87,79 +107,105 @@ async function createOAuthClient(auth: TestAuth, cookie: string): Promise<string
   return client.client_id;
 }
 
-async function createEnabledPolicy(auth: TestAuth, cookie: string, clientId: string): Promise<string> {
+async function createEnabledPolicy(
+  auth: TestAuth,
+  cookie: string,
+  clientId: string,
+): Promise<string> {
   const create = await auth.handler(
-    new Request("https://id.example.test/api/auth/admin/registration-policies", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        slug: "content-beta",
-        name: "Content beta",
-        mode: "client_initiated",
-        clientId,
-        organizationId: "org_reg",
-        allowedScopes: ["openid", "profile", "email"],
-        emailDomains: ["example.test"],
-        defaultRole: "member",
-        defaultTeamIds: [],
-        quotaLimit: 1,
-        quotaTarget: "memberships",
-        requiresEmailVerification: true,
-      }),
-    }),
+    new Request(
+      "https://id.example.test/api/auth/admin/registration-policies",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          slug: "content-beta",
+          name: "Content beta",
+          mode: "client_initiated",
+          clientId,
+          organizationId: "org_reg",
+          allowedScopes: ["openid", "profile", "email"],
+          emailDomains: ["example.test"],
+          defaultRole: "member",
+          defaultTeamIds: [],
+          quotaLimit: 1,
+          quotaTarget: "memberships",
+          requiresEmailVerification: true,
+        }),
+      },
+    ),
   );
   expect(create.status).toBe(200);
   const created = (await create.json()) as { readonly id: string };
 
   const enable = await auth.handler(
-    new Request(`https://id.example.test/api/auth/admin/registration-policies/${created.id}/enable`, {
-      method: "POST",
-      headers: { cookie },
-    }),
+    new Request(
+      `https://id.example.test/api/auth/admin/registration-policies/${created.id}/enable`,
+      {
+        method: "POST",
+        headers: { cookie },
+      },
+    ),
   );
   expect(enable.status).toBe(200);
   return created.id;
 }
 
-async function createInviteOnlyPolicy(auth: TestAuth, cookie: string): Promise<string> {
+async function createInviteOnlyPolicy(
+  auth: TestAuth,
+  cookie: string,
+): Promise<string> {
   const create = await auth.handler(
-    new Request("https://id.example.test/api/auth/admin/registration-policies", {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        slug: "invite-only",
-        name: "Invite only",
-        mode: "invite_only",
-        organizationId: "org_reg",
-        allowedScopes: [],
-        emailDomains: ["example.test"],
-        defaultRole: "member",
-        defaultTeamIds: [],
-        quotaLimit: 5,
-        quotaTarget: "memberships",
-        requiresEmailVerification: true,
-      }),
-    }),
+    new Request(
+      "https://id.example.test/api/auth/admin/registration-policies",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({
+          slug: "invite-only",
+          name: "Invite only",
+          mode: "invite_only",
+          organizationId: "org_reg",
+          allowedScopes: [],
+          emailDomains: ["example.test"],
+          defaultRole: "member",
+          defaultTeamIds: [],
+          quotaLimit: 5,
+          quotaTarget: "memberships",
+          requiresEmailVerification: true,
+        }),
+      },
+    ),
   );
   expect(create.status).toBe(200);
   const created = (await create.json()) as { readonly id: string };
   const enable = await auth.handler(
-    new Request(`https://id.example.test/api/auth/admin/registration-policies/${created.id}/enable`, {
-      method: "POST",
-      headers: { cookie },
-    }),
+    new Request(
+      `https://id.example.test/api/auth/admin/registration-policies/${created.id}/enable`,
+      {
+        method: "POST",
+        headers: { cookie },
+      },
+    ),
   );
   expect(enable.status).toBe(200);
   return created.id;
 }
 
-function createInvitation(raw: RawSqlite, email = "invitee@example.test"): string {
+function createInvitation(
+  raw: RawSqlite,
+  email = "invitee@example.test",
+): string {
   const invitationId = `inv_${email.replace(/[^a-z0-9]/giu, "_")}`;
-  const inviter = raw.prepare(`select "id" from "user" where "email" = ?`).get("root@example.test") as { readonly id: string };
-  raw.prepare(`
+  const inviter = raw
+    .prepare(`select "id" from "user" where "email" = ?`)
+    .get("root@example.test") as { readonly id: string };
+  raw
+    .prepare(`
     insert into "invitation" ("id", "organizationId", "email", "role", "teamId", "status", "expiresAt", "createdAt", "inviterId")
     values (?, 'org_reg', ?, 'member', null, 'pending', ?, ?, ?)
-  `).run(invitationId, email, Date.now() + 86_400_000, Date.now(), inviter.id);
+  `)
+    .run(invitationId, email, Date.now() + 86_400_000, Date.now(), inviter.id);
   return invitationId;
 }
 
@@ -185,18 +231,29 @@ function authorizeQuery(clientId: string, verifier = codeVerifier()): string {
   return query.toString();
 }
 
-async function signedAuthorizeQuery(auth: TestAuth, clientId: string, verifier = codeVerifier()): Promise<string> {
+async function signedAuthorizeQuery(
+  auth: TestAuth,
+  clientId: string,
+  verifier = codeVerifier(),
+): Promise<string> {
   const authorize = await auth.handler(
-    new Request(`https://id.example.test/api/auth/oauth2/authorize?${authorizeQuery(clientId, verifier)}`),
+    new Request(
+      `https://id.example.test/api/auth/oauth2/authorize?${authorizeQuery(clientId, verifier)}`,
+    ),
   );
   expect(authorize.status).toBe(302);
-  const registerUrl = new URL(authorize.headers.get("location") ?? "", "https://id.example.test");
+  const registerUrl = new URL(
+    authorize.headers.get("location") ?? "",
+    "https://id.example.test",
+  );
   expect(registerUrl.pathname).toBe("/register");
   return registerUrl.searchParams.toString();
 }
 
 function userCount(raw: RawSqlite, email: string): number {
-  const row = raw.prepare(`select count(*) as n from "user" where "email" = ?`).get(email) as { readonly n: number };
+  const row = raw
+    .prepare(`select count(*) as n from "user" where "email" = ?`)
+    .get(email) as { readonly n: number };
   return row.n;
 }
 
@@ -215,7 +272,9 @@ describe("idRegistration plugin", () => {
       }),
     );
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ code: "missing_registration_intent" });
+    await expect(response.json()).resolves.toMatchObject({
+      code: "missing_registration_intent",
+    });
     expect(userCount(raw, "no-intent@example.test")).toBe(0);
   });
 
@@ -233,8 +292,13 @@ describe("idRegistration plugin", () => {
       }),
     );
     expect(denied.status).toBe(200);
-    await expect(denied.json()).resolves.toMatchObject({ decision: "denied", reason: "invalid_oauth_query" });
-    const intentCount = raw.prepare(`select count(*) as n from "registrationIntent"`).get() as { readonly n: number };
+    await expect(denied.json()).resolves.toMatchObject({
+      decision: "denied",
+      reason: "invalid_oauth_query",
+    });
+    const intentCount = raw
+      .prepare(`select count(*) as n from "registrationIntent"`)
+      .get() as { readonly n: number };
     expect(intentCount.n).toBe(0);
 
     const oauthQuery = await signedAuthorizeQuery(auth, clientId);
@@ -246,8 +310,17 @@ describe("idRegistration plugin", () => {
       }),
     );
     expect(evaluate.status).toBe(200);
-    const decision = (await evaluate.json()) as { readonly decision: "allowed"; readonly intentId: string; readonly allowedScopes: string[] };
-    expect(decision).toEqual(expect.objectContaining({ decision: "allowed", allowedScopes: ["openid", "profile", "email"] }));
+    const decision = (await evaluate.json()) as {
+      readonly decision: "allowed";
+      readonly intentId: string;
+      readonly allowedScopes: string[];
+    };
+    expect(decision).toEqual(
+      expect.objectContaining({
+        decision: "allowed",
+        allowedScopes: ["openid", "profile", "email"],
+      }),
+    );
 
     const submit = await auth.handler(
       new Request("https://id.example.test/api/auth/registration/submit", {
@@ -262,12 +335,18 @@ describe("idRegistration plugin", () => {
       }),
     );
     expect(submit.status).toBe(200);
-    await expect(submit.json()).resolves.toMatchObject({ status: "ready", intentId: decision.intentId });
+    await expect(submit.json()).resolves.toMatchObject({
+      status: "ready",
+      intentId: decision.intentId,
+    });
 
     const signup = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-up/email", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
+        headers: {
+          "content-type": "application/json",
+          "x-id-registration-intent": decision.intentId,
+        },
         body: JSON.stringify({
           name: "New User",
           email: "new-user@example.test",
@@ -277,18 +356,39 @@ describe("idRegistration plugin", () => {
     );
     expect(signup.status).toBe(200);
     expect(userCount(raw, "new-user@example.test")).toBe(1);
-    const membership = raw.prepare(`select "role" from "member" where "organizationId" = 'org_reg'`).get() as { readonly role: string };
+    const membership = raw
+      .prepare(`select "role" from "member" where "organizationId" = 'org_reg'`)
+      .get() as { readonly role: string };
     expect(membership.role).toBe("member");
-    const intent = raw.prepare(`select "status", "userId" from "registrationIntent" where "id" = ?`).get(decision.intentId) as { readonly status: string; readonly userId: string };
-    expect(intent).toEqual(expect.objectContaining({ status: "completed", userId: expect.any(String) }));
-
-    const quota = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/registration-policies/${policyId}/quota`, {
-        headers: { cookie },
+    const intent = raw
+      .prepare(
+        `select "status", "userId" from "registrationIntent" where "id" = ?`,
+      )
+      .get(decision.intentId) as {
+      readonly status: string;
+      readonly userId: string;
+    };
+    expect(intent).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        userId: expect.any(String),
       }),
     );
+
+    const quota = await auth.handler(
+      new Request(
+        `https://id.example.test/api/auth/admin/registration-policies/${policyId}/quota`,
+        {
+          headers: { cookie },
+        },
+      ),
+    );
     expect(quota.status).toBe(200);
-    await expect(quota.json()).resolves.toMatchObject({ quotaLimit: 1, quotaUsed: 1, quotaReserved: 0 });
+    await expect(quota.json()).resolves.toMatchObject({
+      quotaLimit: 1,
+      quotaUsed: 1,
+      quotaReserved: 0,
+    });
   });
 
   it("proves the OAuth Provider prompt=create signup contract and created continuation", async () => {
@@ -323,12 +423,21 @@ describe("idRegistration plugin", () => {
     const signup = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-up/email", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
-        body: JSON.stringify({ name: "Created User", email: "created@example.test", password: "password12345" }),
+        headers: {
+          "content-type": "application/json",
+          "x-id-registration-intent": decision.intentId,
+        },
+        body: JSON.stringify({
+          name: "Created User",
+          email: "created@example.test",
+          password: "password12345",
+        }),
       }),
     );
     expect(signup.status).toBe(200);
-    raw.exec(`update "user" set "emailVerified" = 1 where "email" = 'created@example.test';`);
+    raw.exec(
+      `update "user" set "emailVerified" = 1 where "email" = 'created@example.test';`,
+    );
     const signIn = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-in/email", {
         method: "POST",
@@ -377,20 +486,38 @@ describe("idRegistration plugin", () => {
       new Request("https://id.example.test/api/auth/registration/submit", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ intentId: decision.intentId, name: "Soon Expired", email: "soon-expired@example.test", password: "password12345" }),
+        body: JSON.stringify({
+          intentId: decision.intentId,
+          name: "Soon Expired",
+          email: "soon-expired@example.test",
+          password: "password12345",
+        }),
       }),
     );
     expect(submit.status).toBe(200);
-    raw.exec(`update "registrationIntent" set "expiresAt" = 1 where "id" = '${decision.intentId}';`);
-    raw.exec(`update "registrationQuotaReservation" set "expiresAt" = 1 where "intentId" = '${decision.intentId}';`);
+    raw.exec(
+      `update "registrationIntent" set "expiresAt" = 1 where "id" = '${decision.intentId}';`,
+    );
+    raw.exec(
+      `update "registrationQuotaReservation" set "expiresAt" = 1 where "intentId" = '${decision.intentId}';`,
+    );
 
     const status = await auth.handler(
-      new Request(`https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`),
+      new Request(
+        `https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`,
+      ),
     );
     expect(status.status).toBe(200);
-    await expect(status.json()).resolves.toMatchObject({ status: "expired", failureReason: "expired" });
+    await expect(status.json()).resolves.toMatchObject({
+      status: "expired",
+      failureReason: "expired",
+    });
 
-    const released = raw.prepare(`select "status" from "registrationQuotaReservation" where "intentId" = ?`).get(decision.intentId) as { readonly status: string };
+    const released = raw
+      .prepare(
+        `select "status" from "registrationQuotaReservation" where "intentId" = ?`,
+      )
+      .get(decision.intentId) as { readonly status: string };
     expect(released.status).toBe("released");
 
     const secondQuery = await signedAuthorizeQuery(auth, clientId);
@@ -401,31 +528,50 @@ describe("idRegistration plugin", () => {
         body: JSON.stringify({ oauthQuery: secondQuery }),
       }),
     );
-    const secondDecision = (await secondEvaluate.json()) as { readonly intentId: string };
+    const secondDecision = (await secondEvaluate.json()) as {
+      readonly intentId: string;
+    };
     await auth.handler(
       new Request("https://id.example.test/api/auth/registration/submit", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ intentId: secondDecision.intentId, name: "Paused", email: "paused@example.test", password: "password12345" }),
+        body: JSON.stringify({
+          intentId: secondDecision.intentId,
+          name: "Paused",
+          email: "paused@example.test",
+          password: "password12345",
+        }),
       }),
     );
 
     const pause = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/registration-policies/${policyId}/pause`, {
-        method: "POST",
-        headers: { cookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/registration-policies/${policyId}/pause`,
+        {
+          method: "POST",
+          headers: { cookie },
+        },
+      ),
     );
     expect(pause.status).toBe(200);
     const signup = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-up/email", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-id-registration-intent": secondDecision.intentId },
-        body: JSON.stringify({ name: "Paused", email: "paused@example.test", password: "password12345" }),
+        headers: {
+          "content-type": "application/json",
+          "x-id-registration-intent": secondDecision.intentId,
+        },
+        body: JSON.stringify({
+          name: "Paused",
+          email: "paused@example.test",
+          password: "password12345",
+        }),
       }),
     );
     expect(signup.status).toBe(400);
-    await expect(signup.json()).resolves.toMatchObject({ code: "registration_intent_used" });
+    await expect(signup.json()).resolves.toMatchObject({
+      code: "registration_intent_used",
+    });
     expect(userCount(raw, "paused@example.test")).toBe(0);
   });
 
@@ -443,26 +589,56 @@ describe("idRegistration plugin", () => {
       }),
     );
     const decision = (await evaluate.json()) as { readonly intentId: string };
-    await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ intentId: decision.intentId, name: "Retry User", email: "retry@example.test", password: "password12345" }),
-    }));
-    const signup = await auth.handler(new Request("https://id.example.test/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
-      body: JSON.stringify({ name: "Retry User", email: "retry@example.test", password: "password12345" }),
-    }));
+    await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          intentId: decision.intentId,
+          name: "Retry User",
+          email: "retry@example.test",
+          password: "password12345",
+        }),
+      }),
+    );
+    const signup = await auth.handler(
+      new Request("https://id.example.test/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-id-registration-intent": decision.intentId,
+        },
+        body: JSON.stringify({
+          name: "Retry User",
+          email: "retry@example.test",
+          password: "password12345",
+        }),
+      }),
+    );
     expect(signup.status).toBe(200);
-    raw.exec(`update "user" set "emailVerified" = 1 where "email" = 'retry@example.test';`);
+    raw.exec(
+      `update "user" set "emailVerified" = 1 where "email" = 'retry@example.test';`,
+    );
 
-    const mark = await auth.handler(new Request("https://id.example.test/api/auth/registration/continuation-failed", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ intentId: decision.intentId, reason: "test_failure" }),
-    }));
+    const mark = await auth.handler(
+      new Request(
+        "https://id.example.test/api/auth/registration/continuation-failed",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            intentId: decision.intentId,
+            reason: "test_failure",
+          }),
+        },
+      ),
+    );
     expect(mark.status).toBe(200);
-    const status = await auth.handler(new Request(`https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`));
+    const status = await auth.handler(
+      new Request(
+        `https://id.example.test/api/auth/registration/status?intentId=${decision.intentId}`,
+      ),
+    );
     await expect(status.json()).resolves.toMatchObject({
       status: "continuation_failed",
       failureReason: "test_failure",
@@ -484,38 +660,76 @@ describe("idRegistration plugin", () => {
       }),
     );
     expect(evaluate.status).toBe(200);
-    const decision = (await evaluate.json()) as { readonly decision: "allowed"; readonly intentId: string; readonly invitation: { readonly email: string }; readonly continueOAuth: boolean };
-    expect(decision).toEqual(expect.objectContaining({
-      decision: "allowed",
-      invitation: expect.objectContaining({ email: "invitee@example.test" }),
-      continueOAuth: false,
-    }));
+    const decision = (await evaluate.json()) as {
+      readonly decision: "allowed";
+      readonly intentId: string;
+      readonly invitation: { readonly email: string };
+      readonly continueOAuth: boolean;
+    };
+    expect(decision).toEqual(
+      expect.objectContaining({
+        decision: "allowed",
+        invitation: expect.objectContaining({ email: "invitee@example.test" }),
+        continueOAuth: false,
+      }),
+    );
 
-    const mismatch = await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ intentId: decision.intentId, name: "Wrong", email: "wrong@example.test", password: "password12345" }),
-    }));
+    const mismatch = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          intentId: decision.intentId,
+          name: "Wrong",
+          email: "wrong@example.test",
+          password: "password12345",
+        }),
+      }),
+    );
     expect(mismatch.status).toBe(400);
-    await expect(mismatch.json()).resolves.toMatchObject({ code: "registration_invitation_email_mismatch" });
+    await expect(mismatch.json()).resolves.toMatchObject({
+      code: "registration_invitation_email_mismatch",
+    });
     expect(userCount(raw, "wrong@example.test")).toBe(0);
 
-    const submit = await auth.handler(new Request("https://id.example.test/api/auth/registration/submit", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ intentId: decision.intentId, name: "Invitee", email: "invitee@example.test", password: "password12345" }),
-    }));
+    const submit = await auth.handler(
+      new Request("https://id.example.test/api/auth/registration/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          intentId: decision.intentId,
+          name: "Invitee",
+          email: "invitee@example.test",
+          password: "password12345",
+        }),
+      }),
+    );
     expect(submit.status).toBe(200);
-    const signup = await auth.handler(new Request("https://id.example.test/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-id-registration-intent": decision.intentId },
-      body: JSON.stringify({ name: "Invitee", email: "invitee@example.test", password: "password12345" }),
-    }));
+    const signup = await auth.handler(
+      new Request("https://id.example.test/api/auth/sign-up/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-id-registration-intent": decision.intentId,
+        },
+        body: JSON.stringify({
+          name: "Invitee",
+          email: "invitee@example.test",
+          password: "password12345",
+        }),
+      }),
+    );
     expect(signup.status).toBe(200);
 
-    const invitation = raw.prepare(`select "status" from "invitation" where "id" = ?`).get(invitationId) as { readonly status: string };
+    const invitation = raw
+      .prepare(`select "status" from "invitation" where "id" = ?`)
+      .get(invitationId) as { readonly status: string };
     expect(invitation.status).toBe("accepted");
-    const member = raw.prepare(`select "role" from "member" where "organizationId" = 'org_reg' and "userId" = (select "id" from "user" where "email" = 'invitee@example.test')`).get() as { readonly role: string };
+    const member = raw
+      .prepare(
+        `select "role" from "member" where "organizationId" = 'org_reg' and "userId" = (select "id" from "user" where "email" = 'invitee@example.test')`,
+      )
+      .get() as { readonly role: string };
     expect(member.role).toBe("member");
   });
 
@@ -525,7 +739,9 @@ describe("idRegistration plugin", () => {
     const clientId = await createOAuthClient(auth, cookie);
     const policyId = await createEnabledPolicy(auth, cookie, clientId);
 
-    raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_other', 'Other Org', 'other-org', 1700000000000);`);
+    raw.exec(
+      `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_other', 'Other Org', 'other-org', 1700000000000);`,
+    );
     await auth.api.createUser({
       body: {
         name: "Other Owner",
@@ -534,8 +750,12 @@ describe("idRegistration plugin", () => {
         data: { emailVerified: true },
       },
     });
-    const otherOwner = raw.prepare(`select "id" from "user" where "email" = ?`).get("other-owner@example.test") as { readonly id: string };
-    raw.exec(`insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('m_other_owner', 'org_other', '${otherOwner.id}', 'owner', 1700000000000);`);
+    const otherOwner = raw
+      .prepare(`select "id" from "user" where "email" = ?`)
+      .get("other-owner@example.test") as { readonly id: string };
+    raw.exec(
+      `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('m_other_owner', 'org_other', '${otherOwner.id}', 'owner', 1700000000000);`,
+    );
     const otherOwnerSignIn = await adminOtpSignIn(auth, emailSender, {
       email: "other-owner@example.test",
       password: "password12345",
@@ -543,15 +763,25 @@ describe("idRegistration plugin", () => {
     const otherOwnerCookie = otherOwnerSignIn.headers.get("set-cookie") ?? "";
 
     const move = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/registration-policies/${policyId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json", cookie: otherOwnerCookie },
-        body: JSON.stringify({ organizationId: "org_other" }),
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/registration-policies/${policyId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            cookie: otherOwnerCookie,
+          },
+          body: JSON.stringify({ organizationId: "org_other" }),
+        },
+      ),
     );
 
     expect(move.status).toBe(403);
-    const policy = raw.prepare(`select "organizationId" from "registrationPolicy" where "id" = ?`).get(policyId) as { readonly organizationId: string };
+    const policy = raw
+      .prepare(
+        `select "organizationId" from "registrationPolicy" where "id" = ?`,
+      )
+      .get(policyId) as { readonly organizationId: string };
     expect(policy.organizationId).toBe("org_reg");
   });
 });

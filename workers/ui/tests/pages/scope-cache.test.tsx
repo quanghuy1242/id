@@ -42,9 +42,10 @@ describe("admin scope cache isolation", () => {
   it("does not reuse OAuth client rows across organization routes after the active-org bridge switches", async () => {
     const activeOrganizationIds: string[] = [];
     const actions = {
-      listClients: vi.fn<(scope: ActiveScope) => Promise<OAuthClient[]>>().mockImplementation(async (scope) => {
-        activeOrganizationIds.push(scope.kind === "organization" ? scope.organizationId : "");
-        return scope.kind === "organization" && scope.organizationId === "org_a"
+      listClients: vi.fn<(scope?: ActiveScope) => Promise<OAuthClient[]>>().mockImplementation(async (scope) => {
+        const organizationId = scope?.kind === "organization" ? scope.organizationId : "";
+        activeOrganizationIds.push(organizationId);
+        return organizationId === "org_a"
           ? [client("cli_a", "Org A Service", "org_a")]
           : [client("cli_b", "Org B Service", "org_b")];
       }),

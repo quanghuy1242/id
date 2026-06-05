@@ -26,22 +26,26 @@ const scimMetaSchema = z.object({
   location: z.string(),
 });
 
-export const scimUserSchema = z.object({
-  schemas: z.array(z.string()),
-  id: z.string(),
-  userName: z.string(),
-  active: z.boolean(),
-  meta: scimMetaSchema,
-}).meta({ id: "ScimUser" });
+export const scimUserSchema = z
+  .object({
+    schemas: z.array(z.string()),
+    id: z.string(),
+    userName: z.string(),
+    active: z.boolean(),
+    meta: scimMetaSchema,
+  })
+  .meta({ id: "ScimUser" });
 
 const scimTenantMembershipSchema = z.object({
   tenantId: z.string(),
   role: z.string(),
 });
 
-export const scimOrgUserSchema = scimUserSchema.extend({
-  [SCIM_TENANT_MEMBERSHIP_SCHEMA]: scimTenantMembershipSchema,
-}).meta({ id: "ScimOrgUser" });
+export const scimOrgUserSchema = scimUserSchema
+  .extend({
+    [SCIM_TENANT_MEMBERSHIP_SCHEMA]: scimTenantMembershipSchema,
+  })
+  .meta({ id: "ScimOrgUser" });
 
 export const scimGroupMemberSchema = z.object({
   value: z.string(),
@@ -49,28 +53,34 @@ export const scimGroupMemberSchema = z.object({
   display: z.string(),
 });
 
-export const scimGroupSchema = z.object({
-  schemas: z.array(z.string()),
-  id: z.string(),
-  displayName: z.string(),
-  members: z.array(scimGroupMemberSchema),
-  meta: scimMetaSchema,
-}).meta({ id: "ScimGroup" });
+export const scimGroupSchema = z
+  .object({
+    schemas: z.array(z.string()),
+    id: z.string(),
+    displayName: z.string(),
+    members: z.array(scimGroupMemberSchema),
+    meta: scimMetaSchema,
+  })
+  .meta({ id: "ScimGroup" });
 
-export const scimErrorSchema = z.object({
-  schemas: z.array(z.string()),
-  status: z.string(),
-  scimType: z.string().optional(),
-  detail: z.string().optional(),
-}).meta({ id: "ScimError" });
+export const scimErrorSchema = z
+  .object({
+    schemas: z.array(z.string()),
+    status: z.string(),
+    scimType: z.string().optional(),
+    detail: z.string().optional(),
+  })
+  .meta({ id: "ScimError" });
 
-const scimListResponseBaseSchema = z.object({
-  schemas: z.array(z.string()),
-  totalResults: z.number(),
-  startIndex: z.number(),
-  itemsPerPage: z.number(),
-  Resources: z.array(z.unknown()),
-}).meta({ id: "ScimListResponse" });
+const scimListResponseBaseSchema = z
+  .object({
+    schemas: z.array(z.string()),
+    totalResults: z.number(),
+    startIndex: z.number(),
+    itemsPerPage: z.number(),
+    Resources: z.array(z.unknown()),
+  })
+  .meta({ id: "ScimListResponse" });
 
 // ── Inferred types ────────────────────────────────────────────────────────────
 
@@ -81,7 +91,10 @@ export type ScimGroupMember = z.infer<typeof scimGroupMemberSchema>;
 export type ScimGroup = z.infer<typeof scimGroupSchema>;
 export type ScimError = z.infer<typeof scimErrorSchema>;
 /** Generic SCIM ListResponse wrapper. Resources is typed at the call site. */
-export type ScimListResponse<T> = Omit<z.infer<typeof scimListResponseBaseSchema>, "Resources"> & {
+export type ScimListResponse<T> = Omit<
+  z.infer<typeof scimListResponseBaseSchema>,
+  "Resources"
+> & {
   readonly Resources: readonly T[];
 };
 
@@ -91,7 +104,9 @@ export const scimUserOpenApiSchema = zodSchemaToOpenApi(scimUserSchema);
 export const scimOrgUserOpenApiSchema = zodSchemaToOpenApi(scimOrgUserSchema);
 export const scimGroupOpenApiSchema = zodSchemaToOpenApi(scimGroupSchema);
 export const scimErrorOpenApiSchema = zodSchemaToOpenApi(scimErrorSchema);
-export const scimListResponseOpenApiSchema = zodSchemaToOpenApi(scimListResponseBaseSchema);
+export const scimListResponseOpenApiSchema = zodSchemaToOpenApi(
+  scimListResponseBaseSchema,
+);
 
 // ── OpenAPI endpoint metadata helper ─────────────────────────────────────────
 //
@@ -156,7 +171,9 @@ export function scimEndpointMeta(options: {
 // because they reference the same URN constants as the resource schemas above.
 
 /** Static SCIM ServiceProviderConfig (RFC 7643 §5). Advertises read-only support. */
-export function buildServiceProviderConfig(baseUrl: string): Record<string, unknown> {
+export function buildServiceProviderConfig(
+  baseUrl: string,
+): Record<string, unknown> {
   const scimBase = `${baseUrl}/api/auth/scim/v2`;
   return {
     schemas: [SCIM_SERVICE_PROVIDER_CONFIG_SCHEMA],
@@ -171,7 +188,8 @@ export function buildServiceProviderConfig(baseUrl: string): Record<string, unkn
       {
         type: "oauthbearertoken",
         name: "OAuth Bearer Token",
-        description: "Authentication using an OAuth 2.0 Bearer Token with audience and scope checks",
+        description:
+          "Authentication using an OAuth 2.0 Bearer Token with audience and scope checks",
         specUri: "https://www.rfc-editor.org/rfc/rfc6750",
       },
     ],
@@ -190,22 +208,62 @@ export function buildSchemas(baseUrl: string): Record<string, unknown>[] {
       schemas: [SCIM_SCHEMA_SCHEMA],
       id: SCIM_USER_SCHEMA,
       name: "User",
-      description: "SCIM core User schema. Read-only profile: active flag and tenant-membership extension only.",
+      description:
+        "SCIM core User schema. Read-only profile: active flag and tenant-membership extension only.",
       attributes: [
-        { name: "id", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "always" },
-        { name: "userName", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "default" },
-        { name: "active", type: "boolean", multiValued: false, required: false, mutability: "readOnly", returned: "default" },
+        {
+          name: "id",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "always",
+        },
+        {
+          name: "userName",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "default",
+        },
+        {
+          name: "active",
+          type: "boolean",
+          multiValued: false,
+          required: false,
+          mutability: "readOnly",
+          returned: "default",
+        },
       ],
-      meta: { resourceType: "Schema", location: `${scimBase}/Schemas/${SCIM_USER_SCHEMA}` },
+      meta: {
+        resourceType: "Schema",
+        location: `${scimBase}/Schemas/${SCIM_USER_SCHEMA}`,
+      },
     },
     {
       schemas: [SCIM_SCHEMA_SCHEMA],
       id: SCIM_GROUP_SCHEMA,
       name: "Group",
-      description: "SCIM core Group schema. Covers teams and the virtual org-admins group.",
+      description:
+        "SCIM core Group schema. Covers teams and the virtual org-admins group.",
       attributes: [
-        { name: "id", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "always" },
-        { name: "displayName", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "default" },
+        {
+          name: "id",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "always",
+        },
+        {
+          name: "displayName",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "default",
+        },
         {
           name: "members",
           type: "complex",
@@ -220,18 +278,39 @@ export function buildSchemas(baseUrl: string): Record<string, unknown>[] {
           ],
         },
       ],
-      meta: { resourceType: "Schema", location: `${scimBase}/Schemas/${SCIM_GROUP_SCHEMA}` },
+      meta: {
+        resourceType: "Schema",
+        location: `${scimBase}/Schemas/${SCIM_GROUP_SCHEMA}`,
+      },
     },
     {
       schemas: [SCIM_SCHEMA_SCHEMA],
       id: SCIM_TENANT_MEMBERSHIP_SCHEMA,
       name: "TenantMembership",
-      description: "Repository-specific extension recording the caller's organization-scoped role. Returned only on tenant-path User responses.",
+      description:
+        "Repository-specific extension recording the caller's organization-scoped role. Returned only on tenant-path User responses.",
       attributes: [
-        { name: "tenantId", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "default" },
-        { name: "role", type: "string", multiValued: false, required: true, mutability: "readOnly", returned: "default" },
+        {
+          name: "tenantId",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "default",
+        },
+        {
+          name: "role",
+          type: "string",
+          multiValued: false,
+          required: true,
+          mutability: "readOnly",
+          returned: "default",
+        },
       ],
-      meta: { resourceType: "Schema", location: `${scimBase}/Schemas/${SCIM_TENANT_MEMBERSHIP_SCHEMA}` },
+      meta: {
+        resourceType: "Schema",
+        location: `${scimBase}/Schemas/${SCIM_TENANT_MEMBERSHIP_SCHEMA}`,
+      },
     },
   ];
 }
@@ -247,17 +326,26 @@ export function buildResourceTypes(baseUrl: string): Record<string, unknown>[] {
       endpoint: "/Users",
       description: "Global user directory lookup",
       schema: SCIM_USER_SCHEMA,
-      schemaExtensions: [{ schema: SCIM_TENANT_MEMBERSHIP_SCHEMA, required: false }],
-      meta: { resourceType: "ResourceType", location: `${scimBase}/ResourceTypes/User` },
+      schemaExtensions: [
+        { schema: SCIM_TENANT_MEMBERSHIP_SCHEMA, required: false },
+      ],
+      meta: {
+        resourceType: "ResourceType",
+        location: `${scimBase}/ResourceTypes/User`,
+      },
     },
     {
       schemas: [SCIM_RESOURCE_TYPE_SCHEMA],
       id: "Group",
       name: "Group",
       endpoint: "/tenants/{orgId}/Groups",
-      description: "Tenant-scoped group (team or virtual org-admins group) lookup",
+      description:
+        "Tenant-scoped group (team or virtual org-admins group) lookup",
       schema: SCIM_GROUP_SCHEMA,
-      meta: { resourceType: "ResourceType", location: `${scimBase}/ResourceTypes/Group` },
+      meta: {
+        resourceType: "ResourceType",
+        location: `${scimBase}/ResourceTypes/Group`,
+      },
     },
   ];
 }

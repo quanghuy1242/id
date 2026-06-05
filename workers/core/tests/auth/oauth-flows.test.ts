@@ -1,4 +1,9 @@
-import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
+import {
+  createLocalJWKSet,
+  decodeJwt,
+  jwtVerify,
+  type JSONWebKeySet,
+} from "jose";
 import { describe, expect, it } from "vitest";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
@@ -14,8 +19,6 @@ type TestDatabase = {
   readonly raw: RawSqlite;
 };
 
-type TestAuth = ReturnType<typeof betterAuth>;
-
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
   return {
@@ -29,7 +32,10 @@ function createKv(): BetterAuthKvStorage {
   };
 }
 
-async function createAuth(db: D1Database, validAudiences: readonly string[] = []) {
+async function createAuth(
+  db: D1Database,
+  validAudiences: readonly string[] = [],
+) {
   return betterAuth(
     getAuthOptions(
       {
@@ -42,7 +48,12 @@ async function createAuth(db: D1Database, validAudiences: readonly string[] = []
         validAudiences,
         scopes: ["content:write"],
         scopeRows: [
-          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
+          {
+            resourceServerId: "rs_content",
+            audience: "https://api.example.test",
+            scope: "content:write",
+            system: false,
+          },
         ],
       },
       { emailSender: capturedEmailSender },
@@ -50,7 +61,12 @@ async function createAuth(db: D1Database, validAudiences: readonly string[] = []
   );
 }
 
-async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<{ readonly cookie: string; readonly userId: string }> {
+type TestAuth = Awaited<ReturnType<typeof createAuth>>;
+
+async function signInSuperadmin(
+  auth: TestAuth,
+  raw: RawSqlite,
+): Promise<{ readonly cookie: string; readonly userId: string }> {
   const created = await auth.api.createUser({
     body: {
       name: "Root Admin",
@@ -72,13 +88,17 @@ async function signInSuperadmin(auth: TestAuth, raw: RawSqlite): Promise<{ reado
 
   const cookie = response.headers.get("set-cookie");
   expect(cookie).toEqual(expect.any(String));
-  raw.exec(`update "session" set "activeOrganizationId" = 'org_1' where "userId" = '${created.user.id}';`);
+  raw.exec(
+    `update "session" set "activeOrganizationId" = 'org_1' where "userId" = '${created.user.id}';`,
+  );
   return { cookie: cookie ?? "", userId: created.user.id };
 }
 
 async function createMemoryDatabase(): Promise<TestDatabase> {
   const { db, raw } = await createMemoryD1();
-  raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`);
+  raw.exec(
+    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`,
+  );
   return { db, raw };
 }
 
@@ -91,7 +111,11 @@ describe("OAuth Provider flows", () => {
     const resourceResponse = await auth.handler(
       new Request("https://id.example.test/api/auth/admin/resource-servers", {
         method: "POST",
-        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        headers: {
+          "content-type": "application/json",
+          cookie,
+          origin: "https://id.example.test",
+        },
         body: JSON.stringify({
           organizationId: "org_1",
           slug: "content-api",
@@ -101,12 +125,18 @@ describe("OAuth Provider flows", () => {
       }),
     );
     expect(resourceResponse.status).toBe(200);
-    const resourceServer = (await resourceResponse.json()) as { readonly id: string };
+    const resourceServer = (await resourceResponse.json()) as {
+      readonly id: string;
+    };
 
     const scopeResponse = await auth.handler(
       new Request("https://id.example.test/api/auth/admin/oauth-scopes", {
         method: "POST",
-        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        headers: {
+          "content-type": "application/json",
+          cookie,
+          origin: "https://id.example.test",
+        },
         body: JSON.stringify({
           resourceServerId: resourceServer.id,
           scope: "content:write",
@@ -118,7 +148,11 @@ describe("OAuth Provider flows", () => {
     const clientResponse = await auth.handler(
       new Request("https://id.example.test/api/auth/oauth2/create-client", {
         method: "POST",
-        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
+        headers: {
+          "content-type": "application/json",
+          cookie,
+          origin: "https://id.example.test",
+        },
         body: JSON.stringify({
           client_name: "Worker API",
           redirect_uris: ["https://app.example.test/callback"],
@@ -135,18 +169,27 @@ describe("OAuth Provider flows", () => {
       readonly client_id: string;
       readonly client_secret: string;
     };
-    raw.exec(`update "oauthClient" set "referenceId" = 'org_1' where "clientId" = '${client.client_id}';`);
+    raw.exec(
+      `update "oauthClient" set "referenceId" = 'org_1' where "clientId" = '${client.client_id}';`,
+    );
 
     const clientResourceScopeResponse = await auth.handler(
-      new Request("https://id.example.test/api/auth/admin/oauth-client-resource-scopes", {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie, origin: "https://id.example.test" },
-        body: JSON.stringify({
-          clientId: client.client_id,
-          resourceServerId: resourceServer.id,
-          allowedScopes: ["content:write"],
-        }),
-      }),
+      new Request(
+        "https://id.example.test/api/auth/admin/oauth-client-resource-scopes",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie,
+            origin: "https://id.example.test",
+          },
+          body: JSON.stringify({
+            clientId: client.client_id,
+            resourceServerId: resourceServer.id,
+            allowedScopes: ["content:write"],
+          }),
+        },
+      ),
     );
     expect(clientResourceScopeResponse.status).toBe(200);
 
@@ -175,8 +218,10 @@ describe("OAuth Provider flows", () => {
     expect(token.token_type).toBe("Bearer");
     expect(token).toEqual(expect.objectContaining({ expires_in: 10_800 }));
 
-    const jwksResponse = await auth.handler(new Request("https://id.example.test/api/auth/jwks"));
-    const jwks = await jwksResponse.json();
+    const jwksResponse = await auth.handler(
+      new Request("https://id.example.test/api/auth/jwks"),
+    );
+    const jwks = (await jwksResponse.json()) as JSONWebKeySet;
     const decoded = decodeJwt(token.access_token);
     expect(decoded.iss).toBe("https://id.example.test/api/auth");
     const { payload } = await jwtVerify(

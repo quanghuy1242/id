@@ -35,8 +35,10 @@ export function applyTheme(mode: ThemeMode): void {
 export function getActiveThemeName(): string {
   if (typeof document === "undefined") return "lumina-light";
   const bodyTheme = document.body.getAttribute("data-theme");
-  if (bodyTheme === "lumina-light" || bodyTheme === "lumina-dark") return bodyTheme;
+  if (bodyTheme === "lumina-light" || bodyTheme === "lumina-dark")
+    return bodyTheme;
   const docTheme = document.documentElement.getAttribute("data-theme");
-  if (docTheme === "lumina-light" || docTheme === "lumina-dark") return docTheme;
+  if (docTheme === "lumina-light" || docTheme === "lumina-dark")
+    return docTheme;
   return systemPrefersDark() ? "lumina-dark" : "lumina-light";
 }

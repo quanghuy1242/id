@@ -11,12 +11,30 @@ import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 
 const capturedEmailSender = createCapturedAuthEmailSender();
 
+type AuthWithCreateUser = Parameters<typeof adminOtpSignIn>[0] & {
+  readonly api: {
+    readonly createUser: (input: {
+      readonly body: {
+        readonly name: string;
+        readonly email: string;
+        readonly password?: string;
+        readonly role?: "admin" | "user" | ("admin" | "user")[];
+        readonly data?: Record<string, unknown>;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
   return {
     get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => { values.set(key, value); },
-    delete: async (key) => { values.delete(key); },
+    put: async (key, value) => {
+      values.set(key, value);
+    },
+    delete: async (key) => {
+      values.delete(key);
+    },
   };
 }
 
@@ -30,8 +48,14 @@ async function createMemoryDatabase(): Promise<RawSqlite> {
   return raw;
 }
 
-async function signIn(auth: ReturnType<typeof betterAuth>, email: string): Promise<string> {
-  const response = await adminOtpSignIn(auth, capturedEmailSender, { email, password: "password123" });
+async function signIn(
+  auth: AuthWithCreateUser,
+  email: string,
+): Promise<string> {
+  const response = await adminOtpSignIn(auth, capturedEmailSender, {
+    email,
+    password: "password123",
+  });
   expect(response.status).toBe(200);
   return response.headers.get("set-cookie") ?? "";
 }
@@ -44,7 +68,11 @@ describe("Better Auth team contract", () => {
         {
           BETTER_AUTH_SECRET: "test-secret",
           BETTER_AUTH_URL: "https://id.example.test",
-          DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+          DB: drizzleAdapter(drizzle(raw), {
+            provider: "sqlite",
+            camelCase: true,
+            schema: authSchema,
+          }),
           KV: createKv(),
         },
         undefined,
@@ -82,51 +110,95 @@ describe("Better Auth team contract", () => {
       new Request("https://id.example.test/api/auth/organization/create-team", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ organizationId: organization.id, name: "Editorial" }),
+        body: JSON.stringify({
+          organizationId: organization.id,
+          name: "Editorial",
+        }),
       }),
     );
     expect(teamResponse.status).toBe(200);
-    const team = (await teamResponse.json()) as { readonly id: string; readonly organizationId: string };
+    const team = (await teamResponse.json()) as {
+      readonly id: string;
+      readonly organizationId: string;
+    };
     expect(team.organizationId).toBe(organization.id);
 
     const addMember = await auth.handler(
-      new Request("https://id.example.test/api/auth/organization/add-team-member", {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ organizationId: organization.id, teamId: team.id, userId: member.user.id }),
-      }),
+      new Request(
+        "https://id.example.test/api/auth/organization/add-team-member",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({
+            organizationId: organization.id,
+            teamId: team.id,
+            userId: member.user.id,
+          }),
+        },
+      ),
     );
     expect(addMember.status).toBe(200);
-    await expect(addMember.json()).resolves.toEqual(expect.objectContaining({ teamId: team.id, userId: member.user.id }));
+    await expect(addMember.json()).resolves.toEqual(
+      expect.objectContaining({ teamId: team.id, userId: member.user.id }),
+    );
 
     const addOwner = await auth.handler(
-      new Request("https://id.example.test/api/auth/organization/add-team-member", {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ organizationId: organization.id, teamId: team.id, userId: owner.user.id }),
-      }),
+      new Request(
+        "https://id.example.test/api/auth/organization/add-team-member",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({
+            organizationId: organization.id,
+            teamId: team.id,
+            userId: owner.user.id,
+          }),
+        },
+      ),
     );
     expect(addOwner.status).toBe(200);
 
-    const teamMemberRows = raw.prepare(`select * from "teamMember" where "teamId" = '${team.id}' and "userId" = '${member.user.id}'`).all();
-    expect(teamMemberRows).toEqual([expect.objectContaining({ teamId: team.id, userId: member.user.id })]);
+    const teamMemberRows = raw
+      .prepare(
+        `select * from "teamMember" where "teamId" = '${team.id}' and "userId" = '${member.user.id}'`,
+      )
+      .all();
+    expect(teamMemberRows).toEqual([
+      expect.objectContaining({ teamId: team.id, userId: member.user.id }),
+    ]);
     expect(teamMemberRows[0]).not.toHaveProperty("memberId");
 
     const list = await auth.handler(
-      new Request(`https://id.example.test/api/auth/organization/list-team-members?teamId=${team.id}&organizationId=${organization.id}`, {
-        headers: { cookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/organization/list-team-members?teamId=${team.id}&organizationId=${organization.id}`,
+        {
+          headers: { cookie },
+        },
+      ),
     );
     expect(list.status).toBe(200);
 
     const removeMember = await auth.handler(
-      new Request("https://id.example.test/api/auth/organization/remove-team-member", {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ organizationId: organization.id, teamId: team.id, userId: member.user.id }),
-      }),
+      new Request(
+        "https://id.example.test/api/auth/organization/remove-team-member",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({
+            organizationId: organization.id,
+            teamId: team.id,
+            userId: member.user.id,
+          }),
+        },
+      ),
     );
     expect(removeMember.status).toBe(200);
-    expect(raw.prepare(`select * from "teamMember" where "teamId" = '${team.id}' and "userId" = '${member.user.id}'`).all()).toEqual([]);
+    expect(
+      raw
+        .prepare(
+          `select * from "teamMember" where "teamId" = '${team.id}' and "userId" = '${member.user.id}'`,
+        )
+        .all(),
+    ).toEqual([]);
   });
 });

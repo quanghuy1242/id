@@ -76,7 +76,9 @@ describe("constants", () => {
     });
     expect(visible.map((item) => item.id)).toContain("identity-teams");
     expect(visible.map((item) => item.id)).toContain("access-resource-apis");
-    expect(visible.map((item) => item.id)).not.toContain("identity-organizations");
+    expect(visible.map((item) => item.id)).not.toContain(
+      "identity-organizations",
+    );
     expect(visible.map((item) => item.id)).not.toContain("security-jwks");
     expect(sections.every((section) => section.items.length > 0)).toBe(true);
   });
@@ -92,10 +94,8 @@ describe("constants", () => {
       requiresStepUp: false,
     };
 
-    expect(visibleNavItems(CONSOLE_NAV_ITEMS, scope).map((item) => item.id)).toEqual([
-      "dashboard",
-      "identity-users",
-      "identity-teams",
-    ]);
+    expect(
+      visibleNavItems(CONSOLE_NAV_ITEMS, scope).map((item) => item.id),
+    ).toEqual(["dashboard", "identity-users", "identity-teams"]);
   });
 });

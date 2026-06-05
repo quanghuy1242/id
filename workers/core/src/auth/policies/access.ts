@@ -1,7 +1,10 @@
 import { MEMBER_MODEL } from "../../shared/constants";
 
 export type AdminDbAdapter = {
-  findMany: (params: { model: string; where?: Array<{ field: string; value: unknown }> }) => Promise<Array<Record<string, unknown>>>;
+  findMany: (params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown }>;
+  }) => Promise<Array<Record<string, unknown>>>;
 };
 
 export function isPlatformAdmin(role: unknown): boolean {

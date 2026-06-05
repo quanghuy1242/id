@@ -1,12 +1,24 @@
-import { authApiGetOrThrow, authApiPostOrThrow, type ActiveScope } from "@id/lib";
+import {
+  authApiGetOrThrow,
+  authApiPostOrThrow,
+  type ActiveScope,
+} from "@id/lib";
 
 const platformScope: ActiveScope = { kind: "platform" };
 
-function orgParams(scope: ActiveScope): { organizationId?: string } | undefined {
-  return scope.kind === "organization" ? { organizationId: scope.organizationId } : undefined;
+function orgParams(
+  scope: ActiveScope,
+): { organizationId?: string } | undefined {
+  return scope.kind === "organization"
+    ? { organizationId: scope.organizationId }
+    : undefined;
 }
 
-export type RegistrationPolicyStatus = "draft" | "enabled" | "paused" | "archived";
+export type RegistrationPolicyStatus =
+  | "draft"
+  | "enabled"
+  | "paused"
+  | "archived";
 
 export type RegistrationPolicy = {
   readonly id: string;
@@ -56,24 +68,48 @@ export type RegistrationIntent = {
   readonly failureReason: string | null;
 };
 
-export async function listRegistrationPolicies(scope: ActiveScope = platformScope): Promise<RegistrationPolicy[]> {
-  const response = await authApiGetOrThrow<{ policies: RegistrationPolicy[] }>("/admin/registration-policies", orgParams(scope));
+export async function listRegistrationPolicies(
+  scope: ActiveScope = platformScope,
+): Promise<RegistrationPolicy[]> {
+  const response = await authApiGetOrThrow<{ policies: RegistrationPolicy[] }>(
+    "/admin/registration-policies",
+    orgParams(scope),
+  );
   return response.policies ?? [];
 }
 
-export async function enableRegistrationPolicy(policyId: string): Promise<RegistrationPolicy> {
-  return authApiPostOrThrow<RegistrationPolicy>(`/admin/registration-policies/${encodeURIComponent(policyId)}/enable`, {});
+export async function enableRegistrationPolicy(
+  policyId: string,
+): Promise<RegistrationPolicy> {
+  return authApiPostOrThrow<RegistrationPolicy>(
+    `/admin/registration-policies/${encodeURIComponent(policyId)}/enable`,
+    {},
+  );
 }
 
-export async function pauseRegistrationPolicy(policyId: string): Promise<RegistrationPolicy> {
-  return authApiPostOrThrow<RegistrationPolicy>(`/admin/registration-policies/${encodeURIComponent(policyId)}/pause`, {});
+export async function pauseRegistrationPolicy(
+  policyId: string,
+): Promise<RegistrationPolicy> {
+  return authApiPostOrThrow<RegistrationPolicy>(
+    `/admin/registration-policies/${encodeURIComponent(policyId)}/pause`,
+    {},
+  );
 }
 
-export async function archiveRegistrationPolicy(policyId: string): Promise<RegistrationPolicy> {
-  return authApiPostOrThrow<RegistrationPolicy>(`/admin/registration-policies/${encodeURIComponent(policyId)}/archive`, {});
+export async function archiveRegistrationPolicy(
+  policyId: string,
+): Promise<RegistrationPolicy> {
+  return authApiPostOrThrow<RegistrationPolicy>(
+    `/admin/registration-policies/${encodeURIComponent(policyId)}/archive`,
+    {},
+  );
 }
 
-export async function listRegistrationPolicyIntents(policyId: string): Promise<RegistrationIntent[]> {
-  const response = await authApiGetOrThrow<{ intents: RegistrationIntent[] }>(`/admin/registration-policies/${encodeURIComponent(policyId)}/intents`);
+export async function listRegistrationPolicyIntents(
+  policyId: string,
+): Promise<RegistrationIntent[]> {
+  const response = await authApiGetOrThrow<{ intents: RegistrationIntent[] }>(
+    `/admin/registration-policies/${encodeURIComponent(policyId)}/intents`,
+  );
   return response.intents ?? [];
 }

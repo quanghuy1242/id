@@ -42,12 +42,18 @@ export async function ensureSystemAccessCatalog(
   const scopes = await Promise.all([
     ensureOAuthResourceScope(
       adapter,
-      { resourceServerId: resourceServer.row.id, scope: authPluginConfig.scimDirectoryScope },
+      {
+        resourceServerId: resourceServer.row.id,
+        scope: authPluginConfig.scimDirectoryScope,
+      },
       actorId,
     ),
     ensureOAuthResourceScope(
       adapter,
-      { resourceServerId: resourceServer.row.id, scope: authPluginConfig.systemOAuthClientPickerScope },
+      {
+        resourceServerId: resourceServer.row.id,
+        scope: authPluginConfig.systemOAuthClientPickerScope,
+      },
       actorId,
     ),
   ]);

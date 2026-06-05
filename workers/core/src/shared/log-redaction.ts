@@ -18,17 +18,28 @@ export type StructuredLogRecord = {
 };
 
 function redactValue(key: string, value: unknown): unknown {
-  return SENSITIVE_LOG_FIELDS.includes(key.toLowerCase()) ? REDACTED_LOG_VALUE : value;
+  return SENSITIVE_LOG_FIELDS.includes(key.toLowerCase())
+    ? REDACTED_LOG_VALUE
+    : value;
 }
 
-export function redactLogFields(fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, redactValue(key, value)]));
+export function redactLogFields(
+  fields: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [
+      key,
+      redactValue(key, value),
+    ]),
+  );
 }
 
-export function structuredLog(event: string, fields: Readonly<Record<string, unknown>>): StructuredLogRecord {
+export function structuredLog(
+  event: string,
+  fields: Readonly<Record<string, unknown>>,
+): StructuredLogRecord {
   return {
     event,
     fields: redactLogFields(fields),
   };
 }
-

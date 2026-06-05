@@ -14,7 +14,14 @@ import {
   TEAM_MEMBER_MODEL,
   USER_MODEL,
 } from "../../../shared/constants";
-import { authPluginConfig, HEX_BYTE_PAD_LENGTH, HEX_RADIX, MS_PER_SECOND, REGISTRATION_INTENT_HEADER, REGISTRATION_INTENT_TTL_MS } from "../../config";
+import {
+  authPluginConfig,
+  HEX_BYTE_PAD_LENGTH,
+  HEX_RADIX,
+  MS_PER_SECOND,
+  REGISTRATION_INTENT_HEADER,
+  REGISTRATION_INTENT_TTL_MS,
+} from "../../config";
 import {
   type ContinuationFailureRegistrationBody,
   type CreateRegistrationPolicyBody,
@@ -79,30 +86,51 @@ function emailDomain(email: string): string {
 }
 
 function protocolScopes(): ReadonlySet<string> {
-  return new Set([...authPluginConfig.oauthProtocolScopes, ...authPluginConfig.bootstrapOAuthScopes]);
+  return new Set([
+    ...authPluginConfig.oauthProtocolScopes,
+    ...authPluginConfig.bootstrapOAuthScopes,
+  ]);
 }
 
 function splitScopes(value: string | null): string[] {
   if (!value) return [];
-  return [...new Set(value.split(/\s+/u).map((scope) => scope.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(/\s+/u)
+        .map((scope) => scope.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
-function scopeDifference(left: readonly string[], right: ReadonlySet<string>): string[] {
+function scopeDifference(
+  left: readonly string[],
+  right: ReadonlySet<string>,
+): string[] {
   return left.filter((scope) => !right.has(scope));
 }
 
 function domainAllowed(policy: RegistrationPolicyRow, email: string): boolean {
   if (policy.emailDomains.length === 0) return true;
   const domain = emailDomain(email);
-  return policy.emailDomains.some((allowed) => allowed.toLowerCase() === domain);
+  return policy.emailDomains.some(
+    (allowed) => allowed.toLowerCase() === domain,
+  );
 }
 
 async function sha256Hex(input: string): Promise<string> {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  const bytes = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(input),
+  );
   return `sha256:${Array.from(new Uint8Array(bytes), (byte) => byte.toString(HEX_RADIX).padStart(HEX_BYTE_PAD_LENGTH, "0")).join("")}`;
 }
 
-async function verifySignedOAuthQuery(oauthQuery: string, secret: string): Promise<boolean> {
+async function verifySignedOAuthQuery(
+  oauthQuery: string,
+  secret: string,
+): Promise<boolean> {
   const params = new URLSearchParams(oauthQuery);
   const signature = params.get("sig");
   const expiresAtSeconds = Number(params.get("exp"));
@@ -111,7 +139,10 @@ async function verifySignedOAuthQuery(oauthQuery: string, secret: string): Promi
   if (!signature || !Number.isFinite(expiresAtSeconds)) return false;
 
   const expectedSignature = await makeSignature(params.toString(), secret);
-  return constantTimeEqual(signature, expectedSignature) && expiresAtSeconds * MS_PER_SECOND >= now();
+  return (
+    constantTimeEqual(signature, expectedSignature) &&
+    expiresAtSeconds * MS_PER_SECOND >= now()
+  );
 }
 
 export function registrationIntentHeaderName(): string {
@@ -122,7 +153,10 @@ export function intentTtlMs(value: number | undefined): number {
   return value ?? REGISTRATION_INTENT_TTL_MS;
 }
 
-export function buildCreatePolicyPayload(body: CreateRegistrationPolicyBody, actorId: string): Record<string, unknown> {
+export function buildCreatePolicyPayload(
+  body: CreateRegistrationPolicyBody,
+  actorId: string,
+): Record<string, unknown> {
   const timestamp = now();
   return {
     ...body,
@@ -140,12 +174,19 @@ export function buildCreatePolicyPayload(body: CreateRegistrationPolicyBody, act
   };
 }
 
-export function buildUpdatePolicyPayload(body: UpdateRegistrationPolicyBody, actorId: string): Record<string, unknown> {
+export function buildUpdatePolicyPayload(
+  body: UpdateRegistrationPolicyBody,
+  actorId: string,
+): Record<string, unknown> {
   return {
     ...body,
     ...(body.clientId === undefined ? {} : { clientId: body.clientId }),
-    ...(body.organizationId === undefined ? {} : { organizationId: body.organizationId }),
-    ...(body.resourceServerId === undefined ? {} : { resourceServerId: body.resourceServerId }),
+    ...(body.organizationId === undefined
+      ? {}
+      : { organizationId: body.organizationId }),
+    ...(body.resourceServerId === undefined
+      ? {}
+      : { resourceServerId: body.resourceServerId }),
     ...(body.quotaLimit === undefined ? {} : { quotaLimit: body.quotaLimit }),
     ...(body.startsAt === undefined ? {} : { startsAt: body.startsAt }),
     ...(body.expiresAt === undefined ? {} : { expiresAt: body.expiresAt }),
@@ -176,25 +217,44 @@ export async function assertUniqueRegistrationPolicySlug(
     where: [{ field: "slug", value: slug }],
   });
   if (existing && existing.id !== existingId) {
-    throw new APIError("CONFLICT", { code: "registration_policy_slug_exists", message: "Registration policy slug already exists" });
+    throw new APIError("CONFLICT", {
+      code: "registration_policy_slug_exists",
+      message: "Registration policy slug already exists",
+    });
   }
 }
 
 function policyIsActive(policy: RegistrationPolicyRow, at: number): boolean {
   if (policy.status !== "enabled") return false;
-  if (policy.startsAt !== null && policy.startsAt !== undefined && policy.startsAt > at) return false;
-  if (policy.expiresAt !== null && policy.expiresAt !== undefined && policy.expiresAt <= at) return false;
+  if (
+    policy.startsAt !== null &&
+    policy.startsAt !== undefined &&
+    policy.startsAt > at
+  )
+    return false;
+  if (
+    policy.expiresAt !== null &&
+    policy.expiresAt !== undefined &&
+    policy.expiresAt <= at
+  )
+    return false;
   return true;
 }
 
-async function loadClient(adapter: RegistrationAdapter, clientId: string): Promise<OAuthClientRow | null> {
+async function loadClient(
+  adapter: RegistrationAdapter,
+  clientId: string,
+): Promise<OAuthClientRow | null> {
   return adapter.findOne<OAuthClientRow>({
     model: OAUTH_CLIENT_MODEL,
     where: [{ field: "clientId", value: clientId }],
   });
 }
 
-async function loadOrganization(adapter: RegistrationAdapter, organizationId: string | null | undefined): Promise<OrganizationRow | null> {
+async function loadOrganization(
+  adapter: RegistrationAdapter,
+  organizationId: string | null | undefined,
+): Promise<OrganizationRow | null> {
   if (!organizationId) return null;
   return adapter.findOne<OrganizationRow>({
     model: ORGANIZATION_MODEL,
@@ -202,7 +262,10 @@ async function loadOrganization(adapter: RegistrationAdapter, organizationId: st
   });
 }
 
-async function loadInvitation(adapter: RegistrationAdapter, invitationId: string): Promise<InvitationRow | null> {
+async function loadInvitation(
+  adapter: RegistrationAdapter,
+  invitationId: string,
+): Promise<InvitationRow | null> {
   return adapter.findOne<InvitationRow>({
     model: INVITATION_MODEL,
     where: [{ field: "id", value: invitationId }],
@@ -210,7 +273,9 @@ async function loadInvitation(adapter: RegistrationAdapter, invitationId: string
 }
 
 function invitationExpiryMs(invitation: InvitationRow): number {
-  return invitation.expiresAt instanceof Date ? invitation.expiresAt.getTime() : invitation.expiresAt;
+  return invitation.expiresAt instanceof Date
+    ? invitation.expiresAt.getTime()
+    : invitation.expiresAt;
 }
 
 function invitationIsOpen(invitation: InvitationRow, at: number): boolean {
@@ -227,13 +292,19 @@ async function findEnabledPolicy(
     where: [{ field: "status", value: "enabled" }],
     sortBy: { field: "createdAt", direction: "desc" },
   });
-  return policies.find((policy) => {
-    if (!policyIsActive(policy, at)) return false;
-    if (policy.mode !== "client_initiated" && policy.mode !== "public_limited" && policy.mode !== "domain_allowlist") {
-      return false;
-    }
-    return !policy.clientId || policy.clientId === clientId;
-  }) ?? null;
+  return (
+    policies.find((policy) => {
+      if (!policyIsActive(policy, at)) return false;
+      if (
+        policy.mode !== "client_initiated" &&
+        policy.mode !== "public_limited" &&
+        policy.mode !== "domain_allowlist"
+      ) {
+        return false;
+      }
+      return !policy.clientId || policy.clientId === clientId;
+    }) ?? null
+  );
 }
 
 async function findEnabledInvitePolicy(
@@ -247,12 +318,14 @@ async function findEnabledInvitePolicy(
     where: [{ field: "status", value: "enabled" }],
     sortBy: { field: "createdAt", direction: "desc" },
   });
-  return policies.find((policy) => {
-    if (!policyIsActive(policy, at)) return false;
-    if (policy.mode !== "invite_only") return false;
-    if (policy.organizationId !== invitation.organizationId) return false;
-    return !policy.clientId || policy.clientId === clientId;
-  }) ?? null;
+  return (
+    policies.find((policy) => {
+      if (!policyIsActive(policy, at)) return false;
+      if (policy.mode !== "invite_only") return false;
+      if (policy.organizationId !== invitation.organizationId) return false;
+      return !policy.clientId || policy.clientId === clientId;
+    }) ?? null
+  );
 }
 
 async function assertScopesAllowed(
@@ -263,15 +336,23 @@ async function assertScopesAllowed(
   resource: string | null,
 ): Promise<string[]> {
   const policyScopeSet = new Set(policy.allowedScopes);
-  const allowedScopes = requestedScopes.filter((scope) => policyScopeSet.has(scope));
+  const allowedScopes = requestedScopes.filter((scope) =>
+    policyScopeSet.has(scope),
+  );
   if (allowedScopes.length === 0 && requestedScopes.length > 0) {
-    throw new APIError("BAD_REQUEST", { code: "registration_scope_denied", message: "Requested scopes are not allowed by registration policy" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_scope_denied",
+      message: "Requested scopes are not allowed by registration policy",
+    });
   }
 
   const nonProtocolScopes = scopeDifference(allowedScopes, protocolScopes());
   if (nonProtocolScopes.length === 0) return allowedScopes;
   if (!resource) {
-    throw new APIError("BAD_REQUEST", { code: "registration_resource_required", message: "Resource is required for product scopes" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_resource_required",
+      message: "Resource is required for product scopes",
+    });
   }
 
   const resourceServer = await adapter.findOne<ResourceServerRow>({
@@ -279,10 +360,19 @@ async function assertScopesAllowed(
     where: [{ field: "audience", value: resource }],
   });
   if (!resourceServer || resourceServer.enabled === false) {
-    throw new APIError("BAD_REQUEST", { code: "registration_resource_denied", message: "Requested resource is not enabled" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_resource_denied",
+      message: "Requested resource is not enabled",
+    });
   }
-  if (policy.resourceServerId && policy.resourceServerId !== resourceServer.id) {
-    throw new APIError("BAD_REQUEST", { code: "registration_resource_denied", message: "Requested resource is not allowed by registration policy" });
+  if (
+    policy.resourceServerId &&
+    policy.resourceServerId !== resourceServer.id
+  ) {
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_resource_denied",
+      message: "Requested resource is not allowed by registration policy",
+    });
   }
 
   const catalogScopes = await adapter.findMany<{ readonly scope: string }>({
@@ -290,9 +380,14 @@ async function assertScopesAllowed(
     where: [{ field: "resourceServerId", value: resourceServer.id }],
   });
   const catalogScopeSet = new Set(catalogScopes.map((row) => row.scope));
-  const missingCatalogScope = nonProtocolScopes.find((scope) => !catalogScopeSet.has(scope));
+  const missingCatalogScope = nonProtocolScopes.find(
+    (scope) => !catalogScopeSet.has(scope),
+  );
   if (missingCatalogScope) {
-    throw new APIError("BAD_REQUEST", { code: "registration_scope_denied", message: "Requested scope is not in the scope catalog" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_scope_denied",
+      message: "Requested scope is not in the scope catalog",
+    });
   }
 
   const clientScope = await adapter.findOne<ClientResourceScopeRow>({
@@ -303,9 +398,14 @@ async function assertScopesAllowed(
     ],
   });
   const clientAllowed = new Set(clientScope?.allowedScopes ?? []);
-  const missingClientScope = nonProtocolScopes.find((scope) => !clientAllowed.has(scope));
+  const missingClientScope = nonProtocolScopes.find(
+    (scope) => !clientAllowed.has(scope),
+  );
   if (missingClientScope) {
-    throw new APIError("BAD_REQUEST", { code: "registration_scope_denied", message: "Requested scope is not allowed for this client/resource" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_scope_denied",
+      message: "Requested scope is not allowed for this client/resource",
+    });
   }
 
   return allowedScopes;
@@ -328,25 +428,41 @@ export async function evaluateRegistration(
   let client: OAuthClientRow | null = null;
 
   if (!oauthQuery && !body.invitationId) {
-    return denial("missing_registration_context", "Registration requires an application request or invitation.");
+    return denial(
+      "missing_registration_context",
+      "Registration requires an application request or invitation.",
+    );
   }
 
   if (oauthQuery && !(await verifySignedOAuthQuery(oauthQuery, secret))) {
-    return denial("invalid_oauth_query", "Registration requires a valid application request.");
+    return denial(
+      "invalid_oauth_query",
+      "Registration requires a valid application request.",
+    );
   }
 
   if (oauthQuery) {
     params = new URLSearchParams(oauthQuery);
     clientId = params.get("client_id");
-    if (!clientId) return denial("missing_client", "Registration requires a client.");
+    if (!clientId)
+      return denial("missing_client", "Registration requires a client.");
 
     client = await loadClient(adapter, clientId);
-    if (!client || client.disabled === true) return denial("invalid_client", "Registration is unavailable for this application.");
+    if (!client || client.disabled === true)
+      return denial(
+        "invalid_client",
+        "Registration is unavailable for this application.",
+      );
   }
 
-  const invitation = body.invitationId ? await loadInvitation(adapter, body.invitationId) : null;
+  const invitation = body.invitationId
+    ? await loadInvitation(adapter, body.invitationId)
+    : null;
   if (body.invitationId && (!invitation || !invitationIsOpen(invitation, at))) {
-    return denial("invalid_invitation", "This invitation is unavailable or expired.");
+    return denial(
+      "invalid_invitation",
+      "This invitation is unavailable or expired.",
+    );
   }
 
   const policy = invitation
@@ -354,13 +470,20 @@ export async function evaluateRegistration(
     : clientId
       ? await findEnabledPolicy(adapter, clientId, at)
       : null;
-  if (!policy) return denial("no_policy", "Registration is closed for this application.");
+  if (!policy)
+    return denial("no_policy", "Registration is closed for this application.");
 
   try {
     const requestedScopes = splitScopes(params.get("scope"));
     const resource = params.get("resource");
     const allowedScopes = clientId
-      ? await assertScopesAllowed(adapter, policy, clientId, requestedScopes, resource)
+      ? await assertScopesAllowed(
+          adapter,
+          policy,
+          clientId,
+          requestedScopes,
+          resource,
+        )
       : [];
     if (await quotaFull(adapter, policy, at)) {
       return denial("quota_full", "Registration is full for this application.");
@@ -378,7 +501,9 @@ export async function evaluateRegistration(
         allowedScopes,
         resource,
         oauthQuery: oauthQuery ?? "",
-        oauthQueryHash: await sha256Hex(oauthQuery ?? `invitation:${invitation?.id ?? ""}`),
+        oauthQueryHash: await sha256Hex(
+          oauthQuery ?? `invitation:${invitation?.id ?? ""}`,
+        ),
         email: invitation ? normalizeEmail(invitation.email) : null,
         status: "started",
         expiresAt,
@@ -393,12 +518,23 @@ export async function evaluateRegistration(
     return {
       decision: "allowed" as const,
       intentId: intent.id,
-      client: client && clientId ? {
-        clientId,
-        clientName: client.name || client.clientName || clientId,
-      } : null,
-      organization: organization ? { id: organization.id, name: organization.name } : null,
-      invitation: invitation ? { id: invitation.id, email: normalizeEmail(invitation.email), role: invitation.role ?? null } : null,
+      client:
+        client && clientId
+          ? {
+              clientId,
+              clientName: client.name || client.clientName || clientId,
+            }
+          : null,
+      organization: organization
+        ? { id: organization.id, name: organization.name }
+        : null,
+      invitation: invitation
+        ? {
+            id: invitation.id,
+            email: normalizeEmail(invitation.email),
+            role: invitation.role ?? null,
+          }
+        : null,
       requestedScopes,
       allowedScopes,
       expiresAt,
@@ -406,42 +542,77 @@ export async function evaluateRegistration(
     };
   } catch (error) {
     if (error instanceof APIError) {
-      const apiError = error as APIError & { readonly body?: { readonly code?: string; readonly message?: string } };
-      return denial(apiError.body?.code ?? "policy_denied", apiError.body?.message ?? "Registration is unavailable for this application.");
+      const apiError = error as APIError & {
+        readonly body?: { readonly code?: string; readonly message?: string };
+      };
+      return denial(
+        apiError.body?.code ?? "policy_denied",
+        apiError.body?.message ??
+          "Registration is unavailable for this application.",
+      );
     }
     throw error;
   }
 }
 
-async function loadIntent(adapter: RegistrationAdapter, intentId: string): Promise<RegistrationIntentRow> {
+async function loadIntent(
+  adapter: RegistrationAdapter,
+  intentId: string,
+): Promise<RegistrationIntentRow> {
   const intent = await adapter.findOne<RegistrationIntentRow>({
     model: REGISTRATION_INTENT_MODEL,
     where: [{ field: "id", value: intentId }],
   });
-  if (!intent) throw new APIError("BAD_REQUEST", { code: "invalid_registration_intent", message: "Registration intent is invalid" });
+  if (!intent)
+    throw new APIError("BAD_REQUEST", {
+      code: "invalid_registration_intent",
+      message: "Registration intent is invalid",
+    });
   return intent;
 }
 
-async function loadPolicy(adapter: RegistrationAdapter, policyId: string): Promise<RegistrationPolicyRow> {
+async function loadPolicy(
+  adapter: RegistrationAdapter,
+  policyId: string,
+): Promise<RegistrationPolicyRow> {
   const policy = await adapter.findOne<RegistrationPolicyRow>({
     model: REGISTRATION_POLICY_MODEL,
     where: [{ field: "id", value: policyId }],
   });
-  if (!policy) throw new APIError("BAD_REQUEST", { code: "invalid_registration_intent", message: "Registration policy no longer exists" });
+  if (!policy)
+    throw new APIError("BAD_REQUEST", {
+      code: "invalid_registration_intent",
+      message: "Registration policy no longer exists",
+    });
   return policy;
 }
 
-async function activeReservations(adapter: RegistrationAdapter, policyId: string, at: number): Promise<RegistrationQuotaReservationRow[]> {
+async function activeReservations(
+  adapter: RegistrationAdapter,
+  policyId: string,
+  at: number,
+): Promise<RegistrationQuotaReservationRow[]> {
   const rows = await adapter.findMany<RegistrationQuotaReservationRow>({
     model: REGISTRATION_QUOTA_RESERVATION_MODEL,
     where: [{ field: "policyId", value: policyId }],
   });
-  return rows.filter((row) => row.status === "consumed" || (row.status === "reserved" && row.expiresAt > at));
+  return rows.filter(
+    (row) =>
+      row.status === "consumed" ||
+      (row.status === "reserved" && row.expiresAt > at),
+  );
 }
 
-async function quotaFull(adapter: RegistrationAdapter, policy: RegistrationPolicyRow, at: number): Promise<boolean> {
+async function quotaFull(
+  adapter: RegistrationAdapter,
+  policy: RegistrationPolicyRow,
+  at: number,
+): Promise<boolean> {
   if (!policy.quotaLimit) return false;
-  return (await activeReservations(adapter, policy.id, at)).length >= policy.quotaLimit;
+  return (
+    (await activeReservations(adapter, policy.id, at)).length >=
+    policy.quotaLimit
+  );
 }
 
 async function ensureReservation(
@@ -456,12 +627,18 @@ async function ensureReservation(
   });
   if (existing) {
     if (existing.status === "released") {
-      throw new APIError("BAD_REQUEST", { code: "registration_intent_expired", message: "Registration intent is no longer active" });
+      throw new APIError("BAD_REQUEST", {
+        code: "registration_intent_expired",
+        message: "Registration intent is no longer active",
+      });
     }
     return;
   }
   if (await quotaFull(adapter, policy, at)) {
-    throw new APIError("BAD_REQUEST", { code: "registration_quota_full", message: "Registration is full for this application" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_quota_full",
+      message: "Registration is full for this application",
+    });
   }
   await adapter.create<RegistrationQuotaReservationRow>({
     model: REGISTRATION_QUOTA_RESERVATION_MODEL,
@@ -479,24 +656,48 @@ async function ensureReservation(
 export async function submitRegistration(
   adapter: RegistrationAdapter,
   body: SubmitRegistrationBody,
-): Promise<{ readonly status: "ready"; readonly intentId: string; readonly email: string; readonly continueOAuth: boolean }> {
+): Promise<{
+  readonly status: "ready";
+  readonly intentId: string;
+  readonly email: string;
+  readonly continueOAuth: boolean;
+}> {
   const intent = await loadIntent(adapter, body.intentId);
   const policy = await loadPolicy(adapter, intent.policyId);
   const at = now();
   await assertIntentOpen(adapter, intent, policy, at);
   if (!domainAllowed(policy, body.email)) {
-    throw new APIError("BAD_REQUEST", { code: "registration_email_domain_denied", message: "Use an allowed email domain to register" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_email_domain_denied",
+      message: "Use an allowed email domain to register",
+    });
   }
-  if (intent.invitationId && intent.email && intent.email !== normalizeEmail(body.email)) {
-    throw new APIError("BAD_REQUEST", { code: "registration_invitation_email_mismatch", message: "Use the invited email address to register" });
+  if (
+    intent.invitationId &&
+    intent.email &&
+    intent.email !== normalizeEmail(body.email)
+  ) {
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_invitation_email_mismatch",
+      message: "Use the invited email address to register",
+    });
   }
   await ensureReservation(adapter, policy, intent, at);
   await adapter.update<RegistrationIntentRow>({
     model: REGISTRATION_INTENT_MODEL,
     where: [{ field: "id", value: intent.id }],
-    update: { status: "submitted", email: normalizeEmail(body.email), updatedAt: at },
+    update: {
+      status: "submitted",
+      email: normalizeEmail(body.email),
+      updatedAt: at,
+    },
   });
-  return { status: "ready", intentId: intent.id, email: normalizeEmail(body.email), continueOAuth: Boolean(intent.oauthQuery) };
+  return {
+    status: "ready",
+    intentId: intent.id,
+    email: normalizeEmail(body.email),
+    continueOAuth: Boolean(intent.oauthQuery),
+  };
 }
 
 async function assertIntentOpen(
@@ -512,19 +713,32 @@ async function assertIntentOpen(
       update: { status: "expired", failureReason: "expired", updatedAt: at },
     });
     await releaseReservation(adapter, intent.id);
-    throw new APIError("BAD_REQUEST", { code: "registration_intent_expired", message: "Registration intent expired" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_intent_expired",
+      message: "Registration intent expired",
+    });
   }
   if (intent.status !== "started" && intent.status !== "submitted") {
-    throw new APIError("BAD_REQUEST", { code: "registration_intent_used", message: "Registration intent is no longer active" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_intent_used",
+      message: "Registration intent is no longer active",
+    });
   }
   if (!policyIsActive(policy, at)) {
     await adapter.update<RegistrationIntentRow>({
       model: REGISTRATION_INTENT_MODEL,
       where: [{ field: "id", value: intent.id }],
-      update: { status: "failed", failureReason: "policy_inactive", updatedAt: at },
+      update: {
+        status: "failed",
+        failureReason: "policy_inactive",
+        updatedAt: at,
+      },
     });
     await releaseReservation(adapter, intent.id);
-    throw new APIError("BAD_REQUEST", { code: "registration_policy_closed", message: "Registration policy is not active" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_policy_closed",
+      message: "Registration policy is not active",
+    });
   }
 }
 
@@ -534,10 +748,16 @@ export async function assertSignupAllowed(
   email: string | undefined,
 ): Promise<RegistrationIntentRow> {
   if (!intentId) {
-    throw new APIError("BAD_REQUEST", { code: "missing_registration_intent", message: "Missing registration intent" });
+    throw new APIError("BAD_REQUEST", {
+      code: "missing_registration_intent",
+      message: "Missing registration intent",
+    });
   }
   if (!email) {
-    throw new APIError("BAD_REQUEST", { code: "missing_registration_email", message: "Missing registration email" });
+    throw new APIError("BAD_REQUEST", {
+      code: "missing_registration_email",
+      message: "Missing registration email",
+    });
   }
   const intent = await loadIntent(adapter, intentId);
   const policy = await loadPolicy(adapter, intent.policyId);
@@ -545,35 +765,60 @@ export async function assertSignupAllowed(
   await assertIntentOpen(adapter, intent, policy, at);
   const normalizedEmail = normalizeEmail(email);
   if (intent.email && intent.email !== normalizedEmail) {
-    throw new APIError("BAD_REQUEST", { code: "registration_email_mismatch", message: "Registration intent email does not match" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_email_mismatch",
+      message: "Registration intent email does not match",
+    });
   }
   if (intent.invitationId) {
     const invitation = await loadInvitation(adapter, intent.invitationId);
     if (!invitation || !invitationIsOpen(invitation, at)) {
       await releaseReservation(adapter, intent.id);
-      throw new APIError("BAD_REQUEST", { code: "registration_invitation_invalid", message: "This invitation is unavailable or expired" });
+      throw new APIError("BAD_REQUEST", {
+        code: "registration_invitation_invalid",
+        message: "This invitation is unavailable or expired",
+      });
     }
     if (normalizeEmail(invitation.email) !== normalizedEmail) {
-      throw new APIError("BAD_REQUEST", { code: "registration_invitation_email_mismatch", message: "Use the invited email address to register" });
+      throw new APIError("BAD_REQUEST", {
+        code: "registration_invitation_email_mismatch",
+        message: "Use the invited email address to register",
+      });
     }
   }
   if (!domainAllowed(policy, normalizedEmail)) {
-    throw new APIError("BAD_REQUEST", { code: "registration_email_domain_denied", message: "Use an allowed email domain to register" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_email_domain_denied",
+      message: "Use an allowed email domain to register",
+    });
   }
   const existingUser = await adapter.findOne<UserRow>({
     model: USER_MODEL,
     where: [{ field: "email", value: normalizedEmail }],
   });
   if (existingUser) {
-    throw new APIError("BAD_REQUEST", { code: "registration_user_exists", message: "Sign in with the existing account" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_user_exists",
+      message: "Sign in with the existing account",
+    });
   }
   await ensureReservation(adapter, policy, intent, at);
   return intent;
 }
 
-async function userIdFromReturned(adapter: RegistrationAdapter, returned: unknown, email: string | null | undefined): Promise<string | null> {
-  const record = returned && typeof returned === "object" ? returned as Record<string, unknown> : {};
-  const user = record.user && typeof record.user === "object" ? record.user as Record<string, unknown> : {};
+async function userIdFromReturned(
+  adapter: RegistrationAdapter,
+  returned: unknown,
+  email: string | null | undefined,
+): Promise<string | null> {
+  const record =
+    returned && typeof returned === "object"
+      ? (returned as Record<string, unknown>)
+      : {};
+  const user =
+    record.user && typeof record.user === "object"
+      ? (record.user as Record<string, unknown>)
+      : {};
   if (typeof user.id === "string") return user.id;
   if (!email) return null;
   const row = await adapter.findOne<UserRow>({
@@ -596,7 +841,11 @@ export async function completeSignup(
     await adapter.update<RegistrationIntentRow>({
       model: REGISTRATION_INTENT_MODEL,
       where: [{ field: "id", value: intent.id }],
-      update: { status: "failed", failureReason: "missing_user_after_signup", updatedAt: now() },
+      update: {
+        status: "failed",
+        failureReason: "missing_user_after_signup",
+        updatedAt: now(),
+      },
     });
     return;
   }
@@ -611,11 +860,20 @@ export async function completeSignup(
   await adapter.update<RegistrationIntentRow>({
     model: REGISTRATION_INTENT_MODEL,
     where: [{ field: "id", value: intent.id }],
-    update: { status: "completed", userId, completedAt: timestamp, updatedAt: timestamp },
+    update: {
+      status: "completed",
+      userId,
+      completedAt: timestamp,
+      updatedAt: timestamp,
+    },
   });
 }
 
-async function ensureMembership(adapter: RegistrationAdapter, policy: RegistrationPolicyRow, userId: string): Promise<void> {
+async function ensureMembership(
+  adapter: RegistrationAdapter,
+  policy: RegistrationPolicyRow,
+  userId: string,
+): Promise<void> {
   const existing = await adapter.findOne<{ readonly id: string }>({
     model: MEMBER_MODEL,
     where: [
@@ -626,30 +884,46 @@ async function ensureMembership(adapter: RegistrationAdapter, policy: Registrati
   if (!existing) {
     await adapter.create({
       model: MEMBER_MODEL,
-      data: { organizationId: policy.organizationId, userId, role: policy.defaultRole, createdAt: now() },
+      data: {
+        organizationId: policy.organizationId,
+        userId,
+        role: policy.defaultRole,
+        createdAt: now(),
+      },
     });
   }
-  await Promise.all(policy.defaultTeamIds.map(async (teamId) => {
-    const existingTeamMember = await adapter.findOne<{ readonly id: string }>({
-      model: TEAM_MEMBER_MODEL,
-      where: [
-        { field: "teamId", value: teamId },
-        { field: "userId", value: userId },
-      ],
-    });
-    if (!existingTeamMember) {
-      await adapter.create({
-        model: TEAM_MEMBER_MODEL,
-        data: { teamId, userId, createdAt: now() },
-      });
-    }
-  }));
+  await Promise.all(
+    policy.defaultTeamIds.map(async (teamId) => {
+      const existingTeamMember = await adapter.findOne<{ readonly id: string }>(
+        {
+          model: TEAM_MEMBER_MODEL,
+          where: [
+            { field: "teamId", value: teamId },
+            { field: "userId", value: userId },
+          ],
+        },
+      );
+      if (!existingTeamMember) {
+        await adapter.create({
+          model: TEAM_MEMBER_MODEL,
+          data: { teamId, userId, createdAt: now() },
+        });
+      }
+    }),
+  );
 }
 
-async function acceptInvitationMembership(adapter: RegistrationAdapter, invitationId: string, userId: string): Promise<void> {
+async function acceptInvitationMembership(
+  adapter: RegistrationAdapter,
+  invitationId: string,
+  userId: string,
+): Promise<void> {
   const invitation = await loadInvitation(adapter, invitationId);
   if (!invitation) {
-    throw new APIError("BAD_REQUEST", { code: "registration_invitation_invalid", message: "This invitation is unavailable" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_invitation_invalid",
+      message: "This invitation is unavailable",
+    });
   }
   const existing = await adapter.findOne<{ readonly id: string }>({
     model: MEMBER_MODEL,
@@ -691,7 +965,10 @@ async function acceptInvitationMembership(adapter: RegistrationAdapter, invitati
   });
 }
 
-async function consumeReservation(adapter: RegistrationAdapter, intentId: string): Promise<void> {
+async function consumeReservation(
+  adapter: RegistrationAdapter,
+  intentId: string,
+): Promise<void> {
   const existing = await adapter.findOne<RegistrationQuotaReservationRow>({
     model: REGISTRATION_QUOTA_RESERVATION_MODEL,
     where: [{ field: "intentId", value: intentId }],
@@ -704,10 +981,16 @@ async function consumeReservation(adapter: RegistrationAdapter, intentId: string
   });
 }
 
-export async function cancelRegistration(adapter: RegistrationAdapter, intentId: string): Promise<{ readonly cancelled: true }> {
+export async function cancelRegistration(
+  adapter: RegistrationAdapter,
+  intentId: string,
+): Promise<{ readonly cancelled: true }> {
   const intent = await loadIntent(adapter, intentId);
   if (intent.status === "completed") {
-    throw new APIError("BAD_REQUEST", { code: "registration_intent_used", message: "Completed registration cannot be cancelled" });
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_intent_used",
+      message: "Completed registration cannot be cancelled",
+    });
   }
   await adapter.update<RegistrationIntentRow>({
     model: REGISTRATION_INTENT_MODEL,
@@ -718,7 +1001,10 @@ export async function cancelRegistration(adapter: RegistrationAdapter, intentId:
   return { cancelled: true };
 }
 
-async function releaseReservation(adapter: RegistrationAdapter, intentId: string): Promise<void> {
+async function releaseReservation(
+  adapter: RegistrationAdapter,
+  intentId: string,
+): Promise<void> {
   const existing = await adapter.findOne<RegistrationQuotaReservationRow>({
     model: REGISTRATION_QUOTA_RESERVATION_MODEL,
     where: [{ field: "intentId", value: intentId }],
@@ -740,25 +1026,39 @@ export async function invalidateActivePolicyIntents(
     model: REGISTRATION_INTENT_MODEL,
     where: [{ field: "policyId", value: policyId }],
   });
-  await Promise.all(intents
-    .filter((intent) => intent.status === "started" || intent.status === "submitted")
-    .map(async (intent) => {
-      await adapter.update<RegistrationIntentRow>({
-        model: REGISTRATION_INTENT_MODEL,
-        where: [{ field: "id", value: intent.id }],
-        update: { status: "failed", failureReason: reason, updatedAt: now() },
-      });
-      await releaseReservation(adapter, intent.id);
-    }));
+  await Promise.all(
+    intents
+      .filter(
+        (intent) =>
+          intent.status === "started" || intent.status === "submitted",
+      )
+      .map(async (intent) => {
+        await adapter.update<RegistrationIntentRow>({
+          model: REGISTRATION_INTENT_MODEL,
+          where: [{ field: "id", value: intent.id }],
+          update: { status: "failed", failureReason: reason, updatedAt: now() },
+        });
+        await releaseReservation(adapter, intent.id);
+      }),
+  );
 }
 
 export async function recordContinuationFailure(
   adapter: RegistrationAdapter,
   body: ContinuationFailureRegistrationBody,
-): Promise<{ readonly recorded: true; readonly status: "continuation_failed" }> {
+): Promise<{
+  readonly recorded: true;
+  readonly status: "continuation_failed";
+}> {
   const intent = await loadIntent(adapter, body.intentId);
-  if (intent.status !== "completed" && intent.status !== "continuation_failed") {
-    throw new APIError("BAD_REQUEST", { code: "registration_not_completed", message: "Registration is not ready for OAuth continuation retry" });
+  if (
+    intent.status !== "completed" &&
+    intent.status !== "continuation_failed"
+  ) {
+    throw new APIError("BAD_REQUEST", {
+      code: "registration_not_completed",
+      message: "Registration is not ready for OAuth continuation retry",
+    });
   }
   await adapter.update<RegistrationIntentRow>({
     model: REGISTRATION_INTENT_MODEL,
@@ -772,7 +1072,10 @@ export async function recordContinuationFailure(
   return { recorded: true, status: "continuation_failed" };
 }
 
-export async function policyQuota(adapter: RegistrationAdapter, policyId: string) {
+export async function policyQuota(
+  adapter: RegistrationAdapter,
+  policyId: string,
+) {
   const policy = await loadPolicy(adapter, policyId);
   const active = await activeReservations(adapter, policyId, now());
   return {
@@ -784,7 +1087,10 @@ export async function policyQuota(adapter: RegistrationAdapter, policyId: string
   };
 }
 
-export async function presentPolicyWithQuota(adapter: RegistrationAdapter, policy: RegistrationPolicyRow) {
+export async function presentPolicyWithQuota(
+  adapter: RegistrationAdapter,
+  policy: RegistrationPolicyRow,
+) {
   return {
     ...policy,
     quota: await policyQuota(adapter, policy.id),
@@ -800,18 +1106,29 @@ export function statusPayload(intent: RegistrationIntentRow) {
     completedAt: intent.completedAt ?? null,
     failureReason: intent.failureReason ?? null,
     continueOAuth: Boolean(intent.oauthQuery),
-    canRetryOAuthContinuation: intent.status === "completed" || intent.status === "continuation_failed",
+    canRetryOAuthContinuation:
+      intent.status === "completed" || intent.status === "continuation_failed",
   };
 }
 
-export async function registrationStatus(adapter: RegistrationAdapter, intentId: string) {
+export async function registrationStatus(
+  adapter: RegistrationAdapter,
+  intentId: string,
+) {
   const intent = await loadIntent(adapter, intentId);
-  if ((intent.status === "started" || intent.status === "submitted") && intent.expiresAt <= now()) {
+  if (
+    (intent.status === "started" || intent.status === "submitted") &&
+    intent.expiresAt <= now()
+  ) {
     const timestamp = now();
     const expired = await adapter.update<RegistrationIntentRow>({
       model: REGISTRATION_INTENT_MODEL,
       where: [{ field: "id", value: intent.id }],
-      update: { status: "expired", failureReason: "expired", updatedAt: timestamp },
+      update: {
+        status: "expired",
+        failureReason: "expired",
+        updatedAt: timestamp,
+      },
     });
     await releaseReservation(adapter, intent.id);
     return statusPayload(expired);

@@ -7,7 +7,7 @@ type TextProps = {
   readonly variant?: TextVariant;
   readonly as?: ElementType;
   readonly mono?: boolean;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 const textClasses: Record<TextVariant, string> = {
@@ -36,7 +36,7 @@ export function Text({ variant = "body", as, mono, children }: TextProps) {
 
 type HeadingProps = {
   readonly level?: "h1" | "h2" | "h3";
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 export function Heading({ level = "h2", children }: HeadingProps) {

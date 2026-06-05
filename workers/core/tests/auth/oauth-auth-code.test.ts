@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
-import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
+import {
+  createLocalJWKSet,
+  decodeJwt,
+  jwtVerify,
+  type JSONWebKeySet,
+} from "jose";
 import { describe, expect, it } from "vitest";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -22,7 +27,10 @@ type OAuthAdminApi = {
   readonly adminCreateOAuthClient: (params: {
     readonly headers: Headers;
     readonly body: Record<string, unknown>;
-  }) => Promise<{ readonly client_id: string; readonly client_secret?: string }>;
+  }) => Promise<{
+    readonly client_id: string;
+    readonly client_secret?: string;
+  }>;
 };
 
 function createKv(): BetterAuthKvStorage {
@@ -56,22 +64,43 @@ async function createAuth(raw: RawSqlite) {
       {
         BETTER_AUTH_SECRET: "test-secret",
         BETTER_AUTH_URL: "https://id.example.test",
-        DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+        DB: drizzleAdapter(drizzle(raw), {
+          provider: "sqlite",
+          camelCase: true,
+          schema: authSchema,
+        }),
         KV: createKv(),
       },
       {
         validAudiences: ["https://api.example.test"],
         scopes: ["content:read", "content:write", "content:share"],
         scopeRows: [
-          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:read" },
-          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:write" },
-          { resourceServerId: "rs_content", audience: "https://api.example.test", scope: "content:share" },
+          {
+            resourceServerId: "rs_content",
+            audience: "https://api.example.test",
+            scope: "content:read",
+            system: false,
+          },
+          {
+            resourceServerId: "rs_content",
+            audience: "https://api.example.test",
+            scope: "content:write",
+            system: false,
+          },
+          {
+            resourceServerId: "rs_content",
+            audience: "https://api.example.test",
+            scope: "content:share",
+            system: false,
+          },
         ],
       },
       { emailSender: capturedEmailSender },
     ),
   );
 }
+
+type TestAuth = Awaited<ReturnType<typeof createAuth>>;
 
 function codeVerifier(): string {
   return randomBytes(48).toString("base64url");
@@ -81,7 +110,7 @@ function codeChallenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-async function createUser(auth: ReturnType<typeof betterAuth>): Promise<string> {
+async function createUser(auth: TestAuth): Promise<string> {
   const created = await auth.api.createUser({
     body: {
       name: "Alice",
@@ -93,7 +122,7 @@ async function createUser(auth: ReturnType<typeof betterAuth>): Promise<string> 
   return created.user.id;
 }
 
-async function signInAdmin(auth: ReturnType<typeof betterAuth>): Promise<string> {
+async function signInAdmin(auth: TestAuth): Promise<string> {
   await auth.api.createUser({
     body: {
       name: "Admin",
@@ -111,7 +140,7 @@ async function signInAdmin(auth: ReturnType<typeof betterAuth>): Promise<string>
   return response.headers.get("set-cookie") ?? "";
 }
 
-async function createTrustedClient(auth: ReturnType<typeof betterAuth>) {
+async function createTrustedClient(auth: TestAuth) {
   const cookie = await signInAdmin(auth);
   const api = auth.api as unknown as OAuthAdminApi;
   return api.adminCreateOAuthClient({
@@ -131,30 +160,46 @@ async function createTrustedClient(auth: ReturnType<typeof betterAuth>) {
 }
 
 async function authorizeAndSignIn(
-  auth: ReturnType<typeof betterAuth>,
+  auth: TestAuth,
   clientId: string,
   verifier: string,
   context = "direct-share",
 ) {
-  const authorize = new URL("https://id.example.test/api/auth/oauth2/authorize");
+  const authorize = new URL(
+    "https://id.example.test/api/auth/oauth2/authorize",
+  );
   authorize.searchParams.set("response_type", "code");
   authorize.searchParams.set("client_id", clientId);
-  authorize.searchParams.set("redirect_uri", "https://content.quanghuy.dev/callback");
-  authorize.searchParams.set("scope", "openid email profile offline_access content:read");
+  authorize.searchParams.set(
+    "redirect_uri",
+    "https://content.quanghuy.dev/callback",
+  );
+  authorize.searchParams.set(
+    "scope",
+    "openid email profile offline_access content:read",
+  );
   authorize.searchParams.set("state", "state_1");
   authorize.searchParams.set("resource", "https://api.example.test");
   authorize.searchParams.set("code_challenge", codeChallenge(verifier));
   authorize.searchParams.set("code_challenge_method", "S256");
 
-  const loginRedirect = await auth.handler(new Request(authorize, { headers: { "x-id-oauth-context": context } }));
+  const loginRedirect = await auth.handler(
+    new Request(authorize, { headers: { "x-id-oauth-context": context } }),
+  );
   expect(loginRedirect.status).toBe(302);
-  const loginUrl = new URL(loginRedirect.headers.get("location") ?? "", "https://id.example.test");
+  const loginUrl = new URL(
+    loginRedirect.headers.get("location") ?? "",
+    "https://id.example.test",
+  );
   expect(loginUrl.pathname).toBe("/login");
 
   const signIn = await auth.handler(
     new Request("https://id.example.test/api/auth/sign-in/email", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-id-oauth-context": context },
+      headers: {
+        "content-type": "application/json",
+        "x-id-oauth-context": context,
+      },
       body: JSON.stringify({
         email: "alice@example.test",
         password: "password123",
@@ -172,7 +217,12 @@ async function authorizeAndSignIn(
   return code ?? "";
 }
 
-async function exchangeCode(auth: ReturnType<typeof betterAuth>, clientId: string, code: string, verifier: string) {
+async function exchangeCode(
+  auth: TestAuth,
+  clientId: string,
+  code: string,
+  verifier: string,
+) {
   return auth.handler(
     new Request("https://id.example.test/api/auth/oauth2/token", {
       method: "POST",
@@ -198,20 +248,36 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     const verifier = codeVerifier();
     const code = await authorizeAndSignIn(auth, client.client_id, verifier);
 
-    const badExchange = await exchangeCode(auth, client.client_id, code, "wrong-verifier");
+    const badExchange = await exchangeCode(
+      auth,
+      client.client_id,
+      code,
+      "wrong-verifier",
+    );
     expect(badExchange.status).toBe(401);
 
     const secondVerifier = codeVerifier();
-    const secondCode = await authorizeAndSignIn(auth, client.client_id, secondVerifier);
-    const tokenResponse = await exchangeCode(auth, client.client_id, secondCode, secondVerifier);
+    const secondCode = await authorizeAndSignIn(
+      auth,
+      client.client_id,
+      secondVerifier,
+    );
+    const tokenResponse = await exchangeCode(
+      auth,
+      client.client_id,
+      secondCode,
+      secondVerifier,
+    );
     expect(tokenResponse.status).toBe(200);
     const token = (await tokenResponse.json()) as TokenResponse;
     expect(token.token_type).toBe("Bearer");
     expect(token.expires_in).toBe(900);
     expect(token.refresh_token).toEqual(expect.any(String));
 
-    const jwksResponse = await auth.handler(new Request("https://id.example.test/api/auth/jwks"));
-    const jwks = await jwksResponse.json();
+    const jwksResponse = await auth.handler(
+      new Request("https://id.example.test/api/auth/jwks"),
+    );
+    const jwks = (await jwksResponse.json()) as JSONWebKeySet;
     const decoded = decodeJwt(token.access_token);
     await expect(
       jwtVerify(token.access_token, createLocalJWKSet(jwks), {
@@ -242,7 +308,9 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     const refreshed = (await refresh.json()) as TokenResponse;
     expect(refreshed.refresh_token).toEqual(expect.any(String));
     expect(refreshed.refresh_token).not.toBe(token.refresh_token);
-    expect(decodeJwt(refreshed.access_token)).toEqual(expect.objectContaining({ team_ids: [] }));
+    expect(decodeJwt(refreshed.access_token)).toEqual(
+      expect.objectContaining({ team_ids: [] }),
+    );
     expect(decodeJwt(refreshed.access_token).org_id).toBeUndefined();
 
     const replay = await auth.handler(
@@ -258,5 +326,4 @@ describe("OAuth authorization-code and refresh-token flows", () => {
     );
     expect(replay.status).toBe(400);
   });
-
 });

@@ -10,7 +10,7 @@ type InlineProps = {
   readonly align?: Align;
   readonly justify?: Justify;
   readonly wrap?: boolean;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 const gapClass: Record<Gap, string> = {

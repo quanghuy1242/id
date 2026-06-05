@@ -16,7 +16,9 @@ import type {
   UpdateOAuthResourceScopeBody,
 } from "./schema";
 
-export type AuthorizeFn = NonNullable<OAuthScopeCatalogPluginOptions["authorize"]>;
+export type AuthorizeFn = NonNullable<
+  OAuthScopeCatalogPluginOptions["authorize"]
+>;
 
 export async function assertCatalogAccess(
   authorize: AuthorizeFn | undefined,
@@ -53,12 +55,16 @@ export type OAuthClientRow = {
   readonly metadata?: Record<string, unknown> | string | null;
 };
 
-function parseMetadata(value: OAuthClientRow["metadata"]): Record<string, unknown> {
+function parseMetadata(
+  value: OAuthClientRow["metadata"],
+): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === "string") {
     try {
       const parsed: unknown = JSON.parse(value);
-      return typeof parsed === "object" && parsed !== null ? { ...parsed as Record<string, unknown> } : {};
+      return typeof parsed === "object" && parsed !== null
+        ? { ...(parsed as Record<string, unknown>) }
+        : {};
     } catch {
       return {};
     }
@@ -106,8 +112,10 @@ export async function findOAuthClientOrThrow(
 }
 
 function userRole(user: Record<string, unknown>): string | null | undefined {
-  return typeof user.role === "string" || user.role === null || user.role === undefined
-    ? user.role as string | null | undefined
+  return typeof user.role === "string" ||
+    user.role === null ||
+    user.role === undefined
+    ? (user.role as string | null | undefined)
     : undefined;
 }
 
@@ -131,7 +139,10 @@ export async function assertClientResourceScopeAccess(
 ): Promise<OAuthClientRow> {
   const session = ctx.context.session;
   if (!session) throw new APIError("UNAUTHORIZED");
-  const client = await findOAuthClientOrThrow(ctx.context.adapter as AdapterContext, clientId);
+  const client = await findOAuthClientOrThrow(
+    ctx.context.adapter as AdapterContext,
+    clientId,
+  );
   await assertCatalogAccess(
     options.authorize,
     client.referenceId ?? null,
@@ -156,7 +167,9 @@ export async function assertUniqueResourceScope(
     ],
   });
   if (rows.some((row) => row.id !== ignoreId)) {
-    throw new APIError("BAD_REQUEST", { message: "OAuth scope already exists for resource server" });
+    throw new APIError("BAD_REQUEST", {
+      message: "OAuth scope already exists for resource server",
+    });
   }
 }
 
@@ -194,7 +207,10 @@ export async function ensureOAuthResourceScope(
 
   const update: OAuthResourceScopeUpdate = {};
   if (!existing.enabled) update.enabled = true;
-  if (body.description !== undefined && existing.description !== body.description) {
+  if (
+    body.description !== undefined &&
+    existing.description !== body.description
+  ) {
     update.description = body.description;
   }
 
@@ -223,16 +239,23 @@ export async function assertGrantScopesExist(
     model: OAUTH_RESOURCE_SCOPE_MODEL,
     where: [{ field: "resourceServerId", value: resourceServerId }],
   });
-  const enabled = new Set(rows.filter((row) => row.enabled).map((row) => row.scope));
+  const enabled = new Set(
+    rows.filter((row) => row.enabled).map((row) => row.scope),
+  );
   const missing = scopes.filter((scope) => !enabled.has(scope));
   if (missing.length > 0) {
-    throw new APIError("BAD_REQUEST", { message: `Grant contains unknown or disabled scopes: ${missing.join(", ")}` });
+    throw new APIError("BAD_REQUEST", {
+      message: `Grant contains unknown or disabled scopes: ${missing.join(", ")}`,
+    });
   }
 }
 
 export async function assertUniqueClientResourceScope(
   adapter: AdapterContext,
-  body: Pick<CreateOAuthClientResourceScopeBody, "clientId" | "resourceServerId">,
+  body: Pick<
+    CreateOAuthClientResourceScopeBody,
+    "clientId" | "resourceServerId"
+  >,
   ignoreId?: string,
 ): Promise<void> {
   const rows = await adapter.findMany<OAuthClientResourceScopeRow>({
@@ -243,7 +266,9 @@ export async function assertUniqueClientResourceScope(
     ],
   });
   if (rows.some((row) => row.id !== ignoreId)) {
-    throw new APIError("BAD_REQUEST", { message: "OAuth client resource-scope row already exists" });
+    throw new APIError("BAD_REQUEST", {
+      message: "OAuth client resource-scope row already exists",
+    });
   }
 }
 
@@ -254,7 +279,10 @@ export async function assertUniqueClientResourceScope(
  * so this explicit plugin-owned field enforces the logical
  * `(resourceServerId, scope)` pair without modifying generated schema output.
  */
-export function resourceScopeKey(resourceServerId: string, scope: string): string {
+export function resourceScopeKey(
+  resourceServerId: string,
+  scope: string,
+): string {
   return JSON.stringify([resourceServerId, scope]);
 }
 
@@ -264,7 +292,10 @@ export function resourceScopeKey(resourceServerId: string, scope: string): strin
  * The value gives the plugin schema a supported unique field that represents
  * the logical `(clientId, resourceServerId)` pair.
  */
-export function clientResourceKey(clientId: string, resourceServerId: string): string {
+export function clientResourceKey(
+  clientId: string,
+  resourceServerId: string,
+): string {
   return JSON.stringify([clientId, resourceServerId]);
 }
 
@@ -291,7 +322,9 @@ export function buildUpdateScopePayload(
 ): Partial<OAuthResourceScopeRow> {
   return {
     ...fields,
-    ...(fields.scope === undefined ? {} : { resourceScopeKey: resourceScopeKey(resourceServerId, fields.scope) }),
+    ...(fields.scope === undefined
+      ? {}
+      : { resourceScopeKey: resourceScopeKey(resourceServerId, fields.scope) }),
     updatedBy: actorId,
     updatedAt: Date.now(),
   } as Partial<OAuthResourceScopeRow>;

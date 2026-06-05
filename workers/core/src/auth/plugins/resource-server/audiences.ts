@@ -3,7 +3,10 @@ import { createMemoryTtlCache } from "../../adapters/memory-cache";
 import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
 import type { BackgroundTaskRunner } from "../../types";
 import type { CoreEnv } from "../../../config/env";
-import { RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS, RESOURCE_SERVER_MODEL } from "../../../shared/constants";
+import {
+  RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS,
+  RESOURCE_SERVER_MODEL,
+} from "../../../shared/constants";
 
 export type ResourceAudienceRow = {
   readonly audience: string;
@@ -26,7 +29,9 @@ type AudienceCacheOptions = {
   readonly backgroundTaskRunner?: BackgroundTaskRunner;
 };
 
-const memoryAudienceCache = createMemoryTtlCache<readonly string[]>(RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS);
+const memoryAudienceCache = createMemoryTtlCache<readonly string[]>(
+  RESOURCE_AUDIENCE_MEMORY_CACHE_TTL_MS,
+);
 
 function parseCachedAudiences(value: string | null): readonly string[] | null {
   if (value === null) {
@@ -40,20 +45,31 @@ function parseCachedAudiences(value: string | null): readonly string[] | null {
     return null;
   }
 
-  if (!Array.isArray(parsed) || !parsed.every((item): item is string => typeof item === "string")) {
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((item): item is string => typeof item === "string")
+  ) {
     return null;
   }
 
   return parsed;
 }
 
-function enabledAudiences(rows: readonly ResourceAudienceRow[]): readonly string[] {
-  return [...new Set(rows.filter((row) => row.enabled).map((row) => row.audience))].sort();
+function enabledAudiences(
+  rows: readonly ResourceAudienceRow[],
+): readonly string[] {
+  return [
+    ...new Set(rows.filter((row) => row.enabled).map((row) => row.audience)),
+  ].sort();
 }
 
-async function loadEnabledResourceAudienceRows(db: CoreEnv["DB"]): Promise<readonly ResourceAudienceRow[]> {
+async function loadEnabledResourceAudienceRows(
+  db: CoreEnv["DB"],
+): Promise<readonly ResourceAudienceRow[]> {
   const result = await db
-    .prepare(`select "audience", "enabled" from "${RESOURCE_SERVER_MODEL}" where "enabled" = ? order by "audience" asc`)
+    .prepare(
+      `select "audience", "enabled" from "${RESOURCE_SERVER_MODEL}" where "enabled" = ? order by "audience" asc`,
+    )
     .bind(1)
     .all<ResourceAudienceRow>();
 
@@ -84,9 +100,13 @@ export async function loadResourceAudiencesFromCache(
   const audiences = enabledAudiences(await loadRows());
   memoryAudienceCache.set(audiences, now);
 
-  const cacheWrite = kv.put(authPluginConfig.resourceAudienceCacheKey, JSON.stringify(audiences), {
-    expirationTtl: authPluginConfig.resourceAudienceCacheTtlSeconds,
-  });
+  const cacheWrite = kv.put(
+    authPluginConfig.resourceAudienceCacheKey,
+    JSON.stringify(audiences),
+    {
+      expirationTtl: authPluginConfig.resourceAudienceCacheTtlSeconds,
+    },
+  );
 
   if (options.backgroundTaskRunner) {
     // D1 validation is done; KV refill is best-effort and can run after response.
@@ -108,7 +128,11 @@ export function loadResourceServerAudiences(
   env: ResourceAudienceEnv,
   backgroundTaskRunner?: BackgroundTaskRunner,
 ): Promise<AudienceLoadResult> {
-  return loadResourceAudiencesFromCache(env.KV, () => loadEnabledResourceAudienceRows(env.DB), { backgroundTaskRunner });
+  return loadResourceAudiencesFromCache(
+    env.KV,
+    () => loadEnabledResourceAudienceRows(env.DB),
+    { backgroundTaskRunner },
+  );
 }
 
 export async function invalidateResourceServerAudiences(

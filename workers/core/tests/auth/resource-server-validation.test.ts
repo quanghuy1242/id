@@ -80,7 +80,7 @@ describe("updateResourceServerBody", () => {
   it("accepts a partial patch", () => {
     const result = updateResourceServerBody.parse({ name: "New Name" });
     expect(result.name).toBe("New Name");
-    expect(result.enabled).toBeUndefined();
+    expect(Object.hasOwn(result, "enabled")).toBe(false);
   });
 
   it("rejects direct enabled toggles", () => {
@@ -99,7 +99,9 @@ describe("updateResourceServerBody", () => {
   });
 
   it("rejects a non-URL audience", () => {
-    const result = updateResourceServerBody.safeParse({ audience: "not-a-url" });
+    const result = updateResourceServerBody.safeParse({
+      audience: "not-a-url",
+    });
     expect(result.success).toBe(false);
   });
 });
@@ -130,16 +132,22 @@ describe("resourceServerBetterAuthFields", () => {
 
 describe("resource server OpenAPI schemas", () => {
   it("does not expose Better Auth-only field metadata", () => {
-    expect(JSON.stringify(resourceServerOpenApiSchema)).not.toContain("betterAuth");
+    expect(JSON.stringify(resourceServerOpenApiSchema)).not.toContain(
+      "betterAuth",
+    );
   });
 
   it("documents create description as optional string, not nullable", () => {
-    const schema = createResourceServerOpenApiRequestBody.content["application/json"].schema;
+    const schema =
+      createResourceServerOpenApiRequestBody.content["application/json"].schema;
     expect(schema).toEqual(
       expect.objectContaining({
         required: ["slug", "name", "audience"],
       }),
     );
-    expect(schema).toHaveProperty(["properties", "description", "type"], "string");
+    expect(schema).toHaveProperty(
+      ["properties", "description", "type"],
+      "string",
+    );
   });
 });

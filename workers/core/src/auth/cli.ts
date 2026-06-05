@@ -18,7 +18,9 @@ const stubDb: D1Database = {
   prepare(_query: string): D1PreparedStatement {
     return unavailable();
   },
-  batch<T = unknown>(_statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+  batch<T = unknown>(
+    _statements: D1PreparedStatement[],
+  ): Promise<D1Result<T>[]> {
     return unavailable();
   },
   exec(_query: string): Promise<D1ExecResult> {
@@ -35,7 +37,11 @@ const stubDb: D1Database = {
 const options = getAuthOptions({
   BETTER_AUTH_SECRET: crypto.randomUUID(),
   BETTER_AUTH_URL: "https://id.localhost",
-  DB: drizzleAdapter(stubDb, { provider: "sqlite", camelCase: true, schema: authSchema }),
+  DB: drizzleAdapter(stubDb, {
+    provider: "sqlite",
+    camelCase: true,
+    schema: authSchema,
+  }),
   KV: {
     get: async (_key: string): Promise<null> => null,
     put: async (_key: string, _value: string): Promise<void> => {},

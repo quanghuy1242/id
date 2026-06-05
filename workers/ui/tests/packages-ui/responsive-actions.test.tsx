@@ -59,14 +59,16 @@ function mockMeasuredContainer(width: number | (() => number)) {
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
     configurable: true,
     get() {
-      return this.querySelector?.("[data-responsive-action]") ? currentContainerWidth() : 0;
+      const element = this as HTMLElement;
+      return element.querySelector("[data-responsive-action]") ? currentContainerWidth() : 0;
     },
   });
   Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
     configurable: true,
     get() {
-      if (this.hasAttribute?.("data-responsive-action") || this.hasAttribute?.("data-responsive-measure-action")) return 80;
-      if (this.hasAttribute?.("data-responsive-menu") || this.hasAttribute?.("data-responsive-measure-menu")) return 40;
+      const element = this as HTMLElement;
+      if (element.hasAttribute("data-responsive-action") || element.hasAttribute("data-responsive-measure-action")) return 80;
+      if (element.hasAttribute("data-responsive-menu") || element.hasAttribute("data-responsive-measure-menu")) return 40;
       return 0;
     },
   });
@@ -74,9 +76,10 @@ function mockMeasuredContainer(width: number | (() => number)) {
   Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
     configurable: true,
     get() {
-      if (!this.querySelector?.("[data-responsive-action]")) return 0;
-      const directActions = Array.from(this.querySelectorAll<HTMLElement>("[data-responsive-action]")).filter((el) => el.style.display !== "none").length;
-      const menu = this.querySelector<HTMLElement>("[data-responsive-menu]");
+      const element = this as HTMLElement;
+      if (!element.querySelector("[data-responsive-action]")) return 0;
+      const directActions = Array.from(element.querySelectorAll<HTMLElement>("[data-responsive-action]")).filter((el) => el.style.display !== "none").length;
+      const menu = element.querySelector<HTMLElement>("[data-responsive-menu]");
       return directActions * 80 + (menu && menu.style.display !== "none" ? 40 : 0);
     },
   });

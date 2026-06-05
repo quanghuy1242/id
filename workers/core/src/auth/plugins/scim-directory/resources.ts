@@ -8,17 +8,32 @@ import {
   SCIM_USER_SCHEMA,
 } from "../../../shared/constants";
 import type { MemberRow, TeamRow, UserRow } from "./operations";
-import type { ScimError, ScimGroup, ScimGroupMember, ScimListResponse, ScimOrgUser, ScimUser } from "./schema";
+import type {
+  ScimError,
+  ScimGroup,
+  ScimGroupMember,
+  ScimListResponse,
+  ScimOrgUser,
+  ScimUser,
+} from "./schema";
 
 function userLocation(baseUrl: string, userId: string): string {
   return `${baseUrl}/api/auth/scim/v2/Users/${userId}`;
 }
 
-function orgUserLocation(baseUrl: string, orgId: string, userId: string): string {
+function orgUserLocation(
+  baseUrl: string,
+  orgId: string,
+  userId: string,
+): string {
   return `${baseUrl}/api/auth/scim/v2/tenants/${orgId}/Users/${userId}`;
 }
 
-function orgGroupLocation(baseUrl: string, orgId: string, groupId: string): string {
+function orgGroupLocation(
+  baseUrl: string,
+  orgId: string,
+  groupId: string,
+): string {
   return `${baseUrl}/api/auth/scim/v2/tenants/${orgId}/Groups/${groupId}`;
 }
 
@@ -49,7 +64,12 @@ export function toScimUser(user: UserRow, baseUrl: string): ScimUser {
  *
  * userName is set to user.id (not email/name) per doc 017 §7.2 privacy rule.
  */
-export function toScimOrgUser(user: UserRow, member: MemberRow, orgId: string, baseUrl: string): ScimOrgUser {
+export function toScimOrgUser(
+  user: UserRow,
+  member: MemberRow,
+  orgId: string,
+  baseUrl: string,
+): ScimOrgUser {
   return {
     schemas: [SCIM_USER_SCHEMA, SCIM_TENANT_MEMBERSHIP_SCHEMA],
     id: user.id,
@@ -86,7 +106,11 @@ export function toScimTeamGroup(team: TeamRow, baseUrl: string): ScimGroup {
  * This group has no corresponding DB row; it is derived dynamically from the
  * Better Auth member table filtered to `role in ("owner", "admin")`.
  */
-export function toScimOrgAdminsGroup(members: MemberRow[], orgId: string, baseUrl: string): ScimGroup {
+export function toScimOrgAdminsGroup(
+  members: MemberRow[],
+  orgId: string,
+  baseUrl: string,
+): ScimGroup {
   const scimMembers: ScimGroupMember[] = members.map((m) => ({
     value: m.userId,
     $ref: userLocation(baseUrl, m.userId),
@@ -105,7 +129,9 @@ export function toScimOrgAdminsGroup(members: MemberRow[], orgId: string, baseUr
 }
 
 /** Wraps an item array into a SCIM ListResponse. */
-export function toScimListResponse<T>(items: readonly T[]): ScimListResponse<T> {
+export function toScimListResponse<T>(
+  items: readonly T[],
+): ScimListResponse<T> {
   return {
     schemas: [SCIM_LIST_RESPONSE_SCHEMA],
     totalResults: items.length,
@@ -116,7 +142,11 @@ export function toScimListResponse<T>(items: readonly T[]): ScimListResponse<T> 
 }
 
 /** Builds a SCIM-formatted error body (RFC 7644 §3.12). */
-export function scimError(status: number, detail: string, scimType?: string): ScimError {
+export function scimError(
+  status: number,
+  detail: string,
+  scimType?: string,
+): ScimError {
   return {
     schemas: [SCIM_ERROR_SCHEMA],
     status: String(status),
@@ -126,7 +156,10 @@ export function scimError(status: number, detail: string, scimType?: string): Sc
 }
 
 /** Returns a SCIM Response with `application/scim+json` content type. */
-export function scimJsonResponse(body: unknown, status: number = SCIM_HTTP_OK): Response {
+export function scimJsonResponse(
+  body: unknown,
+  status: number = SCIM_HTTP_OK,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/scim+json" },

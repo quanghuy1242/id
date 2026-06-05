@@ -3,7 +3,9 @@ import type { CapturedAuthEmailSender } from "../helpers/test-email";
 
 const DEFAULT_ORIGIN = "https://id.example.test";
 
-type AuthHandler = { readonly handler: (request: Request) => Promise<Response> };
+type AuthHandler = {
+  readonly handler: (request: Request) => Promise<Response>;
+};
 
 export function signInRequest(
   body: Record<string, unknown>,
@@ -19,7 +21,8 @@ export function signInRequest(
 
 export function latestAdminOtp(sender: CapturedAuthEmailSender): string {
   const message = sender.messages.findLast((m) => m.kind === "admin-otp");
-  if (!message || message.kind !== "admin-otp") throw new Error("no admin-otp email captured");
+  if (!message || message.kind !== "admin-otp")
+    throw new Error("no admin-otp email captured");
   return message.otp;
 }
 
@@ -32,10 +35,19 @@ export async function adminOtpSignIn(
   auth: AuthHandler,
   _sender: CapturedAuthEmailSender,
   creds: { readonly email: string; readonly password: string },
-  options: { readonly headers?: Record<string, string>; readonly origin?: string } = {},
+  options: {
+    readonly headers?: Record<string, string>;
+    readonly origin?: string;
+  } = {},
 ): Promise<Response> {
-  const base = { email: creds.email, password: creds.password, callbackURL: "/admin" };
-  const response = await auth.handler(signInRequest(base, options.headers, options.origin));
+  const base = {
+    email: creds.email,
+    password: creds.password,
+    callbackURL: "/admin",
+  };
+  const response = await auth.handler(
+    signInRequest(base, options.headers, options.origin),
+  );
   expect(response.status).toBe(200);
   return response;
 }

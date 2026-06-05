@@ -1,8 +1,17 @@
-import type { RegistrationIntent, RegistrationPolicy } from "../_actions/registration-policies";
+import type {
+  RegistrationIntent,
+  RegistrationPolicy,
+} from "../_actions/registration-policies";
 
 const now = Date.now();
 
-function quota(policyId: string, quotaLimit: number | null, quotaUsed: number, quotaReserved: number, quotaTarget = "memberships") {
+function quota(
+  policyId: string,
+  quotaLimit: number | null,
+  quotaUsed: number,
+  quotaReserved: number,
+  quotaTarget = "memberships",
+) {
   return {
     policyId,
     quotaLimit,

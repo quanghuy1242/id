@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RegisterForm } from "@/app/register/register-form";
 
 const mockPush = vi.fn<() => void>();
-const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
-const mockAuthApiPostOrThrow = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockAuthApiPostOrThrow = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 let mockOauthQuery = "client_id=acme-web&scope=openid%20profile%20email";
 
 vi.mock("next/navigation", () => ({

@@ -15,6 +15,7 @@
 > - `/home/quanghuy1242/pjs/auth/docs/reference/content-api-architecture.md` — accepted content-api architecture facts for this review
 > - `/home/quanghuy1242/pjs/content-api/scripts/oxlint-js-plugins/architecture.js` — verified 16-rule architecture plugin
 > - `/home/quanghuy1242/pjs/content-api/.oxlintrc.json` — verified strict layer-import, route, entity, mapper, repository, constants, and test override rules
+> - `/home/quanghuy1242/pjs/content-api/.oxfmtrc.json` — verified 80-column oxfmt configuration and generated/snapshot/migration ignores
 > - `/home/quanghuy1242/pjs/content-api/scripts/check-duplication-threshold.mjs` — verified 3% Fallow hard gate
 > - `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md` — Lumina UI system reference
 > - `/home/quanghuy1242/pjs/auther/package.json`
@@ -119,7 +120,7 @@ The strict posture of the original architecture document is correct and should n
 Verified local claims:
 
 - `content-api` has a 16-rule `architecture` oxlint plugin with rules for layer imports, mapper isolation, storage error parsing, custom errors, request validation, route shape, route handler boundaries, repository workflow, mapper files, entity classes, raw entity serialization, CrudAdapter JSDoc, magic numbers, constants placement, and constants JSDoc.
-- `content-api` runs `pnpm check` as a hard gate: lint, duplicate-code threshold, typecheck, and tests.
+- `content-api` runs `pnpm check` as a hard gate: format check, lint, duplicate-code threshold, typecheck, and tests.
 - `content-api` uses a 3% Fallow duplication threshold with `--mode mild --min-tokens 50 --min-lines 5`.
 - `auther` uses Better Auth 1.3.x with `oidcProvider`, `jwt`, `apiKey`, `admin`, `username`, `oAuthProxy`, and `nextCookies`.
 - `auther` contains resource-server, authorization-space, OAuth-client metadata, ReBAC, ABAC, webhook, pipeline, and registration-context persistence. Those are real systems and are intentionally not first-batch `id` systems.
@@ -174,6 +175,7 @@ The tree below is the target shape at first-batch maturity. The current scaffold
 ├── pnpm-lock.yaml
 ├── tsconfig.json                   # Base config; workers and packages extend it
 ├── .oxlintrc.json                  # Shared lint rules for all workers and packages
+├── .oxfmtrc.json                   # Shared oxfmt config matching content-api
 ├── .advise-suppressions.json       # Known advisory noise filtered during pnpm advise
 ├── vitest.workspace.ts             # References workers/core and workers/ui test configs
 ├── .dev.vars.example               # Documents required secret names; no real values
@@ -1129,9 +1131,11 @@ Base config:
 - `strict: true`
 - `noEmit: true`
 - `moduleResolution: "bundler"`
-- `target: "ES2022"`
+- `target: "ES2025"`
 
-`pnpm typecheck` runs `tsgo --noEmit` against the root `tsconfig.json`; `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. The root config includes worker/package source and root config files, maps shared packages through `@id/lib` and `@id/ui`, and maps `@/*` to the UI worker source only. Core source should prefer relative imports or shared package imports so the root checker does not need ambiguous two-worker `@/*` resolution.
+`pnpm typecheck` runs `tsgo --noEmit` against the root `tsconfig.json`; `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. The root config includes worker/package source, worker tests, UI mocks, and root config files, maps shared packages through `@id/lib` and `@id/ui`, and maps `@/*` to the UI worker source only. Core source should prefer relative imports or shared package imports so the root checker does not need ambiguous two-worker `@/*` resolution.
+
+Formatting is a hard gate through oxfmt. `.oxfmtrc.json` matches the content-api configuration: 80-column print width, generated/snapshot/migration/dist ignores, and the root scripts scope formatting to source TypeScript under `packages/**` and `workers/**`.
 
 ### 10.4 Advisory Pass
 
@@ -1144,6 +1148,7 @@ Advisory output is not a substitute for hard gates. It is review input for struc
 | Gate | Command | Status |
 |---|---|---|
 | Lint | `pnpm lint` | Hard gate |
+| Format | `pnpm format:check` | Hard gate |
 | Dup check | `pnpm check:dup` | Hard gate |
 | UI composition | `pnpm lint` through `architecture/ui-route-composition` | Hard gate |
 | Typecheck | `pnpm typecheck` | Hard gate |
@@ -1162,7 +1167,7 @@ Root `package.json`:
 - Wrangler bundles workers from per-worker config;
 - current dependencies include Better Auth, OAuth Provider, Hono, Drizzle, Zod, Jose, React, React DOM, and Vinext;
 - UI dependencies such as React Aria, Lucide, Tailwind, and DaisyUI may be added when `packages/ui` grows, but they are not required by the current scaffold;
-- dev dependencies include oxlint, TypeScript, TypeScript native preview (`tsgo`), Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
+- dev dependencies include oxlint, oxfmt, TypeScript, TypeScript native preview (`tsgo`), Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
 
 Workspace:
 
@@ -1228,12 +1233,14 @@ packages:
     "dev:stack:ui": "wrangler dev -c workers/ui/wrangler.jsonc -c workers/core/wrangler.jsonc",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "format": "oxfmt --write \"packages/**/*.ts\" \"workers/**/*.ts\" \"!packages/client/src/**\"",
+    "format:check": "oxfmt --check \"packages/**/*.ts\" \"workers/**/*.ts\" \"!packages/client/src/**\"",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
     "typecheck": "tsgo --noEmit",
     "typecheck:tsc": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "check": "pnpm lint && pnpm check:dup && pnpm typecheck && pnpm test",
+    "check": "pnpm format:check && pnpm lint && pnpm check:dup && pnpm typecheck && pnpm test",
     "advise": "node scripts/filter-advise.mjs",
     "db:generate": "npx @better-auth/cli generate --config workers/core/src/auth/cli-auth.ts --output better-auth_migrations/0001_better_auth.sql",
     "db:migrate:local": "wrangler d1 migrations apply id --local --config workers/core/wrangler.jsonc",
@@ -1354,6 +1361,7 @@ Acceptance:
 Automated:
 
 - `pnpm lint`
+- `pnpm format:check`
 - `pnpm check:dup`
 - `pnpm typecheck`
 - `pnpm test`
@@ -1409,6 +1417,7 @@ Required enforcement outcomes:
 - [ ] id-specific rules are implemented as hard errors.
 - [ ] UI route composition is mechanically enforced.
 - [ ] duplicate-code threshold is <3%.
+- [ ] oxfmt formatting is clean.
 - [ ] TypeScript strict mode is enabled.
 - [ ] `pnpm check` passes from a clean checkout.
 - [ ] `pnpm advise` runs and suppressions are reviewed.

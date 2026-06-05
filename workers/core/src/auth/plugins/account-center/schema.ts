@@ -71,99 +71,133 @@ export type AccountTeamMemberRow = {
   readonly userId: string;
 };
 
-const accountUserSchema = z.object({
-  id: z.string(),
-  email: z.string(),
-  emailVerified: z.boolean(),
-  name: z.string().nullable(),
-  image: z.string().nullable(),
-}).meta({ id: "AccountCenterUser" });
+const accountUserSchema = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    emailVerified: z.boolean(),
+    name: z.string().nullable(),
+    image: z.string().nullable(),
+  })
+  .meta({ id: "AccountCenterUser" });
 
-const accountSecuritySchema = z.object({
-  passwordEnabled: z.boolean(),
-  mfaEnabled: z.boolean(),
-  emailVerificationRequired: z.boolean(),
-}).meta({ id: "AccountCenterSecurity" });
+const accountSecuritySchema = z
+  .object({
+    passwordEnabled: z.boolean(),
+    mfaEnabled: z.boolean(),
+    emailVerificationRequired: z.boolean(),
+  })
+  .meta({ id: "AccountCenterSecurity" });
 
-const accountCountsSchema = z.object({
-  organizations: z.number(),
-  activeSessions: z.number(),
-  connectedApplications: z.number(),
-}).meta({ id: "AccountCenterCounts" });
+const accountCountsSchema = z
+  .object({
+    organizations: z.number(),
+    activeSessions: z.number(),
+    connectedApplications: z.number(),
+  })
+  .meta({ id: "AccountCenterCounts" });
 
-const accountSessionSchema = z.object({
-  id: z.string(),
-  current: z.boolean(),
-  createdAt: z.number().nullable(),
-  updatedAt: z.number().nullable(),
-  expiresAt: z.number().nullable(),
-  ipAddress: z.string().nullable(),
-  userAgent: z.string().nullable(),
-}).meta({ id: "AccountCenterSession" });
+const accountSessionSchema = z
+  .object({
+    id: z.string(),
+    current: z.boolean(),
+    createdAt: z.number().nullable(),
+    updatedAt: z.number().nullable(),
+    expiresAt: z.number().nullable(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable(),
+  })
+  .meta({ id: "AccountCenterSession" });
 
-const accountConsentSchema = z.object({
-  id: z.string(),
-  clientId: z.string(),
-  clientName: z.string().nullable(),
-  clientUri: z.string().nullable(),
-  clientIcon: z.string().nullable(),
-  scopes: z.array(z.string()),
-  createdAt: z.number().nullable(),
-  updatedAt: z.number().nullable(),
-}).meta({ id: "AccountCenterConsent" });
+const accountConsentSchema = z
+  .object({
+    id: z.string(),
+    clientId: z.string(),
+    clientName: z.string().nullable(),
+    clientUri: z.string().nullable(),
+    clientIcon: z.string().nullable(),
+    scopes: z.array(z.string()),
+    createdAt: z.number().nullable(),
+    updatedAt: z.number().nullable(),
+  })
+  .meta({ id: "AccountCenterConsent" });
 
-const accountOrganizationTeamSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-}).meta({ id: "AccountCenterOrganizationTeam" });
+const accountOrganizationTeamSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+  })
+  .meta({ id: "AccountCenterOrganizationTeam" });
 
-const accountOrganizationSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  slug: z.string().nullable(),
-  role: z.enum(["platform-admin", "owner", "admin", "member"]),
-  teams: z.array(accountOrganizationTeamSchema),
-  canOpenConsole: z.boolean(),
-  consoleHref: z.string().nullable(),
-}).meta({ id: "AccountCenterOrganization" });
+const accountOrganizationSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string().nullable(),
+    role: z.enum(["platform-admin", "owner", "admin", "member"]),
+    teams: z.array(accountOrganizationTeamSchema),
+    canOpenConsole: z.boolean(),
+    consoleHref: z.string().nullable(),
+  })
+  .meta({ id: "AccountCenterOrganization" });
 
-export const revokeAccountSessionBody = z.object({
-  sessionId: z.string().min(1),
-}).strict();
+export const revokeAccountSessionBody = z
+  .object({
+    sessionId: z.string().min(1),
+  })
+  .strict();
 
-export const revokeAccountConsentBody = z.object({
-  clientId: z.string().min(1),
-}).strict();
+export const revokeAccountConsentBody = z
+  .object({
+    clientId: z.string().min(1),
+  })
+  .strict();
 
-export const accountSummaryOpenApiSchema = zodSchemaToOpenApi(z.object({
-  user: accountUserSchema,
-  security: accountSecuritySchema,
-  counts: accountCountsSchema,
-}));
+export const accountSummaryOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    user: accountUserSchema,
+    security: accountSecuritySchema,
+    counts: accountCountsSchema,
+  }),
+);
 
-export const accountSessionsOpenApiSchema = zodSchemaToOpenApi(z.object({
-  sessions: z.array(accountSessionSchema),
-}));
+export const accountSessionsOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    sessions: z.array(accountSessionSchema),
+  }),
+);
 
-export const accountConsentsOpenApiSchema = zodSchemaToOpenApi(z.object({
-  consents: z.array(accountConsentSchema),
-}));
+export const accountConsentsOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    consents: z.array(accountConsentSchema),
+  }),
+);
 
-export const accountOrganizationsOpenApiSchema = zodSchemaToOpenApi(z.object({
-  organizations: z.array(accountOrganizationSchema),
-}));
+export const accountOrganizationsOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    organizations: z.array(accountOrganizationSchema),
+  }),
+);
 
-export const accountSuccessOpenApiSchema = zodSchemaToOpenApi(z.object({
-  status: z.boolean(),
-}));
+export const accountSuccessOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    status: z.boolean(),
+  }),
+);
 
-export const revokeOthersOpenApiSchema = zodSchemaToOpenApi(z.object({
-  status: z.boolean(),
-  revoked: z.number(),
-}));
+export const revokeOthersOpenApiSchema = zodSchemaToOpenApi(
+  z.object({
+    status: z.boolean(),
+    revoked: z.number(),
+  }),
+);
 
-export const revokeAccountSessionOpenApiRequestBody = openApiJsonRequestBody(revokeAccountSessionBody);
-export const revokeAccountConsentOpenApiRequestBody = openApiJsonRequestBody(revokeAccountConsentBody);
+export const revokeAccountSessionOpenApiRequestBody = openApiJsonRequestBody(
+  revokeAccountSessionBody,
+);
+export const revokeAccountConsentOpenApiRequestBody = openApiJsonRequestBody(
+  revokeAccountConsentBody,
+);
 
 type AccountEndpointMetaOptions = {
   readonly description: string;
@@ -173,7 +207,13 @@ type AccountEndpointMetaOptions = {
 };
 
 export function accountCenterEndpointMeta(options: AccountEndpointMetaOptions) {
-  const responses: Record<string, { description: string; content?: { "application/json"?: { schema: Record<string, unknown> } } }> = {};
+  const responses: Record<
+    string,
+    {
+      description: string;
+      content?: { "application/json"?: { schema: Record<string, unknown> } };
+    }
+  > = {};
   if (options.responseSchema) {
     responses["200"] = {
       description: options.responseDescription ?? "Success",

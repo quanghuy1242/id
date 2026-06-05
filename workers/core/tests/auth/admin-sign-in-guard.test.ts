@@ -3,10 +3,16 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
-import { ADMIN_STEP_UP_TTL_SECONDS, authPluginConfig } from "../../src/auth/config";
+import {
+  ADMIN_STEP_UP_TTL_SECONDS,
+  authPluginConfig,
+} from "../../src/auth/config";
 import { otpHmacHex } from "../../src/auth/plugins/admin-sign-in-guard/operations";
 import { createMemoryD1, type RawSqlite } from "./d1-test-helper";
-import { createCapturedAuthEmailSender, type CapturedAuthEmailSender } from "../helpers/test-email";
+import {
+  createCapturedAuthEmailSender,
+  type CapturedAuthEmailSender,
+} from "../helpers/test-email";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
 
@@ -16,13 +22,17 @@ const BETTER_AUTH_SECRET = "test-secret";
 const ORIGIN = "https://id.example.test";
 
 type Harness = {
-  readonly auth: ReturnType<typeof betterAuth>;
+  readonly auth: TestAuth;
   readonly raw: RawSqlite;
   readonly kv: BetterAuthKvStorage & { readonly values: Map<string, string> };
   readonly emailSender: CapturedAuthEmailSender;
 };
 
-function createKv(): BetterAuthKvStorage & { readonly values: Map<string, string> } {
+type TestAuth = ReturnType<typeof createTestAuth>;
+
+function createKv(): BetterAuthKvStorage & {
+  readonly values: Map<string, string>;
+} {
   const values = new Map<string, string>();
   return {
     values,
@@ -36,22 +46,34 @@ function createKv(): BetterAuthKvStorage & { readonly values: Map<string, string
   };
 }
 
-async function buildHarness(): Promise<Harness> {
-  const { raw } = await createMemoryD1();
-  const kv = createKv();
-  const emailSender = createCapturedAuthEmailSender();
-  const auth = betterAuth(
+function createTestAuth(
+  raw: RawSqlite,
+  kv: BetterAuthKvStorage,
+  emailSender: CapturedAuthEmailSender,
+) {
+  return betterAuth(
     getAuthOptions(
       {
         BETTER_AUTH_SECRET,
         BETTER_AUTH_URL: ORIGIN,
-        DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+        DB: drizzleAdapter(drizzle(raw), {
+          provider: "sqlite",
+          camelCase: true,
+          schema: authSchema,
+        }),
         KV: kv,
       },
       { validAudiences: [], scopes: [], scopeRows: [] },
       { emailSender },
     ),
   );
+}
+
+async function buildHarness(): Promise<Harness> {
+  const { raw } = await createMemoryD1();
+  const kv = createKv();
+  const emailSender = createCapturedAuthEmailSender();
+  const auth = createTestAuth(raw, kv, emailSender);
 
   await auth.api.createUser({
     body: {
@@ -68,7 +90,10 @@ function verifyEmail(raw: RawSqlite, email: string): void {
   raw.exec(`update "user" set "emailVerified" = 1 where "email" = '${email}';`);
 }
 
-function signIn(auth: Harness["auth"], body: Record<string, unknown>): Promise<Response> {
+function signIn(
+  auth: Harness["auth"],
+  body: Record<string, unknown>,
+): Promise<Response> {
   return auth.handler(
     new Request(`${ORIGIN}/api/auth/sign-in/email`, {
       method: "POST",
@@ -88,11 +113,19 @@ async function signInCookie(auth: Harness["auth"]): Promise<string> {
   return res.headers.get("set-cookie") ?? "";
 }
 
-function authRequest(auth: Harness["auth"], path: string, cookie: string, body?: Record<string, unknown>): Promise<Response> {
+function authRequest(
+  auth: Harness["auth"],
+  path: string,
+  cookie: string,
+  body?: Record<string, unknown>,
+): Promise<Response> {
   return auth.handler(
     new Request(`${ORIGIN}/api/auth${path}`, {
       method: body ? "POST" : "GET",
-      headers: { ...(body ? { "content-type": "application/json" } : {}), cookie },
+      headers: {
+        ...(body ? { "content-type": "application/json" } : {}),
+        cookie,
+      },
       body: body ? JSON.stringify(body) : undefined,
     }),
   );
@@ -100,7 +133,8 @@ function authRequest(auth: Harness["auth"], path: string, cookie: string, body?:
 
 function latestOtp(emailSender: CapturedAuthEmailSender): string {
   const message = emailSender.messages.findLast((m) => m.kind === "admin-otp");
-  if (!message || message.kind !== "admin-otp") throw new Error("no admin-otp email captured");
+  if (!message || message.kind !== "admin-otp")
+    throw new Error("no admin-otp email captured");
   return message.otp;
 }
 
@@ -108,7 +142,8 @@ function storedOtpEntry(kv: Harness["kv"]): readonly [string, string] {
   const entries = [...kv.values.entries()].filter(([key]) =>
     key.startsWith(authPluginConfig.adminOtpStoragePrefix),
   );
-  if (entries.length !== 1) throw new Error(`expected one stored admin OTP, found ${entries.length}`);
+  if (entries.length !== 1)
+    throw new Error(`expected one stored admin OTP, found ${entries.length}`);
   return entries[0] as readonly [string, string];
 }
 
@@ -130,9 +165,14 @@ describe("id-admin-sign-in-guard", () => {
 
   describe("context gate", () => {
     it("rejects a sign-in with neither callbackURL nor oauth_query", async () => {
-      const res = await signIn(harness.auth, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+      const res = await signIn(harness.auth, {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+      });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toMatchObject({ code: "missing_login_context" });
+      await expect(res.json()).resolves.toMatchObject({
+        code: "missing_login_context",
+      });
       expect(res.headers.get("set-cookie")).toBeNull();
     });
 
@@ -143,7 +183,9 @@ describe("id-admin-sign-in-guard", () => {
         callbackURL: "/dashboard",
       });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toMatchObject({ code: "missing_login_context" });
+      await expect(res.json()).resolves.toMatchObject({
+        code: "missing_login_context",
+      });
     });
 
     it("accepts account and console callbacks without login-time OTP", async () => {
@@ -154,7 +196,10 @@ describe("id-admin-sign-in-guard", () => {
       });
       expect(account.status).toBe(200);
       expect(account.headers.get("set-cookie")).toEqual(expect.any(String));
-      await expect(account.json()).resolves.toMatchObject({ redirect: true, url: "/account/security" });
+      await expect(account.json()).resolves.toMatchObject({
+        redirect: true,
+        url: "/account/security",
+      });
 
       const admin = await signIn(harness.auth, {
         email: ADMIN_EMAIL,
@@ -163,7 +208,10 @@ describe("id-admin-sign-in-guard", () => {
       });
       expect(admin.status).toBe(200);
       expect(admin.headers.get("set-cookie")).toEqual(expect.any(String));
-      await expect(admin.json()).resolves.toMatchObject({ redirect: true, url: "/admin" });
+      await expect(admin.json()).resolves.toMatchObject({
+        redirect: true,
+        url: "/admin",
+      });
       expect(harness.emailSender.messages).toHaveLength(0);
     });
 
@@ -176,7 +224,9 @@ describe("id-admin-sign-in-guard", () => {
         oauth_query: "client_id=acme",
       });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toMatchObject({ error: "invalid_signature" });
+      await expect(res.json()).resolves.toMatchObject({
+        error: "invalid_signature",
+      });
     });
   });
 
@@ -184,11 +234,20 @@ describe("id-admin-sign-in-guard", () => {
     it("starts false, emails an OTP, and stores only an HMAC of the OTP", async () => {
       const cookie = await signInCookie(harness.auth);
 
-      const status = await authRequest(harness.auth, "/admin/step-up/status", cookie);
+      const status = await authRequest(
+        harness.auth,
+        "/admin/step-up/status",
+        cookie,
+      );
       expect(status.status).toBe(200);
       await expect(status.json()).resolves.toEqual({ steppedUp: false });
 
-      const request = await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+      const request = await authRequest(
+        harness.auth,
+        "/admin/step-up/request",
+        cookie,
+        {},
+      );
       expect(request.status).toBe(200);
       await expect(request.json()).resolves.toMatchObject({
         status: true,
@@ -209,14 +268,23 @@ describe("id-admin-sign-in-guard", () => {
       await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
       const otp = latestOtp(harness.emailSender);
 
-      const verify = await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp });
+      const verify = await authRequest(
+        harness.auth,
+        "/admin/step-up/verify",
+        cookie,
+        { otp },
+      );
       expect(verify.status).toBe(200);
       await expect(verify.json()).resolves.toMatchObject({
         steppedUp: true,
         expiresIn: ADMIN_STEP_UP_TTL_SECONDS,
       });
 
-      const status = await authRequest(harness.auth, "/admin/step-up/status", cookie);
+      const status = await authRequest(
+        harness.auth,
+        "/admin/step-up/status",
+        cookie,
+      );
       expect(status.status).toBe(200);
       await expect(status.json()).resolves.toEqual({ steppedUp: true });
     });
@@ -229,10 +297,14 @@ describe("id-admin-sign-in-guard", () => {
 
       // The only step-up KV writes are the OTP code (now deleted) and rate-limit
       // counters — never a dedicated step-up status key.
-      const stepUpKeys = [...harness.kv.values.keys()].filter((key) => key.includes("step-up"));
+      const stepUpKeys = [...harness.kv.values.keys()].filter((key) =>
+        key.includes("step-up"),
+      );
       expect(stepUpKeys).toEqual([]);
       const stepUpAt = harness.raw
-        .prepare(`select "platformStepUpAt" as v from "session" order by "createdAt" desc limit 1`)
+        .prepare(
+          `select "platformStepUpAt" as v from "session" order by "createdAt" desc limit 1`,
+        )
         .get() as { v: number | null };
       expect(typeof stepUpAt.v).toBe("number");
     });
@@ -243,14 +315,27 @@ describe("id-admin-sign-in-guard", () => {
 
       await authRequest(harness.auth, "/admin/step-up/request", cookieA, {});
       const otp = latestOtp(harness.emailSender);
-      const verify = await authRequest(harness.auth, "/admin/step-up/verify", cookieA, { otp });
+      const verify = await authRequest(
+        harness.auth,
+        "/admin/step-up/verify",
+        cookieA,
+        { otp },
+      );
       expect(verify.status).toBe(200);
 
-      const statusA = await authRequest(harness.auth, "/admin/step-up/status", cookieA);
+      const statusA = await authRequest(
+        harness.auth,
+        "/admin/step-up/status",
+        cookieA,
+      );
       await expect(statusA.json()).resolves.toEqual({ steppedUp: true });
       // A separate session for the same user does not inherit the proof; a new
       // session starts unstepped, which is how sign-out/revocation clears it.
-      const statusB = await authRequest(harness.auth, "/admin/step-up/status", cookieB);
+      const statusB = await authRequest(
+        harness.auth,
+        "/admin/step-up/status",
+        cookieB,
+      );
       await expect(statusB.json()).resolves.toEqual({ steppedUp: false });
     });
 
@@ -258,14 +343,22 @@ describe("id-admin-sign-in-guard", () => {
       const cookie = await signInCookie(harness.auth);
       await authRequest(harness.auth, "/admin/step-up/request", cookie, {});
 
-      const invalid = await authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp: "000000" });
+      const invalid = await authRequest(
+        harness.auth,
+        "/admin/step-up/verify",
+        cookie,
+        { otp: "000000" },
+      );
       expect(invalid.status).toBe(401);
-      await expect(invalid.json()).resolves.toMatchObject({ code: "invalid_otp" });
+      await expect(invalid.json()).resolves.toMatchObject({
+        code: "invalid_otp",
+      });
     });
 
     it("throttles step-up OTP generation and verification", async () => {
       const cookie = await signInCookie(harness.auth);
-      const request = () => authRequest(harness.auth, "/admin/step-up/request", cookie, {});
+      const request = () =>
+        authRequest(harness.auth, "/admin/step-up/request", cookie, {});
       expect((await request()).status).toBe(200);
       expect((await request()).status).toBe(200);
       expect((await request()).status).toBe(200);
@@ -274,7 +367,10 @@ describe("id-admin-sign-in-guard", () => {
 
       harness.kv.values.clear();
       await request();
-      const wrong = () => authRequest(harness.auth, "/admin/step-up/verify", cookie, { otp: "000000" });
+      const wrong = () =>
+        authRequest(harness.auth, "/admin/step-up/verify", cookie, {
+          otp: "000000",
+        });
       for (let i = 0; i < 5; i += 1) {
         expect((await wrong()).status).toBe(401);
       }

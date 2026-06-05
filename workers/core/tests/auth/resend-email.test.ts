@@ -4,7 +4,9 @@ import type { ResendEmailError } from "../../src/shared/errors";
 
 describe("Resend transactional email adapter", () => {
   it("sends verification email through the Resend REST API", async () => {
-    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ id: "email_1" }));
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      Response.json({ id: "email_1" }),
+    );
     const sender = createResendAuthEmailSender(
       {
         apiKey: "re_test_key",
@@ -38,18 +40,28 @@ describe("Resend transactional email adapter", () => {
         subject: "Verify your email for id",
       }),
     );
-    expect(body.text).toContain("https://id.example.test/api/auth/verify-email");
-    expect(body.html).toContain("https://id.example.test/api/auth/verify-email");
+    expect(body.text).toContain(
+      "https://id.example.test/api/auth/verify-email",
+    );
+    expect(body.html).toContain(
+      "https://id.example.test/api/auth/verify-email",
+    );
   });
 
   it("sends the admin OTP code without a link", async () => {
-    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ id: "email_2" }));
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      Response.json({ id: "email_2" }),
+    );
     const sender = createResendAuthEmailSender(
       { apiKey: "re_test_key", fromEmail: "id@example.test", fromName: "id" },
       fetcher as unknown as typeof fetch,
     );
 
-    await sender.send({ kind: "admin-otp", to: "admin@example.test", otp: "123456" });
+    await sender.send({
+      kind: "admin-otp",
+      to: "admin@example.test",
+      otp: "123456",
+    });
 
     const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
     expect(body.to).toEqual(["admin@example.test"]);
@@ -61,7 +73,11 @@ describe("Resend transactional email adapter", () => {
   it("fails on Resend rejection with retry metadata", async () => {
     const fetcher = vi.fn<typeof fetch>(async () =>
       Response.json(
-        { name: "rate_limit_exceeded", message: "Too many requests", statusCode: 429 },
+        {
+          name: "rate_limit_exceeded",
+          message: "Too many requests",
+          statusCode: 429,
+        },
         {
           status: 429,
           headers: {
@@ -78,13 +94,7 @@ describe("Resend transactional email adapter", () => {
       fetcher as unknown as typeof fetch,
     );
 
-    await expect(
-      sender.send({
-        kind: "password-reset",
-        to: "alice@example.test",
-        url: "https://id.example.test/reset",
-      }),
-    ).rejects.toMatchObject<Partial<ResendEmailError>>({
+    const expectedError = {
       status: 429,
       rateLimit: {
         retryAfter: "30",
@@ -92,6 +102,14 @@ describe("Resend transactional email adapter", () => {
         remaining: "0",
         reset: "1779259293",
       },
-    });
+    } satisfies Partial<ResendEmailError>;
+
+    await expect(
+      sender.send({
+        kind: "password-reset",
+        to: "alice@example.test",
+        url: "https://id.example.test/reset",
+      }),
+    ).rejects.toMatchObject(expectedError);
   });
 });

@@ -1,8 +1,14 @@
 import type { Hono } from "hono";
 import type { CoreEnv } from "../../config/env";
 import { resolveAuthRuntime } from "../../composition/resolve-auth-runtime";
-import { authPathIsWellKnown, handleWellKnown } from "../../auth/adapters/well-known";
-import { authPathNeedsOAuthRuntimeCatalog, createAuthForRequest } from "../../auth/get-auth";
+import {
+  authPathIsWellKnown,
+  handleWellKnown,
+} from "../../auth/adapters/well-known";
+import {
+  authPathNeedsOAuthRuntimeCatalog,
+  createAuthForRequest,
+} from "../../auth/get-auth";
 
 export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
   app.all("/api/auth/*", async (c) => {
@@ -17,7 +23,9 @@ export function registerAuthRoutes(app: Hono<{ Bindings: CoreEnv }>) {
     }
 
     const auth = await createAuthForRequest(c.env, runtime, {
-      loadResourceAudiences: authPathNeedsOAuthRuntimeCatalog(requestUrl.pathname),
+      loadResourceAudiences: authPathNeedsOAuthRuntimeCatalog(
+        requestUrl.pathname,
+      ),
     });
     return auth.handler(c.req.raw);
   });

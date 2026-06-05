@@ -1,3 +1,7 @@
+import { describe as moduleMarker } from "vitest";
+
+void moduleMarker;
+
 await import("./auth/admin-sign-in-guard.test");
 await import("./auth/account-center-plugin.test");
 await import("./auth/admin-activity-log.test");

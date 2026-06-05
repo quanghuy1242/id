@@ -10,7 +10,10 @@ import type { BetterAuthKvStorage } from "../../adapters/secondary-storage";
  */
 export interface AdminSignInGuardOptions {
   /** Queues the admin OTP email (wired to `sendAuthEmail` in `get-auth.ts`). */
-  readonly sendEmail: (params: { readonly to: string; readonly otp: string }) => Promise<void>;
+  readonly sendEmail: (params: {
+    readonly to: string;
+    readonly otp: string;
+  }) => Promise<void>;
   /** KV namespace for OTP storage and rate-limit counters. */
   readonly kv: BetterAuthKvStorage;
   /** Secret used to HMAC low-entropy OTP codes before storing them in KV. */
@@ -36,7 +39,10 @@ export interface AdminSignInGuardContext {
   };
   readonly password: {
     readonly hash: (password: string) => Promise<string>;
-    readonly verify: (params: { readonly hash: string; readonly password: string }) => Promise<boolean>;
+    readonly verify: (params: {
+      readonly hash: string;
+      readonly password: string;
+    }) => Promise<boolean>;
   };
 }
 

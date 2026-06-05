@@ -80,7 +80,10 @@ export const CONSOLE_NAV_SECTIONS = [
 ] as const;
 
 function scopedHref(path: string): ConsoleNavItem["href"] {
-  return (scope) => scope.kind === "platform" ? `/admin/platform${path}` : `/admin/orgs/${scope.organizationId}${path}`;
+  return (scope) =>
+    scope.kind === "platform"
+      ? `/admin/platform${path}`
+      : `/admin/orgs/${scope.organizationId}${path}`;
 }
 
 function platformHref(path: string): ConsoleNavItem["href"] {
@@ -88,7 +91,10 @@ function platformHref(path: string): ConsoleNavItem["href"] {
 }
 
 function organizationHref(path: string): ConsoleNavItem["href"] {
-  return (scope) => scope.kind === "organization" ? `/admin/orgs/${scope.organizationId}${path}` : "/admin/platform";
+  return (scope) =>
+    scope.kind === "organization"
+      ? `/admin/orgs/${scope.organizationId}${path}`
+      : "/admin/platform";
 }
 
 function navItems(
@@ -96,16 +102,18 @@ function navItems(
   hrefForPath: (path: string) => ConsoleNavItem["href"],
   configs: readonly NavTuple[],
 ): readonly ConsoleNavItem[] {
-  return configs.map(([id, label, section, requiredPermission, path, icon, options]) => ({
-    id,
-    label,
-    section,
-    appliesTo,
-    requiredPermission,
-    href: hrefForPath(path),
-    icon,
-    ...options,
-  }));
+  return configs.map(
+    ([id, label, section, requiredPermission, path, icon, options]) => ({
+      id,
+      label,
+      section,
+      appliesTo,
+      requiredPermission,
+      href: hrefForPath(path),
+      icon,
+      ...options,
+    }),
+  );
 }
 
 const dashboardNavItem: ConsoleNavItem = {
@@ -113,7 +121,10 @@ const dashboardNavItem: ConsoleNavItem = {
   label: { platform: "Dashboard", organization: "Overview" },
   section: "overview",
   appliesTo: "both",
-  requiredPermission: { platform: "platform:read", organization: "members:read" },
+  requiredPermission: {
+    platform: "platform:read",
+    organization: "members:read",
+  },
   href: scopedHref(""),
   icon: "LayoutDashboard",
   exact: true,
@@ -125,8 +136,14 @@ const identityUsersNavItem: ConsoleNavItem = {
   label: { platform: "Users", organization: "Members" },
   section: "identity",
   appliesTo: "both",
-  requiredPermission: { platform: "platform:read", organization: "members:read" },
-  href: (scope) => scope.kind === "platform" ? "/admin/platform/identity/users" : `/admin/orgs/${scope.organizationId}/identity/members`,
+  requiredPermission: {
+    platform: "platform:read",
+    organization: "members:read",
+  },
+  href: (scope) =>
+    scope.kind === "platform"
+      ? "/admin/platform/identity/users"
+      : `/admin/orgs/${scope.organizationId}/identity/members`,
   icon: "Users",
   mobile: true,
 };
@@ -136,10 +153,14 @@ const registrationPoliciesNavItem: ConsoleNavItem = {
   label: "Registration Policies",
   section: "identity",
   appliesTo: "both",
-  requiredPermission: { platform: "platform:read", organization: "members:write" },
-  href: (scope) => scope.kind === "platform"
-    ? "/admin/platform/identity/registration-policies"
-    : `/admin/orgs/${scope.organizationId}/identity/registration-policies`,
+  requiredPermission: {
+    platform: "platform:read",
+    organization: "members:write",
+  },
+  href: (scope) =>
+    scope.kind === "platform"
+      ? "/admin/platform/identity/registration-policies"
+      : `/admin/orgs/${scope.organizationId}/identity/registration-policies`,
   icon: "ListChecks",
 };
 
@@ -149,30 +170,131 @@ export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
   identityUsersNavItem,
   registrationPoliciesNavItem,
   ...navItems("platform", platformHref, [
-    ["identity-organizations", "Organizations", "identity", "organizations:read", "/identity/organizations", "Building2"],
+    [
+      "identity-organizations",
+      "Organizations",
+      "identity",
+      "organizations:read",
+      "/identity/organizations",
+      "Building2",
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("organization", organizationHref, [
-    ["identity-teams", "Teams", "identity", "members:read", "/identity/teams", "UsersRound"],
-    ["identity-invitations", "Invitations", "identity", "members:write", "/identity/invitations", "UserPlus"],
+    [
+      "identity-teams",
+      "Teams",
+      "identity",
+      "members:read",
+      "/identity/teams",
+      "UsersRound",
+    ],
+    [
+      "identity-invitations",
+      "Invitations",
+      "identity",
+      "members:write",
+      "/identity/invitations",
+      "UserPlus",
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("both", scopedHref, [
-    ["applications", "Applications", "applications", "oauth-clients:read", "/oauth/applications", "KeyRound", { mobile: true }],
+    [
+      "applications",
+      "Applications",
+      "applications",
+      "oauth-clients:read",
+      "/oauth/applications",
+      "KeyRound",
+      { mobile: true },
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("platform", platformHref, [
-    ["access-admins-roles", "Admins & Roles", "access", "platform:read", "/access/admins-roles", "UserCog"],
+    [
+      "access-admins-roles",
+      "Admins & Roles",
+      "access",
+      "platform:read",
+      "/access/admins-roles",
+      "UserCog",
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("both", scopedHref, [
-    ["access-service-accounts", "Service Accounts", "access", "oauth-clients:read", "/access/service-accounts", "Bot", { mobile: true }],
-    ["access-resource-apis", "Resource APIs", "access", "resource-servers:read", "/access/resource-apis", "Server"],
-    ["access-scope-catalog", "Scope Catalog", "access", "resource-servers:read", "/access/scope-catalog", "Tags"],
-    ["access-m2m-bindings", "M2M Bindings", "access", "resource-servers:read", "/access/m2m-bindings", "Network"],
+    [
+      "access-service-accounts",
+      "Service Accounts",
+      "access",
+      "oauth-clients:read",
+      "/access/service-accounts",
+      "Bot",
+      { mobile: true },
+    ],
+    [
+      "access-resource-apis",
+      "Resource APIs",
+      "access",
+      "resource-servers:read",
+      "/access/resource-apis",
+      "Server",
+    ],
+    [
+      "access-scope-catalog",
+      "Scope Catalog",
+      "access",
+      "resource-servers:read",
+      "/access/scope-catalog",
+      "Tags",
+    ],
+    [
+      "access-m2m-bindings",
+      "M2M Bindings",
+      "access",
+      "resource-servers:read",
+      "/access/m2m-bindings",
+      "Network",
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("platform", platformHref, [
-    ["security-sessions", "Sessions", "security", "security-audit:read", "/security/sessions", "ShieldCheck", { mobile: true }],
-    ["security-tokens", "Tokens", "security", "security-audit:read", "/security/tokens?type=access", "Fingerprint"],
-    ["security-consents", "Consents", "security", "security-audit:read", "/security/consents", "FileCheck2"],
-    ["security-introspection", "Introspection", "security", "security-audit:read", "/security/introspect", "CircleHelp"],
-    ["security-jwks", "JWKS", "security", "jwks:read", "/security/jwks", "KeyRound"],
+    [
+      "security-sessions",
+      "Sessions",
+      "security",
+      "security-audit:read",
+      "/security/sessions",
+      "ShieldCheck",
+      { mobile: true },
+    ],
+    [
+      "security-tokens",
+      "Tokens",
+      "security",
+      "security-audit:read",
+      "/security/tokens?type=access",
+      "Fingerprint",
+    ],
+    [
+      "security-consents",
+      "Consents",
+      "security",
+      "security-audit:read",
+      "/security/consents",
+      "FileCheck2",
+    ],
+    [
+      "security-introspection",
+      "Introspection",
+      "security",
+      "security-audit:read",
+      "/security/introspect",
+      "CircleHelp",
+    ],
+    [
+      "security-jwks",
+      "JWKS",
+      "security",
+      "jwks:read",
+      "/security/jwks",
+      "KeyRound",
+    ],
   ] satisfies readonly NavTuple[]),
   ...navItems("organization", organizationHref, [
     ["audit", "Audit", "audit", "security-audit:read", "/audit", "History"],
@@ -182,11 +304,20 @@ export const CONSOLE_NAV_ITEMS: readonly ConsoleNavItem[] = [
 function activeScope(scope: ConsoleScope): ActiveScope {
   return scope.kind === "platform"
     ? { kind: "platform" }
-    : { kind: "organization", organizationId: scope.organizationId ?? scope.id.replace("organization:", "") };
+    : {
+        kind: "organization",
+        organizationId:
+          scope.organizationId ?? scope.id.replace("organization:", ""),
+      };
 }
 
-function permissionForScope(item: ConsoleNavItem, scope: ConsoleScope): ConsolePermission {
-  return typeof item.requiredPermission === "string" ? item.requiredPermission : item.requiredPermission[scope.kind];
+function permissionForScope(
+  item: ConsoleNavItem,
+  scope: ConsoleScope,
+): ConsolePermission {
+  return typeof item.requiredPermission === "string"
+    ? item.requiredPermission
+    : item.requiredPermission[scope.kind];
 }
 
 function appliesToScope(item: ConsoleNavItem, scope: ConsoleScope): boolean {
@@ -204,7 +335,11 @@ export function visibleNavItems(
 ): readonly VisibleConsoleNavItem[] {
   const currentScope = activeScope(scope);
   return items
-    .filter((item) => appliesToScope(item, scope) && scope.permissions.includes(permissionForScope(item, scope)))
+    .filter(
+      (item) =>
+        appliesToScope(item, scope) &&
+        scope.permissions.includes(permissionForScope(item, scope)),
+    )
     .map((item) => ({
       id: item.id,
       label: labelForScope(item, scope),
@@ -217,13 +352,13 @@ export function visibleNavItems(
 }
 
 /** Groups visible items and omits empty headers. */
-export function visibleNavSections(scope: ConsoleScope): readonly VisibleConsoleNavSection[] {
+export function visibleNavSections(
+  scope: ConsoleScope,
+): readonly VisibleConsoleNavSection[] {
   const items = visibleNavItems(CONSOLE_NAV_ITEMS, scope);
-  return CONSOLE_NAV_SECTIONS
-    .map((section) => ({
-      id: section.id,
-      label: section.label,
-      items: items.filter((item) => item.section === section.id),
-    }))
-    .filter((section) => section.items.length > 0);
+  return CONSOLE_NAV_SECTIONS.map((section) => ({
+    id: section.id,
+    label: section.label,
+    items: items.filter((item) => item.section === section.id),
+  })).filter((section) => section.items.length > 0);
 }

@@ -48,11 +48,21 @@ export function useActivityLog({
   error: errorOverride,
   actions = defaultActions,
 }: UseActivityLogOptions): ActivityLogResult {
-  const params: ActivityLogParams = { targetType, targetId, action, actorId, limit, offset };
-  const skip = Boolean(loadingOverride || errorOverride || !targetType || !targetId);
-  const { data, isLoading, error, mutate } = useSWR<Paginated<"entries", AdminActivity>>(
-    skip ? null : activityLogKey(params),
-    () => actions.listActivityLog(params),
+  const params: ActivityLogParams = {
+    targetType,
+    targetId,
+    action,
+    actorId,
+    limit,
+    offset,
+  };
+  const skip = Boolean(
+    loadingOverride || errorOverride || !targetType || !targetId,
+  );
+  const { data, isLoading, error, mutate } = useSWR<
+    Paginated<"entries", AdminActivity>
+  >(skip ? null : activityLogKey(params), () =>
+    actions.listActivityLog(params),
   );
 
   return {
@@ -61,7 +71,15 @@ export function useActivityLog({
     limit,
     offset,
     isLoading: loadingOverride ?? (errorOverride ? false : isLoading),
-    error: errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined),
-    refetch: () => { void mutate(); },
+    error:
+      errorOverride ??
+      (error instanceof Error
+        ? error.message
+        : error
+          ? String(error)
+          : undefined),
+    refetch: () => {
+      void mutate();
+    },
   };
 }

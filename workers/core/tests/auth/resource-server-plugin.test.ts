@@ -11,16 +11,37 @@ import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 
 const capturedEmailSender = createCapturedAuthEmailSender();
 
+type AuthWithCreateUser = Parameters<typeof adminOtpSignIn>[0] & {
+  readonly api: {
+    readonly createUser: (input: {
+      readonly body: {
+        readonly name: string;
+        readonly email: string;
+        readonly password?: string;
+        readonly role?: "admin" | "user" | ("admin" | "user")[];
+        readonly data?: Record<string, unknown>;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
   return {
     get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => { values.set(key, value); },
-    delete: async (key) => { values.delete(key); },
+    put: async (key, value) => {
+      values.set(key, value);
+    },
+    delete: async (key) => {
+      values.delete(key);
+    },
   };
 }
 
-async function signInSuperadmin(auth: ReturnType<typeof betterAuth>, _raw: { exec(sql: string): void }) {
+async function signInSuperadmin(
+  auth: AuthWithCreateUser,
+  _raw: { exec(sql: string): void },
+) {
   await auth.api.createUser({
     body: {
       name: "Root Admin",
@@ -85,7 +106,12 @@ describe("idResourceServer plugin endpoint", () => {
     );
 
     expect(response.status).toBe(200);
-    const created = await response.json() as { readonly id: string; readonly organizationId: string; readonly audience: string; readonly enabled: boolean };
+    const created = (await response.json()) as {
+      readonly id: string;
+      readonly organizationId: string;
+      readonly audience: string;
+      readonly enabled: boolean;
+    };
     expect(created).toEqual(
       expect.objectContaining({
         organizationId: "org_1",
@@ -95,23 +121,35 @@ describe("idResourceServer plugin endpoint", () => {
     );
 
     const disable = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/resource-servers/${created.id}/disable`, {
-        method: "POST",
-        headers: { cookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers/${created.id}/disable`,
+        {
+          method: "POST",
+          headers: { cookie },
+        },
+      ),
     );
     expect(disable.status).toBe(200);
-    await expect(disable.json()).resolves.toEqual(expect.objectContaining({ enabled: false }));
+    await expect(disable.json()).resolves.toEqual(
+      expect.objectContaining({ enabled: false }),
+    );
 
     const enable = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/resource-servers/${created.id}/enable`, {
-        method: "POST",
-        headers: { cookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers/${created.id}/enable`,
+        {
+          method: "POST",
+          headers: { cookie },
+        },
+      ),
     );
     expect(enable.status).toBe(200);
     await expect(enable.json()).resolves.toEqual(
-      expect.objectContaining({ enabled: true, disabledAt: null, disabledBy: null }),
+      expect.objectContaining({
+        enabled: true,
+        disabledAt: null,
+        disabledBy: null,
+      }),
     );
   });
 
@@ -168,9 +206,15 @@ describe("idResourceServer plugin endpoint", () => {
       body: { name: "Acme", slug: "acme", userId: owner.user.id },
     });
     const ownerMemberships = (
-      raw as unknown as { prepare: (sql: string) => { all: () => Array<Record<string, unknown>> } }
-    ).prepare(`select * from "member" where "userId" = '${owner.user.id}'`).all();
-    expect(ownerMemberships).toEqual([expect.objectContaining({ role: "owner" })]);
+      raw as unknown as {
+        prepare: (sql: string) => { all: () => Array<Record<string, unknown>> };
+      }
+    )
+      .prepare(`select * from "member" where "userId" = '${owner.user.id}'`)
+      .all();
+    expect(ownerMemberships).toEqual([
+      expect.objectContaining({ role: "owner" }),
+    ]);
     raw.exec(
       `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('m_member', '${organizationOne.id}', '${member.user.id}', 'member', 1700000000000);`,
     );
@@ -180,7 +224,9 @@ describe("idResourceServer plugin endpoint", () => {
     });
     expect(ownerSignIn.status).toBe(200);
     const ownerCookie = ownerSignIn.headers.get("set-cookie") ?? "";
-    const ownerSession = await auth.api.getSession({ headers: new Headers({ cookie: ownerCookie }) });
+    const ownerSession = await auth.api.getSession({
+      headers: new Headers({ cookie: ownerCookie }),
+    });
     expect(ownerSession?.user.id).toBe(owner.user.id);
     const resourceOne = await auth.handler(
       new Request("https://id.example.test/api/auth/admin/resource-servers", {
@@ -213,22 +259,33 @@ describe("idResourceServer plugin endpoint", () => {
     const createdTwo = (await resourceTwo.json()) as { readonly id: string };
 
     const platformScopedCrossOrgPatch = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}?organizationId=${organizationOne.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json", cookie: adminCookie },
-        body: JSON.stringify({ description: "cross-org update attempt" }),
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}?organizationId=${organizationOne.id}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json", cookie: adminCookie },
+          body: JSON.stringify({ description: "cross-org update attempt" }),
+        },
+      ),
     );
     expect(platformScopedCrossOrgPatch.status).toBe(404);
 
     const platformOrgList = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/resource-servers?organizationId=${organizationOne.id}`, {
-        headers: { cookie: adminCookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers?organizationId=${organizationOne.id}`,
+        {
+          headers: { cookie: adminCookie },
+        },
+      ),
     );
     expect(platformOrgList.status).toBe(200);
     await expect(platformOrgList.json()).resolves.toEqual({
-      resourceServers: [expect.objectContaining({ id: createdOne.id, organizationId: organizationOne.id })],
+      resourceServers: [
+        expect.objectContaining({
+          id: createdOne.id,
+          organizationId: organizationOne.id,
+        }),
+      ],
     });
 
     const list = await auth.handler(
@@ -242,9 +299,12 @@ describe("idResourceServer plugin endpoint", () => {
     });
 
     const crossOrg = await auth.handler(
-      new Request(`https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}`, {
-        headers: { cookie: ownerCookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers/${createdTwo.id}`,
+        {
+          headers: { cookie: ownerCookie },
+        },
+      ),
     );
     expect(crossOrg.status).toBe(404);
 

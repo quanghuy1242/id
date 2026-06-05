@@ -27,7 +27,8 @@ export const ORG_INVITATIONS = "/organization/list-invitations";
 /** Registration policy list. */
 export const REGISTRATION_POLICIES = "/admin/registration-policies";
 /** Registration intent list for one policy. */
-export const REGISTRATION_POLICY_INTENTS = "/admin/registration-policies/:id/intents";
+export const REGISTRATION_POLICY_INTENTS =
+  "/admin/registration-policies/:id/intents";
 /** OAuth2 client (application) list — snake_case OAuth2-formatted entities. */
 export const OAUTH_CLIENTS = "/oauth2/get-clients";
 /** OAuth resource server (audience) list. */
@@ -35,7 +36,8 @@ export const RESOURCE_SERVERS = "/admin/resource-servers";
 /** OAuth resource scope catalog list. */
 export const OAUTH_SCOPES = "/admin/oauth-scopes";
 /** Per-client OAuth resource-scope (M2M) binding list. */
-export const OAUTH_CLIENT_RESOURCE_SCOPES = "/admin/oauth-client-resource-scopes";
+export const OAUTH_CLIENT_RESOURCE_SCOPES =
+  "/admin/oauth-client-resource-scopes";
 /** Public JWKS (RFC 7517) key set. */
 export const JWKS = "/jwks";
 /** Aggregate admin session listing (admin-audit plugin). */

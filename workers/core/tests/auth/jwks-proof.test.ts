@@ -1,4 +1,9 @@
-import { createLocalJWKSet, decodeProtectedHeader, jwtVerify, type JSONWebKeySet } from "jose";
+import {
+  createLocalJWKSet,
+  decodeProtectedHeader,
+  jwtVerify,
+  type JSONWebKeySet,
+} from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { authPluginConfig } from "../../src/auth/config";
 import { getAuth } from "../../src/auth/get-auth";
@@ -49,8 +54,12 @@ async function signToken(
   return signed.token;
 }
 
-async function fetchJwks(auth: ReturnType<typeof getAuth>): Promise<JSONWebKeySet> {
-  const response = await auth.handler(new Request("https://id.example.test/api/auth/jwks"));
+async function fetchJwks(
+  auth: ReturnType<typeof getAuth>,
+): Promise<JSONWebKeySet> {
+  const response = await auth.handler(
+    new Request("https://id.example.test/api/auth/jwks"),
+  );
   expect(response.status).toBe(200);
   return (await response.json()) as JSONWebKeySet;
 }
@@ -84,7 +93,11 @@ describe("Better Auth JWKS signing and rotation", () => {
 
     const issuer = "https://id.example.test/api/auth";
     const audience = "https://api.example.test";
-    const tokenExpiresAt = Math.floor((start.getTime() + 2 * authPluginConfig.jwksRotationIntervalSeconds * 1000) / 1000);
+    const tokenExpiresAt = Math.floor(
+      (start.getTime() +
+        2 * authPluginConfig.jwksRotationIntervalSeconds * 1000) /
+        1000,
+    );
     const auth = getAuth(await createEnv());
 
     const oldToken = await signToken(auth, issuer, audience, tokenExpiresAt);
@@ -93,9 +106,17 @@ describe("Better Auth JWKS signing and rotation", () => {
 
     expect(oldKid).toBeTypeOf("string");
     expect(oldJwks.keys.map((key) => key.kid)).toContain(oldKid);
-    await expect(verifyToken(oldToken, oldJwks, issuer, audience)).resolves.toBe("user_1");
+    await expect(
+      verifyToken(oldToken, oldJwks, issuer, audience),
+    ).resolves.toBe("user_1");
 
-    vi.setSystemTime(new Date(start.getTime() + authPluginConfig.jwksRotationIntervalSeconds * 1000 + 1));
+    vi.setSystemTime(
+      new Date(
+        start.getTime() +
+          authPluginConfig.jwksRotationIntervalSeconds * 1000 +
+          1,
+      ),
+    );
 
     const newToken = await signToken(auth, issuer, audience, tokenExpiresAt);
     const newKid = tokenKid(newToken);
@@ -106,7 +127,11 @@ describe("Better Auth JWKS signing and rotation", () => {
     expect(newKid).not.toBe(oldKid);
     expect(publishedKids).toContain(newKid);
     expect(publishedKids).toContain(oldKid);
-    await expect(verifyToken(newToken, rotatedJwks, issuer, audience)).resolves.toBe("user_1");
-    await expect(verifyToken(oldToken, rotatedJwks, issuer, audience)).resolves.toBe("user_1");
+    await expect(
+      verifyToken(newToken, rotatedJwks, issuer, audience),
+    ).resolves.toBe("user_1");
+    await expect(
+      verifyToken(oldToken, rotatedJwks, issuer, audience),
+    ).resolves.toBe("user_1");
   });
 });

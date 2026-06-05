@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
+import {
+  authPluginConfig,
+  systemResourceServerAudience,
+} from "../../src/auth/config";
 import { getAuth } from "../../src/auth/get-auth";
 import { ensureSystemAccessCatalog } from "../../src/auth/system-access-seed";
 import {
@@ -21,36 +24,52 @@ describe("system access seed", () => {
     await test.env.KV.put(authPluginConfig.resourceAudienceCacheKey, "[]");
     await test.env.KV.put(authPluginConfig.oauthScopeCacheKey, "[]");
 
-    const first = await ensureSystemAccessCatalog(test.env, adapter, "seed_user");
+    const first = await ensureSystemAccessCatalog(
+      test.env,
+      adapter,
+      "seed_user",
+    );
 
     expect(first.changed).toBe(true);
-    await expect(test.env.KV.get(authPluginConfig.resourceAudienceCacheKey)).resolves.toBeNull();
-    await expect(test.env.KV.get(authPluginConfig.oauthScopeCacheKey)).resolves.toBeNull();
+    await expect(
+      test.env.KV.get(authPluginConfig.resourceAudienceCacheKey),
+    ).resolves.toBeNull();
+    await expect(
+      test.env.KV.get(authPluginConfig.oauthScopeCacheKey),
+    ).resolves.toBeNull();
 
     const resourceServer = await adapter.findOne<ResourceServerRow>({
       model: RESOURCE_SERVER_MODEL,
       where: [{ field: "id", value: first.resourceServerId }],
     });
-    expect(resourceServer).toEqual(expect.objectContaining({
-      organizationId: null,
-      slug: authPluginConfig.systemResourceServerSlug,
-      name: authPluginConfig.systemResourceServerName,
-      audience: systemResourceServerAudience(test.env.BETTER_AUTH_URL),
-      enabled: true,
-      createdBy: "seed_user",
-    }));
+    expect(resourceServer).toEqual(
+      expect.objectContaining({
+        organizationId: null,
+        slug: authPluginConfig.systemResourceServerSlug,
+        name: authPluginConfig.systemResourceServerName,
+        audience: systemResourceServerAudience(test.env.BETTER_AUTH_URL),
+        enabled: true,
+        createdBy: "seed_user",
+      }),
+    );
 
     const scopes = await adapter.findMany<OAuthResourceScopeRow>({
       model: OAUTH_RESOURCE_SCOPE_MODEL,
       where: [{ field: "resourceServerId", value: first.resourceServerId }],
     });
-    expect(scopes.map((scope) => scope.scope).sort()).toEqual([
-      authPluginConfig.scimDirectoryScope,
-      authPluginConfig.systemOAuthClientPickerScope,
-    ].sort());
+    expect(scopes.map((scope) => scope.scope).sort()).toEqual(
+      [
+        authPluginConfig.scimDirectoryScope,
+        authPluginConfig.systemOAuthClientPickerScope,
+      ].sort(),
+    );
     expect(scopes.every((scope) => scope.enabled)).toBe(true);
 
-    const second = await ensureSystemAccessCatalog(test.env, adapter, "seed_user");
+    const second = await ensureSystemAccessCatalog(
+      test.env,
+      adapter,
+      "seed_user",
+    );
     expect(second).toEqual({
       resourceServerId: first.resourceServerId,
       scopeIds: first.scopeIds,
@@ -65,7 +84,10 @@ describe("system access seed", () => {
       "/api/bootstrap/admin",
       {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-bootstrap-token-v1",
+        },
         body: JSON.stringify({
           email: "root@example.test",
           password: "password12345",
@@ -79,20 +101,27 @@ describe("system access seed", () => {
     expect(response.status).toBe(200);
     const resourceServer = test.raw
       .prepare(`select * from "resourceServer" where "audience" = ?`)
-      .get(systemResourceServerAudience(test.env.BETTER_AUTH_URL)) as ResourceServerRow | undefined;
-    expect(resourceServer).toEqual(expect.objectContaining({
-      organizationId: null,
-      slug: authPluginConfig.systemResourceServerSlug,
-      enabled: 1,
-    }));
+      .get(systemResourceServerAudience(test.env.BETTER_AUTH_URL)) as
+      | ResourceServerRow
+      | undefined;
+    expect(resourceServer).toEqual(
+      expect.objectContaining({
+        organizationId: null,
+        slug: authPluginConfig.systemResourceServerSlug,
+        enabled: 1,
+      }),
+    );
 
     const scopes = test.raw
-      .prepare(`select "scope" from "oauthResourceScope" where "resourceServerId" = ? order by "scope" asc`)
+      .prepare(
+        `select "scope" from "oauthResourceScope" where "resourceServerId" = ? order by "scope" asc`,
+      )
       .all(resourceServer?.id) as Array<{ readonly scope: string }>;
-    expect(scopes).toEqual([
-      { scope: authPluginConfig.scimDirectoryScope },
-      { scope: authPluginConfig.systemOAuthClientPickerScope },
-    ].sort((left, right) => left.scope.localeCompare(right.scope)));
+    expect(scopes).toEqual(
+      [
+        { scope: authPluginConfig.scimDirectoryScope },
+        { scope: authPluginConfig.systemOAuthClientPickerScope },
+      ].sort((left, right) => left.scope.localeCompare(right.scope)),
+    );
   });
 });
-

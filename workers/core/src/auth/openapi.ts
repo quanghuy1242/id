@@ -5,11 +5,18 @@ export interface BetterAuthFieldDef {
   required?: boolean;
   unique?: boolean;
   index?: boolean;
-  defaultValue?: string | number | boolean | Date | (() => string | number | boolean | Date);
+  defaultValue?:
+    | string
+    | number
+    | boolean
+    | Date
+    | (() => string | number | boolean | Date);
   references?: { model: string; field: string };
 }
 
-type BetterAuthMeta = Partial<Pick<BetterAuthFieldDef, "index" | "unique" | "references">>;
+type BetterAuthMeta = Partial<
+  Pick<BetterAuthFieldDef, "index" | "unique" | "references">
+>;
 
 function analyzeZodField(schema: z.ZodTypeAny): {
   type: BetterAuthFieldDef["type"];
@@ -41,13 +48,16 @@ function analyzeZodField(schema: z.ZodTypeAny): {
       continue;
     }
 
-    if (current instanceof z.ZodString || current instanceof z.ZodURL) baseType = "string";
+    if (current instanceof z.ZodString || current instanceof z.ZodURL)
+      baseType = "string";
     if (current instanceof z.ZodNumber) baseType = "number";
     if (current instanceof z.ZodBoolean) baseType = "boolean";
     if (current instanceof z.ZodDate) baseType = "date";
     if (current instanceof z.ZodArray) baseType = "string[]";
     if (baseType !== undefined) break;
-    throw new TypeError(`Unsupported schema field type: ${current.constructor.name}`);
+    throw new TypeError(
+      `Unsupported schema field type: ${current.constructor.name}`,
+    );
   }
 
   const required = hasDefault || !(hasOptional || hasNullable);
@@ -59,22 +69,30 @@ function analyzeZodField(schema: z.ZodTypeAny): {
   };
 }
 
-export function mapZodToBetterAuthFields(zodSchema: z.ZodObject<z.ZodRawShape>): Record<string, BetterAuthFieldDef> {
+export function mapZodToBetterAuthFields(
+  zodSchema: z.ZodObject<z.ZodRawShape>,
+): Record<string, BetterAuthFieldDef> {
   const fields: Record<string, BetterAuthFieldDef> = {};
 
   for (const [key, value] of Object.entries(zodSchema.shape)) {
     if (key === "id") continue;
 
-    const { type, required, defaultValue } = analyzeZodField(value as z.ZodTypeAny);
+    const { type, required, defaultValue } = analyzeZodField(
+      value as z.ZodTypeAny,
+    );
     const typedValue = value as { meta?: unknown };
-    const meta = typeof typedValue.meta === "function"
-      ? (typedValue.meta as () => { betterAuth?: BetterAuthMeta })()?.betterAuth
-      : undefined;
+    const meta =
+      typeof typedValue.meta === "function"
+        ? (typedValue.meta as () => { betterAuth?: BetterAuthMeta })()
+            ?.betterAuth
+        : undefined;
 
     fields[key] = {
       type,
       required,
-      ...(defaultValue !== undefined ? { defaultValue: defaultValue as BetterAuthFieldDef["defaultValue"] } : {}),
+      ...(defaultValue !== undefined
+        ? { defaultValue: defaultValue as BetterAuthFieldDef["defaultValue"] }
+        : {}),
       ...meta,
     };
   }
@@ -93,8 +111,13 @@ function stripInternalOpenApiMetadata(value: unknown): unknown {
   return cleaned;
 }
 
-export function zodSchemaToOpenApi(schema: z.ZodTypeAny): Record<string, unknown> {
-  return stripInternalOpenApiMetadata(z.toJSONSchema(schema)) as Record<string, unknown>;
+export function zodSchemaToOpenApi(
+  schema: z.ZodTypeAny,
+): Record<string, unknown> {
+  return stripInternalOpenApiMetadata(z.toJSONSchema(schema)) as Record<
+    string,
+    unknown
+  >;
 }
 
 export type OpenApiJsonContent = {
@@ -108,7 +131,9 @@ export type OpenApiRequestBody = {
   content: OpenApiJsonContent;
 };
 
-export function openApiJsonRequestBody(schema: z.ZodTypeAny): OpenApiRequestBody {
+export function openApiJsonRequestBody(
+  schema: z.ZodTypeAny,
+): OpenApiRequestBody {
   return {
     required: true,
     content: {

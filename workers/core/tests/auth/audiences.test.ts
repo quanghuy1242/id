@@ -21,7 +21,11 @@ function createKv() {
       }
       return values.get(key)?.value ?? null;
     },
-    put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+    put: async (
+      key: string,
+      value: string,
+      options?: { expirationTtl?: number },
+    ) => {
       values.set(key, { value, ttl: options?.expirationTtl });
     },
     delete: async (key: string) => {
@@ -39,27 +43,39 @@ describe("resource audience cache", () => {
 
   it("serves valid audiences from KV without hitting the store", async () => {
     const { getOptions, kv, values } = createKv();
-    values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify(["https://api.example.test"]) });
+    values.set(authPluginConfig.resourceAudienceCacheKey, {
+      value: JSON.stringify(["https://api.example.test"]),
+    });
 
     const result = await loadResourceAudiencesFromCache(kv, async () => {
       throw new Error("store should not be read on cache hit");
     });
 
-    expect(result).toEqual({ audiences: ["https://api.example.test"], source: "cache" });
-    expect(getOptions).toEqual([{ cacheTtl: authPluginConfig.resourceAudienceCacheTtlSeconds }]);
+    expect(result).toEqual({
+      audiences: ["https://api.example.test"],
+      source: "cache",
+    });
+    expect(getOptions).toEqual([
+      { cacheTtl: authPluginConfig.resourceAudienceCacheTtlSeconds },
+    ]);
   });
 
   it("serves warm isolate audiences from memory before KV", async () => {
     const { kv, values } = createKv();
 
-    await loadResourceAudiencesFromCache(kv, async () => [{ audience: "https://api.example.test", enabled: true }]);
+    await loadResourceAudiencesFromCache(kv, async () => [
+      { audience: "https://api.example.test", enabled: true },
+    ]);
     values.delete(authPluginConfig.resourceAudienceCacheKey);
 
     const result = await loadResourceAudiencesFromCache(kv, async () => {
       throw new Error("store should not be read on memory hit");
     });
 
-    expect(result).toEqual({ audiences: ["https://api.example.test"], source: "memory" });
+    expect(result).toEqual({
+      audiences: ["https://api.example.test"],
+      source: "memory",
+    });
   });
 
   it("loads enabled audiences from the store and writes the KV cache", async () => {
@@ -77,20 +93,28 @@ describe("resource audience cache", () => {
       source: "store",
     });
     expect(values.get(authPluginConfig.resourceAudienceCacheKey)).toEqual({
-      value: JSON.stringify(["https://api.example.test", "https://mcp.example.test"]),
+      value: JSON.stringify([
+        "https://api.example.test",
+        "https://mcp.example.test",
+      ]),
       ttl: authPluginConfig.resourceAudienceCacheTtlSeconds,
     });
   });
 
   it("treats malformed KV values as cache misses", async () => {
     const { kv, values } = createKv();
-    values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify({ audience: "https://api.example.test" }) });
+    values.set(authPluginConfig.resourceAudienceCacheKey, {
+      value: JSON.stringify({ audience: "https://api.example.test" }),
+    });
 
     const result = await loadResourceAudiencesFromCache(kv, async () => [
       { audience: "https://api.example.test", enabled: true },
     ]);
 
-    expect(result).toEqual({ audiences: ["https://api.example.test"], source: "store" });
+    expect(result).toEqual({
+      audiences: ["https://api.example.test"],
+      source: "store",
+    });
   });
 
   it("loads enabled audiences from the plugin-owned D1 query on KV miss", async () => {
@@ -124,7 +148,9 @@ describe("resource audience cache", () => {
 
   it("invalidates the audience cache after plugin-owned resource server mutation", async () => {
     const { kv, values } = createKv();
-    values.set(authPluginConfig.resourceAudienceCacheKey, { value: JSON.stringify(["https://api.example.test"]) });
+    values.set(authPluginConfig.resourceAudienceCacheKey, {
+      value: JSON.stringify(["https://api.example.test"]),
+    });
 
     await invalidateResourceServerAudiences({ KV: kv });
 

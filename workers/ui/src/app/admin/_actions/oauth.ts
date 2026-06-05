@@ -12,8 +12,12 @@ import {
 
 const platformScope: ActiveScope = { kind: "platform" };
 
-function orgParams(scope: ActiveScope): { organizationId?: string } | undefined {
-  return scope.kind === "organization" ? { organizationId: scope.organizationId } : undefined;
+function orgParams(
+  scope: ActiveScope,
+): { organizationId?: string } | undefined {
+  return scope.kind === "organization"
+    ? { organizationId: scope.organizationId }
+    : undefined;
 }
 
 function scopedPath(path: string, scope: ActiveScope): string {
@@ -21,7 +25,9 @@ function scopedPath(path: string, scope: ActiveScope): string {
   return `${path}?organizationId=${encodeURIComponent(scope.organizationId)}`;
 }
 
-async function setActiveOrganizationForOAuth(scope: ActiveScope): Promise<void> {
+async function setActiveOrganizationForOAuth(
+  scope: ActiveScope,
+): Promise<void> {
   await authApiPostOrThrow("/organization/set-active", {
     organizationId: scope.kind === "organization" ? scope.organizationId : null,
   });
@@ -94,30 +100,53 @@ export type UpdateClientInput = Partial<{
   type: "web" | "native" | "user-agent-based";
 }>;
 
-export async function listClients(scope: ActiveScope = platformScope): Promise<OAuthClient[]> {
+export async function listClients(
+  scope: ActiveScope = platformScope,
+): Promise<OAuthClient[]> {
   await setActiveOrganizationForOAuth(scope);
-  const clients = (await authApiGetOrThrow<OAuthClient[] | null>("/oauth2/get-clients")) ?? [];
+  const clients =
+    (await authApiGetOrThrow<OAuthClient[] | null>("/oauth2/get-clients")) ??
+    [];
   return scope.kind === "organization"
     ? clients.filter((client) => client.reference_id === scope.organizationId)
     : clients;
 }
 
-export async function createClient(data: CreateClientInput, scope: ActiveScope = platformScope): Promise<OAuthClient> {
+export async function createClient(
+  data: CreateClientInput,
+  scope: ActiveScope = platformScope,
+): Promise<OAuthClient> {
   await setActiveOrganizationForOAuth(scope);
   return authApiPostOrThrow<OAuthClient>("/oauth2/create-client", data);
 }
 
-export async function updateClient(clientId: string, update: UpdateClientInput, scope: ActiveScope = platformScope): Promise<OAuthClient> {
+export async function updateClient(
+  clientId: string,
+  update: UpdateClientInput,
+  scope: ActiveScope = platformScope,
+): Promise<OAuthClient> {
   await setActiveOrganizationForOAuth(scope);
-  return authApiPostOrThrow<OAuthClient>("/oauth2/update-client", { client_id: clientId, update });
+  return authApiPostOrThrow<OAuthClient>("/oauth2/update-client", {
+    client_id: clientId,
+    update,
+  });
 }
 
-export async function rotateClientSecret(clientId: string, scope: ActiveScope = platformScope): Promise<{ client_secret: string }> {
+export async function rotateClientSecret(
+  clientId: string,
+  scope: ActiveScope = platformScope,
+): Promise<{ client_secret: string }> {
   await setActiveOrganizationForOAuth(scope);
-  return authApiPostOrThrow<{ client_secret: string }>("/oauth2/client/rotate-secret", { client_id: clientId });
+  return authApiPostOrThrow<{ client_secret: string }>(
+    "/oauth2/client/rotate-secret",
+    { client_id: clientId },
+  );
 }
 
-export async function deleteClient(clientId: string, scope: ActiveScope = platformScope): Promise<void> {
+export async function deleteClient(
+  clientId: string,
+  scope: ActiveScope = platformScope,
+): Promise<void> {
   await setActiveOrganizationForOAuth(scope);
   await authApiPostOrThrow("/oauth2/delete-client", { client_id: clientId });
 }
@@ -156,32 +185,66 @@ export type UpdateResourceServerInput = Partial<{
   description: string | null;
 }>;
 
-export async function listResourceServers(scope: ActiveScope = platformScope): Promise<ResourceServer[]> {
-  const res = await authApiGetOrThrow<{ resourceServers: ResourceServer[] }>("/admin/resource-servers", orgParams(scope));
+export async function listResourceServers(
+  scope: ActiveScope = platformScope,
+): Promise<ResourceServer[]> {
+  const res = await authApiGetOrThrow<{ resourceServers: ResourceServer[] }>(
+    "/admin/resource-servers",
+    orgParams(scope),
+  );
   return res.resourceServers ?? [];
 }
 
-export async function createResourceServer(data: CreateResourceServerInput, scope: ActiveScope = platformScope): Promise<ResourceServer> {
+export async function createResourceServer(
+  data: CreateResourceServerInput,
+  scope: ActiveScope = platformScope,
+): Promise<ResourceServer> {
   return authApiPostOrThrow<ResourceServer>("/admin/resource-servers", {
     ...data,
-    ...(scope.kind === "organization" ? { organizationId: scope.organizationId } : {}),
+    ...(scope.kind === "organization"
+      ? { organizationId: scope.organizationId }
+      : {}),
   });
 }
 
-export async function updateResourceServer(id: string, data: UpdateResourceServerInput, scope: ActiveScope = platformScope): Promise<ResourceServer> {
-  return authApiPatchOrThrow<ResourceServer>(scopedPath(`/admin/resource-servers/${id}`, scope), data);
+export async function updateResourceServer(
+  id: string,
+  data: UpdateResourceServerInput,
+  scope: ActiveScope = platformScope,
+): Promise<ResourceServer> {
+  return authApiPatchOrThrow<ResourceServer>(
+    scopedPath(`/admin/resource-servers/${id}`, scope),
+    data,
+  );
 }
 
-export async function disableResourceServer(id: string, scope: ActiveScope = platformScope): Promise<ResourceServer> {
-  return authApiPostOrThrow<ResourceServer>(scopedPath(`/admin/resource-servers/${id}/disable`, scope), {});
+export async function disableResourceServer(
+  id: string,
+  scope: ActiveScope = platformScope,
+): Promise<ResourceServer> {
+  return authApiPostOrThrow<ResourceServer>(
+    scopedPath(`/admin/resource-servers/${id}/disable`, scope),
+    {},
+  );
 }
 
-export async function enableResourceServer(id: string, scope: ActiveScope = platformScope): Promise<ResourceServer> {
-  return authApiPostOrThrow<ResourceServer>(scopedPath(`/admin/resource-servers/${id}/enable`, scope), {});
+export async function enableResourceServer(
+  id: string,
+  scope: ActiveScope = platformScope,
+): Promise<ResourceServer> {
+  return authApiPostOrThrow<ResourceServer>(
+    scopedPath(`/admin/resource-servers/${id}/enable`, scope),
+    {},
+  );
 }
 
-export async function deleteResourceServer(id: string, scope: ActiveScope = platformScope): Promise<void> {
-  await authApiDeleteOrThrow(scopedPath(`/admin/resource-servers/${id}`, scope));
+export async function deleteResourceServer(
+  id: string,
+  scope: ActiveScope = platformScope,
+): Promise<void> {
+  await authApiDeleteOrThrow(
+    scopedPath(`/admin/resource-servers/${id}`, scope),
+  );
 }
 
 // ─── OAuth resource scopes ────────────────────────────────────────
@@ -210,17 +273,35 @@ export type UpdateScopeInput = Partial<{
   enabled: boolean;
 }>;
 
-export async function listScopes(scope: ActiveScope = platformScope): Promise<OAuthResourceScope[]> {
-  const res = await authApiGetOrThrow<{ oauthScopes: OAuthResourceScope[] }>("/admin/oauth-scopes", orgParams(scope));
+export async function listScopes(
+  scope: ActiveScope = platformScope,
+): Promise<OAuthResourceScope[]> {
+  const res = await authApiGetOrThrow<{ oauthScopes: OAuthResourceScope[] }>(
+    "/admin/oauth-scopes",
+    orgParams(scope),
+  );
   return res.oauthScopes ?? [];
 }
 
-export async function createScope(data: CreateScopeInput, scope: ActiveScope = platformScope): Promise<OAuthResourceScope> {
-  return authApiPostOrThrow<OAuthResourceScope>(scopedPath("/admin/oauth-scopes", scope), data);
+export async function createScope(
+  data: CreateScopeInput,
+  scope: ActiveScope = platformScope,
+): Promise<OAuthResourceScope> {
+  return authApiPostOrThrow<OAuthResourceScope>(
+    scopedPath("/admin/oauth-scopes", scope),
+    data,
+  );
 }
 
-export async function updateScope(id: string, data: UpdateScopeInput, scope: ActiveScope = platformScope): Promise<OAuthResourceScope> {
-  return authApiPatchOrThrow<OAuthResourceScope>(scopedPath(`/admin/oauth-scopes/${id}`, scope), data);
+export async function updateScope(
+  id: string,
+  data: UpdateScopeInput,
+  scope: ActiveScope = platformScope,
+): Promise<OAuthResourceScope> {
+  return authApiPatchOrThrow<OAuthResourceScope>(
+    scopedPath(`/admin/oauth-scopes/${id}`, scope),
+    data,
+  );
 }
 
 // ─── M2M client-resource-scope bindings ───────────────────────────
@@ -248,24 +329,43 @@ export type UpdateBindingInput = Partial<{
   enabled: boolean;
 }>;
 
-export async function listBindings(scope: ActiveScope = platformScope): Promise<ClientResourceScope[]> {
-  const res = await authApiGetOrThrow<{ oauthClientResourceScopes: ClientResourceScope[] }>(
-    "/admin/oauth-client-resource-scopes",
-    orgParams(scope),
-  );
+export async function listBindings(
+  scope: ActiveScope = platformScope,
+): Promise<ClientResourceScope[]> {
+  const res = await authApiGetOrThrow<{
+    oauthClientResourceScopes: ClientResourceScope[];
+  }>("/admin/oauth-client-resource-scopes", orgParams(scope));
   return res.oauthClientResourceScopes ?? [];
 }
 
-export async function createBinding(data: CreateBindingInput, scope: ActiveScope = platformScope): Promise<ClientResourceScope> {
-  return authApiPostOrThrow<ClientResourceScope>(scopedPath("/admin/oauth-client-resource-scopes", scope), data);
+export async function createBinding(
+  data: CreateBindingInput,
+  scope: ActiveScope = platformScope,
+): Promise<ClientResourceScope> {
+  return authApiPostOrThrow<ClientResourceScope>(
+    scopedPath("/admin/oauth-client-resource-scopes", scope),
+    data,
+  );
 }
 
-export async function updateBinding(id: string, data: UpdateBindingInput, scope: ActiveScope = platformScope): Promise<ClientResourceScope> {
-  return authApiPatchOrThrow<ClientResourceScope>(scopedPath(`/admin/oauth-client-resource-scopes/${id}`, scope), data);
+export async function updateBinding(
+  id: string,
+  data: UpdateBindingInput,
+  scope: ActiveScope = platformScope,
+): Promise<ClientResourceScope> {
+  return authApiPatchOrThrow<ClientResourceScope>(
+    scopedPath(`/admin/oauth-client-resource-scopes/${id}`, scope),
+    data,
+  );
 }
 
-export async function deleteBinding(id: string, scope: ActiveScope = platformScope): Promise<void> {
-  await authApiDeleteOrThrow(scopedPath(`/admin/oauth-client-resource-scopes/${id}`, scope));
+export async function deleteBinding(
+  id: string,
+  scope: ActiveScope = platformScope,
+): Promise<void> {
+  await authApiDeleteOrThrow(
+    scopedPath(`/admin/oauth-client-resource-scopes/${id}`, scope),
+  );
 }
 
 // ─── Derived client type (no `type` enum at the boundary) ─────────

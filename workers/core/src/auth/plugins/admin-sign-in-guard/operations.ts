@@ -17,15 +17,25 @@ function isLocalPath(value: string): boolean {
 }
 
 function hasAllowedCallbackPath(pathname: string): boolean {
-  return pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/account" || pathname.startsWith("/account/");
+  return (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/account" ||
+    pathname.startsWith("/account/")
+  );
 }
 
 /** True when a sign-in `callbackURL` targets a first-party app shell. */
-export function isFirstPartyAppCallback(callbackURL: string | undefined): callbackURL is string {
-  if (typeof callbackURL !== "string" || !isLocalPath(callbackURL)) return false;
+export function isFirstPartyAppCallback(
+  callbackURL: string | undefined,
+): callbackURL is string {
+  if (typeof callbackURL !== "string" || !isLocalPath(callbackURL))
+    return false;
   try {
     const url = new URL(callbackURL, "https://id.local");
-    return url.origin === "https://id.local" && hasAllowedCallbackPath(url.pathname);
+    return (
+      url.origin === "https://id.local" && hasAllowedCallbackPath(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -37,7 +47,11 @@ export function generateOtp(): string {
 }
 
 /** Purpose-bound HMAC for low-entropy admin OTP codes stored in KV. */
-export function otpHmacHex(secret: string, userId: string, otp: string): string {
+export function otpHmacHex(
+  secret: string,
+  userId: string,
+  otp: string,
+): string {
   return createHmac("sha256", secret)
     .update(ADMIN_OTP_HMAC_PURPOSE)
     .update("\0")
@@ -105,7 +119,10 @@ async function assertWithinRateLimit(
 }
 
 /** Throttles OTP generation (email sends) per user. Checked before rotating the stored OTP. */
-export function assertOtpGenerateLimit(kv: BetterAuthKvStorage, userId: string): Promise<void> {
+export function assertOtpGenerateLimit(
+  kv: BetterAuthKvStorage,
+  userId: string,
+): Promise<void> {
   return assertWithinRateLimit(
     kv,
     `${authPluginConfig.adminOtpGenerateAttemptsPrefix}${userId}`,
@@ -115,7 +132,10 @@ export function assertOtpGenerateLimit(kv: BetterAuthKvStorage, userId: string):
 }
 
 /** Throttles OTP verification attempts per user within an OTP window. */
-export function assertOtpVerifyLimit(kv: BetterAuthKvStorage, userId: string): Promise<void> {
+export function assertOtpVerifyLimit(
+  kv: BetterAuthKvStorage,
+  userId: string,
+): Promise<void> {
   return assertWithinRateLimit(
     kv,
     `${authPluginConfig.adminOtpVerifyAttemptsPrefix}${userId}`,

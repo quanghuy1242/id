@@ -52,7 +52,11 @@ describe("OAuth endpoint transport contracts", () => {
   it("does not emit Better Auth rate-limit headers when repo rate limiting is disabled", async () => {
     const app = createApp();
     const env = await createEnv();
-    const response = await app.request("/api/auth/get-session", { method: "GET" }, env);
+    const response = await app.request(
+      "/api/auth/get-session",
+      { method: "GET" },
+      env,
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-ratelimit-limit")).toBeNull();

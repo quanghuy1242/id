@@ -46,7 +46,10 @@ export async function bootstrapAdmin(test: TestEnv): Promise<string> {
     "/api/bootstrap/admin",
     {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-bootstrap-token-v1",
+      },
       body: JSON.stringify({
         email: "root@example.test",
         password: "password12345",
@@ -57,7 +60,10 @@ export async function bootstrapAdmin(test: TestEnv): Promise<string> {
     test.env,
   );
   expect(response.status).toBe(200);
-  return signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
+  return signInViaAdminOtp(test.env, {
+    email: "root@example.test",
+    password: "password12345",
+  });
 }
 
 /**
@@ -80,21 +86,30 @@ export async function signInViaAdminOtp(
 export async function createResourceServer(
   test: TestEnv,
   cookie: string,
-  args: { readonly organizationId: string | null; readonly slug: string; readonly name: string; readonly audience: string },
+  args: {
+    readonly organizationId: string | null;
+    readonly slug: string;
+    readonly name: string;
+    readonly audience: string;
+  },
 ): Promise<string> {
   const response = await test.app.request(
     "/api/auth/admin/resource-servers",
     {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify(args.organizationId === null ? { slug: args.slug, name: args.name, audience: args.audience } : args),
+      body: JSON.stringify(
+        args.organizationId === null
+          ? { slug: args.slug, name: args.name, audience: args.audience }
+          : args,
+      ),
     },
     test.env,
   );
   if (
-    response.status !== 200
-    && args.organizationId === null
-    && args.audience === systemResourceServerAudience(test.env.BETTER_AUTH_URL)
+    response.status !== 200 &&
+    args.organizationId === null &&
+    args.audience === systemResourceServerAudience(test.env.BETTER_AUTH_URL)
   ) {
     const existing = test.raw
       .prepare(`select "id" from "resourceServer" where "audience" = ?`)
@@ -122,8 +137,12 @@ export async function createOAuthScope(
   );
   if (response.status !== 200) {
     const existing = test.raw
-      .prepare(`select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`)
-      .get(args.resourceServerId, args.scope) as { readonly id: string } | undefined;
+      .prepare(
+        `select "id" from "oauthResourceScope" where "resourceServerId" = ? and "scope" = ?`,
+      )
+      .get(args.resourceServerId, args.scope) as
+      | { readonly id: string }
+      | undefined;
     if (existing) return;
   }
   expect(response.status).toBe(200);
@@ -137,7 +156,11 @@ export type CreatedClient = {
 export async function createM2MClient(
   test: TestEnv,
   cookie: string,
-  args: { readonly name: string; readonly scope: string; readonly referenceId?: string | null },
+  args: {
+    readonly name: string;
+    readonly scope: string;
+    readonly referenceId?: string | null;
+  },
 ): Promise<CreatedClient> {
   const response = await test.app.request(
     "/api/auth/oauth2/create-client",
@@ -156,11 +179,18 @@ export async function createM2MClient(
     test.env,
   );
   expect(response.status).toBe(200);
-  const body = (await response.json()) as { readonly client_id: string; readonly client_secret: string };
+  const body = (await response.json()) as {
+    readonly client_id: string;
+    readonly client_secret: string;
+  };
   if (args.referenceId === null) {
-    test.raw.exec(`update "oauthClient" set "referenceId" = NULL where "clientId" = '${body.client_id}';`);
+    test.raw.exec(
+      `update "oauthClient" set "referenceId" = NULL where "clientId" = '${body.client_id}';`,
+    );
   } else if (args.referenceId) {
-    test.raw.exec(`update "oauthClient" set "referenceId" = '${args.referenceId}' where "clientId" = '${body.client_id}';`);
+    test.raw.exec(
+      `update "oauthClient" set "referenceId" = '${args.referenceId}' where "clientId" = '${body.client_id}';`,
+    );
   }
   return { clientId: body.client_id, clientSecret: body.client_secret };
 }
@@ -168,7 +198,11 @@ export async function createM2MClient(
 export async function attachClientResourceScope(
   test: TestEnv,
   cookie: string,
-  args: { readonly clientId: string; readonly resourceServerId: string; readonly allowedScopes: readonly string[] },
+  args: {
+    readonly clientId: string;
+    readonly resourceServerId: string;
+    readonly allowedScopes: readonly string[];
+  },
 ): Promise<{ readonly id: string; readonly status: number }> {
   const response = await test.app.request(
     "/api/auth/admin/oauth-client-resource-scopes",
@@ -188,7 +222,12 @@ export async function attachClientResourceScope(
 
 export async function tokenRequest(
   test: TestEnv,
-  args: { readonly clientId: string; readonly clientSecret: string; readonly resource: string; readonly scope: string },
+  args: {
+    readonly clientId: string;
+    readonly clientSecret: string;
+    readonly resource: string;
+    readonly scope: string;
+  },
 ): Promise<Response> {
   return test.app.request(
     "/api/auth/oauth2/token",

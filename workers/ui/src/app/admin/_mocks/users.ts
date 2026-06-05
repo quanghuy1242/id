@@ -74,7 +74,8 @@ export const mockSessions: Session[] = [
     userId: "user_001",
     userEmail: "john@acme.com",
     ipAddress: "192.168.1.1",
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0",
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0",
     activeOrganizationId: "org_001",
     activeTeamId: null,
     impersonatedBy: null,

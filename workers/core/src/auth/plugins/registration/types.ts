@@ -32,23 +32,45 @@ type ModelName =
 type AdapterWhere = {
   readonly field: string;
   readonly value: unknown;
-  readonly operator?: "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "in" | "contains" | "starts_with" | "ends_with";
+  readonly operator?:
+    | "eq"
+    | "ne"
+    | "lt"
+    | "lte"
+    | "gt"
+    | "gte"
+    | "in"
+    | "contains"
+    | "starts_with"
+    | "ends_with";
 };
 
 export type RegistrationAdapter = {
-  readonly findOne: <T>(args: { readonly model: ModelName; readonly where: readonly AdapterWhere[] }) => Promise<T | null>;
+  readonly findOne: <T>(args: {
+    readonly model: ModelName;
+    readonly where: readonly AdapterWhere[];
+  }) => Promise<T | null>;
   readonly findMany: <T>(args: {
     readonly model: ModelName;
     readonly where?: readonly AdapterWhere[];
-    readonly sortBy?: { readonly field: string; readonly direction: "asc" | "desc" };
+    readonly sortBy?: {
+      readonly field: string;
+      readonly direction: "asc" | "desc";
+    };
   }) => Promise<T[]>;
-  readonly create: <T>(args: { readonly model: ModelName; readonly data: Record<string, unknown> }) => Promise<T>;
+  readonly create: <T>(args: {
+    readonly model: ModelName;
+    readonly data: Record<string, unknown>;
+  }) => Promise<T>;
   readonly update: <T>(args: {
     readonly model: ModelName;
     readonly where: readonly AdapterWhere[];
     readonly update: Record<string, unknown>;
   }) => Promise<T>;
-  readonly delete: (args: { readonly model: ModelName; readonly where: readonly AdapterWhere[] }) => Promise<void>;
+  readonly delete: (args: {
+    readonly model: ModelName;
+    readonly where: readonly AdapterWhere[];
+  }) => Promise<void>;
 };
 
 export type RegistrationAuthorize = (

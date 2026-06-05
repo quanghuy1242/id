@@ -57,7 +57,11 @@ async function buildAuth(disableSignUp: boolean) {
     baseURL: ORIGIN,
     basePath: "/api/auth",
     secret: "spike-secret",
-    database: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+    database: drizzleAdapter(drizzle(raw), {
+      provider: "sqlite",
+      camelCase: true,
+      schema: authSchema,
+    }),
     emailAndPassword: {
       enabled: true,
       disableSignUp,
@@ -73,7 +77,10 @@ async function buildAuth(disableSignUp: boolean) {
   return { auth, raw };
 }
 
-function signUp(auth: Awaited<ReturnType<typeof buildAuth>>["auth"], intent?: string): Promise<Response> {
+function signUp(
+  auth: Awaited<ReturnType<typeof buildAuth>>["auth"],
+  intent?: string,
+): Promise<Response> {
   return auth.handler(
     new Request(`${ORIGIN}/api/auth/sign-up/email`, {
       method: "POST",
@@ -81,13 +88,22 @@ function signUp(auth: Awaited<ReturnType<typeof buildAuth>>["auth"], intent?: st
         "content-type": "application/json",
         ...(intent ? { "x-id-registration-intent": intent } : {}),
       },
-      body: JSON.stringify({ name: "Spike User", email: "spike@example.test", password: "password12345" }),
+      body: JSON.stringify({
+        name: "Spike User",
+        email: "spike@example.test",
+        password: "password12345",
+      }),
     }),
   );
 }
 
-function userCount(raw: Awaited<ReturnType<typeof buildAuth>>["raw"], email: string): number {
-  const row = raw.prepare(`select count(*) as n from "user" where "email" = ?`).get(email) as { n: number };
+function userCount(
+  raw: Awaited<ReturnType<typeof buildAuth>>["raw"],
+  email: string,
+): number {
+  const row = raw
+    .prepare(`select count(*) as n from "user" where "email" = ?`)
+    .get(email) as { n: number };
   return row.n;
 }
 
@@ -99,7 +115,9 @@ describe("Track D · D0 signup-guard spike", () => {
     const { auth, raw } = await buildAuth(false);
     const res = await signUp(auth);
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({ code: "missing_registration_intent" });
+    await expect(res.json()).resolves.toMatchObject({
+      code: "missing_registration_intent",
+    });
     expect(userCount(raw, "spike@example.test")).toBe(0);
   });
 
@@ -117,7 +135,9 @@ describe("Track D · D0 signup-guard spike", () => {
     const { auth, raw } = await buildAuth(true);
     const res = await signUp(auth, VALID_INTENT);
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({ code: "EMAIL_PASSWORD_SIGN_UP_DISABLED" });
+    await expect(res.json()).resolves.toMatchObject({
+      code: "EMAIL_PASSWORD_SIGN_UP_DISABLED",
+    });
     expect(userCount(raw, "spike@example.test")).toBe(0);
   });
 });

@@ -7,7 +7,9 @@ import { authPluginConfig } from "../config";
 const wellKnownOauthServer = "/.well-known/oauth-authorization-server";
 const wellKnownOidc = "/.well-known/openid-configuration";
 
-type WellKnownMetadataKind = "oauth-authorization-server" | "openid-configuration";
+type WellKnownMetadataKind =
+  | "oauth-authorization-server"
+  | "openid-configuration";
 
 /**
  * OAuth Provider intentionally keeps these metadata endpoints server-callable
@@ -22,7 +24,9 @@ type WellKnownMetadataKind = "oauth-authorization-server" | "openid-configuratio
  * normal HTTP route under the Better Auth base path, and discovery advertises
  * that canonical `/api/auth/jwks` route.
  */
-function getWellKnownMetadataKind(pathname: string): WellKnownMetadataKind | undefined {
+function getWellKnownMetadataKind(
+  pathname: string,
+): WellKnownMetadataKind | undefined {
   if (
     pathname === wellKnownOauthServer ||
     pathname === `${authPluginConfig.issuerPath}${wellKnownOauthServer}` ||
@@ -52,14 +56,28 @@ export function authPathIsWellKnown(pathname: string): boolean {
  * the supported bridge between app-owned public well-known routes and the
  * plugin-owned metadata generator.
  */
-export async function handleWellKnown(auth: unknown, request: Request): Promise<Response> {
-  if (getWellKnownMetadataKind(new URL(request.url).pathname) === "oauth-authorization-server") {
+export async function handleWellKnown(
+  auth: unknown,
+  request: Request,
+): Promise<Response> {
+  if (
+    getWellKnownMetadataKind(new URL(request.url).pathname) ===
+    "oauth-authorization-server"
+  ) {
     return oauthProviderAuthServerMetadata(
-      auth as { readonly api: { readonly getOAuthServerConfig: (...args: unknown[]) => unknown } },
+      auth as {
+        readonly api: {
+          readonly getOAuthServerConfig: (...args: unknown[]) => unknown;
+        };
+      },
     )(request);
   }
 
   return oauthProviderOpenIdConfigMetadata(
-    auth as { readonly api: { readonly getOpenIdConfig: (...args: unknown[]) => unknown } },
+    auth as {
+      readonly api: {
+        readonly getOpenIdConfig: (...args: unknown[]) => unknown;
+      };
+    },
   )(request);
 }

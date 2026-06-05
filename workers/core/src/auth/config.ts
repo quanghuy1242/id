@@ -74,7 +74,9 @@ export const TEST_PASSWORD_SCRYPT_N = 64;
 export const PRODUCTION_PASSWORD_SCRYPT_N = 16_384;
 
 /** Runtime scrypt CPU/memory cost parameter for Better Auth password hashing. */
-export const PASSWORD_SCRYPT_N = process.env.VITEST ? TEST_PASSWORD_SCRYPT_N : PRODUCTION_PASSWORD_SCRYPT_N;
+export const PASSWORD_SCRYPT_N = process.env.VITEST
+  ? TEST_PASSWORD_SCRYPT_N
+  : PRODUCTION_PASSWORD_SCRYPT_N;
 
 /** Scrypt block-size parameter for Better Auth password hashing. */
 export const PASSWORD_SCRYPT_R = 16;
@@ -129,7 +131,11 @@ export type AuthPluginConfig = {
   readonly jwksGracePeriodMs: number;
   readonly oauthProtocolScopes: readonly string[];
   readonly bootstrapOAuthScopes: readonly string[];
-  readonly oauthGrantTypes: readonly ("authorization_code" | "client_credentials" | "refresh_token")[];
+  readonly oauthGrantTypes: readonly (
+    | "authorization_code"
+    | "client_credentials"
+    | "refresh_token"
+  )[];
   readonly directShareReferenceId: string;
   readonly workspaceOnlyScopes: readonly string[];
   readonly maxTokenTeamIds: number;
@@ -172,8 +178,10 @@ export const authPluginConfig = {
   resourceAudienceCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   oauthScopeCacheKey: "id-oauth-scopes:enabled",
   oauthScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
-  oauthClientResourceScopeCachePrefix: "id-oauth-scopes:client-resource-scopes:",
-  oauthClientResourceScopeCacheTtlSeconds: OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
+  oauthClientResourceScopeCachePrefix:
+    "id-oauth-scopes:client-resource-scopes:",
+  oauthClientResourceScopeCacheTtlSeconds:
+    OAUTH_RUNTIME_CATALOG_CACHE_TTL_SECONDS,
   teamMembershipCachePrefix: "id-teams:user:",
   emailVerificationStoragePrefix: "id-email:verification:",
   passwordResetStoragePrefix: "id-email:password-reset:",
@@ -186,7 +194,11 @@ export const authPluginConfig = {
   jwksGracePeriodMs: JWKS_GRACE_PERIOD_MS,
   oauthProtocolScopes: ["openid", "profile", "email", "offline_access"],
   bootstrapOAuthScopes: ["org:read", "org:write"],
-  oauthGrantTypes: ["authorization_code", "client_credentials", "refresh_token"],
+  oauthGrantTypes: [
+    "authorization_code",
+    "client_credentials",
+    "refresh_token",
+  ],
   directShareReferenceId: "urn:id:oauth-context:direct-share",
   workspaceOnlyScopes: ["content:share"],
   maxTokenTeamIds: MAX_TOKEN_TEAM_IDS,
@@ -221,7 +233,11 @@ export function systemResourceServerAudience(baseUrl: string): string {
  * computed at read time rather than enforced by a KV TTL. A future high-impact action gate
  * can reuse the same stored timestamp with its own shorter window.
  */
-export function isPlatformStepUpFresh(stepUpAtMs: number | null | undefined, nowMs: number = Date.now()): boolean {
-  if (typeof stepUpAtMs !== "number" || !Number.isFinite(stepUpAtMs)) return false;
+export function isPlatformStepUpFresh(
+  stepUpAtMs: number | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (typeof stepUpAtMs !== "number" || !Number.isFinite(stepUpAtMs))
+    return false;
   return nowMs - stepUpAtMs < ADMIN_STEP_UP_TTL_SECONDS * MS_PER_SECOND;
 }

@@ -1,5 +1,10 @@
 import { APIError } from "better-auth/api";
-import { decodeProtectedHeader, importJWK, jwtVerify, type JWTPayload } from "jose";
+import {
+  decodeProtectedHeader,
+  importJWK,
+  jwtVerify,
+  type JWTPayload,
+} from "jose";
 import { JWKS_MODEL } from "../shared/constants";
 import { extractBearerToken } from "../shared/request";
 
@@ -14,7 +19,10 @@ type JwksReader = {
 };
 
 function tokenHasScope(scopeClaim: unknown, requiredScope: string): boolean {
-  return typeof scopeClaim === "string" && scopeClaim.split(" ").includes(requiredScope);
+  return (
+    typeof scopeClaim === "string" &&
+    scopeClaim.split(" ").includes(requiredScope)
+  );
 }
 
 /**
@@ -44,7 +52,8 @@ export async function verifyScopedBearerToken(params: {
   const key = keys.find((row) => row.id === header.kid);
   if (!key) throw new APIError("UNAUTHORIZED");
 
-  const alg = key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA");
+  const alg =
+    key.alg ?? (typeof header.alg === "string" ? header.alg : "EdDSA");
   const cryptoKey = await importJWK(
     JSON.parse(key.publicKey) as JsonWebKey,
     alg,

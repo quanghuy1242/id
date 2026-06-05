@@ -48,29 +48,39 @@ describe("organization actions", () => {
   it("unwraps Better Auth list-members envelopes", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(mockListMembersResponse));
 
-    await expect(listMembers("org_001")).resolves.toEqual(mockListMembersResponse.members);
+    await expect(listMembers("org_001")).resolves.toEqual(
+      mockListMembersResponse.members,
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/organization/list-members?organizationId=org_001",
-      expect.objectContaining({ headers: expect.objectContaining({ accept: "application/json" }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ accept: "application/json" }),
+      }),
     );
   });
 
   it("normalizes organization metadata returned as an object", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([mockOrganizationWireWithObjectMetadata]));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([mockOrganizationWireWithObjectMetadata]),
+    );
 
     await expect(listOrganizations()).resolves.toEqual([
-      { ...mockOrganizations[0], metadata: "{\n  \"plan\": \"enterprise\"\n}" },
+      { ...mockOrganizations[0], metadata: '{\n  "plan": "enterprise"\n}' },
     ]);
   });
 
   it("sends organization metadata as a Better Auth JSON object on create", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(mockOrganizationWireWithObjectMetadata));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(mockOrganizationWireWithObjectMetadata),
+    );
 
-    await expect(createOrganization({
-      name: "Acme Corp",
-      slug: "acme",
-      metadata: "{\"plan\":\"enterprise\"}",
-    })).resolves.toMatchObject({ metadata: "{\n  \"plan\": \"enterprise\"\n}" });
+    await expect(
+      createOrganization({
+        name: "Acme Corp",
+        slug: "acme",
+        metadata: '{"plan":"enterprise"}',
+      }),
+    ).resolves.toMatchObject({ metadata: '{\n  "plan": "enterprise"\n}' });
 
     const { url, init } = lastCall();
     expect(url).toBe("/api/auth/organization/create");
@@ -82,9 +92,11 @@ describe("organization actions", () => {
   });
 
   it("sends organization metadata as a Better Auth JSON object on update", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(mockOrganizationWireWithObjectMetadata));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(mockOrganizationWireWithObjectMetadata),
+    );
 
-    await updateOrganization("org_001", { metadata: "{\"plan\":\"enterprise\"}" });
+    await updateOrganization("org_001", { metadata: '{"plan":"enterprise"}' });
 
     const { url, init } = lastCall();
     expect(url).toBe("/api/auth/organization/update");
@@ -101,10 +113,16 @@ describe("organization actions", () => {
   });
 
   it("derives expired invitations and preserves Better Auth canceled spelling", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([
-      { ...mockInvitations[0], status: "pending", expiresAt: "2000-01-01T00:00:00.000Z" },
-      { ...mockInvitations[0], id: "inv_canceled", status: "canceled" },
-    ]));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          ...mockInvitations[0],
+          status: "pending",
+          expiresAt: "2000-01-01T00:00:00.000Z",
+        },
+        { ...mockInvitations[0], id: "inv_canceled", status: "canceled" },
+      ]),
+    );
 
     await expect(listInvitations("org_001")).resolves.toEqual([
       expect.objectContaining({ status: "expired" }),
@@ -118,7 +136,9 @@ describe("organization actions", () => {
       .mockResolvedValueOnce(jsonResponse(mockTeamMembers.team_001));
 
     await expect(listTeams("org_001")).resolves.toEqual(mockTeams);
-    await expect(listTeamMembers("team_001")).resolves.toEqual(mockTeamMembers.team_001);
+    await expect(listTeamMembers("team_001")).resolves.toEqual(
+      mockTeamMembers.team_001,
+    );
   });
 
   it("sends route-bound organization id for team mutations", async () => {

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "target": "ES2025",
+    "lib": ["ES2025", "DOM", "DOM.Iterable", "WebWorker"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -14,7 +14,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "types": ["@cloudflare/workers-types", "node", "vitest/globals"],
+    "types": [
+      "@cloudflare/workers-types",
+      "@testing-library/jest-dom/vitest",
+      "node",
+      "vitest/globals"
+    ],
     "paths": {
       "@/*": ["./workers/ui/src/*"],
       "@id/lib": ["./packages/lib/src/index.ts"],
@@ -23,5 +28,12 @@
       "@id/ui/*": ["./packages/ui/src/*"]
     }
   },
-  "include": ["packages/*/src", "workers/*/src", "drizzle.config.ts", "vite.config.ts"]
+  "include": [
+    "packages/*/src",
+    "workers/*/src",
+    "workers/*/tests",
+    ".ladle/mocks",
+    "drizzle.config.ts",
+    "vite.config.ts"
+  ]
 }

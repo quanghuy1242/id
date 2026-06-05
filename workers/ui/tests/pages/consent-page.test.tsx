@@ -16,7 +16,7 @@ vi.mock("@/lib/oauth-query", () => ({
 
 vi.mock("@id/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
-  authApiPost: vi.fn<(...args: unknown[]) => void>(),
+  authApiPost: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
 describe("ConsentPage", () => {

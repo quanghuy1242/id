@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { authPluginConfig, systemResourceServerAudience } from "../../src/auth/config";
+import {
+  authPluginConfig,
+  systemResourceServerAudience,
+} from "../../src/auth/config";
 import {
   attachClientResourceScope,
   bootstrapAdmin,
@@ -24,21 +27,32 @@ const SCIM_TENANT_SCHEMA = "https://id/scim/schemas/tenant-membership";
 describe("parseScimFilter", () => {
   it("parses single id eq clause", () => {
     const result = parseScimFilter('id eq "user_123"');
-    expect(result).toEqual({ kind: "single", clause: { field: "id", op: "eq", value: "user_123" } });
+    expect(result).toEqual({
+      kind: "single",
+      clause: { field: "id", op: "eq", value: "user_123" },
+    });
   });
 
   it("parses single userName eq clause", () => {
     const result = parseScimFilter('userName eq "user_abc"');
-    expect(result).toEqual({ kind: "single", clause: { field: "userName", op: "eq", value: "user_abc" } });
+    expect(result).toEqual({
+      kind: "single",
+      clause: { field: "userName", op: "eq", value: "user_abc" },
+    });
   });
 
   it("parses members.value eq clause", () => {
     const result = parseScimFilter('members.value eq "user_x"');
-    expect(result).toEqual({ kind: "single", clause: { field: "members.value", op: "eq", value: "user_x" } });
+    expect(result).toEqual({
+      kind: "single",
+      clause: { field: "members.value", op: "eq", value: "user_x" },
+    });
   });
 
   it("parses compound id and members.value clause", () => {
-    const result = parseScimFilter('id eq "org-admins" and members.value eq "user_y"');
+    const result = parseScimFilter(
+      'id eq "org-admins" and members.value eq "user_y"',
+    );
     expect(result).toEqual({
       kind: "and",
       left: { field: "id", op: "eq", value: "org-admins" },
@@ -54,11 +68,15 @@ describe("parseScimFilter", () => {
   });
 
   it("throws for unsupported filter field", () => {
-    expect(() => parseScimFilter('email eq "a@b.com"')).toThrow("Unsupported SCIM filter");
+    expect(() => parseScimFilter('email eq "a@b.com"')).toThrow(
+      "Unsupported SCIM filter",
+    );
   });
 
   it("throws for malformed filter", () => {
-    expect(() => parseScimFilter("id badop value")).toThrow("Unsupported SCIM filter");
+    expect(() => parseScimFilter("id badop value")).toThrow(
+      "Unsupported SCIM filter",
+    );
   });
 });
 
@@ -77,7 +95,10 @@ async function seedScimInfrastructure() {
     name: "SCIM Directory",
     audience: SCIM_AUDIENCE,
   });
-  await createOAuthScope(test, cookie, { resourceServerId: scimRsId, scope: authPluginConfig.scimDirectoryScope });
+  await createOAuthScope(test, cookie, {
+    resourceServerId: scimRsId,
+    scope: authPluginConfig.scimDirectoryScope,
+  });
 
   // Provision an infra M2M client for SCIM.
   const scimClient = await createM2MClient(test, cookie, {
@@ -116,11 +137,17 @@ async function issueScimToken(
 describe("SCIM discovery endpoints (no auth required)", () => {
   it("GET ServiceProviderConfig returns SCIM+JSON and advertises read-only support", async () => {
     const { test } = await seedScimInfrastructure();
-    const resp = await test.app.request(`${SCIM_BASE}/ServiceProviderConfig`, {}, test.env);
+    const resp = await test.app.request(
+      `${SCIM_BASE}/ServiceProviderConfig`,
+      {},
+      test.env,
+    );
     expect(resp.status).toBe(200);
     expect(resp.headers.get("content-type")).toContain(SCIM_CONTENT_TYPE);
     const body = (await resp.json()) as Record<string, unknown>;
-    expect(body.schemas).toContain("urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig");
+    expect(body.schemas).toContain(
+      "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig",
+    );
     expect((body.patch as { supported: boolean }).supported).toBe(false);
     expect((body.bulk as { supported: boolean }).supported).toBe(false);
   });
@@ -139,7 +166,11 @@ describe("SCIM discovery endpoints (no auth required)", () => {
 
   it("GET ResourceTypes returns User and Group resource types", async () => {
     const { test } = await seedScimInfrastructure();
-    const resp = await test.app.request(`${SCIM_BASE}/ResourceTypes`, {}, test.env);
+    const resp = await test.app.request(
+      `${SCIM_BASE}/ResourceTypes`,
+      {},
+      test.env,
+    );
     expect(resp.status).toBe(200);
     const types = (await resp.json()) as Array<{ id: string }>;
     expect(types.map((t) => t.id)).toContain("User");
@@ -207,7 +238,11 @@ describe("SCIM global user lookup", () => {
 
   it("returns 401 without bearer token", async () => {
     const { test } = await seedScimInfrastructure();
-    const resp = await test.app.request(`${SCIM_BASE}/Users/user_any`, {}, test.env);
+    const resp = await test.app.request(
+      `${SCIM_BASE}/Users/user_any`,
+      {},
+      test.env,
+    );
     expect(resp.status).toBe(401);
   });
 
@@ -219,9 +254,17 @@ describe("SCIM global user lookup", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/Users?filter=${encodeURIComponent('id eq "user_bob"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { schemas: string[]; totalResults: number; Resources: Array<{ id: string }> };
+    const body = (await resp.json()) as {
+      schemas: string[];
+      totalResults: number;
+      Resources: Array<{ id: string }>;
+    };
     expect(body.schemas).toContain(SCIM_LIST_SCHEMA);
     expect(body.totalResults).toBe(1);
     expect(body.Resources[0].id).toBe("user_bob");
@@ -232,7 +275,11 @@ describe("SCIM global user lookup", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/Users?filter=${encodeURIComponent('id eq "user_nobody"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { totalResults: number };
     expect(body.totalResults).toBe(0);
@@ -246,9 +293,17 @@ describe("SCIM global user lookup", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/Users?filter=${encodeURIComponent('userName eq "user_charlie"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { schemas: string[]; totalResults: number; Resources: Array<{ id: string; userName: string }> };
+    const body = (await resp.json()) as {
+      schemas: string[];
+      totalResults: number;
+      Resources: Array<{ id: string; userName: string }>;
+    };
     expect(body.schemas).toContain(SCIM_LIST_SCHEMA);
     expect(body.totalResults).toBe(1);
     expect(body.Resources[0].id).toBe("user_charlie");
@@ -260,7 +315,11 @@ describe("SCIM global user lookup", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/Users?filter=${encodeURIComponent('email eq "a@b.com"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(400);
     const body = (await resp.json()) as { scimType: string };
     expect(body.scimType).toBe("invalidFilter");
@@ -353,7 +412,10 @@ describe("SCIM tenant-scoped user lookup", () => {
     expect(body.id).toBe("user_member");
     expect(body.active).toBe(true);
     expect(body.schemas).toContain(SCIM_TENANT_SCHEMA);
-    const membership = body[SCIM_TENANT_SCHEMA] as { tenantId: string; role: string };
+    const membership = body[SCIM_TENANT_SCHEMA] as {
+      tenantId: string;
+      role: string;
+    };
     expect(membership.tenantId).toBe("org_content");
     expect(membership.role).toBe("admin");
   });
@@ -458,7 +520,10 @@ describe("SCIM tenant Users mutation methods return 405", () => {
       {
         method: "POST",
         headers: { "content-type": SCIM_CONTENT_TYPE },
-        body: JSON.stringify({ schemas: ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"], Operations: [] }),
+        body: JSON.stringify({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+          Operations: [],
+        }),
       },
       test.env,
     );
@@ -605,9 +670,16 @@ describe("SCIM tenant-scoped group filter", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent('id eq "team_editorial"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { totalResults: number; Resources: Array<{ id: string }> };
+    const body = (await resp.json()) as {
+      totalResults: number;
+      Resources: Array<{ id: string }>;
+    };
     expect(body.totalResults).toBe(1);
     expect(body.Resources[0].id).toBe("team_editorial");
   });
@@ -620,9 +692,16 @@ describe("SCIM tenant-scoped group filter", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent('id eq "org-admins"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { totalResults: number; Resources: Array<{ id: string }> };
+    const body = (await resp.json()) as {
+      totalResults: number;
+      Resources: Array<{ id: string }>;
+    };
     expect(body.totalResults).toBe(1);
     expect(body.Resources[0].id).toBe("org-admins");
   });
@@ -642,9 +721,16 @@ describe("SCIM tenant-scoped group filter", () => {
 
     const filter = 'id eq "org-admins" and members.value eq "user_admin"';
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent(filter)}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { totalResults: number; Resources: Array<{ id: string }> };
+    const body = (await resp.json()) as {
+      totalResults: number;
+      Resources: Array<{ id: string }>;
+    };
     expect(body.totalResults).toBe(1);
     expect(body.Resources[0].id).toBe("org-admins");
   });
@@ -664,7 +750,11 @@ describe("SCIM tenant-scoped group filter", () => {
 
     const filter = 'id eq "org-admins" and members.value eq "user_plain"';
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent(filter)}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { totalResults: number };
     expect(body.totalResults).toBe(0);
@@ -682,7 +772,11 @@ describe("SCIM tenant-scoped group filter", () => {
 
     const filter = 'id eq "org-admins" and members.value eq "user_external"';
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent(filter)}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { totalResults: number };
     expect(body.totalResults).toBe(0);
@@ -703,7 +797,11 @@ describe("SCIM tenant-scoped group filter", () => {
 
     // Searching in org_a for a team that belongs to org_b → empty list.
     const url = `${SCIM_BASE}/tenants/org_a/Groups?filter=${encodeURIComponent('id eq "team_b"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { totalResults: number };
     expect(body.totalResults).toBe(0);
@@ -717,7 +815,11 @@ describe("SCIM tenant-scoped group filter", () => {
     const token = await issueScimToken(test, scimClient, SCIM_AUDIENCE);
 
     const url = `${SCIM_BASE}/tenants/org_content/Groups?filter=${encodeURIComponent('displayName eq "foo"')}`;
-    const resp = await test.app.request(url, { headers: { authorization: `Bearer ${token}` } }, test.env);
+    const resp = await test.app.request(
+      url,
+      { headers: { authorization: `Bearer ${token}` } },
+      test.env,
+    );
     expect(resp.status).toBe(400);
     const body = (await resp.json()) as { scimType: string };
     expect(body.scimType).toBe("invalidFilter");
@@ -734,7 +836,10 @@ describe("SCIM Groups mutation methods return 405", () => {
       {
         method: "POST",
         headers: { "content-type": SCIM_CONTENT_TYPE },
-        body: JSON.stringify({ schemas: [SCIM_GROUP_SCHEMA], displayName: "New Group" }),
+        body: JSON.stringify({
+          schemas: [SCIM_GROUP_SCHEMA],
+          displayName: "New Group",
+        }),
       },
       test.env,
     );
@@ -748,7 +853,10 @@ describe("SCIM Groups mutation methods return 405", () => {
       {
         method: "PUT",
         headers: { "content-type": SCIM_CONTENT_TYPE },
-        body: JSON.stringify({ schemas: [SCIM_GROUP_SCHEMA], displayName: "Updated" }),
+        body: JSON.stringify({
+          schemas: [SCIM_GROUP_SCHEMA],
+          displayName: "Updated",
+        }),
       },
       test.env,
     );
@@ -818,7 +926,10 @@ describe("SCIM bearer token enforcement", () => {
       name: "Other",
       audience: otherAudience,
     });
-    await createOAuthScope(test, cookie, { resourceServerId: otherRsId, scope: authPluginConfig.scimDirectoryScope });
+    await createOAuthScope(test, cookie, {
+      resourceServerId: otherRsId,
+      scope: authPluginConfig.scimDirectoryScope,
+    });
     const otherClient = await createM2MClient(test, cookie, {
       name: "other client",
       scope: authPluginConfig.scimDirectoryScope,
@@ -837,7 +948,8 @@ describe("SCIM bearer token enforcement", () => {
       scope: authPluginConfig.scimDirectoryScope,
     });
     expect(tokenResp.status).toBe(200);
-    const wrongToken = ((await tokenResp.json()) as { access_token: string }).access_token;
+    const wrongToken = ((await tokenResp.json()) as { access_token: string })
+      .access_token;
 
     const resp = await test.app.request(
       `${SCIM_BASE}/Users/user_x`,

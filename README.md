@@ -214,6 +214,8 @@ pnpm db:migrate:remote
 ## Quality Checks
 
 ```bash
+pnpm format
+pnpm format:check
 pnpm lint
 pnpm check:dup
 pnpm typecheck
@@ -229,7 +231,7 @@ pnpm auth:api:login <origin> <email>
 pnpm auth:api:logout
 ```
 
-`pnpm check` is the hard gate: oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict via `tsgo` (TypeScript 7 native preview) against the root `tsconfig.json`, and Vitest. `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
+`pnpm check` is the hard gate: oxfmt formatting (`pnpm format:check`; run `pnpm format` to apply — configured in `.oxfmtrc.json` at 80-column print width, scoped to source TypeScript and excluding generated/snapshot/migration files), oxlint architecture rules (16 ported + 7 id-specific), Fallow mild duplicate threshold (<3%), UI composition rules, TypeScript strict via `tsgo` (TypeScript 7 native preview) against the root `tsconfig.json` including worker/package source and tests, and Vitest. `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. `pnpm advise` is non-blocking review input from Aislop plus semantic Fallow; run it after substantial code changes.
 There is intentionally no separate `check:ui`; UI composition is enforced by `pnpm lint`, so it is already included in `pnpm check`.
 Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `workers/ui/tests/all.test.ts`) to avoid repeated environment/import setup. Add new test files to the matching barrel instead of widening the project `include` patterns.
 `pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks use `/ui-health` for the public UI Worker liveness probe and `/admin/*` for admin page routing, because production only routes explicit UI paths to `ui-id`.
@@ -241,7 +243,7 @@ Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `w
 
 CI/CD is handled by `.github/workflows/ci.yml`. Push/PR runs `pnpm check`; push and manual dispatch via **Actions → CI & Deploy → Run workflow** with `deploy=true` run the deploy pipeline:
 
-1. `pnpm check` — lint, dup gate, typecheck (root config, tsgo), tests
+1. `pnpm check` — format check, lint, dup gate, typecheck (root config, tsgo), tests
 2. Validate required deploy secrets
 3. `pnpm db:migrate:remote`
 4. `pnpm build` — builds core-id with Vite and emits `dist/id_core/wrangler.json`

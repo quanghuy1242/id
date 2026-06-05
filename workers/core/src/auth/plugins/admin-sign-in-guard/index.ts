@@ -1,7 +1,16 @@
-import { APIError, createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  sessionMiddleware,
+} from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import * as z from "zod";
-import { ADMIN_OTP_TTL_SECONDS, ADMIN_STEP_UP_TTL_SECONDS, isPlatformStepUpFresh } from "../../config";
+import {
+  ADMIN_OTP_TTL_SECONDS,
+  ADMIN_STEP_UP_TTL_SECONDS,
+  isPlatformStepUpFresh,
+} from "../../config";
 import { readBody, readString } from "../../../shared/request";
 import {
   assertOtpGenerateLimit,
@@ -29,11 +38,19 @@ type StepUpSession = {
 };
 
 type SessionWriter = {
-  readonly updateSession: (token: string, data: Record<string, unknown>) => Promise<unknown>;
+  readonly updateSession: (
+    token: string,
+    data: Record<string, unknown>,
+  ) => Promise<unknown>;
 };
 
 function requireSession(session: unknown): StepUpSession {
-  if (!session || typeof session !== "object" || !("user" in session) || !("session" in session)) {
+  if (
+    !session ||
+    typeof session !== "object" ||
+    !("user" in session) ||
+    !("session" in session)
+  ) {
     throw new APIError("UNAUTHORIZED");
   }
   return session as StepUpSession;
@@ -44,12 +61,17 @@ function requireSessionToken(session: StepUpSession): string {
   return session.session.token;
 }
 
-function assertPlatformAdmin(session: StepUpSession, opts: AdminSignInGuardOptions): void {
+function assertPlatformAdmin(
+  session: StepUpSession,
+  opts: AdminSignInGuardOptions,
+): void {
   if (!(opts.isPlatformAdmin ?? (() => false))(session.user.role)) {
-    throw new APIError("FORBIDDEN", { code: "platform_step_up_required", message: "Platform access requires an eligible account" });
+    throw new APIError("FORBIDDEN", {
+      code: "platform_step_up_required",
+      message: "Platform access requires an eligible account",
+    });
   }
 }
-
 
 const verifyStepUpBody = z.object({
   otp: z.string().min(1),
@@ -68,7 +90,9 @@ const verifyStepUpBody = z.object({
  * before the endpoint body, so an invalid context cannot leave a session cookie
  * behind.
  */
-export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlugin => ({
+export const idAdminSignInGuard = (
+  opts: AdminSignInGuardOptions,
+): BetterAuthPlugin => ({
   id: "id-admin-sign-in-guard",
   schema: {
     session: {
@@ -92,7 +116,11 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
           return ctx.json({ steppedUp: false });
         }
         // Read the proof off the session record (no KV); freshness is computed at read time.
-        return ctx.json({ steppedUp: isPlatformStepUpFresh(session.session.platformStepUpAt ?? null) });
+        return ctx.json({
+          steppedUp: isPlatformStepUpFresh(
+            session.session.platformStepUpAt ?? null,
+          ),
+        });
       },
     ),
     requestAdminStepUp: createAuthEndpoint(
@@ -102,7 +130,10 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
         const session = requireSession(ctx.context.session);
         assertPlatformAdmin(session, opts);
         if (session.user.emailVerified === false) {
-          throw new APIError("FORBIDDEN", { code: "EMAIL_NOT_VERIFIED", message: "Email is not verified" });
+          throw new APIError("FORBIDDEN", {
+            code: "EMAIL_NOT_VERIFIED",
+            message: "Email is not verified",
+          });
         }
 
         await assertOtpGenerateLimit(opts.kv, session.user.id);
@@ -114,7 +145,10 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
         );
         await opts.sendEmail({ to: session.user.email, otp: code });
 
-        return ctx.json({ status: true, maskedEmail: maskEmail(session.user.email) });
+        return ctx.json({
+          status: true,
+          maskedEmail: maskEmail(session.user.email),
+        });
       },
     ),
     verifyAdminStepUp: createAuthEndpoint(
@@ -125,15 +159,27 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
         assertPlatformAdmin(session, opts);
         await assertOtpVerifyLimit(opts.kv, session.user.id);
         const stored = await opts.kv.get(otpCodeKey(session.user.id));
-        const submitted = otpHmacHex(opts.otpHmacSecret, session.user.id, ctx.body.otp);
+        const submitted = otpHmacHex(
+          opts.otpHmacSecret,
+          session.user.id,
+          ctx.body.otp,
+        );
         if (!stored || !timingSafeEqualHex(stored, submitted)) {
-          throw new APIError("UNAUTHORIZED", { code: "invalid_otp", message: "Invalid or expired code" });
+          throw new APIError("UNAUTHORIZED", {
+            code: "invalid_otp",
+            message: "Invalid or expired code",
+          });
         }
         await opts.kv.delete(otpCodeKey(session.user.id));
         // Record the proof on the session (write-through to D1 + KV secondary storage).
         const internalAdapter = ctx.context.internalAdapter as SessionWriter;
-        await internalAdapter.updateSession(requireSessionToken(session), { platformStepUpAt: Date.now() });
-        return ctx.json({ steppedUp: true, expiresIn: ADMIN_STEP_UP_TTL_SECONDS });
+        await internalAdapter.updateSession(requireSessionToken(session), {
+          platformStepUpAt: Date.now(),
+        });
+        return ctx.json({
+          steppedUp: true,
+          expiresIn: ADMIN_STEP_UP_TTL_SECONDS,
+        });
       },
     ),
   },
@@ -150,7 +196,10 @@ export const idAdminSignInGuard = (opts: AdminSignInGuardOptions): BetterAuthPlu
           // everything else must target a first-party app shell or it is rejected.
           if (oauthQuery) return;
           if (!isFirstPartyAppCallback(callbackURL)) {
-            throw new APIError("BAD_REQUEST", { code: "missing_login_context", message: "Missing login context" });
+            throw new APIError("BAD_REQUEST", {
+              code: "missing_login_context",
+              message: "Missing login context",
+            });
           }
         }),
       },

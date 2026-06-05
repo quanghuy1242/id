@@ -40,11 +40,17 @@ export function toMs(value: unknown): number | null {
 }
 
 /** Clamps caller-supplied `limit`/`offset` query values into a safe page window. */
-export function parsePageParams(query: { limit?: unknown; offset?: unknown } | undefined): PageParams {
+export function parsePageParams(
+  query: { limit?: unknown; offset?: unknown } | undefined,
+): PageParams {
   const rawLimit = Number(query?.limit);
   const rawOffset = Number(query?.offset);
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), ADMIN_AUDIT_MAX_PAGE_LIMIT) : ADMIN_AUDIT_DEFAULT_PAGE_LIMIT;
-  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(Math.floor(rawLimit), ADMIN_AUDIT_MAX_PAGE_LIMIT)
+      : ADMIN_AUDIT_DEFAULT_PAGE_LIMIT;
+  const offset =
+    Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
   return { limit, offset };
 }
 
@@ -53,7 +59,10 @@ export function parsePageParams(query: { limit?: unknown; offset?: unknown } | u
  * full token value. Falls back to the row id when the token column is null
  * (access tokens are nullable in storage).
  */
-export function tokenPrefix(token: string | null | undefined, id: string): string {
+export function tokenPrefix(
+  token: string | null | undefined,
+  id: string,
+): string {
   const source = token && token.length > 0 ? token : id;
   return `${source.slice(0, ADMIN_AUDIT_TOKEN_PREFIX_LENGTH)}…`;
 }
@@ -61,11 +70,15 @@ export function tokenPrefix(token: string | null | undefined, id: string): strin
 /** Parses the stored public-key JSON into a JWK object; returns `{}` on failure. */
 export function parsePublicJwk(publicKey: unknown): Record<string, unknown> {
   if (typeof publicKey !== "string") {
-    return publicKey && typeof publicKey === "object" ? (publicKey as Record<string, unknown>) : {};
+    return publicKey && typeof publicKey === "object"
+      ? (publicKey as Record<string, unknown>)
+      : {};
   }
   try {
     const parsed = JSON.parse(publicKey) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
     return {};
   }
@@ -77,14 +90,21 @@ export function parsePublicJwk(publicKey: unknown): Record<string, unknown> {
  * key still inside the grace window is `rotated`; past the grace window it is
  * `expired`.
  */
-export function deriveJwkStatus(expiresAtMs: number | null, nowMs: number, graceMs: number): "active" | "rotated" | "expired" {
+export function deriveJwkStatus(
+  expiresAtMs: number | null,
+  nowMs: number,
+  graceMs: number,
+): "active" | "rotated" | "expired" {
   if (expiresAtMs === null || nowMs < expiresAtMs) return "active";
   if (nowMs < expiresAtMs + graceMs) return "rotated";
   return "expired";
 }
 
 /** Collects the unique, defined values of one field across rows (for `in` enrichment). */
-export function uniqueIds<T>(rows: readonly T[], pick: (row: T) => string | null | undefined): string[] {
+export function uniqueIds<T>(
+  rows: readonly T[],
+  pick: (row: T) => string | null | undefined,
+): string[] {
   const set = new Set<string>();
   for (const row of rows) {
     const id = pick(row);
@@ -93,7 +113,10 @@ export function uniqueIds<T>(rows: readonly T[], pick: (row: T) => string | null
   return [...set];
 }
 
-export function presentSession(row: SessionRow, emailByUserId: Map<string, string>): PresentedSession {
+export function presentSession(
+  row: SessionRow,
+  emailByUserId: Map<string, string>,
+): PresentedSession {
   // Do not return row.token here. Session tokens are bearer material; callers revoke by session id and the plugin resolves the token server-side.
   return {
     id: row.id,
@@ -122,7 +145,7 @@ export function presentToken(
     clientId: row.clientId,
     clientName: nameByClientId.get(row.clientId) ?? null,
     userId: row.userId ?? null,
-    userEmail: row.userId ? emailByUserId.get(row.userId) ?? null : null,
+    userEmail: row.userId ? (emailByUserId.get(row.userId) ?? null) : null,
     scopes: normalizeScopes(row.scopes),
     expiresAt: toMs(row.expiresAt),
     createdAt: toMs(row.createdAt),
@@ -139,14 +162,18 @@ export function presentConsent(
     clientId: row.clientId,
     clientName: nameByClientId.get(row.clientId) ?? null,
     userId: row.userId ?? null,
-    userEmail: row.userId ? emailByUserId.get(row.userId) ?? null : null,
+    userEmail: row.userId ? (emailByUserId.get(row.userId) ?? null) : null,
     scopes: normalizeScopes(row.scopes),
     createdAt: toMs(row.createdAt),
     updatedAt: toMs(row.updatedAt),
   };
 }
 
-export function presentJwk(row: JwksRow, nowMs: number, graceMs: number): PresentedJwk {
+export function presentJwk(
+  row: JwksRow,
+  nowMs: number,
+  graceMs: number,
+): PresentedJwk {
   const publicJwk = parsePublicJwk(row.publicKey);
   const expiresAt = toMs(row.expiresAt);
   return {

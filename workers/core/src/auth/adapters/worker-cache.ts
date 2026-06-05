@@ -15,7 +15,10 @@ export function defaultWorkerCache(): Cache | null {
 }
 
 /** Read from the Worker cache and fail open when Cache API access fails. */
-export async function matchWorkerCache(cache: Cache, key: Request): Promise<Response | undefined> {
+export async function matchWorkerCache(
+  cache: Cache,
+  key: Request,
+): Promise<Response | undefined> {
   try {
     return await cache.match(key);
   } catch {

@@ -40,7 +40,9 @@ describe("account actions", () => {
     await expect(getAccountSummary()).resolves.toEqual(mockAccountSummary);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/account/summary",
-      expect.objectContaining({ headers: expect.objectContaining({ accept: "application/json" }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ accept: "application/json" }),
+      }),
     );
   });
 
@@ -83,6 +85,8 @@ describe("account actions", () => {
     });
 
     await verifyEmail("verify_token");
-    expect(lastCall().url).toBe("/api/auth/verify-email?token=verify_token&callbackURL=%2Faccount%2Fsecurity");
+    expect(lastCall().url).toBe(
+      "/api/auth/verify-email?token=verify_token&callbackURL=%2Faccount%2Fsecurity",
+    );
   });
 });

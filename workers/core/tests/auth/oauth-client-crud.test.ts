@@ -5,48 +5,73 @@ import { betterAuth } from "better-auth";
 import { getAuthOptions } from "../../src/auth/get-auth";
 import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-storage";
 import * as authSchema from "../../src/db/auth-schema";
-import { applyAuthMigrations } from "./d1-test-helper";
+import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 import { createCapturedAuthEmailSender } from "../helpers/test-email";
 import { adminOtpSignIn } from "./admin-otp-sign-in";
 
 const capturedEmailSender = createCapturedAuthEmailSender();
 
-type RawSqlite = { readonly exec: (sql: string) => void };
-type TestAuth = ReturnType<typeof betterAuth>;
-
 function createKv(): BetterAuthKvStorage {
   const values = new Map<string, string>();
   return {
     get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => { values.set(key, value); },
-    delete: async (key) => { values.delete(key); },
+    put: async (key, value) => {
+      values.set(key, value);
+    },
+    delete: async (key) => {
+      values.delete(key);
+    },
   };
 }
 
 async function createAuth(raw: RawSqlite) {
-  const db = drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema });
+  const db = drizzleAdapter(drizzle(raw), {
+    provider: "sqlite",
+    camelCase: true,
+    schema: authSchema,
+  });
   return betterAuth(
     getAuthOptions(
-      { BETTER_AUTH_SECRET: "test-secret", BETTER_AUTH_URL: "https://id.example.test", DB: db, KV: createKv() },
+      {
+        BETTER_AUTH_SECRET: "test-secret",
+        BETTER_AUTH_URL: "https://id.example.test",
+        DB: db,
+        KV: createKv(),
+      },
       { validAudiences: [], scopes: [], scopeRows: [] },
       { emailSender: capturedEmailSender },
     ),
   );
 }
 
+type TestAuth = Awaited<ReturnType<typeof createAuth>>;
+
 async function createMemoryDatabase(): Promise<RawSqlite> {
-  const { default: Database } = await import("better-sqlite3") as { readonly default: new (path: string) => RawSqlite };
+  const { default: Database } = (await import("better-sqlite3")) as {
+    readonly default: new (path: string) => RawSqlite;
+  };
   const raw = new Database(":memory:");
   applyAuthMigrations(raw);
-  raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`);
+  raw.exec(
+    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_1', 'Acme', 'acme', 1700000000000);`,
+  );
   return raw;
 }
 
 async function signInSuperadmin(auth: TestAuth): Promise<string> {
   await auth.api.createUser({
-    body: { name: "Admin", email: "admin@example.test", password: "password123", role: "admin", data: { emailVerified: true } },
+    body: {
+      name: "Admin",
+      email: "admin@example.test",
+      password: "password123",
+      role: "admin",
+      data: { emailVerified: true },
+    },
   });
-  const r = await adminOtpSignIn(auth, capturedEmailSender, { email: "admin@example.test", password: "password123" });
+  const r = await adminOtpSignIn(auth, capturedEmailSender, {
+    email: "admin@example.test",
+    password: "password123",
+  });
   return r.headers.get("set-cookie") ?? "";
 }
 
@@ -56,9 +81,12 @@ describe("OAuth client management", () => {
     const auth = await createAuth(raw);
     const cookie = await signInSuperadmin(auth);
 
-    const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/get-clients", {
-      method: "GET", headers: { cookie },
-    }));
+    const r = await auth.handler(
+      new Request("https://id.example.test/api/auth/oauth2/get-clients", {
+        method: "GET",
+        headers: { cookie },
+      }),
+    );
     expect(r.status).toBe(200);
   });
 
@@ -66,9 +94,11 @@ describe("OAuth client management", () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
 
-    const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/get-clients", {
-      method: "GET",
-    }));
+    const r = await auth.handler(
+      new Request("https://id.example.test/api/auth/oauth2/get-clients", {
+        method: "GET",
+      }),
+    );
     expect(r.status).toBeGreaterThanOrEqual(400);
   });
 
@@ -76,14 +106,20 @@ describe("OAuth client management", () => {
     const raw = await createMemoryDatabase();
     const auth = await createAuth(raw);
 
-    const r = await auth.handler(new Request("https://id.example.test/api/auth/oauth2/create-client", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        client_name: "Unauth", redirect_uris: ["https://app.example.test/callback"],
-        token_endpoint_auth_method: "client_secret_post", grant_types: ["authorization_code"],
-        response_types: ["code"], scope: "openid",
+    const r = await auth.handler(
+      new Request("https://id.example.test/api/auth/oauth2/create-client", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Unauth",
+          redirect_uris: ["https://app.example.test/callback"],
+          token_endpoint_auth_method: "client_secret_post",
+          grant_types: ["authorization_code"],
+          response_types: ["code"],
+          scope: "openid",
+        }),
       }),
-    }));
+    );
     expect(r.status).toBeGreaterThanOrEqual(400);
   });
 });

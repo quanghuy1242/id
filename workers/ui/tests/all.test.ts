@@ -1,3 +1,7 @@
+import { describe as moduleMarker } from "vitest";
+
+void moduleMarker;
+
 await import("./lib/oauth-query.test");
 await import("./lib/auth-fetch.test");
 await import("./pages/organization-actions.test");

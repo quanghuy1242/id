@@ -1,6 +1,11 @@
 "use client";
 
-import { authApiGet, authApiGetOrThrow, authApiPost, authApiPostOrThrow } from "@id/lib";
+import {
+  authApiGet,
+  authApiGetOrThrow,
+  authApiPost,
+  authApiPostOrThrow,
+} from "@id/lib";
 
 export type AccountUser = {
   readonly id: string;
@@ -57,35 +62,63 @@ export type AccountOrganization = {
 
 export type AccountActions = {
   readonly getAccountSummary: () => Promise<AccountSummary>;
-  readonly updateProfile: (input: { readonly name: string; readonly image?: string | null }) => Promise<void>;
-  readonly changePassword: (input: { readonly currentPassword: string; readonly newPassword: string; readonly revokeOtherSessions: boolean }) => Promise<void>;
+  readonly updateProfile: (input: {
+    readonly name: string;
+    readonly image?: string | null;
+  }) => Promise<void>;
+  readonly changePassword: (input: {
+    readonly currentPassword: string;
+    readonly newPassword: string;
+    readonly revokeOtherSessions: boolean;
+  }) => Promise<void>;
   readonly sendVerificationEmail: (email: string) => Promise<void>;
-  readonly listAccountSessions: () => Promise<{ readonly sessions: readonly AccountSession[] }>;
+  readonly listAccountSessions: () => Promise<{
+    readonly sessions: readonly AccountSession[];
+  }>;
   readonly revokeAccountSession: (sessionId: string) => Promise<void>;
   readonly revokeOtherSessions: () => Promise<{ readonly revoked: number }>;
   readonly revokeAllSessions: () => Promise<void>;
-  readonly listAccountConsents: () => Promise<{ readonly consents: readonly AccountConsent[] }>;
+  readonly listAccountConsents: () => Promise<{
+    readonly consents: readonly AccountConsent[];
+  }>;
   readonly revokeAccountConsent: (clientId: string) => Promise<void>;
-  readonly listAccountOrganizations: () => Promise<{ readonly organizations: readonly AccountOrganization[] }>;
+  readonly listAccountOrganizations: () => Promise<{
+    readonly organizations: readonly AccountOrganization[];
+  }>;
 };
 
 export async function getAccountSummary(): Promise<AccountSummary> {
   return authApiGetOrThrow<AccountSummary>("/account/summary");
 }
 
-export async function updateProfile(input: { readonly name: string; readonly image?: string | null }): Promise<void> {
-  await authApiPostOrThrow("/update-user", { name: input.name, image: input.image || undefined });
+export async function updateProfile(input: {
+  readonly name: string;
+  readonly image?: string | null;
+}): Promise<void> {
+  await authApiPostOrThrow("/update-user", {
+    name: input.name,
+    image: input.image || undefined,
+  });
 }
 
-export async function changePassword(input: { readonly currentPassword: string; readonly newPassword: string; readonly revokeOtherSessions: boolean }): Promise<void> {
+export async function changePassword(input: {
+  readonly currentPassword: string;
+  readonly newPassword: string;
+  readonly revokeOtherSessions: boolean;
+}): Promise<void> {
   await authApiPostOrThrow("/change-password", input);
 }
 
 export async function sendVerificationEmail(email: string): Promise<void> {
-  await authApiPost("/send-verification-email", { email, callbackURL: "/verify-email" });
+  await authApiPost("/send-verification-email", {
+    email,
+    callbackURL: "/verify-email",
+  });
 }
 
-export async function listAccountSessions(): Promise<{ readonly sessions: readonly AccountSession[] }> {
+export async function listAccountSessions(): Promise<{
+  readonly sessions: readonly AccountSession[];
+}> {
   return authApiGetOrThrow<{ sessions: AccountSession[] }>("/account/sessions");
 }
 
@@ -93,15 +126,21 @@ export async function revokeAccountSession(sessionId: string): Promise<void> {
   await authApiPostOrThrow("/account/sessions/revoke", { sessionId });
 }
 
-export async function revokeOtherSessions(): Promise<{ readonly revoked: number }> {
-  return authApiPostOrThrow<{ status: boolean; revoked: number }>("/account/sessions/revoke-others");
+export async function revokeOtherSessions(): Promise<{
+  readonly revoked: number;
+}> {
+  return authApiPostOrThrow<{ status: boolean; revoked: number }>(
+    "/account/sessions/revoke-others",
+  );
 }
 
 export async function revokeAllSessions(): Promise<void> {
   await authApiPostOrThrow("/account/sessions/revoke-all");
 }
 
-export async function listAccountConsents(): Promise<{ readonly consents: readonly AccountConsent[] }> {
+export async function listAccountConsents(): Promise<{
+  readonly consents: readonly AccountConsent[];
+}> {
   return authApiGetOrThrow<{ consents: AccountConsent[] }>("/account/consents");
 }
 
@@ -109,20 +148,37 @@ export async function revokeAccountConsent(clientId: string): Promise<void> {
   await authApiPostOrThrow("/account/consents/revoke", { clientId });
 }
 
-export async function listAccountOrganizations(): Promise<{ readonly organizations: readonly AccountOrganization[] }> {
-  return authApiGetOrThrow<{ organizations: AccountOrganization[] }>("/account/organizations");
+export async function listAccountOrganizations(): Promise<{
+  readonly organizations: readonly AccountOrganization[];
+}> {
+  return authApiGetOrThrow<{ organizations: AccountOrganization[] }>(
+    "/account/organizations",
+  );
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  await authApiPost("/request-password-reset", { email, redirectTo: "/reset-password" });
+  await authApiPost("/request-password-reset", {
+    email,
+    redirectTo: "/reset-password",
+  });
 }
 
-export async function resetPassword(newPassword: string, token: string): Promise<void> {
+export async function resetPassword(
+  newPassword: string,
+  token: string,
+): Promise<void> {
   await authApiPostOrThrow("/reset-password", { newPassword, token });
 }
 
-export async function verifyEmail(token: string): Promise<{ readonly status?: boolean; readonly error?: string; readonly message?: string }> {
-  return authApiGet<{ status?: boolean; error?: string; message?: string }>("/verify-email", { token, callbackURL: "/account/security" });
+export async function verifyEmail(token: string): Promise<{
+  readonly status?: boolean;
+  readonly error?: string;
+  readonly message?: string;
+}> {
+  return authApiGet<{ status?: boolean; error?: string; message?: string }>(
+    "/verify-email",
+    { token, callbackURL: "/account/security" },
+  );
 }
 
 export async function signOut(): Promise<void> {
@@ -142,4 +198,3 @@ export const defaultAccountActions: AccountActions = {
   revokeAccountConsent,
   listAccountOrganizations,
 };
-

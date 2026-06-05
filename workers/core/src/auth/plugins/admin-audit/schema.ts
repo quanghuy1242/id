@@ -114,55 +114,65 @@ export type RotateJwksResponse = PresentedJwk & { reason: string };
 
 // ─── Zod schemas (for OpenAPI generation only) ────────────────────
 
-const sessionSchema = z.object({
-  id: z.string(),
-  userId: z.string(),
-  userEmail: z.string().nullable(),
-  ipAddress: z.string().nullable(),
-  userAgent: z.string().nullable(),
-  activeOrganizationId: z.string().nullable(),
-  activeTeamId: z.string().nullable(),
-  impersonatedBy: z.string().nullable(),
-  createdAt: z.number().nullable(),
-  expiresAt: z.number().nullable(),
-}).meta({ id: "AdminAuditSession" });
+const sessionSchema = z
+  .object({
+    id: z.string(),
+    userId: z.string(),
+    userEmail: z.string().nullable(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable(),
+    activeOrganizationId: z.string().nullable(),
+    activeTeamId: z.string().nullable(),
+    impersonatedBy: z.string().nullable(),
+    createdAt: z.number().nullable(),
+    expiresAt: z.number().nullable(),
+  })
+  .meta({ id: "AdminAuditSession" });
 
-const tokenSchema = z.object({
-  id: z.string(),
-  tokenPrefix: z.string(),
-  type: z.enum(["access", "refresh"]),
-  clientId: z.string(),
-  clientName: z.string().nullable(),
-  userId: z.string().nullable(),
-  userEmail: z.string().nullable(),
-  scopes: z.array(z.string()),
-  expiresAt: z.number().nullable(),
-  createdAt: z.number().nullable(),
-}).meta({ id: "AdminAuditToken" });
+const tokenSchema = z
+  .object({
+    id: z.string(),
+    tokenPrefix: z.string(),
+    type: z.enum(["access", "refresh"]),
+    clientId: z.string(),
+    clientName: z.string().nullable(),
+    userId: z.string().nullable(),
+    userEmail: z.string().nullable(),
+    scopes: z.array(z.string()),
+    expiresAt: z.number().nullable(),
+    createdAt: z.number().nullable(),
+  })
+  .meta({ id: "AdminAuditToken" });
 
-const consentSchema = z.object({
-  id: z.string(),
-  clientId: z.string(),
-  clientName: z.string().nullable(),
-  userId: z.string().nullable(),
-  userEmail: z.string().nullable(),
-  scopes: z.array(z.string()),
-  createdAt: z.number().nullable(),
-  updatedAt: z.number().nullable(),
-}).meta({ id: "AdminAuditConsent" });
+const consentSchema = z
+  .object({
+    id: z.string(),
+    clientId: z.string(),
+    clientName: z.string().nullable(),
+    userId: z.string().nullable(),
+    userEmail: z.string().nullable(),
+    scopes: z.array(z.string()),
+    createdAt: z.number().nullable(),
+    updatedAt: z.number().nullable(),
+  })
+  .meta({ id: "AdminAuditConsent" });
 
-const jwkSchema = z.object({
-  id: z.string(),
-  alg: z.string(),
-  createdAt: z.number().nullable(),
-  expiresAt: z.number().nullable(),
-  status: z.enum(["active", "rotated", "expired"]),
-  publicJwk: z.record(z.string(), z.unknown()),
-}).meta({ id: "AdminAuditJwk" });
+const jwkSchema = z
+  .object({
+    id: z.string(),
+    alg: z.string(),
+    createdAt: z.number().nullable(),
+    expiresAt: z.number().nullable(),
+    status: z.enum(["active", "rotated", "expired"]),
+    publicJwk: z.record(z.string(), z.unknown()),
+  })
+  .meta({ id: "AdminAuditJwk" });
 
-const rotateJwksSchema = jwkSchema.extend({
-  reason: z.string(),
-}).meta({ id: "AdminRotateJwksResponse" });
+const rotateJwksSchema = jwkSchema
+  .extend({
+    reason: z.string(),
+  })
+  .meta({ id: "AdminRotateJwksResponse" });
 
 /** Validated body for the revoke-consent endpoint. */
 export const revokeConsentBody = z
@@ -182,7 +192,10 @@ export const revokeSessionBody = z
 /** Validated body for the emergency-rotate endpoint. */
 export const rotateJwksBody = z
   .object({
-    reason: z.string().min(ROTATE_JWKS_REASON_MIN_LENGTH).max(ROTATE_JWKS_REASON_MAX_LENGTH),
+    reason: z
+      .string()
+      .min(ROTATE_JWKS_REASON_MIN_LENGTH)
+      .max(ROTATE_JWKS_REASON_MAX_LENGTH),
   })
   .strict();
 
@@ -193,20 +206,42 @@ export type RotateJwksBody = z.infer<typeof rotateJwksBody>;
 // ─── Precomputed OpenAPI fragments ────────────────────────────────
 
 export const listSessionsOpenApiSchema = zodSchemaToOpenApi(
-  z.object({ sessions: z.array(sessionSchema), total: z.number(), limit: z.number(), offset: z.number() }),
+  z.object({
+    sessions: z.array(sessionSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+  }),
 );
 export const listTokensOpenApiSchema = zodSchemaToOpenApi(
-  z.object({ tokens: z.array(tokenSchema), total: z.number(), limit: z.number(), offset: z.number() }),
+  z.object({
+    tokens: z.array(tokenSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+  }),
 );
 export const listConsentsOpenApiSchema = zodSchemaToOpenApi(
-  z.object({ consents: z.array(consentSchema), total: z.number(), limit: z.number(), offset: z.number() }),
+  z.object({
+    consents: z.array(consentSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+  }),
 );
-export const successOpenApiSchema = zodSchemaToOpenApi(z.object({ success: z.boolean() }));
-export const revokeConsentOpenApiRequestBody = openApiJsonRequestBody(revokeConsentBody);
-export const revokeSessionOpenApiRequestBody = openApiJsonRequestBody(revokeSessionBody);
-export const jwksOpenApiSchema = zodSchemaToOpenApi(z.object({ keys: z.array(jwkSchema) }));
+export const successOpenApiSchema = zodSchemaToOpenApi(
+  z.object({ success: z.boolean() }),
+);
+export const revokeConsentOpenApiRequestBody =
+  openApiJsonRequestBody(revokeConsentBody);
+export const revokeSessionOpenApiRequestBody =
+  openApiJsonRequestBody(revokeSessionBody);
+export const jwksOpenApiSchema = zodSchemaToOpenApi(
+  z.object({ keys: z.array(jwkSchema) }),
+);
 export const rotateJwksOpenApiSchema = zodSchemaToOpenApi(rotateJwksSchema);
-export const rotateJwksOpenApiRequestBody = openApiJsonRequestBody(rotateJwksBody);
+export const rotateJwksOpenApiRequestBody =
+  openApiJsonRequestBody(rotateJwksBody);
 
 type QueryParameter = {
   name: string;
@@ -217,8 +252,20 @@ type QueryParameter = {
 };
 
 const paginationParameters: readonly QueryParameter[] = [
-  { name: "limit", in: "query", required: false, schema: { type: "integer" }, description: "Page size (max 100, default 25)" },
-  { name: "offset", in: "query", required: false, schema: { type: "integer" }, description: "Row offset to start from" },
+  {
+    name: "limit",
+    in: "query",
+    required: false,
+    schema: { type: "integer" },
+    description: "Page size (max 100, default 25)",
+  },
+  {
+    name: "offset",
+    in: "query",
+    required: false,
+    schema: { type: "integer" },
+    description: "Row offset to start from",
+  },
 ];
 
 /** Static OpenAPI metadata builder for admin-audit endpoints. */
@@ -237,7 +284,10 @@ export function adminAuditEndpointMeta(options: {
 
   const responses: Record<
     string,
-    { description: string; content?: { "application/json"?: { schema: Record<string, unknown> } } }
+    {
+      description: string;
+      content?: { "application/json"?: { schema: Record<string, unknown> } };
+    }
   > = {};
   if (options.responseSchema) {
     responses["200"] = {

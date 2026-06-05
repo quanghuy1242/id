@@ -5,7 +5,9 @@ export { AuthApiError } from "./shared/errors";
  * Internal: serialises a flat params record into a URL query string.
  * undefined / "" values are omitted.
  */
-function buildQuery(params?: Record<string, string | number | undefined>): string {
+function buildQuery(
+  params?: Record<string, string | number | undefined>,
+): string {
   if (!params) return "";
   const search = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -25,7 +27,11 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
  * @param params  — optional flat key/value map serialised as query string
  * @param init    — optional `RequestInit` overrides (headers are merged)
  */
-async function apiGetFetch(path: string, params?: Record<string, string | number | undefined>, init?: RequestInit): Promise<Response> {
+async function apiGetFetch(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+  init?: RequestInit,
+): Promise<Response> {
   const { headers: initHeaders, ...restInit } = init ?? {};
   return fetch(`/api/auth${path}${buildQuery(params)}`, {
     ...restInit,
@@ -43,12 +49,20 @@ async function apiGetFetch(path: string, params?: Record<string, string | number
  * @param body  — optional JSON-serialisable request body
  * @param init  — optional `RequestInit` overrides (headers are merged)
  */
-async function apiPostFetch(path: string, body: unknown | undefined, init: RequestInit | undefined): Promise<Response> {
+async function apiPostFetch(
+  path: string,
+  body: unknown | undefined,
+  init: RequestInit | undefined,
+): Promise<Response> {
   const { headers: initHeaders, ...restInit } = init ?? {};
   return fetch(`/api/auth${path}`, {
     ...restInit,
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json", ...initHeaders },
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      ...initHeaders,
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
@@ -59,12 +73,20 @@ async function apiPostFetch(path: string, body: unknown | undefined, init: Reque
  * Use this for protocol endpoints such as token introspection where the wire
  * format is `application/x-www-form-urlencoded`, not JSON.
  */
-async function apiFormPostFetch(path: string, body: URLSearchParams, init: RequestInit | undefined): Promise<Response> {
+async function apiFormPostFetch(
+  path: string,
+  body: URLSearchParams,
+  init: RequestInit | undefined,
+): Promise<Response> {
   const { headers: initHeaders, ...restInit } = init ?? {};
   return fetch(`/api/auth${path}`, {
     ...restInit,
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", ...initHeaders },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+      ...initHeaders,
+    },
     body,
   });
 }
@@ -82,12 +104,21 @@ async function apiFormPostFetch(path: string, body: URLSearchParams, init: Reque
  * @param body   — optional JSON-serialisable request body
  * @param init   — optional `RequestInit` overrides (headers are merged)
  */
-async function apiBodyFetch(method: "PATCH" | "DELETE", path: string, body: unknown | undefined, init: RequestInit | undefined): Promise<Response> {
+async function apiBodyFetch(
+  method: "PATCH" | "DELETE",
+  path: string,
+  body: unknown | undefined,
+  init: RequestInit | undefined,
+): Promise<Response> {
   const { headers: initHeaders, ...restInit } = init ?? {};
   return fetch(`/api/auth${path}`, {
     ...restInit,
     method,
-    headers: { "content-type": "application/json", accept: "application/json", ...initHeaders },
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      ...initHeaders,
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
@@ -104,14 +135,24 @@ type ApiErrorDetails = {
 };
 
 /** Error-body fields that must never be displayed verbatim in admin alerts. */
-const SENSITIVE_FIELD = "(?:client_secret|clientSecret|access_token|accessToken|refresh_token|refreshToken|id_token|idToken|session_token|sessionToken|password|newPassword|private_key|privateKey|api_key|apiKey|authorization|secret)";
-const SENSITIVE_JSON_FIELD_PATTERN = new RegExp(`("${SENSITIVE_FIELD}"\\s*:\\s*)"[^"]*"`, "gi");
-const SENSITIVE_QUERY_FIELD_PATTERN = new RegExp(`\\b(${SENSITIVE_FIELD})=([^\\s&]+)`, "gi");
-const AUTHORIZATION_HEADER_PATTERN = /\b(authorization:\s*)(?:bearer|basic)\s+[\w.+/~=-]+/gi;
+const SENSITIVE_FIELD =
+  "(?:client_secret|clientSecret|access_token|accessToken|refresh_token|refreshToken|id_token|idToken|session_token|sessionToken|password|newPassword|private_key|privateKey|api_key|apiKey|authorization|secret)";
+const SENSITIVE_JSON_FIELD_PATTERN = new RegExp(
+  `("${SENSITIVE_FIELD}"\\s*:\\s*)"[^"]*"`,
+  "gi",
+);
+const SENSITIVE_QUERY_FIELD_PATTERN = new RegExp(
+  `\\b(${SENSITIVE_FIELD})=([^\\s&]+)`,
+  "gi",
+);
+const AUTHORIZATION_HEADER_PATTERN =
+  /\b(authorization:\s*)(?:bearer|basic)\s+[\w.+/~=-]+/gi;
 const AUTHORIZATION_VALUE_PATTERN = /\b(Bearer|Basic)\s+[\w.+/~=-]+/g;
 const OPENAI_SECRET_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{8,}\b/g;
-const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g;
-const PRIVATE_KEY_PATTERN = /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g;
+const JWT_PATTERN =
+  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\b/g;
+const PRIVATE_KEY_PATTERN =
+  /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g;
 const STRUCTURED_ERROR_TEXT_PATTERN = /^(?:\{|\[)|<html|<!doctype/i;
 /** Maximum validation issue messages to display before summarising the rest. */
 const MAX_VALIDATION_ISSUES = 3;
@@ -120,14 +161,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function readString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function sanitizeErrorMessage(message: string): string {
   return message
-    .replace(SENSITIVE_JSON_FIELD_PATTERN, "$1\"[redacted]\"")
+    .replace(SENSITIVE_JSON_FIELD_PATTERN, '$1"[redacted]"')
     .replace(SENSITIVE_QUERY_FIELD_PATTERN, "$1=[redacted]")
     .replace(AUTHORIZATION_HEADER_PATTERN, "$1[redacted]")
     .replace(AUTHORIZATION_VALUE_PATTERN, "$1 [redacted]")
@@ -139,14 +183,24 @@ function sanitizeErrorMessage(message: string): string {
 function validationIssuePath(path: unknown): string | undefined {
   if (typeof path === "string" && path.trim()) return path.trim();
   if (!Array.isArray(path) || path.length === 0) return undefined;
-  const segments = path.map((segment) => typeof segment === "string" || typeof segment === "number" ? String(segment) : "").filter(Boolean);
+  const segments = path
+    .map((segment) =>
+      typeof segment === "string" || typeof segment === "number"
+        ? String(segment)
+        : "",
+    )
+    .filter(Boolean);
   return segments.length > 0 ? segments.join(".") : undefined;
 }
 
 function validationIssueMessage(issue: unknown): string | undefined {
-  if (typeof issue === "string" && issue.trim()) return sanitizeErrorMessage(issue.trim());
+  if (typeof issue === "string" && issue.trim())
+    return sanitizeErrorMessage(issue.trim());
   if (!isRecord(issue)) return undefined;
-  const message = readString(issue, "message") ?? readString(issue, "description") ?? readString(issue, "code");
+  const message =
+    readString(issue, "message") ??
+    readString(issue, "description") ??
+    readString(issue, "code");
   if (!message) return undefined;
   const path = validationIssuePath(issue.path);
   return sanitizeErrorMessage(path ? `${path}: ${message}` : message);
@@ -154,41 +208,65 @@ function validationIssueMessage(issue: unknown): string | undefined {
 
 function validationIssuesMessage(issues: unknown): string | undefined {
   if (!Array.isArray(issues)) return undefined;
-  const messages = issues.map(validationIssueMessage).filter((message): message is string => Boolean(message)).slice(0, MAX_VALIDATION_ISSUES);
+  const messages = issues
+    .map(validationIssueMessage)
+    .filter((message): message is string => Boolean(message))
+    .slice(0, MAX_VALIDATION_ISSUES);
   if (messages.length === 0) return undefined;
   const remaining = issues.length - messages.length;
-  return remaining > 0 ? `${messages.join("; ")}; ${remaining} more issue${remaining === 1 ? "" : "s"}` : messages.join("; ");
+  return remaining > 0
+    ? `${messages.join("; ")}; ${remaining} more issue${remaining === 1 ? "" : "s"}`
+    : messages.join("; ");
 }
 
 function fallbackErrorMessage(res: Response): string {
-  return res.statusText ? `Request failed (${res.status} ${res.statusText})` : `Request failed (${res.status})`;
+  return res.statusText
+    ? `Request failed (${res.status} ${res.statusText})`
+    : `Request failed (${res.status})`;
 }
 
 function safeTextMessage(text: string, res: Response): string {
   const trimmed = text.trim();
   if (!trimmed) return fallbackErrorMessage(res);
-  if (STRUCTURED_ERROR_TEXT_PATTERN.test(trimmed)) return fallbackErrorMessage(res);
+  if (STRUCTURED_ERROR_TEXT_PATTERN.test(trimmed))
+    return fallbackErrorMessage(res);
   return sanitizeErrorMessage(trimmed);
 }
 
-function errorDetailsFromRecord(record: Record<string, unknown>, res: Response): ApiErrorDetails {
-  const issueMessage = validationIssuesMessage(record.issues) ?? validationIssuesMessage(record.errors);
-  const primary = readString(record, "error_description")
-    ?? readString(record, "message")
-    ?? issueMessage
-    ?? readString(record, "error")
-    ?? readString(record, "code");
-  const message = primary && issueMessage && primary !== issueMessage ? `${primary}: ${issueMessage}` : primary;
+function errorDetailsFromRecord(
+  record: Record<string, unknown>,
+  res: Response,
+): ApiErrorDetails {
+  const issueMessage =
+    validationIssuesMessage(record.issues) ??
+    validationIssuesMessage(record.errors);
+  const primary =
+    readString(record, "error_description") ??
+    readString(record, "message") ??
+    issueMessage ??
+    readString(record, "error") ??
+    readString(record, "code");
+  const message =
+    primary && issueMessage && primary !== issueMessage
+      ? `${primary}: ${issueMessage}`
+      : primary;
   const code = readString(record, "code") ?? readString(record, "error");
-  return { message: sanitizeErrorMessage(message ?? fallbackErrorMessage(res)), code };
+  return {
+    message: sanitizeErrorMessage(message ?? fallbackErrorMessage(res)),
+    code,
+  };
 }
 
-function normalizeAuthApiError(bodyText: string, res: Response): ApiErrorDetails {
+function normalizeAuthApiError(
+  bodyText: string,
+  res: Response,
+): ApiErrorDetails {
   if (bodyText.trim()) {
     try {
       const parsed = JSON.parse(bodyText) as unknown;
       if (isRecord(parsed)) return errorDetailsFromRecord(parsed, res);
-      if (typeof parsed === "string") return { message: safeTextMessage(parsed, res) };
+      if (typeof parsed === "string")
+        return { message: safeTextMessage(parsed, res) };
       const issueMessage = validationIssuesMessage(parsed);
       if (issueMessage) return { message: issueMessage };
     } catch {
@@ -200,7 +278,10 @@ function normalizeAuthApiError(bodyText: string, res: Response): ApiErrorDetails
 
 async function throwApiError(res: Response): Promise<never> {
   const details = normalizeAuthApiError(await res.text(), res);
-  throw new AuthApiError(details.message, { status: res.status, code: details.code });
+  throw new AuthApiError(details.message, {
+    status: res.status,
+    code: details.code,
+  });
 }
 
 // ─── Public GET helpers ───────────────────────────────────────────
@@ -218,7 +299,11 @@ async function throwApiError(res: Response): Promise<never> {
  * @param params  — optional flat key/value map serialised as query string
  * @param init    — optional `RequestInit` overrides (e.g. `credentials: "include"`)
  */
-export async function authApiGet<T>(path: string, params?: Record<string, string | number | undefined>, init?: RequestInit): Promise<T> {
+export async function authApiGet<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiGetFetch(path, params, init);
   return (await res.json().catch(() => ({}))) as T;
 }
@@ -233,7 +318,11 @@ export async function authApiGet<T>(path: string, params?: Record<string, string
  * @param params  — optional flat key/value map serialised as query string
  * @param init    — optional `RequestInit` overrides
  */
-export async function authApiGetOrThrow<T>(path: string, params?: Record<string, string | number | undefined>, init?: RequestInit): Promise<T> {
+export async function authApiGetOrThrow<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiGetFetch(path, params, init);
   if (!res.ok) await throwApiError(res);
   return parseJsonOrUndefined<T>(res);
@@ -254,7 +343,11 @@ export async function authApiGetOrThrow<T>(path: string, params?: Record<string,
  * @param body  — optional JSON-serialisable request body
  * @param init  — optional `RequestInit` overrides (e.g. `{ headers: { "x-id-oauth-context": "..." } }`)
  */
-export async function authApiPost<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
+export async function authApiPost<T>(
+  path: string,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiPostFetch(path, body, init);
   return (await res.json().catch(() => ({}))) as T;
 }
@@ -274,7 +367,11 @@ export async function authApiPost<T>(path: string, body?: unknown, init?: Reques
  * @param body  — optional JSON-serialisable request body
  * @param init  — optional `RequestInit` overrides
  */
-export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
+export async function authApiPostOrThrow<T>(
+  path: string,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiPostFetch(path, body, init);
   if (!res.ok) await throwApiError(res);
   return parseJsonOrUndefined<T>(res);
@@ -292,7 +389,11 @@ export async function authApiPostOrThrow<T>(path: string, body?: unknown, init?:
  * @param body  — URLSearchParams carrying the form body
  * @param init  — optional `RequestInit` overrides
  */
-export async function authApiFormPostOrThrow<T>(path: string, body: URLSearchParams, init?: RequestInit): Promise<T> {
+export async function authApiFormPostOrThrow<T>(
+  path: string,
+  body: URLSearchParams,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiFormPostFetch(path, body, init);
   if (!res.ok) await throwApiError(res);
   return parseJsonOrUndefined<T>(res);
@@ -312,7 +413,11 @@ export async function authApiFormPostOrThrow<T>(path: string, body: URLSearchPar
  * @param body  — flat JSON-serialisable request body
  * @param init  — optional `RequestInit` overrides
  */
-export async function authApiPatchOrThrow<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
+export async function authApiPatchOrThrow<T>(
+  path: string,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiBodyFetch("PATCH", path, body, init);
   if (!res.ok) await throwApiError(res);
   return parseJsonOrUndefined<T>(res);
@@ -328,7 +433,10 @@ export async function authApiPatchOrThrow<T>(path: string, body?: unknown, init?
  * @param path  — path relative to `/api/auth` (e.g. `"/admin/resource-servers/abc"`)
  * @param init  — optional `RequestInit` overrides
  */
-export async function authApiDeleteOrThrow<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authApiDeleteOrThrow<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiBodyFetch("DELETE", path, undefined, init);
   if (!res.ok) await throwApiError(res);
   return parseJsonOrUndefined<T>(res);

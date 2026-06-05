@@ -15,7 +15,7 @@ type TooltipPlacement = "top" | "bottom" | "left" | "right";
 type ButtonProps = {
   readonly variant?: ButtonVariant;
   readonly size?: ButtonSize;
-  readonly type?: "button" | "submit";
+  readonly type?: "button" | "submit" | "reset";
   readonly name?: string;
   readonly value?: string;
   readonly disabled?: boolean;

@@ -1,6 +1,8 @@
 import type { AuthRuntimeOptions } from "../auth/types";
 
-export function resolveAuthRuntime(c: { executionCtx?: { waitUntil(task: Promise<unknown>): void } }): AuthRuntimeOptions {
+export function resolveAuthRuntime(c: {
+  executionCtx?: { waitUntil(task: Promise<unknown>): void };
+}): AuthRuntimeOptions {
   try {
     const executionCtx = c.executionCtx;
     if (!executionCtx) {

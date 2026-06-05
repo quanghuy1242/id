@@ -1,11 +1,18 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
-import { hasOrganizationAccess, isPlatformAdmin, type AdminDbAdapter } from "./policies/access";
+import {
+  hasOrganizationAccess,
+  isPlatformAdmin,
+  type AdminDbAdapter,
+} from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
 import { hashPassword, verifyPassword } from "./adapters/password";
 import { authPluginConfig, systemResourceServerAudience } from "./config";
-import { invalidateResourceServerAudiences, loadResourceServerAudiences } from "./plugins/resource-server/audiences";
+import {
+  invalidateResourceServerAudiences,
+  loadResourceServerAudiences,
+} from "./plugins/resource-server/audiences";
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
@@ -18,14 +25,21 @@ import { idConsoleScopes } from "./plugins/console-scopes";
 import { idAccountCenter } from "./plugins/account-center";
 import { idRegistration } from "./plugins/registration";
 import { invalidateClientResourceScopes } from "./plugins/oauth-scope-catalog/grants";
-import { invalidateOAuthResourceScopes, loadOAuthResourceScopes } from "./plugins/oauth-scope-catalog/scopes";
+import {
+  invalidateOAuthResourceScopes,
+  loadOAuthResourceScopes,
+} from "./plugins/oauth-scope-catalog/scopes";
 import { kvSecondaryStorage } from "./adapters/secondary-storage";
 import {
   authPathNeedsOAuthRuntimeCatalog,
   createOAuthProviderPlugin,
   emptyOAuthRuntimeCatalog,
 } from "./oauth-provider";
-import type { AuthOptionsEnv, AuthRuntimeOptions, OAuthRuntimeCatalog } from "./types";
+import type {
+  AuthOptionsEnv,
+  AuthRuntimeOptions,
+  OAuthRuntimeCatalog,
+} from "./types";
 import type { CoreEnv } from "../config/env";
 
 export function getAuth(
@@ -99,7 +113,11 @@ export function getAuthOptions(
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: ({ user, url }) =>
-        sendAuthEmail(emailSender, { kind: "verification", to: user.email, url }, runtime.backgroundTaskRunner),
+        sendAuthEmail(
+          emailSender,
+          { kind: "verification", to: user.email, url },
+          runtime.backgroundTaskRunner,
+        ),
     },
     session: {
       storeSessionInDatabase: true,
@@ -109,7 +127,11 @@ export function getAuthOptions(
       disableSignUp: false,
       requireEmailVerification: true,
       sendResetPassword: ({ user, url }) =>
-        sendAuthEmail(emailSender, { kind: "password-reset", to: user.email, url }, runtime.backgroundTaskRunner),
+        sendAuthEmail(
+          emailSender,
+          { kind: "password-reset", to: user.email, url },
+          runtime.backgroundTaskRunner,
+        ),
       password: {
         hash: hashPassword,
         verify: verifyPassword,
@@ -133,7 +155,12 @@ export function getAuthOptions(
         authorize: async (organizationId, userId, role, adapter) =>
           organizationId === null || organizationId === undefined
             ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+            : isPlatformAdmin(role) ||
+              (await hasOrganizationAccess(
+                adapter as AdminDbAdapter,
+                userId,
+                organizationId,
+              )),
       }),
       idAdminSignInGuard({
         sendEmail: ({ to, otp }) =>
@@ -144,20 +171,36 @@ export function getAuthOptions(
       }),
       createOAuthProviderPlugin(env, catalog, runtime, isPlatformAdmin),
       idResourceServer({
-        invalidateAudienceCache: () => invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
+        invalidateAudienceCache: () =>
+          invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
         authorize: async (organizationId, userId, role, adapter) =>
           organizationId === null || organizationId === undefined
             ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+            : isPlatformAdmin(role) ||
+              (await hasOrganizationAccess(
+                adapter as AdminDbAdapter,
+                userId,
+                organizationId,
+              )),
       }),
       idOAuthScopeCatalog({
-        invalidateScopeCache: () => invalidateOAuthResourceScopes(env, runtime.backgroundTaskRunner),
+        invalidateScopeCache: () =>
+          invalidateOAuthResourceScopes(env, runtime.backgroundTaskRunner),
         invalidateClientResourceScopeCache: (clientId) =>
-          invalidateClientResourceScopes(env, clientId, runtime.backgroundTaskRunner),
+          invalidateClientResourceScopes(
+            env,
+            clientId,
+            runtime.backgroundTaskRunner,
+          ),
         authorize: async (organizationId, userId, role, adapter) =>
           organizationId === null || organizationId === undefined
             ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) || (await hasOrganizationAccess(adapter as AdminDbAdapter, userId, organizationId)),
+            : isPlatformAdmin(role) ||
+              (await hasOrganizationAccess(
+                adapter as AdminDbAdapter,
+                userId,
+                organizationId,
+              )),
       }),
       idOAuthClientPicker({ issuer }),
       idAdminAudit({
@@ -182,4 +225,7 @@ export function getAuthOptions(
   } satisfies BetterAuthOptions;
 }
 
-export { authPathNeedsOAuthRuntimeCatalog, authPathNeedsOAuthRuntimeCatalog as authPathNeedsResourceAudiences };
+export {
+  authPathNeedsOAuthRuntimeCatalog,
+  authPathNeedsOAuthRuntimeCatalog as authPathNeedsResourceAudiences,
+};

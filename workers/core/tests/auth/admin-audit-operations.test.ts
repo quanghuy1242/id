@@ -18,7 +18,9 @@ describe("admin-audit operations", () => {
     it("normalizes Date, number, ISO string; null otherwise", () => {
       expect(toMs(new Date(1000))).toBe(1000);
       expect(toMs(1736900000000)).toBe(1736900000000);
-      expect(toMs("2025-01-15T00:00:00.000Z")).toBe(Date.parse("2025-01-15T00:00:00.000Z"));
+      expect(toMs("2025-01-15T00:00:00.000Z")).toBe(
+        Date.parse("2025-01-15T00:00:00.000Z"),
+      );
       expect(toMs(null)).toBeNull();
       expect(toMs(undefined)).toBeNull();
       expect(toMs("not-a-date")).toBeNull();
@@ -28,10 +30,22 @@ describe("admin-audit operations", () => {
   describe("parsePageParams", () => {
     it("defaults, clamps to max, floors, and rejects negatives", () => {
       expect(parsePageParams(undefined)).toEqual({ limit: 25, offset: 0 });
-      expect(parsePageParams({ limit: 10, offset: 5 })).toEqual({ limit: 10, offset: 5 });
-      expect(parsePageParams({ limit: 9999 })).toEqual({ limit: 100, offset: 0 });
-      expect(parsePageParams({ limit: -3, offset: -1 })).toEqual({ limit: 25, offset: 0 });
-      expect(parsePageParams({ limit: "20", offset: "40" })).toEqual({ limit: 20, offset: 40 });
+      expect(parsePageParams({ limit: 10, offset: 5 })).toEqual({
+        limit: 10,
+        offset: 5,
+      });
+      expect(parsePageParams({ limit: 9999 })).toEqual({
+        limit: 100,
+        offset: 0,
+      });
+      expect(parsePageParams({ limit: -3, offset: -1 })).toEqual({
+        limit: 25,
+        offset: 0,
+      });
+      expect(parsePageParams({ limit: "20", offset: "40" })).toEqual({
+        limit: 20,
+        offset: 40,
+      });
     });
   });
 
@@ -68,7 +82,12 @@ describe("admin-audit operations", () => {
 
   describe("uniqueIds", () => {
     it("collects defined, distinct ids", () => {
-      expect(uniqueIds([{ u: "a" }, { u: "a" }, { u: null }, { u: "b" }], (r) => r.u)).toEqual(["a", "b"]);
+      expect(
+        uniqueIds(
+          [{ u: "a" }, { u: "a" }, { u: null }, { u: "b" }],
+          (r) => r.u,
+        ),
+      ).toEqual(["a", "b"]);
     });
   });
 
@@ -84,7 +103,15 @@ describe("admin-audit operations", () => {
   describe("presenters", () => {
     it("presentToken returns only a prefix, never the token value", () => {
       const out = presentToken(
-        { id: "t1", token: "supersecrettokenvalue", clientId: "cli_1", userId: "u1", scopes: ["s:read"], expiresAt: 5, createdAt: 1 },
+        {
+          id: "t1",
+          token: "supersecrettokenvalue",
+          clientId: "cli_1",
+          userId: "u1",
+          scopes: ["s:read"],
+          expiresAt: 5,
+          createdAt: 1,
+        },
         "access",
         new Map([["u1", "a@b.com"]]),
         new Map([["cli_1", "Content API"]]),
@@ -98,7 +125,12 @@ describe("admin-audit operations", () => {
 
     it("presentJwk never exposes a private key", () => {
       const out = presentJwk(
-        { id: "k1", publicKey: '{"kty":"OKP","alg":"EdDSA"}', createdAt: 1, expiresAt: null } as never,
+        {
+          id: "k1",
+          publicKey: '{"kty":"OKP","alg":"EdDSA"}',
+          createdAt: 1,
+          expiresAt: null,
+        } as never,
         100,
         1000,
       );
@@ -110,7 +142,18 @@ describe("admin-audit operations", () => {
 
     it("presentSession strips bearer tokens, enriches email, and leaves unknown ids null", () => {
       const session = presentSession(
-        { id: "s1", token: "supersecretsessiontoken", userId: "u9", ipAddress: null, userAgent: null, activeOrganizationId: "org_1", activeTeamId: null, impersonatedBy: null, createdAt: 1, expiresAt: 2 },
+        {
+          id: "s1",
+          token: "supersecretsessiontoken",
+          userId: "u9",
+          ipAddress: null,
+          userAgent: null,
+          activeOrganizationId: "org_1",
+          activeTeamId: null,
+          impersonatedBy: null,
+          createdAt: 1,
+          expiresAt: 2,
+        },
         new Map([["u9", "u9@example.test"]]),
       );
       expect(session.userEmail).toBe("u9@example.test");
@@ -119,7 +162,14 @@ describe("admin-audit operations", () => {
       expect(JSON.stringify(session)).not.toContain("supersecretsessiontoken");
       expect(session).not.toHaveProperty("token");
       const consent = presentConsent(
-        { id: "c1", clientId: "cli_1", userId: "u1", scopes: ["openid"], createdAt: 1, updatedAt: 2 },
+        {
+          id: "c1",
+          clientId: "cli_1",
+          userId: "u1",
+          scopes: ["openid"],
+          createdAt: 1,
+          updatedAt: 2,
+        },
         new Map([["u1", "a@b.com"]]),
         new Map([["cli_1", "Content API"]]),
       );

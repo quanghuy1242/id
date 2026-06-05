@@ -9,7 +9,7 @@ import { Menu, MenuItem } from "../menu";
 import { NavIcon } from "../nav-icons";
 
 type SurfaceProps = {
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 };
 
 export function AppShell({ children }: SurfaceProps) {

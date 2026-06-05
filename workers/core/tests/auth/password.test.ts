@@ -41,19 +41,28 @@ describe("password", () => {
     });
 
     it("returns false for a malformed hash with no colon separator", async () => {
-      const result = await verifyPassword({ hash: "not-a-valid-hash", password: "anything" });
+      const result = await verifyPassword({
+        hash: "not-a-valid-hash",
+        password: "anything",
+      });
       expect(result).toBe(false);
     });
 
     it("returns false for a hash with empty salt", async () => {
-      const result = await verifyPassword({ hash: ":somekey", password: "anything" });
+      const result = await verifyPassword({
+        hash: ":somekey",
+        password: "anything",
+      });
       expect(result).toBe(false);
     });
 
     it("returns false for a truncated hash", async () => {
       const hash = await hashPassword("original");
       const truncated = hash.substring(0, 20);
-      const result = await verifyPassword({ hash: truncated, password: "original" });
+      const result = await verifyPassword({
+        hash: truncated,
+        password: "original",
+      });
       expect(result).toBe(false);
     });
 
@@ -72,8 +81,12 @@ describe("password", () => {
       const halfWidth = "password";
       const hashFull = await hashPassword(fullWidth);
       const hashHalf = await hashPassword(halfWidth);
-      expect(await verifyPassword({ hash: hashFull, password: halfWidth })).toBe(true);
-      expect(await verifyPassword({ hash: hashHalf, password: fullWidth })).toBe(true);
+      expect(
+        await verifyPassword({ hash: hashFull, password: halfWidth }),
+      ).toBe(true);
+      expect(
+        await verifyPassword({ hash: hashHalf, password: fullWidth }),
+      ).toBe(true);
     });
 
     it("treats composed and decomposed forms consistently", async () => {

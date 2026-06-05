@@ -46,7 +46,7 @@ describe("Account Center content", () => {
 
     expect(await screen.findByRole("heading", { name: "Account" })).toBeInTheDocument();
     const organizationsStat = screen.getAllByText("Organizations").find((element) => element.closest(".stat"))?.closest(".stat");
-    if (!organizationsStat) throw new Error("missing organizations stat");
+    if (!(organizationsStat instanceof HTMLElement)) throw new Error("missing organizations stat");
     expect(within(organizationsStat).getByText("2")).toBeInTheDocument();
     expect(screen.getByText("Default")).toBeInTheDocument();
     expect(screen.getByText("Owner")).toBeInTheDocument();

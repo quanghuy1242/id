@@ -1,4 +1,8 @@
-import { authApiFormPostOrThrow, authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import {
+  authApiFormPostOrThrow,
+  authApiGetOrThrow,
+  authApiPostOrThrow,
+} from "@id/lib";
 
 /**
  * Aggregate admin-audit reads (sessions, tokens, consents, JWKS metadata) and
@@ -90,7 +94,11 @@ export type TokenIntrospectionResult = {
   [claim: string]: unknown;
 };
 
-export type Paginated<K extends string, T> = { total: number; limit: number; offset: number } & Record<K, T[]>;
+export type Paginated<K extends string, T> = {
+  total: number;
+  limit: number;
+  offset: number;
+} & Record<K, T[]>;
 
 export type PageParams = { limit: number; offset: number };
 export type SessionListParams = PageParams & { userId?: string };
@@ -101,8 +109,13 @@ export type ActivityLogParams = PageParams & {
   actorId?: string;
 };
 
-export async function listAdminSessions(params: SessionListParams): Promise<Paginated<"sessions", AdminSession>> {
-  return authApiGetOrThrow<Paginated<"sessions", AdminSession>>("/admin/list-sessions", params);
+export async function listAdminSessions(
+  params: SessionListParams,
+): Promise<Paginated<"sessions", AdminSession>> {
+  return authApiGetOrThrow<Paginated<"sessions", AdminSession>>(
+    "/admin/list-sessions",
+    params,
+  );
 }
 
 // Browser UI revokes by row id; Better Auth's revoke-user-session requires a live session token.
@@ -110,15 +123,28 @@ export async function revokeAdminSession(sessionId: string): Promise<void> {
   await authApiPostOrThrow("/admin/revoke-session", { sessionId });
 }
 
-export async function listAdminTokens(params: PageParams & { type: "access" | "refresh" }): Promise<Paginated<"tokens", AdminToken>> {
-  return authApiGetOrThrow<Paginated<"tokens", AdminToken>>("/admin/list-tokens", params);
+export async function listAdminTokens(
+  params: PageParams & { type: "access" | "refresh" },
+): Promise<Paginated<"tokens", AdminToken>> {
+  return authApiGetOrThrow<Paginated<"tokens", AdminToken>>(
+    "/admin/list-tokens",
+    params,
+  );
 }
 
-export async function listAdminConsents(params: PageParams & { clientId?: string }): Promise<Paginated<"consents", AdminConsent>> {
-  return authApiGetOrThrow<Paginated<"consents", AdminConsent>>("/admin/list-consents", params);
+export async function listAdminConsents(
+  params: PageParams & { clientId?: string },
+): Promise<Paginated<"consents", AdminConsent>> {
+  return authApiGetOrThrow<Paginated<"consents", AdminConsent>>(
+    "/admin/list-consents",
+    params,
+  );
 }
 
-export async function revokeConsent(clientId: string, userId: string): Promise<void> {
+export async function revokeConsent(
+  clientId: string,
+  userId: string,
+): Promise<void> {
   await authApiPostOrThrow("/admin/revoke-consent", { clientId, userId });
 }
 
@@ -127,15 +153,24 @@ export async function listAdminJwks(): Promise<AdminJwk[]> {
   return res.keys ?? [];
 }
 
-export async function rotateAdminJwks(reason: string): Promise<RotateJwksResult> {
+export async function rotateAdminJwks(
+  reason: string,
+): Promise<RotateJwksResult> {
   return authApiPostOrThrow<RotateJwksResult>("/admin/jwks/rotate", { reason });
 }
 
-export async function listActivityLog(params: ActivityLogParams): Promise<Paginated<"entries", AdminActivity>> {
-  return authApiGetOrThrow<Paginated<"entries", AdminActivity>>("/admin/activity-log", params);
+export async function listActivityLog(
+  params: ActivityLogParams,
+): Promise<Paginated<"entries", AdminActivity>> {
+  return authApiGetOrThrow<Paginated<"entries", AdminActivity>>(
+    "/admin/activity-log",
+    params,
+  );
 }
 
-export async function introspectToken(input: TokenIntrospectionInput): Promise<TokenIntrospectionResult> {
+export async function introspectToken(
+  input: TokenIntrospectionInput,
+): Promise<TokenIntrospectionResult> {
   const form = new URLSearchParams({ token: input.token });
   if (input.token_type_hint) form.set("token_type_hint", input.token_type_hint);
   if (input.resource) form.set("resource", input.resource);
@@ -147,5 +182,9 @@ export async function introspectToken(input: TokenIntrospectionInput): Promise<T
     form.set("client_id", input.client_id);
   }
 
-  return authApiFormPostOrThrow<TokenIntrospectionResult>("/oauth2/introspect", form, { headers });
+  return authApiFormPostOrThrow<TokenIntrospectionResult>(
+    "/oauth2/introspect",
+    form,
+    { headers },
+  );
 }

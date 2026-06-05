@@ -1,7 +1,11 @@
 import { APIError } from "better-auth/api";
 import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
 import type { AdapterContext, ResourceServerPluginOptions } from "./types";
-import type { CreateResourceServerBody, UpdateResourceServerBody, ResourceServerRow } from "./schema";
+import type {
+  CreateResourceServerBody,
+  UpdateResourceServerBody,
+  ResourceServerRow,
+} from "./schema";
 
 /**
  * Operation helpers for the Better Auth resource-server plugin.
@@ -45,7 +49,9 @@ export async function canAccessResourceServer(
   role: string | null | undefined,
   adapter: unknown,
 ): Promise<boolean> {
-  return Boolean(authorize && (await authorize(row.organizationId, userId, role, adapter)));
+  return Boolean(
+    authorize && (await authorize(row.organizationId, userId, role, adapter)),
+  );
 }
 
 /**
@@ -71,7 +77,9 @@ export async function assertUniqueSlug(
     });
 
     if (rows.some((row) => row.id !== ignoreId)) {
-      throw new APIError("BAD_REQUEST", { message: "System resource server slug already exists" });
+      throw new APIError("BAD_REQUEST", {
+        message: "System resource server slug already exists",
+      });
     }
     return;
   }
@@ -85,7 +93,9 @@ export async function assertUniqueSlug(
   });
 
   if (rows.some((row) => row.id !== ignoreId)) {
-    throw new APIError("BAD_REQUEST", { message: "Resource server slug already exists in organization" });
+    throw new APIError("BAD_REQUEST", {
+      message: "Resource server slug already exists in organization",
+    });
   }
 }
 
@@ -127,16 +137,25 @@ export async function ensureResourceServerByAudience(
   }
 
   if (existing.slug !== body.slug) {
-    await assertUniqueSlug(adapter, body.organizationId, body.slug, existing.id);
+    await assertUniqueSlug(
+      adapter,
+      body.organizationId,
+      body.slug,
+      existing.id,
+    );
   }
 
   const update: ResourceServerUpdate = {};
   const organizationId = body.organizationId ?? null;
-  if ((existing.organizationId ?? null) !== organizationId) update.organizationId = organizationId;
+  if ((existing.organizationId ?? null) !== organizationId)
+    update.organizationId = organizationId;
   if (existing.slug !== body.slug) update.slug = body.slug;
   if (existing.name !== body.name) update.name = body.name;
   if (existing.audience !== body.audience) update.audience = body.audience;
-  if (body.description !== undefined && existing.description !== body.description) {
+  if (
+    body.description !== undefined &&
+    existing.description !== body.description
+  ) {
     update.description = body.description;
   }
   if (!existing.enabled) {
@@ -200,7 +219,9 @@ export function buildUpdatePayload(
  * Builds the update payload for disabling a resource server.
  * Sets `enabled: false` and stamps `disabledBy`/`disabledAt`.
  */
-export function buildDisablePayload(actorId: string): Partial<ResourceServerRow> {
+export function buildDisablePayload(
+  actorId: string,
+): Partial<ResourceServerRow> {
   const now = Date.now();
   return {
     enabled: false,
@@ -215,7 +236,9 @@ export function buildDisablePayload(actorId: string): Partial<ResourceServerRow>
  * Builds the update payload for re-enabling a resource server.
  * Clears disable metadata so the row describes its current active state.
  */
-export function buildEnablePayload(actorId: string): Partial<ResourceServerRow> {
+export function buildEnablePayload(
+  actorId: string,
+): Partial<ResourceServerRow> {
   return {
     enabled: true,
     disabledBy: null,

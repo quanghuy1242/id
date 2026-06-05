@@ -11,7 +11,7 @@ describe("core scaffold", () => {
     const app = createApp();
     const res = await app.request("/health");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { readonly service: string };
     expect(body.service).toBe("id-core");
   });
 

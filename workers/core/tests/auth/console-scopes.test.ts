@@ -29,20 +29,30 @@ async function createVerifiedUser(
 async function createOrganization(
   test: TestEnv,
   auth: TestAuth,
-  args: { readonly userId: string; readonly name: string; readonly slug: string; readonly role?: "owner" | "admin" | "member" },
+  args: {
+    readonly userId: string;
+    readonly name: string;
+    readonly slug: string;
+    readonly role?: "owner" | "admin" | "member";
+  },
 ): Promise<string> {
   const organization = await auth.api.createOrganization({
     body: { name: args.name, slug: args.slug, userId: args.userId },
   });
   if (args.role && args.role !== "owner") {
     test.raw
-      .prepare(`update "member" set "role" = ? where "organizationId" = ? and "userId" = ?`)
+      .prepare(
+        `update "member" set "role" = ? where "organizationId" = ? and "userId" = ?`,
+      )
       .run(args.role, organization.id, args.userId);
   }
   return organization.id;
 }
 
-async function consoleScopes(test: TestEnv, cookie: string): Promise<ConsoleScopeEnvelope> {
+async function consoleScopes(
+  test: TestEnv,
+  cookie: string,
+): Promise<ConsoleScopeEnvelope> {
   const response = await test.app.request(
     "/api/auth/admin/console-scopes",
     { method: "GET", headers: { cookie } },
@@ -56,21 +66,29 @@ describe("id-console-scopes endpoint", () => {
   it("returns platform plus every organization scope for a platform admin", async () => {
     const test = await createTestEnv();
     const auth = getAuth(test.env);
-    const userId = await createVerifiedUser(test, auth, { email: "platform@example.test", role: "admin" });
+    const userId = await createVerifiedUser(test, auth, {
+      email: "platform@example.test",
+      role: "admin",
+    });
     const ownedOrganizationId = await createOrganization(test, auth, {
       userId,
       name: "Acme Publishing",
       slug: "acme",
       role: "owner",
     });
-    const otherUserId = await createVerifiedUser(test, auth, { email: "owner@example.test" });
+    const otherUserId = await createVerifiedUser(test, auth, {
+      email: "owner@example.test",
+    });
     const otherOrganizationId = await createOrganization(test, auth, {
       userId: otherUserId,
       name: "Globex",
       slug: "globex",
       role: "owner",
     });
-    const cookie = await signInViaAdminOtp(test.env, { email: "platform@example.test", password: "password12345" });
+    const cookie = await signInViaAdminOtp(test.env, {
+      email: "platform@example.test",
+      password: "password12345",
+    });
 
     const envelope = await consoleScopes(test, cookie);
     expect(() => consoleScopeEnvelopeSchema.parse(envelope)).not.toThrow();
@@ -109,14 +127,19 @@ describe("id-console-scopes endpoint", () => {
   it("defaults a single-org admin directly to that organization scope", async () => {
     const test = await createTestEnv();
     const auth = getAuth(test.env);
-    const userId = await createVerifiedUser(test, auth, { email: "admin@example.test" });
+    const userId = await createVerifiedUser(test, auth, {
+      email: "admin@example.test",
+    });
     const organizationId = await createOrganization(test, auth, {
       userId,
       name: "Acme Publishing",
       slug: "acme",
       role: "admin",
     });
-    const cookie = await signInViaAdminOtp(test.env, { email: "admin@example.test", password: "password12345" });
+    const cookie = await signInViaAdminOtp(test.env, {
+      email: "admin@example.test",
+      password: "password12345",
+    });
 
     await expect(consoleScopes(test, cookie)).resolves.toEqual({
       actor: { userId, email: "admin@example.test", canEnterConsole: true },
@@ -127,7 +150,11 @@ describe("id-console-scopes endpoint", () => {
           organizationId,
           label: "Acme Publishing",
           role: "admin",
-          permissions: expect.arrayContaining(["members:read", "members:write", "resource-servers:read"]),
+          permissions: expect.arrayContaining([
+            "members:read",
+            "members:write",
+            "resource-servers:read",
+          ]),
         }),
       ],
       memberships: [],
@@ -138,7 +165,9 @@ describe("id-console-scopes endpoint", () => {
   it("returns sorted operable scopes and member hints for a multi-org admin", async () => {
     const test = await createTestEnv();
     const auth = getAuth(test.env);
-    const userId = await createVerifiedUser(test, auth, { email: "multi@example.test" });
+    const userId = await createVerifiedUser(test, auth, {
+      email: "multi@example.test",
+    });
     const globexId = await createOrganization(test, auth, {
       userId,
       name: "Globex",
@@ -157,15 +186,28 @@ describe("id-console-scopes endpoint", () => {
       slug: "initech",
       role: "member",
     });
-    const cookie = await signInViaAdminOtp(test.env, { email: "multi@example.test", password: "password12345" });
+    const cookie = await signInViaAdminOtp(test.env, {
+      email: "multi@example.test",
+      password: "password12345",
+    });
 
     await expect(consoleScopes(test, cookie)).resolves.toEqual({
       actor: { userId, email: "multi@example.test", canEnterConsole: true },
       scopes: [
-        expect.objectContaining({ id: `organization:${acmeId}`, label: "Acme Publishing", role: "owner" }),
-        expect.objectContaining({ id: `organization:${globexId}`, label: "Globex", role: "admin" }),
+        expect.objectContaining({
+          id: `organization:${acmeId}`,
+          label: "Acme Publishing",
+          role: "owner",
+        }),
+        expect.objectContaining({
+          id: `organization:${globexId}`,
+          label: "Globex",
+          role: "admin",
+        }),
       ],
-      memberships: [{ organizationId: memberOnlyId, label: "Initech", role: "member" }],
+      memberships: [
+        { organizationId: memberOnlyId, label: "Initech", role: "member" },
+      ],
       defaultScopeId: `organization:${acmeId}`,
     });
   });
@@ -173,19 +215,26 @@ describe("id-console-scopes endpoint", () => {
   it("returns only membership hints for an ordinary member", async () => {
     const test = await createTestEnv();
     const auth = getAuth(test.env);
-    const userId = await createVerifiedUser(test, auth, { email: "member@example.test" });
+    const userId = await createVerifiedUser(test, auth, {
+      email: "member@example.test",
+    });
     const organizationId = await createOrganization(test, auth, {
       userId,
       name: "Acme Publishing",
       slug: "acme",
       role: "member",
     });
-    const cookie = await signInViaAdminOtp(test.env, { email: "member@example.test", password: "password12345" });
+    const cookie = await signInViaAdminOtp(test.env, {
+      email: "member@example.test",
+      password: "password12345",
+    });
 
     await expect(consoleScopes(test, cookie)).resolves.toEqual({
       actor: { userId, email: "member@example.test", canEnterConsole: false },
       scopes: [],
-      memberships: [{ organizationId, label: "Acme Publishing", role: "member" }],
+      memberships: [
+        { organizationId, label: "Acme Publishing", role: "member" },
+      ],
       defaultScopeId: null,
     });
   });

@@ -27,7 +27,9 @@ export type { OAuthClientPickerPluginOptions } from "./types";
  * reconciliation. The picker never returns `client_secret`; cross-org reads
  * return `404`.
  */
-export const idOAuthClientPicker = (options: OAuthClientPickerPluginOptions = {}): BetterAuthPlugin => ({
+export const idOAuthClientPicker = (
+  options: OAuthClientPickerPluginOptions = {},
+): BetterAuthPlugin => ({
   id: "id-oauth-client-picker",
   endpoints: {
     lookupOAuthClient: createAuthEndpoint(
@@ -38,7 +40,8 @@ export const idOAuthClientPicker = (options: OAuthClientPickerPluginOptions = {}
         if (!headers) throw new APIError("UNAUTHORIZED");
         const adapter = ctx.context.adapter as PickerAdapter;
 
-        const audience = options.audience ?? systemResourceServerAudience(ctx.context.baseURL);
+        const audience =
+          options.audience ?? systemResourceServerAudience(ctx.context.baseURL);
         await verifyScopedBearerToken({
           adapter,
           headers,
@@ -48,11 +51,14 @@ export const idOAuthClientPicker = (options: OAuthClientPickerPluginOptions = {}
         });
 
         const query = (ctx.query ?? {}) as Record<string, unknown>;
-        const clientId = typeof query.client_id === "string" ? query.client_id : undefined;
-        const orgId = typeof query.org_id === "string" ? query.org_id : undefined;
-        const resource = typeof query.resource === "string" && query.resource.length > 0
-          ? query.resource
-          : undefined;
+        const clientId =
+          typeof query.client_id === "string" ? query.client_id : undefined;
+        const orgId =
+          typeof query.org_id === "string" ? query.org_id : undefined;
+        const resource =
+          typeof query.resource === "string" && query.resource.length > 0
+            ? query.resource
+            : undefined;
         if (!clientId) {
           throw new APIError("BAD_REQUEST", {
             error: "invalid_request",

@@ -19,47 +19,66 @@ export const consolePermissionValues = [
   "system:write",
 ] as const;
 
-export const consoleScopeSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("platform"),
-    id: z.literal("platform"),
-    label: z.string().min(1),
-    role: z.literal("platform-admin"),
-    permissions: z.array(z.enum(consolePermissionValues)),
-    requiresStepUp: z.boolean(),
-    stepUpSatisfied: z.boolean(),
-  }),
-  z.object({
-    kind: z.literal("organization"),
-    id: z.templateLiteral(["organization:", z.string().min(1)]),
+export const consoleScopeSchema = z
+  .discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("platform"),
+      id: z.literal("platform"),
+      label: z.string().min(1),
+      role: z.literal("platform-admin"),
+      permissions: z.array(z.enum(consolePermissionValues)),
+      requiresStepUp: z.boolean(),
+      stepUpSatisfied: z.boolean(),
+    }),
+    z.object({
+      kind: z.literal("organization"),
+      id: z.templateLiteral(["organization:", z.string().min(1)]),
+      organizationId: z.string().min(1),
+      label: z.string().min(1),
+      role: z.enum(["platform-admin", "owner", "admin"]),
+      permissions: z.array(z.enum(consolePermissionValues)),
+      requiresStepUp: z.boolean(),
+    }),
+  ])
+  .meta({ id: "ConsoleScope" });
+
+export const consoleMembershipHintSchema = z
+  .object({
     organizationId: z.string().min(1),
     label: z.string().min(1),
-    role: z.enum(["platform-admin", "owner", "admin"]),
-    permissions: z.array(z.enum(consolePermissionValues)),
-    requiresStepUp: z.boolean(),
-  }),
-]).meta({ id: "ConsoleScope" });
+    role: z.literal("member"),
+  })
+  .meta({ id: "ConsoleMembershipHint" });
 
-export const consoleMembershipHintSchema = z.object({
-  organizationId: z.string().min(1),
-  label: z.string().min(1),
-  role: z.literal("member"),
-}).meta({ id: "ConsoleMembershipHint" });
+export const consoleScopeEnvelopeSchema = z
+  .object({
+    actor: z.object({
+      userId: z.string().min(1),
+      email: z.email().optional(),
+      canEnterConsole: z.boolean(),
+    }),
+    scopes: z.array(consoleScopeSchema),
+    memberships: z.array(consoleMembershipHintSchema),
+    defaultScopeId: z
+      .union([
+        z.literal("platform"),
+        z.templateLiteral(["organization:", z.string().min(1)]),
+      ])
+      .nullable(),
+  })
+  .meta({ id: "ConsoleScopeEnvelope" });
 
-export const consoleScopeEnvelopeSchema = z.object({
-  actor: z.object({
-    userId: z.string().min(1),
-    email: z.email().optional(),
-    canEnterConsole: z.boolean(),
-  }),
-  scopes: z.array(consoleScopeSchema),
-  memberships: z.array(consoleMembershipHintSchema),
-  defaultScopeId: z.union([z.literal("platform"), z.templateLiteral(["organization:", z.string().min(1)])]).nullable(),
-}).meta({ id: "ConsoleScopeEnvelope" });
+export const consoleScopeEnvelopeOpenApiSchema = zodSchemaToOpenApi(
+  consoleScopeEnvelopeSchema,
+);
 
-export const consoleScopeEnvelopeOpenApiSchema = zodSchemaToOpenApi(consoleScopeEnvelopeSchema);
-
-const responses: Record<string, { description: string; content?: { "application/json"?: { schema: Record<string, unknown> } } }> = {
+const responses: Record<
+  string,
+  {
+    description: string;
+    content?: { "application/json"?: { schema: Record<string, unknown> } };
+  }
+> = {
   "200": {
     description: "Console scopes resolved successfully",
     content: {
@@ -73,7 +92,8 @@ const responses: Record<string, { description: string; content?: { "application/
 export const consoleScopesEndpointMetadata = {
   openapi: {
     tags: ["Console Scopes"],
-    description: "Resolve platform and organization console scopes available to the current session user",
+    description:
+      "Resolve platform and organization console scopes available to the current session user",
     responses,
   },
 };

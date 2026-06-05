@@ -43,11 +43,15 @@ export type ResourceAccess = Readonly<{
 
 function parseList(value: OAuthClientRow["grantTypes"]): readonly string[] {
   if (!value) return [];
-  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === "string");
+  if (Array.isArray(value))
+    return value.filter((entry): entry is string => typeof entry === "string");
   if (typeof value === "string") {
     try {
       const parsed: unknown = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.filter((entry): entry is string => typeof entry === "string");
+      if (Array.isArray(parsed))
+        return parsed.filter(
+          (entry): entry is string => typeof entry === "string",
+        );
       if (typeof parsed === "string") return parsed.split(" ").filter(Boolean);
     } catch {
       return value.split(" ").filter(Boolean);
@@ -94,12 +98,18 @@ export async function resolveResourceAccess(
   }
   return {
     resource,
-    status: resourceServer.enabled === false || clientResource.enabled === false ? "disabled" : "enabled",
+    status:
+      resourceServer.enabled === false || clientResource.enabled === false
+        ? "disabled"
+        : "enabled",
   };
 }
 
 /** Presents non-secret OAuth client metadata with optional advisory resource eligibility. */
-export function presentClientLookup(row: OAuthClientRow, resourceAccess?: ResourceAccess): Record<string, unknown> {
+export function presentClientLookup(
+  row: OAuthClientRow,
+  resourceAccess?: ResourceAccess,
+): Record<string, unknown> {
   return {
     client_id: row.clientId,
     client_name: row.name ?? null,

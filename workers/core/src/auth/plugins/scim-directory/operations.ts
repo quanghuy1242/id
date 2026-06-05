@@ -1,4 +1,8 @@
-import { MEMBER_MODEL, TEAM_MODEL, USER_MODEL } from "../../../shared/constants";
+import {
+  MEMBER_MODEL,
+  TEAM_MODEL,
+  USER_MODEL,
+} from "../../../shared/constants";
 import type { ScimAdapter } from "./types";
 
 export type UserRow = {
@@ -23,7 +27,10 @@ export type TeamRow = {
 const adminRoles = new Set(["owner", "admin"]);
 
 /** Looks up a single user by ID. Returns the row or null when absent. */
-export async function findUser(adapter: ScimAdapter, userId: string): Promise<UserRow | null> {
+export async function findUser(
+  adapter: ScimAdapter,
+  userId: string,
+): Promise<UserRow | null> {
   return adapter.findOne<UserRow>({
     model: USER_MODEL,
     where: [{ field: "id", value: userId }],
@@ -58,7 +65,11 @@ export async function findOrgUser(
  * Looks up a team that belongs to the given organization.
  * Returns null when the team does not exist or belongs to a different org.
  */
-export async function findTeam(adapter: ScimAdapter, teamId: string, orgId: string): Promise<TeamRow | null> {
+export async function findTeam(
+  adapter: ScimAdapter,
+  teamId: string,
+  orgId: string,
+): Promise<TeamRow | null> {
   const team = await adapter.findOne<TeamRow>({
     model: TEAM_MODEL,
     where: [{ field: "id", value: teamId }],
@@ -70,7 +81,10 @@ export async function findTeam(adapter: ScimAdapter, teamId: string, orgId: stri
 /**
  * Returns all owner/admin members of an organization for the virtual `org-admins` group.
  */
-export async function findOrgAdmins(adapter: ScimAdapter, orgId: string): Promise<MemberRow[]> {
+export async function findOrgAdmins(
+  adapter: ScimAdapter,
+  orgId: string,
+): Promise<MemberRow[]> {
   const members = await adapter.findMany<MemberRow>({
     model: MEMBER_MODEL,
     where: [{ field: "organizationId", value: orgId }],
@@ -81,7 +95,11 @@ export async function findOrgAdmins(adapter: ScimAdapter, orgId: string): Promis
 /**
  * Checks whether a specific user is a current owner or admin of the given organization.
  */
-export async function isOrgAdmin(adapter: ScimAdapter, userId: string, orgId: string): Promise<boolean> {
+export async function isOrgAdmin(
+  adapter: ScimAdapter,
+  userId: string,
+  orgId: string,
+): Promise<boolean> {
   const member = await adapter.findOne<MemberRow>({
     model: MEMBER_MODEL,
     where: [
@@ -91,4 +109,3 @@ export async function isOrgAdmin(adapter: ScimAdapter, userId: string, orgId: st
   });
   return member !== null && adminRoles.has(member.role);
 }
-

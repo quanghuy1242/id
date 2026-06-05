@@ -1,6 +1,9 @@
 // Resend transactional email: https://resend.com/docs/api-reference/emails/send-email
 import { renderAuthEmail } from "./auth-email-render";
-import { ResendEmailError, type EmailRateLimitMetadata } from "../../shared/errors";
+import {
+  ResendEmailError,
+  type EmailRateLimitMetadata,
+} from "../../shared/errors";
 import type { AuthEmailMessage, AuthEmailSender } from "../types";
 
 const resendEmailsUrl = "https://api.resend.com/emails";
@@ -24,7 +27,9 @@ function requireResendConfig(config: ResendEmailConfig): void {
 }
 
 function fromAddress(config: ResendEmailConfig): string {
-  return config.fromName ? `${config.fromName} <${config.fromEmail}>` : config.fromEmail;
+  return config.fromName
+    ? `${config.fromName} <${config.fromEmail}>`
+    : config.fromEmail;
 }
 
 function rateLimitMetadata(headers: Headers): EmailRateLimitMetadata {
@@ -60,9 +65,12 @@ export function createResendAuthEmailSender(
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as ResendApiError;
+        const body = (await response
+          .json()
+          .catch(() => ({}))) as ResendApiError;
         throw new ResendEmailError(
-          body.message ?? `Resend rejected transactional email with HTTP ${response.status}`,
+          body.message ??
+            `Resend rejected transactional email with HTTP ${response.status}`,
           response.status,
           rateLimitMetadata(response.headers),
         );

@@ -15,7 +15,10 @@ export type RenderedAuthEmail = {
 };
 
 function escapeHtml(value: string): string {
-  return htmlEscapes.reduce((escaped, [search, replacement]) => escaped.replaceAll(search, replacement), value);
+  return htmlEscapes.reduce(
+    (escaped, [search, replacement]) => escaped.replaceAll(search, replacement),
+    value,
+  );
 }
 
 function renderAdminOtpEmail(otp: string): RenderedAuthEmail {
@@ -50,9 +53,18 @@ export function renderAuthEmail(message: AuthEmailMessage): RenderedAuthEmail {
     return renderAdminOtpEmail(message.otp);
   }
 
-  const label = message.kind === "verification" ? "Verify your email" : "Reset your password";
-  const subject = message.kind === "verification" ? "Verify your email for id" : "Reset your id password";
-  const action = message.kind === "verification" ? "verify your email" : "reset your password";
+  const label =
+    message.kind === "verification"
+      ? "Verify your email"
+      : "Reset your password";
+  const subject =
+    message.kind === "verification"
+      ? "Verify your email for id"
+      : "Reset your id password";
+  const action =
+    message.kind === "verification"
+      ? "verify your email"
+      : "reset your password";
   const escapedUrl = escapeHtml(message.url);
 
   return {

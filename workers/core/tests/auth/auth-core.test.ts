@@ -10,7 +10,9 @@ import type { BetterAuthKvStorage } from "../../src/auth/adapters/secondary-stor
 import * as authSchema from "../../src/db/auth-schema";
 import { applyAuthMigrations, type RawSqlite } from "./d1-test-helper";
 
-function createKv(): BetterAuthKvStorage & { readonly values: Map<string, string> } {
+function createKv(): BetterAuthKvStorage & {
+  readonly values: Map<string, string>;
+} {
   const values = new Map<string, string>();
   return {
     values,
@@ -44,7 +46,11 @@ describe("Better Auth core flows", () => {
         {
           BETTER_AUTH_SECRET: "test-secret",
           BETTER_AUTH_URL: "https://id.example.test",
-          DB: drizzleAdapter(drizzle(raw), { provider: "sqlite", camelCase: true, schema: authSchema }),
+          DB: drizzleAdapter(drizzle(raw), {
+            provider: "sqlite",
+            camelCase: true,
+            schema: authSchema,
+          }),
           KV: kv,
         },
         { validAudiences: [], scopes: [], scopeRows: [] },
@@ -64,7 +70,9 @@ describe("Better Auth core flows", () => {
       }),
     );
     expect(signup.status).toBe(400);
-    await expect(signup.json()).resolves.toMatchObject({ code: "missing_registration_intent" });
+    await expect(signup.json()).resolves.toMatchObject({
+      code: "missing_registration_intent",
+    });
 
     await auth.api.createUser({
       body: {
@@ -83,18 +91,31 @@ describe("Better Auth core flows", () => {
     );
     expect(verification.status).toBe(200);
     expect(emailSender.messages).toContainEqual(
-      expect.objectContaining({ kind: "verification", to: "alice@example.test" }),
+      expect.objectContaining({
+        kind: "verification",
+        to: "alice@example.test",
+      }),
     );
-    expect([...kv.values.keys()].some((key) => key.startsWith(authPluginConfig.emailVerificationStoragePrefix))).toBe(false);
+    expect(
+      [...kv.values.keys()].some((key) =>
+        key.startsWith(authPluginConfig.emailVerificationStoragePrefix),
+      ),
+    ).toBe(false);
 
     // Admin-context sign-in (doc 024): the guard rejects an unverified email
     // before issuing an OTP, matching the underlying email-verification gate.
     const blockedSignIn = await auth.handler(
-      signInRequest({ email: "alice@example.test", password: "password123", callbackURL: "/admin" }),
+      signInRequest({
+        email: "alice@example.test",
+        password: "password123",
+        callbackURL: "/admin",
+      }),
     );
     expect(blockedSignIn.status).toBe(403);
 
-    raw.exec(`update "user" set "emailVerified" = 1 where "email" = 'alice@example.test';`);
+    raw.exec(
+      `update "user" set "emailVerified" = 1 where "email" = 'alice@example.test';`,
+    );
 
     const signin = await adminOtpSignIn(auth, emailSender, {
       email: "alice@example.test",
@@ -119,20 +140,32 @@ describe("Better Auth core flows", () => {
       }),
     );
     expect(organization.status).toBe(200);
-    await expect(organization.json()).resolves.toEqual(expect.objectContaining({ slug: "acme" }));
+    await expect(organization.json()).resolves.toEqual(
+      expect.objectContaining({ slug: "acme" }),
+    );
 
     const reset = await auth.handler(
       new Request("https://id.example.test/api/auth/request-password-reset", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "alice@example.test", redirectTo: "https://app.example.test/reset" }),
+        body: JSON.stringify({
+          email: "alice@example.test",
+          redirectTo: "https://app.example.test/reset",
+        }),
       }),
     );
     expect(reset.status).toBe(200);
     expect(emailSender.messages).toContainEqual(
-      expect.objectContaining({ kind: "password-reset", to: "alice@example.test" }),
+      expect.objectContaining({
+        kind: "password-reset",
+        to: "alice@example.test",
+      }),
     );
-    expect([...kv.values.keys()].some((key) => key.startsWith(authPluginConfig.passwordResetStoragePrefix))).toBe(false);
+    expect(
+      [...kv.values.keys()].some((key) =>
+        key.startsWith(authPluginConfig.passwordResetStoragePrefix),
+      ),
+    ).toBe(false);
 
     const signout = await auth.handler(
       new Request("https://id.example.test/api/auth/sign-out", {

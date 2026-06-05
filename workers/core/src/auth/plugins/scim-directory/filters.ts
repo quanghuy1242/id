@@ -27,7 +27,9 @@ function parseSingleClause(raw: string): ScimFilterClause | null {
  * Throws a descriptive error for non-empty strings that do not match an approved form,
  * so callers can return a SCIM 400 with `scimType: invalidFilter`.
  */
-export function parseScimFilter(raw: string | undefined | null): ParsedScimFilter | null {
+export function parseScimFilter(
+  raw: string | undefined | null,
+): ParsedScimFilter | null {
   if (raw === undefined || raw === null || raw.trim() === "") return null;
 
   const trimmed = raw.trim();

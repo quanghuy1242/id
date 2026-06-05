@@ -91,7 +91,9 @@ export const mockAccountOrganizations: readonly AccountOrganization[] = [
   },
 ];
 
-export function createMockAccountActions(overrides: Partial<AccountActions> = {}): AccountActions {
+export function createMockAccountActions(
+  overrides: Partial<AccountActions> = {},
+): AccountActions {
   return {
     getAccountSummary: async () => mockAccountSummary,
     updateProfile: async () => undefined,
@@ -103,7 +105,9 @@ export function createMockAccountActions(overrides: Partial<AccountActions> = {}
     revokeAllSessions: async () => undefined,
     listAccountConsents: async () => ({ consents: mockAccountConsents }),
     revokeAccountConsent: async () => undefined,
-    listAccountOrganizations: async () => ({ organizations: mockAccountOrganizations }),
+    listAccountOrganizations: async () => ({
+      organizations: mockAccountOrganizations,
+    }),
     ...overrides,
   };
 }

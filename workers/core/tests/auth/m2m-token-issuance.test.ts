@@ -14,15 +14,23 @@ import {
 async function seedTenantWithClient() {
   const test = await createTestEnv();
   const cookie = await bootstrapAdmin(test);
-  test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_default', 'Default Org', 'org-default', 1700000000000);`);
+  test.raw.exec(
+    `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_default', 'Default Org', 'org-default', 1700000000000);`,
+  );
   const resourceServerId = await createResourceServer(test, cookie, {
     organizationId: "org_default",
     slug: "content",
     name: "Content",
     audience: "https://content.example.test",
   });
-  await createOAuthScope(test, cookie, { resourceServerId, scope: "content:read" });
-  await createOAuthScope(test, cookie, { resourceServerId, scope: "content:write" });
+  await createOAuthScope(test, cookie, {
+    resourceServerId,
+    scope: "content:read",
+  });
+  await createOAuthScope(test, cookie, {
+    resourceServerId,
+    scope: "content:write",
+  });
   const client = await createM2MClient(test, cookie, {
     name: "Tenant SA",
     scope: "content:read content:write",
@@ -74,7 +82,10 @@ describe("M2M token issuance", () => {
       `/api/auth/admin/oauth-client-resource-scopes/${attachId}`,
       {
         method: "PATCH",
-        headers: { "content-type": "application/json", cookie: await bootstrapAdminAgainCookieReturn(test) },
+        headers: {
+          "content-type": "application/json",
+          cookie: await bootstrapAdminAgainCookieReturn(test),
+        },
         body: JSON.stringify({ enabled: false }),
       },
       test.env,
@@ -104,6 +115,11 @@ describe("M2M token issuance", () => {
   });
 });
 
-async function bootstrapAdminAgainCookieReturn(test: Awaited<ReturnType<typeof createTestEnv>>): Promise<string> {
-  return signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
+async function bootstrapAdminAgainCookieReturn(
+  test: Awaited<ReturnType<typeof createTestEnv>>,
+): Promise<string> {
+  return signInViaAdminOtp(test.env, {
+    email: "root@example.test",
+    password: "password12345",
+  });
 }

@@ -30,31 +30,61 @@ function forbid(): AuthorizeFn {
 describe("assertResourceServerAccess", () => {
   it("resolves when the authorize callback returns true", async () => {
     await expect(
-      assertResourceServerAccess(permit(), "org_1", "user_1", "admin", dummyAdapter),
+      assertResourceServerAccess(
+        permit(),
+        "org_1",
+        "user_1",
+        "admin",
+        dummyAdapter,
+      ),
     ).resolves.toBeUndefined();
   });
 
   it("resolves when the authorize callback returns true (org owner)", async () => {
     await expect(
-      assertResourceServerAccess(permit(), "org_1", "user_1", "member", dummyAdapter),
+      assertResourceServerAccess(
+        permit(),
+        "org_1",
+        "user_1",
+        "member",
+        dummyAdapter,
+      ),
     ).resolves.toBeUndefined();
   });
 
   it("throws FORBIDDEN when the authorize callback returns false", async () => {
     await expect(
-      assertResourceServerAccess(forbid(), "org_1", "user_1", "member", dummyAdapter),
+      assertResourceServerAccess(
+        forbid(),
+        "org_1",
+        "user_1",
+        "member",
+        dummyAdapter,
+      ),
     ).rejects.toBeInstanceOf(APIError);
   });
 
   it("throws FORBIDDEN for unauthenticated (null role) when callback returns false", async () => {
     await expect(
-      assertResourceServerAccess(forbid(), "org_1", "user_1", null, dummyAdapter),
+      assertResourceServerAccess(
+        forbid(),
+        "org_1",
+        "user_1",
+        null,
+        dummyAdapter,
+      ),
     ).rejects.toBeInstanceOf(APIError);
   });
 
   it("throws FORBIDDEN when no authorize callback is provided", async () => {
     await expect(
-      assertResourceServerAccess(undefined, "org_1", "user_1", "admin", dummyAdapter),
+      assertResourceServerAccess(
+        undefined,
+        "org_1",
+        "user_1",
+        "admin",
+        dummyAdapter,
+      ),
     ).rejects.toBeInstanceOf(APIError);
   });
 });
@@ -93,7 +123,10 @@ describe("buildCreatePayload", () => {
   });
 
   it("passes through optional description", () => {
-    const payload = buildCreatePayload({ ...base, description: "The main API" }, "user_1");
+    const payload = buildCreatePayload(
+      { ...base, description: "The main API" },
+      "user_1",
+    );
     expect(payload.description).toBe("The main API");
   });
 });
@@ -160,7 +193,10 @@ describe("buildEnablePayload", () => {
   });
 
   it("clears disabled metadata", () => {
-    const payload = buildEnablePayload("user_4") as { disabledBy: string | null; disabledAt: number | null };
+    const payload = buildEnablePayload("user_4") as {
+      disabledBy: string | null;
+      disabledAt: number | null;
+    };
     expect(payload.disabledBy).toBeNull();
     expect(payload.disabledAt).toBeNull();
   });

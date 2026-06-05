@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { bootstrapAdmin, createTestEnv, signInViaAdminOtp } from "./m2m-helpers";
+import {
+  bootstrapAdmin,
+  createTestEnv,
+  signInViaAdminOtp,
+} from "./m2m-helpers";
 
 describe("OAuth client ownership via BA clientReference", () => {
   it("attaches referenceId from the active session's organization to newly created clients", async () => {
     const test = await createTestEnv();
     const cookie = await bootstrapAdmin(test);
-    const defaultOrg = test.raw.prepare(`select "id" from "organization" where "slug" = 'default'`).get() as { readonly id: string };
+    const defaultOrg = test.raw
+      .prepare(`select "id" from "organization" where "slug" = 'default'`)
+      .get() as { readonly id: string };
     expect(defaultOrg.id).toEqual(expect.any(String));
     const setActive = await test.app.request(
       "/api/auth/organization/set-active",
@@ -50,12 +56,18 @@ describe("OAuth client ownership via BA clientReference", () => {
       {
         method: "POST",
         headers: { "content-type": "application/json", cookie: adminCookie },
-        body: JSON.stringify({ name: "Owner", email: "owner@example.test", password: "password12345" }),
+        body: JSON.stringify({
+          name: "Owner",
+          email: "owner@example.test",
+          password: "password12345",
+        }),
       },
       test.env,
     );
     expect(createdUser.status).toBe(200);
-    const owner = test.raw.prepare(`select "id" from "user" where "email" = ?`).get("owner@example.test") as {
+    const owner = test.raw
+      .prepare(`select "id" from "user" where "email" = ?`)
+      .get("owner@example.test") as {
       readonly id: string;
     };
     test.raw.exec(
@@ -63,7 +75,10 @@ describe("OAuth client ownership via BA clientReference", () => {
        insert into "organization" ("id", "name", "slug", "createdAt") values ('org_owner', 'Owner Org', 'owner-org', 1700000000000);
        insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_owner', 'org_owner', '${owner.id}', 'owner', 1700000000000);`,
     );
-    const ownerCookie = await signInViaAdminOtp(test.env, { email: "owner@example.test", password: "password12345" });
+    const ownerCookie = await signInViaAdminOtp(test.env, {
+      email: "owner@example.test",
+      password: "password12345",
+    });
     const setActive = await test.app.request(
       "/api/auth/organization/set-active",
       {
@@ -119,14 +134,19 @@ describe("OAuth client ownership via BA clientReference", () => {
     );
     expect(response.status).toBe(200);
     const created = (await response.json()) as { readonly client_id: string };
-    test.raw.exec(`insert into "organization" ("id", "name", "slug", "createdAt") values ('org_target', 'T', 't', 1700000000000);`);
+    test.raw.exec(
+      `insert into "organization" ("id", "name", "slug", "createdAt") values ('org_target', 'T', 't', 1700000000000);`,
+    );
 
     const update = await test.app.request(
       "/api/auth/oauth2/update-client",
       {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ client_id: created.client_id, reference_id: "org_target" }),
+        body: JSON.stringify({
+          client_id: created.client_id,
+          reference_id: "org_target",
+        }),
       },
       test.env,
     );
@@ -147,12 +167,18 @@ describe("OAuth client ownership via BA clientReference", () => {
       {
         method: "POST",
         headers: { "content-type": "application/json", cookie: adminCookie },
-        body: JSON.stringify({ name: "Member", email: "member@example.test", password: "password12345" }),
+        body: JSON.stringify({
+          name: "Member",
+          email: "member@example.test",
+          password: "password12345",
+        }),
       },
       test.env,
     );
     expect(createdUser.status).toBe(200);
-    const member = test.raw.prepare(`select "id" from "user" where "email" = ?`).get("member@example.test") as {
+    const member = test.raw
+      .prepare(`select "id" from "user" where "email" = ?`)
+      .get("member@example.test") as {
       readonly id: string;
     };
     test.raw.exec(
@@ -162,11 +188,16 @@ describe("OAuth client ownership via BA clientReference", () => {
 
     // Add the admin to org_plain so they can create a client there for within-org tests.
     // Must re-sign-in so the admin session picks up the new membership.
-    const adminId = test.raw.prepare(`select "id" from "user" where "role" = 'admin' limit 1`).get() as { readonly id: string };
+    const adminId = test.raw
+      .prepare(`select "id" from "user" where "role" = 'admin' limit 1`)
+      .get() as { readonly id: string };
     test.raw.exec(
       `insert into "member" ("id", "organizationId", "userId", "role", "createdAt") values ('member_admin_plain', 'org_plain', '${adminId.id}', 'owner', 1700000000000);`,
     );
-    const adminCookie2 = await signInViaAdminOtp(test.env, { email: "root@example.test", password: "password12345" });
+    const adminCookie2 = await signInViaAdminOtp(test.env, {
+      email: "root@example.test",
+      password: "password12345",
+    });
 
     // Admin creates a client in org_plain for within-org rejection tests.
     const adminSetActive = await test.app.request(
@@ -195,10 +226,14 @@ describe("OAuth client ownership via BA clientReference", () => {
       test.env,
     );
     expect(ownOrgClientResp.status).toBe(200);
-    const ownOrgClient = (await ownOrgClientResp.json()) as { readonly client_id: string };
+    const ownOrgClient = (await ownOrgClientResp.json()) as {
+      readonly client_id: string;
+    };
 
     // Admin creates a client in the default org for cross-org read test.
-    const defaultOrg = test.raw.prepare(`select "id" from "organization" where "slug" = 'default'`).get() as { readonly id: string };
+    const defaultOrg = test.raw
+      .prepare(`select "id" from "organization" where "slug" = 'default'`)
+      .get() as { readonly id: string };
     const defaultSetActive = await test.app.request(
       "/api/auth/organization/set-active",
       {
@@ -225,10 +260,15 @@ describe("OAuth client ownership via BA clientReference", () => {
       test.env,
     );
     expect(crossOrgClientResp.status).toBe(200);
-    const crossOrgClient = (await crossOrgClientResp.json()) as { readonly client_id: string };
+    const crossOrgClient = (await crossOrgClientResp.json()) as {
+      readonly client_id: string;
+    };
 
     // Sign in as ordinary member.
-    const memberCookie = await signInViaAdminOtp(test.env, { email: "member@example.test", password: "password12345" });
+    const memberCookie = await signInViaAdminOtp(test.env, {
+      email: "member@example.test",
+      password: "password12345",
+    });
     const setActive = await test.app.request(
       "/api/auth/organization/set-active",
       {
@@ -274,10 +314,26 @@ describe("OAuth client ownership via BA clientReference", () => {
 
     // Within-org: read, update, delete, rotate are all rejected.
     for (const [label, path, body] of [
-      ["read", "/api/auth/oauth2/get-client", { client_id: ownOrgClient.client_id }],
-      ["update", "/api/auth/oauth2/update-client", { client_id: ownOrgClient.client_id, client_name: "hacked" }],
-      ["delete", "/api/auth/oauth2/delete-client", { client_id: ownOrgClient.client_id }],
-      ["rotate", "/api/auth/oauth2/rotate-client-secret", { client_id: ownOrgClient.client_id }],
+      [
+        "read",
+        "/api/auth/oauth2/get-client",
+        { client_id: ownOrgClient.client_id },
+      ],
+      [
+        "update",
+        "/api/auth/oauth2/update-client",
+        { client_id: ownOrgClient.client_id, client_name: "hacked" },
+      ],
+      [
+        "delete",
+        "/api/auth/oauth2/delete-client",
+        { client_id: ownOrgClient.client_id },
+      ],
+      [
+        "rotate",
+        "/api/auth/oauth2/rotate-client-secret",
+        { client_id: ownOrgClient.client_id },
+      ],
     ] as const) {
       const resp = await test.app.request(
         path,
@@ -288,7 +344,9 @@ describe("OAuth client ownership via BA clientReference", () => {
         },
         test.env,
       );
-      expect(resp.status, `${label} should be rejected`).toBeGreaterThanOrEqual(400);
+      expect(resp.status, `${label} should be rejected`).toBeGreaterThanOrEqual(
+        400,
+      );
     }
 
     // Cross-org read: member cannot read a client in the admin's default org.

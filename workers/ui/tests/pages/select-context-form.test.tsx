@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { SelectContextForm } from "@/app/select-authorization-context/select-context-form";
 
 const mockPush = vi.fn<() => void>();
-const mockAuthApiPost = vi.fn<(...args: unknown[]) => void>();
+const mockAuthApiPost = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockFetch = vi.fn<typeof globalThis.fetch>();
 
 vi.mock("next/navigation", () => ({
@@ -45,9 +45,7 @@ describe("SelectContextForm", () => {
   });
 
   it("renders individual access radio group", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -56,9 +54,7 @@ describe("SelectContextForm", () => {
   });
 
   it("renders workspace access when organizations exist", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([{ id: "org1", name: "Acme Corp" }]),
-    });
+    mockFetch.mockResolvedValue(Response.json([{ id: "org1", name: "Acme Corp" }]));
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -68,9 +64,7 @@ describe("SelectContextForm", () => {
   });
 
   it("shows no organizations message when no orgs", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
 
     render(<SelectContextForm />);
     await waitFor(() => {
@@ -79,9 +73,7 @@ describe("SelectContextForm", () => {
   });
 
   it("submits with direct-share selection by default", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
@@ -100,9 +92,7 @@ describe("SelectContextForm", () => {
   });
 
   it("submits with workspace context when selected", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([{ id: "org1", name: "Acme Corp" }]),
-    });
+    mockFetch.mockResolvedValue(Response.json([{ id: "org1", name: "Acme Corp" }]));
     mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
@@ -121,9 +111,7 @@ describe("SelectContextForm", () => {
   });
 
   it("redirects on successful selection", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     mockAuthApiPost.mockResolvedValue({ redirect_uri: "https://app.example.com/callback" });
 
     render(<SelectContextForm />);
@@ -138,9 +126,7 @@ describe("SelectContextForm", () => {
   });
 
   it("redirects when Better Auth continue returns a url field", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     mockAuthApiPost.mockResolvedValue({ redirect: true, url: "https://app.example.com/callback?code=abc" });
 
     render(<SelectContextForm />);
@@ -155,9 +141,7 @@ describe("SelectContextForm", () => {
   });
 
   it("shows error message on failure", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     mockAuthApiPost.mockResolvedValue({ message: "Selection failed" });
 
     render(<SelectContextForm />);
@@ -172,9 +156,7 @@ describe("SelectContextForm", () => {
   });
 
   it("shows network error on fetch failure", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     mockAuthApiPost.mockRejectedValue(new Error("Network error"));
 
     render(<SelectContextForm />);
@@ -189,9 +171,7 @@ describe("SelectContextForm", () => {
   });
 
   it("disables continue button while loading", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    mockFetch.mockResolvedValue(Response.json([]));
     let resolvePromise: (value: unknown) => void;
     mockAuthApiPost.mockImplementation(
       () => new Promise((resolve) => {
@@ -225,9 +205,7 @@ describe("SelectContextForm", () => {
   });
 
   it("handles malformed organization API responses as zero organizations", async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ error: "unavailable" }),
-    });
+    mockFetch.mockResolvedValue(Response.json({ error: "unavailable" }));
 
     render(<SelectContextForm />);
     await waitFor(() => {

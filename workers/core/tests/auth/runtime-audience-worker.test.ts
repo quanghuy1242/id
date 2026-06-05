@@ -1,4 +1,9 @@
-import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
+import {
+  createLocalJWKSet,
+  decodeJwt,
+  jwtVerify,
+  type JSONWebKeySet,
+} from "jose";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/composition/create-app";
 import { getAuth } from "../../src/auth/get-auth";
@@ -20,7 +25,10 @@ function createKv(): KVNamespace {
   } as KVNamespace;
 }
 
-async function createEnv(): Promise<{ readonly env: CoreEnv; readonly raw: RawSqlite }> {
+async function createEnv(): Promise<{
+  readonly env: CoreEnv;
+  readonly raw: RawSqlite;
+}> {
   const { db, raw } = await createMemoryD1();
   return {
     raw,
@@ -34,12 +42,18 @@ async function createEnv(): Promise<{ readonly env: CoreEnv; readonly raw: RawSq
   };
 }
 
-async function bootstrap(app: ReturnType<typeof createApp>, env: CoreEnv): Promise<string> {
+async function bootstrap(
+  app: ReturnType<typeof createApp>,
+  env: CoreEnv,
+): Promise<string> {
   const response = await app.request(
     "/api/bootstrap/admin",
     {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-bootstrap-token-v1",
+      },
       body: JSON.stringify({
         email: "root@example.test",
         password: "password12345",
@@ -131,7 +145,9 @@ describe("runtime resource audience integration", () => {
       readonly client_id: string;
       readonly client_secret: string;
     };
-    raw.exec(`update "oauthClient" set "referenceId" = '${org.id}' where "clientId" = '${oauthClient.client_id}';`);
+    raw.exec(
+      `update "oauthClient" set "referenceId" = '${org.id}' where "clientId" = '${oauthClient.client_id}';`,
+    );
 
     const clientResourceScope = await app.request(
       "/api/auth/admin/oauth-client-resource-scopes",
@@ -166,7 +182,7 @@ describe("runtime resource audience integration", () => {
     expect(token.status).toBe(200);
     const issued = (await token.json()) as { readonly access_token: string };
     const jwksResponse = await app.request("/api/auth/jwks", {}, env);
-    const jwks = await jwksResponse.json();
+    const jwks = (await jwksResponse.json()) as JSONWebKeySet;
     const decoded = decodeJwt(issued.access_token);
     await expect(
       jwtVerify(issued.access_token, createLocalJWKSet(jwks), {

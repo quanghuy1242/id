@@ -37,7 +37,10 @@ type OrganizationRow = {
   readonly name?: string | null;
 };
 
-type OrganizationConsoleScope = Omit<ConsoleScope, "kind" | "id" | "organizationId" | "role"> & {
+type OrganizationConsoleScope = Omit<
+  ConsoleScope,
+  "kind" | "id" | "organizationId" | "role"
+> & {
   readonly kind: "organization";
   readonly id: `organization:${string}`;
   readonly organizationId: string;
@@ -73,7 +76,9 @@ export const organizationConsolePermissions = [
 ] as const satisfies readonly ConsolePermission[];
 
 function membershipRole(value: unknown): "owner" | "admin" | "member" | null {
-  return value === "owner" || value === "admin" || value === "member" ? value : null;
+  return value === "owner" || value === "admin" || value === "member"
+    ? value
+    : null;
 }
 
 function roleRank(role: "owner" | "admin" | "member"): number {
@@ -82,7 +87,10 @@ function roleRank(role: "owner" | "admin" | "member"): number {
   return CONSOLE_MEMBER_ROLE_RANK;
 }
 
-function organizationLabel(row: OrganizationRow | undefined, organizationId: string): string {
+function organizationLabel(
+  row: OrganizationRow | undefined,
+  organizationId: string,
+): string {
   return row?.name?.trim() || organizationId;
 }
 
@@ -90,13 +98,17 @@ function scopeId(organizationId: string): `organization:${string}` {
   return `organization:${organizationId}`;
 }
 
-function resolveDefaultScopeId(scopes: readonly ConsoleScope[]): ConsoleScope["id"] | null {
+function resolveDefaultScopeId(
+  scopes: readonly ConsoleScope[],
+): ConsoleScope["id"] | null {
   const platform = scopes.find((scope) => scope.kind === "platform");
   if (platform) return platform.id;
   return scopes[0]?.id ?? null;
 }
 
-function isOrganizationConsoleScope(item: OrganizationScopeItem): item is OrganizationConsoleScope {
+function isOrganizationConsoleScope(
+  item: OrganizationScopeItem,
+): item is OrganizationConsoleScope {
   return "kind" in item && item.kind === "organization";
 }
 
@@ -109,25 +121,33 @@ async function loadOrganizationRows(
       adapter.findMany<OrganizationRow>({
         model: ORGANIZATION_MODEL,
         where: [{ field: "id", value: organizationId }],
-      })),
+      }),
+    ),
   );
   return new Map(rows.flat().map((row) => [row.id, row]));
 }
 
-async function loadAllOrganizationRows(adapter: ConsoleScopesAdapter): Promise<readonly OrganizationRow[]> {
+async function loadAllOrganizationRows(
+  adapter: ConsoleScopesAdapter,
+): Promise<readonly OrganizationRow[]> {
   return adapter.findMany<OrganizationRow>({
     model: ORGANIZATION_MODEL,
     sortBy: { field: "name", direction: "asc" },
   });
 }
 
-function normalizeMemberships(rows: readonly MemberRow[]): readonly MemberRow[] {
+function normalizeMemberships(
+  rows: readonly MemberRow[],
+): readonly MemberRow[] {
   const byOrganization = new Map<string, MemberRow>();
   for (const row of rows) {
     const role = membershipRole(row.role);
     if (!role) continue;
     const existing = byOrganization.get(row.organizationId);
-    if (!existing || roleRank(role) > roleRank(membershipRole(existing.role) ?? "member")) {
+    if (
+      !existing ||
+      roleRank(role) > roleRank(membershipRole(existing.role) ?? "member")
+    ) {
       byOrganization.set(row.organizationId, row);
     }
   }
@@ -158,44 +178,72 @@ export async function resolveConsoleScopeEnvelope(params: {
   readonly platformStepUpSatisfied: boolean;
 }): Promise<ConsoleScopeEnvelope> {
   const platformAdmin = params.isPlatformAdmin(params.user.role);
-  const membershipRows = normalizeMemberships(await params.adapter.findMany<MemberRow>({
-    model: MEMBER_MODEL,
-    where: [{ field: "userId", value: params.user.id }],
-    sortBy: { field: "createdAt", direction: "asc" },
-  }));
-  const organizationRows = await loadOrganizationRows(params.adapter, membershipRows.map((membership) => membership.organizationId));
-  const platformOrganizationRows = platformAdmin ? await loadAllOrganizationRows(params.adapter) : [];
+  const membershipRows = normalizeMemberships(
+    await params.adapter.findMany<MemberRow>({
+      model: MEMBER_MODEL,
+      where: [{ field: "userId", value: params.user.id }],
+      sortBy: { field: "createdAt", direction: "asc" },
+    }),
+  );
+  const organizationRows = await loadOrganizationRows(
+    params.adapter,
+    membershipRows.map((membership) => membership.organizationId),
+  );
+  const platformOrganizationRows = platformAdmin
+    ? await loadAllOrganizationRows(params.adapter)
+    : [];
 
   const organizationScopes = membershipRows
     .map((membership): OrganizationScopeItem | null => {
       const role = membershipRole(membership.role);
       if (!role) return null;
-      const label = organizationLabel(organizationRows.get(membership.organizationId), membership.organizationId);
+      const label = organizationLabel(
+        organizationRows.get(membership.organizationId),
+        membership.organizationId,
+      );
       if (role === "member") {
         return { organizationId: membership.organizationId, label, role };
       }
       return organizationConsoleScope(membership.organizationId, label, role);
     })
     .filter((scope): scope is OrganizationScopeItem => scope !== null)
-    .sort((left, right) => left.label.localeCompare(right.label) || left.organizationId.localeCompare(right.organizationId));
+    .sort(
+      (left, right) =>
+        left.label.localeCompare(right.label) ||
+        left.organizationId.localeCompare(right.organizationId),
+    );
 
   const scopes: ConsoleScope[] = platformAdmin
-    ? [{
-        kind: "platform",
-        id: "platform",
-        label: "Platform",
-        role: "platform-admin",
-        permissions: [...platformConsolePermissions],
-        requiresStepUp: true,
-        stepUpSatisfied: params.platformStepUpSatisfied,
-      }]
+    ? [
+        {
+          kind: "platform",
+          id: "platform",
+          label: "Platform",
+          role: "platform-admin",
+          permissions: [...platformConsolePermissions],
+          requiresStepUp: true,
+          stepUpSatisfied: params.platformStepUpSatisfied,
+        },
+      ]
     : [];
   const memberships: ConsoleMembershipHint[] = [];
 
   if (platformAdmin) {
-    scopes.push(...platformOrganizationRows
-      .map((row) => organizationConsoleScope(row.id, organizationLabel(row, row.id), "platform-admin"))
-      .sort((left, right) => left.label.localeCompare(right.label) || left.organizationId.localeCompare(right.organizationId)));
+    scopes.push(
+      ...platformOrganizationRows
+        .map((row) =>
+          organizationConsoleScope(
+            row.id,
+            organizationLabel(row, row.id),
+            "platform-admin",
+          ),
+        )
+        .sort(
+          (left, right) =>
+            left.label.localeCompare(right.label) ||
+            left.organizationId.localeCompare(right.organizationId),
+        ),
+    );
   } else {
     for (const item of organizationScopes) {
       if (isOrganizationConsoleScope(item)) {
@@ -206,9 +254,10 @@ export async function resolveConsoleScopeEnvelope(params: {
     }
   }
 
-  const email = typeof params.user.email === "string" && params.user.email.length > 0
-    ? params.user.email
-    : undefined;
+  const email =
+    typeof params.user.email === "string" && params.user.email.length > 0
+      ? params.user.email
+      : undefined;
 
   return {
     actor: {

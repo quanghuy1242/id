@@ -37,7 +37,10 @@ describe("bootstrap admin route", () => {
       "/api/bootstrap/admin",
       {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer wrong" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer wrong",
+        },
         body: JSON.stringify({
           email: "root@example.test",
           password: "password12345",
@@ -52,7 +55,10 @@ describe("bootstrap admin route", () => {
       "/api/bootstrap/admin",
       {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-bootstrap-token-v1",
+        },
         body: JSON.stringify({
           email: "root@example.test",
           password: "password12345",
@@ -75,13 +81,19 @@ describe("bootstrap admin route", () => {
 
     // Post-bootstrap admin sign-in goes through the email-OTP step (doc 024);
     // the helper asserts a 200 and returns the session cookie.
-    await signInViaAdminOtp(env, { email: "root@example.test", password: "password12345" });
+    await signInViaAdminOtp(env, {
+      email: "root@example.test",
+      password: "password12345",
+    });
 
     const secondRun = await app.request(
       "/api/bootstrap/admin",
       {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer test-bootstrap-token-v1" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-bootstrap-token-v1",
+        },
         body: JSON.stringify({
           email: "other@example.test",
           password: "password12345",

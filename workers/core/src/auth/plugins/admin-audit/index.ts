@@ -1,4 +1,8 @@
-import { APIError, createAuthEndpoint, sessionMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  sessionMiddleware,
+} from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { createJwk } from "better-auth/plugins/jwt";
 import {
@@ -40,13 +44,18 @@ import {
   type TokenRow,
 } from "./schema";
 
-import { JWKS_GRACE_PERIOD_MS, JWKS_ROTATION_INTERVAL_SECONDS } from "../../config";
+import {
+  JWKS_GRACE_PERIOD_MS,
+  JWKS_ROTATION_INTERVAL_SECONDS,
+} from "../../config";
 
 export type { AdminAuditPluginOptions } from "./types";
 
 type UserRow = { id: string; email?: string | null };
 type ClientRow = { clientId: string; name?: string | null };
-type InternalSessionAdapter = { readonly deleteSession: (sessionToken: string) => Promise<unknown> };
+type InternalSessionAdapter = {
+  readonly deleteSession: (sessionToken: string) => Promise<unknown>;
+};
 
 /**
  * Narrows `ctx.context.adapter` to the minimal read surface this plugin needs.
@@ -58,7 +67,9 @@ function auditAdapter(ctx: { context: { adapter: unknown } }): AuditAdapter {
   return ctx.context.adapter as unknown as AuditAdapter;
 }
 
-function internalSessionAdapter(ctx: { context: { internalAdapter: unknown } }): InternalSessionAdapter {
+function internalSessionAdapter(ctx: {
+  context: { internalAdapter: unknown };
+}): InternalSessionAdapter {
   return ctx.context.internalAdapter as InternalSessionAdapter;
 }
 
@@ -73,7 +84,10 @@ function requireAdmin(
 }
 
 /** Loads a `userId -> email` map for the referenced users in one batched `in` query. */
-async function emailMap(adapter: AuditAdapter, userIds: string[]): Promise<Map<string, string>> {
+async function emailMap(
+  adapter: AuditAdapter,
+  userIds: string[],
+): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
   const users = await adapter.findMany<UserRow>({
     model: USER_MODEL,
@@ -85,7 +99,10 @@ async function emailMap(adapter: AuditAdapter, userIds: string[]): Promise<Map<s
 }
 
 /** Loads a `clientId -> name` map for the referenced clients in one batched `in` query. */
-async function clientNameMap(adapter: AuditAdapter, clientIds: string[]): Promise<Map<string, string>> {
+async function clientNameMap(
+  adapter: AuditAdapter,
+  clientIds: string[],
+): Promise<Map<string, string>> {
   if (clientIds.length === 0) return new Map();
   const clients = await adapter.findMany<ClientRow>({
     model: OAUTH_CLIENT_MODEL,
@@ -97,57 +114,85 @@ async function clientNameMap(adapter: AuditAdapter, clientIds: string[]): Promis
 }
 
 const listSessionsMeta = adminAuditEndpointMeta({
-  description: "List browser sessions without session tokens (platform admin only)",
+  description:
+    "List browser sessions without session tokens (platform admin only)",
   pagination: true,
   extraParameters: [
-    { name: "userId", in: "query", required: false, schema: { type: "string" }, description: "Filter to one user" },
+    {
+      name: "userId",
+      in: "query",
+      required: false,
+      schema: { type: "string" },
+      description: "Filter to one user",
+    },
   ],
   responseSchema: listSessionsOpenApiSchema,
-  responseDescription: "Paginated session list with batched user-email enrichment; session tokens are never returned",
+  responseDescription:
+    "Paginated session list with batched user-email enrichment; session tokens are never returned",
 });
 
 const listTokensMeta = adminAuditEndpointMeta({
-  description: "List OAuth access or refresh tokens across all clients (platform admin only); token values are never returned",
+  description:
+    "List OAuth access or refresh tokens across all clients (platform admin only); token values are never returned",
   pagination: true,
   extraParameters: [
-    { name: "type", in: "query", required: false, schema: { type: "string", enum: ["access", "refresh"] }, description: "Token table to read (default access)" },
+    {
+      name: "type",
+      in: "query",
+      required: false,
+      schema: { type: "string", enum: ["access", "refresh"] },
+      description: "Token table to read (default access)",
+    },
   ],
   responseSchema: listTokensOpenApiSchema,
-  responseDescription: "Paginated token list (prefix only) with client/user enrichment",
+  responseDescription:
+    "Paginated token list (prefix only) with client/user enrichment",
 });
 
 const listConsentsMeta = adminAuditEndpointMeta({
-  description: "List OAuth consent grants across all users (platform admin only)",
+  description:
+    "List OAuth consent grants across all users (platform admin only)",
   pagination: true,
   extraParameters: [
-    { name: "clientId", in: "query", required: false, schema: { type: "string" }, description: "Filter to a single client" },
+    {
+      name: "clientId",
+      in: "query",
+      required: false,
+      schema: { type: "string" },
+      description: "Filter to a single client",
+    },
   ],
   responseSchema: listConsentsOpenApiSchema,
   responseDescription: "Paginated consent list with client/user enrichment",
 });
 
 const revokeConsentMeta = adminAuditEndpointMeta({
-  description: "Revoke a single OAuth consent grant, forcing re-consent (platform admin only)",
+  description:
+    "Revoke a single OAuth consent grant, forcing re-consent (platform admin only)",
   requestBody: revokeConsentOpenApiRequestBody,
   responseSchema: successOpenApiSchema,
   responseDescription: "Consent revoked",
 });
 
 const revokeSessionMeta = adminAuditEndpointMeta({
-  description: "Revoke one browser session by id without exposing the session token to the caller (platform admin only)",
+  description:
+    "Revoke one browser session by id without exposing the session token to the caller (platform admin only)",
   requestBody: revokeSessionOpenApiRequestBody,
   responseSchema: successOpenApiSchema,
   responseDescription: "Session revoked",
 });
 
 const jwksMeta = adminAuditEndpointMeta({
-  description: "List JWKS key metadata with timestamps and lifecycle status (platform admin only); the private key is never returned",
+  description:
+    "List JWKS key metadata with timestamps and lifecycle status (platform admin only); the private key is never returned",
   responseSchema: jwksOpenApiSchema,
-  responseDescription: "Public JWK material plus createdAt/expiresAt/status per key",
+  responseDescription:
+    "Public JWK material plus createdAt/expiresAt/status per key",
 });
 
 const rotateJwksMeta = adminAuditEndpointMeta({
-  description: "Emergency-rotate signing keys by creating and promoting a new JWKS key (platform admin only)",
+  description:
+    "Emergency-rotate signing keys by creating and promoting a new JWKS key (platform admin only)",
   requestBody: rotateJwksOpenApiRequestBody,
   responseSchema: rotateJwksOpenApiSchema,
   responseDescription: "New public JWKS key metadata",
@@ -180,7 +225,9 @@ async function createSigningJwk(
  * session token. This plugin intentionally accepts `sessionId`, resolves the
  * token inside the auth worker, and deletes it server-side.
  */
-export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthPlugin => {
+export const idAdminAudit = (
+  options: AdminAuditPluginOptions = {},
+): BetterAuthPlugin => {
   const graceMs = options.jwksGracePeriodMs ?? JWKS_GRACE_PERIOD_MS;
 
   return {
@@ -193,10 +240,17 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
           requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
           const { limit, offset } = parsePageParams(ctx.query);
-          const userId = typeof ctx.query?.userId === "string" && ctx.query.userId ? ctx.query.userId : undefined;
-          const where = userId ? [{ field: "userId", value: userId }] : undefined;
+          const userId =
+            typeof ctx.query?.userId === "string" && ctx.query.userId
+              ? ctx.query.userId
+              : undefined;
+          const where = userId
+            ? [{ field: "userId", value: userId }]
+            : undefined;
 
-          const total = Number(await adapter.count({ model: SESSION_MODEL, where }));
+          const total = Number(
+            await adapter.count({ model: SESSION_MODEL, where }),
+          );
           const rows = await adapter.findMany<SessionRow>({
             model: SESSION_MODEL,
             where,
@@ -204,14 +258,27 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
             offset,
             sortBy: { field: "createdAt", direction: "desc" },
           });
-          const emails = await emailMap(adapter, uniqueIds(rows, (r) => r.userId));
-          return ctx.json({ sessions: rows.map((r) => presentSession(r, emails)), total, limit, offset });
+          const emails = await emailMap(
+            adapter,
+            uniqueIds(rows, (r) => r.userId),
+          );
+          return ctx.json({
+            sessions: rows.map((r) => presentSession(r, emails)),
+            total,
+            limit,
+            offset,
+          });
         },
       ),
 
       revokeAdminSession: createAuthEndpoint(
         "/admin/revoke-session",
-        { method: "POST", use: [sessionMiddleware], body: revokeSessionBody, metadata: revokeSessionMeta },
+        {
+          method: "POST",
+          use: [sessionMiddleware],
+          body: revokeSessionBody,
+          metadata: revokeSessionMeta,
+        },
         async (ctx) => {
           requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
@@ -234,7 +301,10 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
           const adapter = auditAdapter(ctx);
           const { limit, offset } = parsePageParams(ctx.query);
           const type = ctx.query?.type === "refresh" ? "refresh" : "access";
-          const model = type === "refresh" ? OAUTH_REFRESH_TOKEN_MODEL : OAUTH_ACCESS_TOKEN_MODEL;
+          const model =
+            type === "refresh"
+              ? OAUTH_REFRESH_TOKEN_MODEL
+              : OAUTH_ACCESS_TOKEN_MODEL;
 
           const total = Number(await adapter.count({ model }));
           const rows = await adapter.findMany<TokenRow>({
@@ -244,10 +314,21 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
             sortBy: { field: "createdAt", direction: "desc" },
           });
           const [emails, clients] = await Promise.all([
-            emailMap(adapter, uniqueIds(rows, (r) => r.userId)),
-            clientNameMap(adapter, uniqueIds(rows, (r) => r.clientId)),
+            emailMap(
+              adapter,
+              uniqueIds(rows, (r) => r.userId),
+            ),
+            clientNameMap(
+              adapter,
+              uniqueIds(rows, (r) => r.clientId),
+            ),
           ]);
-          return ctx.json({ tokens: rows.map((r) => presentToken(r, type, emails, clients)), total, limit, offset });
+          return ctx.json({
+            tokens: rows.map((r) => presentToken(r, type, emails, clients)),
+            total,
+            limit,
+            offset,
+          });
         },
       ),
 
@@ -258,10 +339,17 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
           requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
           const { limit, offset } = parsePageParams(ctx.query);
-          const clientId = typeof ctx.query?.clientId === "string" && ctx.query.clientId ? ctx.query.clientId : undefined;
-          const where = clientId ? [{ field: "clientId", value: clientId }] : undefined;
+          const clientId =
+            typeof ctx.query?.clientId === "string" && ctx.query.clientId
+              ? ctx.query.clientId
+              : undefined;
+          const where = clientId
+            ? [{ field: "clientId", value: clientId }]
+            : undefined;
 
-          const total = Number(await adapter.count({ model: OAUTH_CONSENT_MODEL, where }));
+          const total = Number(
+            await adapter.count({ model: OAUTH_CONSENT_MODEL, where }),
+          );
           const rows = await adapter.findMany<ConsentRow>({
             model: OAUTH_CONSENT_MODEL,
             where,
@@ -270,16 +358,32 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
             sortBy: { field: "createdAt", direction: "desc" },
           });
           const [emails, clients] = await Promise.all([
-            emailMap(adapter, uniqueIds(rows, (r) => r.userId)),
-            clientNameMap(adapter, uniqueIds(rows, (r) => r.clientId)),
+            emailMap(
+              adapter,
+              uniqueIds(rows, (r) => r.userId),
+            ),
+            clientNameMap(
+              adapter,
+              uniqueIds(rows, (r) => r.clientId),
+            ),
           ]);
-          return ctx.json({ consents: rows.map((r) => presentConsent(r, emails, clients)), total, limit, offset });
+          return ctx.json({
+            consents: rows.map((r) => presentConsent(r, emails, clients)),
+            total,
+            limit,
+            offset,
+          });
         },
       ),
 
       revokeAdminConsent: createAuthEndpoint(
         "/admin/revoke-consent",
-        { method: "POST", use: [sessionMiddleware], body: revokeConsentBody, metadata: revokeConsentMeta },
+        {
+          method: "POST",
+          use: [sessionMiddleware],
+          body: revokeConsentBody,
+          metadata: revokeConsentMeta,
+        },
         async (ctx) => {
           requireAdmin(options.authorize, ctx.context.session);
           const adapter = auditAdapter(ctx);
@@ -305,17 +409,27 @@ export const idAdminAudit = (options: AdminAuditPluginOptions = {}): BetterAuthP
             sortBy: { field: "createdAt", direction: "desc" },
           });
           const now = Date.now();
-          return ctx.json({ keys: rows.map((r) => presentJwk(r, now, graceMs)) });
+          return ctx.json({
+            keys: rows.map((r) => presentJwk(r, now, graceMs)),
+          });
         },
       ),
 
       rotateAdminJwks: createAuthEndpoint(
         "/admin/jwks/rotate",
-        { method: "POST", use: [sessionMiddleware], body: rotateJwksBody, metadata: rotateJwksMeta },
+        {
+          method: "POST",
+          use: [sessionMiddleware],
+          body: rotateJwksBody,
+          metadata: rotateJwksMeta,
+        },
         async (ctx) => {
           requireAdmin(options.authorize, ctx.context.session);
           const row = await createSigningJwk(ctx);
-          const response: RotateJwksResponse = { ...presentJwk(row, Date.now(), graceMs), reason: ctx.body.reason };
+          const response: RotateJwksResponse = {
+            ...presentJwk(row, Date.now(), graceMs),
+            reason: ctx.body.reason,
+          };
           return ctx.json(response);
         },
       ),

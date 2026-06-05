@@ -26,7 +26,8 @@ async function createEnv(): Promise<CoreEnv> {
   };
 }
 
-const METADATA_CACHE_CONTROL = "public, max-age=15, stale-while-revalidate=15, stale-if-error=86400";
+const METADATA_CACHE_CONTROL =
+  "public, max-age=15, stale-while-revalidate=15, stale-if-error=86400";
 const BASE_URL = "https://id.example.test/api/auth";
 
 const oauthMetadataPaths = [
@@ -73,19 +74,24 @@ function expectOidcMetadata(body: Record<string, unknown>) {
 }
 
 describe("well-known endpoints", () => {
-  it.each(oauthMetadataPaths)("serves OAuth authorization server metadata at %s", async (path) => {
-    const app = createApp();
-    const env = await createEnv();
+  it.each(oauthMetadataPaths)(
+    "serves OAuth authorization server metadata at %s",
+    async (path) => {
+      const app = createApp();
+      const env = await createEnv();
 
-    const response = await app.request(path, {}, env);
+      const response = await app.request(path, {}, env);
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("application/json");
-    expect(response.headers.get("cache-control")).toBe(METADATA_CACHE_CONTROL);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("application/json");
+      expect(response.headers.get("cache-control")).toBe(
+        METADATA_CACHE_CONTROL,
+      );
 
-    const body = (await response.json()) as Record<string, unknown>;
-    expectOAuthMetadata(body);
-  });
+      const body = (await response.json()) as Record<string, unknown>;
+      expectOAuthMetadata(body);
+    },
+  );
 
   it.each(oidcMetadataPaths)("serves OIDC discovery at %s", async (path) => {
     const app = createApp();

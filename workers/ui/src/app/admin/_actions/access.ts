@@ -1,5 +1,10 @@
 import { getUser, listUsers, type User } from "./users";
-import { listMembers, listOrganizations, type Member, type Organization } from "./organizations";
+import {
+  listMembers,
+  listOrganizations,
+  type Member,
+  type Organization,
+} from "./organizations";
 
 const ownerAdminRoles = new Set(["owner", "admin"]);
 
@@ -24,15 +29,20 @@ async function listAllPlatformAdmins(): Promise<User[]> {
   });
   const stride = firstPage.limit > 0 ? firstPage.limit : limit;
   const offsets: number[] = [];
-  for (let offset = stride; offset < firstPage.total; offset += stride) offsets.push(offset);
+  for (let offset = stride; offset < firstPage.total; offset += stride)
+    offsets.push(offset);
 
-  const rest = await Promise.all(offsets.map((offset) => listUsers({
-    limit: stride,
-    offset,
-    filterField: "role",
-    filterValue: "admin",
-    filterOperator: "eq",
-  })));
+  const rest = await Promise.all(
+    offsets.map((offset) =>
+      listUsers({
+        limit: stride,
+        offset,
+        filterField: "role",
+        filterValue: "admin",
+        filterOperator: "eq",
+      }),
+    ),
+  );
 
   return [firstPage, ...rest].flatMap((page) => page.users);
 }
@@ -42,10 +52,12 @@ export async function listAdminsRoles(): Promise<AdminsRolesSnapshot> {
     listAllPlatformAdmins(),
     listOrganizations(),
   ]);
-  const memberLists = await Promise.all(organizations.map(async (organization) => ({
-    organization,
-    members: await listMembers(organization.id),
-  })));
+  const memberLists = await Promise.all(
+    organizations.map(async (organization) => ({
+      organization,
+      members: await listMembers(organization.id),
+    })),
+  );
 
   return {
     platformAdmins,

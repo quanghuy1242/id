@@ -29,17 +29,19 @@ function mockMeasuredBreadcrumb(width: number) {
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
     configurable: true,
     get() {
-      return this.getAttribute?.("aria-label") === "Breadcrumb" ? width : 0;
+      const element = this as HTMLElement;
+      return element.getAttribute("aria-label") === "Breadcrumb" ? width : 0;
     },
   });
   Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
     configurable: true,
     get() {
-      if (this.tagName !== "OL") return 0;
-      const visibleItems = Array.from(this.querySelectorAll<HTMLElement>("[data-breadcrumb-item]"))
+      const element = this as HTMLElement;
+      if (element.tagName !== "OL") return 0;
+      const visibleItems = Array.from(element.querySelectorAll<HTMLElement>("[data-breadcrumb-item]"))
         .filter((item) => item.style.display !== "none").length;
-      const leadingItem = this.querySelector<HTMLElement>("li:not([data-breadcrumb-item]):not([data-breadcrumb-menu])");
-      const collapsedMenu = this.querySelector<HTMLElement>("[data-breadcrumb-menu]");
+      const leadingItem = element.querySelector<HTMLElement>("li:not([data-breadcrumb-item]):not([data-breadcrumb-menu])");
+      const collapsedMenu = element.querySelector<HTMLElement>("[data-breadcrumb-menu]");
       const leadingWidth = leadingItem && leadingItem.style.display !== "none" ? 110 : 0;
       const menuWidth = collapsedMenu && collapsedMenu.style.display !== "none" ? 40 : 0;
       return leadingWidth + menuWidth + visibleItems * 90;

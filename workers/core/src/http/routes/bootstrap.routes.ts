@@ -5,9 +5,21 @@ import type { CoreEnv } from "../../config/env";
 import { getAuth } from "../../auth/get-auth";
 import { ensureSystemAccessCatalog } from "../../auth/system-access-seed";
 import { nativeAdminExists } from "../../infrastructure/persistence/bootstrap-store";
-import { MIN_BOOTSTRAP_PASSWORD_LENGTH, MIN_BOOTSTRAP_TOKEN_LENGTH, BOOTSTRAP_RATE_LIMIT_MAX_ATTEMPTS, BOOTSTRAP_RATE_LIMIT_TTL_SECONDS, BOOTSTRAP_LOCK_TTL_SECONDS } from "../../shared/constants";
+import {
+  MIN_BOOTSTRAP_PASSWORD_LENGTH,
+  MIN_BOOTSTRAP_TOKEN_LENGTH,
+  BOOTSTRAP_RATE_LIMIT_MAX_ATTEMPTS,
+  BOOTSTRAP_RATE_LIMIT_TTL_SECONDS,
+  BOOTSTRAP_LOCK_TTL_SECONDS,
+} from "../../shared/constants";
 import { extractBearerToken } from "../../shared/request";
-import { HTTP_BAD_REQUEST, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, HTTP_TOO_MANY_REQUESTS, HTTP_SERVICE_UNAVAILABLE } from "../../shared/http-status";
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_FORBIDDEN,
+  HTTP_UNAUTHORIZED,
+  HTTP_TOO_MANY_REQUESTS,
+  HTTP_SERVICE_UNAVAILABLE,
+} from "../../shared/http-status";
 
 /*
  * Bootstrap is an exceptional infrastructure route: it runs before an admin
@@ -52,7 +64,13 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
   }
 
   if (expectedToken.length < MIN_BOOTSTRAP_TOKEN_LENGTH) {
-    return c.json({ error: "bootstrap_token_insufficient_strength", message: `Bootstrap token must be at least ${MIN_BOOTSTRAP_TOKEN_LENGTH} characters` }, HTTP_SERVICE_UNAVAILABLE);
+    return c.json(
+      {
+        error: "bootstrap_token_insufficient_strength",
+        message: `Bootstrap token must be at least ${MIN_BOOTSTRAP_TOKEN_LENGTH} characters`,
+      },
+      HTTP_SERVICE_UNAVAILABLE,
+    );
   }
 
   const clientIp = c.req.header("cf-connecting-ip") ?? "unknown";
@@ -62,8 +80,15 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
     return c.json({ error: "too_many_attempts" }, HTTP_TOO_MANY_REQUESTS);
   }
 
-  if (!safeBearerEquals(extractBearerToken(c.req.header("authorization") ?? null), expectedToken)) {
-    await env.KV.put(attemptKey, String(attemptCount + 1), { expirationTtl: BOOTSTRAP_RATE_LIMIT_TTL_SECONDS });
+  if (
+    !safeBearerEquals(
+      extractBearerToken(c.req.header("authorization") ?? null),
+      expectedToken,
+    )
+  ) {
+    await env.KV.put(attemptKey, String(attemptCount + 1), {
+      expirationTtl: BOOTSTRAP_RATE_LIMIT_TTL_SECONDS,
+    });
     return c.json({ error: "unauthorized" }, HTTP_UNAUTHORIZED);
   }
 
@@ -78,7 +103,9 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
   }
   await env.KV.put(lockKey, "1", { expirationTtl: BOOTSTRAP_LOCK_TTL_SECONDS });
 
-  const body = bootstrapAdminBody.safeParse(await c.req.raw.json().catch(() => null));
+  const body = bootstrapAdminBody.safeParse(
+    await c.req.raw.json().catch(() => null),
+  );
   if (!body.success) {
     await env.KV.delete(lockKey);
     return c.json({ error: "invalid_bootstrap_request" }, HTTP_BAD_REQUEST);
@@ -107,7 +134,11 @@ async function handleBootstrapAdmin(c: BootstrapContext) {
       });
     }
 
-    await ensureSystemAccessCatalog(env, authContext.adapter as Parameters<typeof ensureSystemAccessCatalog>[1], created.user.id);
+    await ensureSystemAccessCatalog(
+      env,
+      authContext.adapter as Parameters<typeof ensureSystemAccessCatalog>[1],
+      created.user.id,
+    );
 
     return c.json({
       user: {

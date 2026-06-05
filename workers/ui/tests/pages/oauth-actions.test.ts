@@ -20,14 +20,20 @@ const base: OAuthClient = {
 
 describe("clientType", () => {
   it("is M2M when client_credentials is granted", () => {
-    expect(clientType({ ...base, grant_types: ["client_credentials"] })).toBe("M2M");
+    expect(clientType({ ...base, grant_types: ["client_credentials"] })).toBe(
+      "M2M",
+    );
   });
 
   it("is public when token_endpoint_auth_method is none", () => {
-    expect(clientType({ ...base, token_endpoint_auth_method: "none" })).toBe("public");
+    expect(clientType({ ...base, token_endpoint_auth_method: "none" })).toBe(
+      "public",
+    );
   });
 
   it("is confidential otherwise", () => {
-    expect(clientType({ ...base, grant_types: ["authorization_code"] })).toBe("confidential");
+    expect(clientType({ ...base, grant_types: ["authorization_code"] })).toBe(
+      "confidential",
+    );
   });
 });

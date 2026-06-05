@@ -23,12 +23,20 @@ export async function storeVerificationEmailLink(
   kv: BetterAuthKvStorage,
   payload: EmailLinkPayload,
 ): Promise<void> {
-  await storeEmailLink(kv, authPluginConfig.emailVerificationStoragePrefix, payload);
+  await storeEmailLink(
+    kv,
+    authPluginConfig.emailVerificationStoragePrefix,
+    payload,
+  );
 }
 
 export async function storePasswordResetEmailLink(
   kv: BetterAuthKvStorage,
   payload: EmailLinkPayload,
 ): Promise<void> {
-  await storeEmailLink(kv, authPluginConfig.passwordResetStoragePrefix, payload);
+  await storeEmailLink(
+    kv,
+    authPluginConfig.passwordResetStoragePrefix,
+    payload,
+  );
 }

@@ -1,5 +1,10 @@
 import { createResendAuthEmailSender } from "./resend-email";
-import type { AuthEmailMessage, AuthEmailSender, AuthOptionsEnv, BackgroundTaskRunner } from "../types";
+import type {
+  AuthEmailMessage,
+  AuthEmailSender,
+  AuthOptionsEnv,
+  BackgroundTaskRunner,
+} from "../types";
 
 export async function sendAuthEmail(
   sender: AuthEmailSender,

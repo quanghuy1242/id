@@ -18,13 +18,48 @@ function publicAuthPath(path: string): string {
 }
 
 export const authRouteMap = [
-  { name: "signUpEmail", path: publicAuthPath("/sign-up/email"), method: "POST", source: "better-auth" },
-  { name: "getJwks", path: publicAuthPath("/jwks"), method: "GET", source: "jwt-plugin" },
-  { name: "oauth2Authorize", path: publicAuthPath("/oauth2/authorize"), method: "GET", source: "oauth-provider-plugin" },
-  { name: "oauth2Token", path: publicAuthPath("/oauth2/token"), method: "POST", source: "oauth-provider-plugin" },
-  { name: "oauth2Introspect", path: publicAuthPath("/oauth2/introspect"), method: "POST", source: "oauth-provider-plugin" },
-  { name: "oauth2Revoke", path: publicAuthPath("/oauth2/revoke"), method: "POST", source: "oauth-provider-plugin" },
-  { name: "oauth2UserInfo", path: publicAuthPath("/oauth2/userinfo"), method: "GET", source: "oauth-provider-plugin" },
+  {
+    name: "signUpEmail",
+    path: publicAuthPath("/sign-up/email"),
+    method: "POST",
+    source: "better-auth",
+  },
+  {
+    name: "getJwks",
+    path: publicAuthPath("/jwks"),
+    method: "GET",
+    source: "jwt-plugin",
+  },
+  {
+    name: "oauth2Authorize",
+    path: publicAuthPath("/oauth2/authorize"),
+    method: "GET",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "oauth2Token",
+    path: publicAuthPath("/oauth2/token"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "oauth2Introspect",
+    path: publicAuthPath("/oauth2/introspect"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "oauth2Revoke",
+    path: publicAuthPath("/oauth2/revoke"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "oauth2UserInfo",
+    path: publicAuthPath("/oauth2/userinfo"),
+    method: "GET",
+    source: "oauth-provider-plugin",
+  },
   {
     name: "getOAuthServerConfig",
     path: publicAuthPath("/.well-known/oauth-authorization-server"),
@@ -37,10 +72,30 @@ export const authRouteMap = [
     method: "GET",
     source: "oauth-provider-plugin",
   },
-  { name: "createOAuthClient", path: publicAuthPath("/oauth2/create-client"), method: "POST", source: "oauth-provider-plugin" },
-  { name: "getOAuthClients", path: publicAuthPath("/oauth2/get-clients"), method: "GET", source: "oauth-provider-plugin" },
-  { name: "updateOAuthClient", path: publicAuthPath("/oauth2/update-client"), method: "POST", source: "oauth-provider-plugin" },
-  { name: "deleteOAuthClient", path: publicAuthPath("/oauth2/delete-client"), method: "POST", source: "oauth-provider-plugin" },
+  {
+    name: "createOAuthClient",
+    path: publicAuthPath("/oauth2/create-client"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "getOAuthClients",
+    path: publicAuthPath("/oauth2/get-clients"),
+    method: "GET",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "updateOAuthClient",
+    path: publicAuthPath("/oauth2/update-client"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
+  {
+    name: "deleteOAuthClient",
+    path: publicAuthPath("/oauth2/delete-client"),
+    method: "POST",
+    source: "oauth-provider-plugin",
+  },
   {
     name: "rotateClientSecret",
     path: publicAuthPath("/oauth2/client/rotate-secret"),

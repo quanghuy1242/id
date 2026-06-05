@@ -21,8 +21,14 @@ export type AdminAuditPluginOptions = {
 
 /** Minimal adapter surface used by the read-only audit endpoints. */
 export type AuditAdapter = {
-  create: <T>(params: { model: string; data: Record<string, unknown> }) => Promise<T>;
-  findOne: <T>(params: { model: string; where: Array<{ field: string; value: unknown }> }) => Promise<T | null>;
+  create: <T>(params: {
+    model: string;
+    data: Record<string, unknown>;
+  }) => Promise<T>;
+  findOne: <T>(params: {
+    model: string;
+    where: Array<{ field: string; value: unknown }>;
+  }) => Promise<T | null>;
   findMany: <T>(params: {
     model: string;
     where?: Array<{ field: string; value: unknown; operator?: string }>;
@@ -30,6 +36,12 @@ export type AuditAdapter = {
     offset?: number;
     sortBy?: { field: string; direction: "asc" | "desc" };
   }) => Promise<T[]>;
-  count: (params: { model: string; where?: Array<{ field: string; value: unknown; operator?: string }> }) => Promise<number | string>;
-  delete: (params: { model: string; where: Array<{ field: string; value: unknown }> }) => Promise<unknown>;
+  count: (params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown; operator?: string }>;
+  }) => Promise<number | string>;
+  delete: (params: {
+    model: string;
+    where: Array<{ field: string; value: unknown }>;
+  }) => Promise<unknown>;
 };

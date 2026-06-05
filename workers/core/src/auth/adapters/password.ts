@@ -17,10 +17,11 @@ const scryptConfig = {
   p: PASSWORD_SCRYPT_P,
   dkLen: PASSWORD_SCRYPT_DK_LEN,
 } as const;
-const scryptMaxmem = PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES
-  * PASSWORD_SCRYPT_N
-  * scryptConfig.r
-  * PASSWORD_SCRYPT_MAXMEM_MULTIPLIER;
+const scryptMaxmem =
+  PASSWORD_SCRYPT_MAXMEM_BLOCK_BYTES *
+  PASSWORD_SCRYPT_N *
+  scryptConfig.r *
+  PASSWORD_SCRYPT_MAXMEM_MULTIPLIER;
 
 /**
  * Hashes a password using `node:crypto.scrypt` with a random 16-byte salt.
@@ -41,7 +42,12 @@ export function hashPassword(password: string): Promise<string> {
       password.normalize("NFKC"),
       salt,
       scryptConfig.dkLen,
-      { N: scryptConfig.N, r: scryptConfig.r, p: scryptConfig.p, maxmem: scryptMaxmem },
+      {
+        N: scryptConfig.N,
+        r: scryptConfig.r,
+        p: scryptConfig.p,
+        maxmem: scryptMaxmem,
+      },
       (err, derivedKey) => {
         if (err) return reject(err);
         resolve(`${salt}:${derivedKey.toString("hex")}`);
@@ -76,7 +82,12 @@ export function verifyPassword({
       password.normalize("NFKC"),
       salt,
       scryptConfig.dkLen,
-      { N: scryptConfig.N, r: scryptConfig.r, p: scryptConfig.p, maxmem: scryptMaxmem },
+      {
+        N: scryptConfig.N,
+        r: scryptConfig.r,
+        p: scryptConfig.p,
+        maxmem: scryptMaxmem,
+      },
       (err, derivedKey) => {
         if (err) {
           resolve(false);

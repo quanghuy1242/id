@@ -19,7 +19,10 @@ export type ClientResourceScopeRow = {
   readonly enabled: boolean;
 };
 
-type RawClientResourceScopeRow = Omit<ClientResourceScopeRow, "allowedScopes"> & {
+type RawClientResourceScopeRow = Omit<
+  ClientResourceScopeRow,
+  "allowedScopes"
+> & {
   readonly allowedScopes: string | readonly string[];
 };
 
@@ -34,10 +37,13 @@ type GrantEnv = {
   readonly KV: BetterAuthKvStorage;
 };
 
-const memoryCache = new Map<string, {
-  readonly expiresAt: number;
-  readonly rows: readonly ClientResourceScopeRow[];
-}>();
+const memoryCache = new Map<
+  string,
+  {
+    readonly expiresAt: number;
+    readonly rows: readonly ClientResourceScopeRow[];
+  }
+>();
 
 type AdapterLike = {
   readonly findOne: <T>(query: {
@@ -55,14 +61,22 @@ function isD1Database(value: unknown): value is D1Database {
 }
 
 function isAdapterLike(value: unknown): value is AdapterLike {
-  return typeof value === "object" && value !== null && "findOne" in value && "findMany" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "findOne" in value &&
+    "findMany" in value
+  );
 }
 
 function cacheKey(clientId: string): string {
   return `${authPluginConfig.oauthClientResourceScopeCachePrefix}${clientId}`;
 }
 
-function getMemoryRows(clientId: string, now: number): readonly ClientResourceScopeRow[] | null {
+function getMemoryRows(
+  clientId: string,
+  now: number,
+): readonly ClientResourceScopeRow[] | null {
   const cached = memoryCache.get(clientId);
   if (!cached) return null;
   if (cached.expiresAt <= now) {
@@ -72,25 +86,36 @@ function getMemoryRows(clientId: string, now: number): readonly ClientResourceSc
   return cached.rows;
 }
 
-function setMemoryRows(clientId: string, rows: readonly ClientResourceScopeRow[], now: number): void {
+function setMemoryRows(
+  clientId: string,
+  rows: readonly ClientResourceScopeRow[],
+  now: number,
+): void {
   memoryCache.set(clientId, {
     rows,
     expiresAt: now + OAUTH_SCOPE_CATALOG_MEMORY_CACHE_TTL_MS,
   });
 }
 
-function parseAllowedScopes(value: string | readonly string[]): readonly string[] {
+function parseAllowedScopes(
+  value: string | readonly string[],
+): readonly string[] {
   if (Array.isArray(value)) return value;
   try {
     const parsed: unknown = JSON.parse(value as string);
     if (typeof parsed === "string") return parseAllowedScopes(parsed);
-    return Array.isArray(parsed) && parsed.every((item): item is string => typeof item === "string") ? parsed : [];
+    return Array.isArray(parsed) &&
+      parsed.every((item): item is string => typeof item === "string")
+      ? parsed
+      : [];
   } catch {
     return [];
   }
 }
 
-function normalizeRows(rows: readonly RawClientResourceScopeRow[]): readonly ClientResourceScopeRow[] {
+function normalizeRows(
+  rows: readonly RawClientResourceScopeRow[],
+): readonly ClientResourceScopeRow[] {
   return rows.map((row) => ({
     ...row,
     allowedScopes: parseAllowedScopes(row.allowedScopes),
@@ -98,7 +123,9 @@ function normalizeRows(rows: readonly RawClientResourceScopeRow[]): readonly Cli
   }));
 }
 
-function parseCachedRows(value: string | null): readonly ClientResourceScopeRow[] | null {
+function parseCachedRows(
+  value: string | null,
+): readonly ClientResourceScopeRow[] | null {
   if (value === null) return null;
   let parsed: unknown;
   try {
@@ -107,14 +134,16 @@ function parseCachedRows(value: string | null): readonly ClientResourceScopeRow[
     return null;
   }
   if (
-    !Array.isArray(parsed)
-    || !parsed.every((item): item is ClientResourceScopeRow =>
-      Boolean(item)
-      && typeof item === "object"
-      && typeof (item as ClientResourceScopeRow).clientId === "string"
-      && typeof (item as ClientResourceScopeRow).resourceServerId === "string"
-      && typeof (item as ClientResourceScopeRow).audience === "string"
-      && Array.isArray((item as ClientResourceScopeRow).allowedScopes))
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (item): item is ClientResourceScopeRow =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        typeof (item as ClientResourceScopeRow).clientId === "string" &&
+        typeof (item as ClientResourceScopeRow).resourceServerId === "string" &&
+        typeof (item as ClientResourceScopeRow).audience === "string" &&
+        Array.isArray((item as ClientResourceScopeRow).allowedScopes),
+    )
   ) {
     return null;
   }
@@ -125,24 +154,33 @@ async function loadRowsFromAdapter(
   db: AdapterLike,
   clientId: string,
 ): Promise<readonly ClientResourceScopeRow[]> {
-  const scopeRows = await db.findMany<Omit<RawClientResourceScopeRow, "audience">>({
+  const scopeRows = await db.findMany<
+    Omit<RawClientResourceScopeRow, "audience">
+  >({
     model: OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
     where: [{ field: "clientId", value: clientId }],
   });
   const rows: RawClientResourceScopeRow[] = [];
-  await Promise.all(scopeRows.map(async (scopeRow) => {
-    const resourceServer = await db.findOne<ResourceServerAudienceRow>({
-      model: RESOURCE_SERVER_MODEL,
-      where: [{ field: "id", value: scopeRow.resourceServerId }],
-    });
-    if (resourceServer?.enabled) {
-      rows.push(Object.assign({}, scopeRow, { audience: resourceServer.audience }));
-    }
-  }));
+  await Promise.all(
+    scopeRows.map(async (scopeRow) => {
+      const resourceServer = await db.findOne<ResourceServerAudienceRow>({
+        model: RESOURCE_SERVER_MODEL,
+        where: [{ field: "id", value: scopeRow.resourceServerId }],
+      });
+      if (resourceServer?.enabled) {
+        rows.push(
+          Object.assign({}, scopeRow, { audience: resourceServer.audience }),
+        );
+      }
+    }),
+  );
   return normalizeRows(rows);
 }
 
-async function loadRowsFromD1(db: D1Database, clientId: string): Promise<readonly ClientResourceScopeRow[]> {
+async function loadRowsFromD1(
+  db: D1Database,
+  clientId: string,
+): Promise<readonly ClientResourceScopeRow[]> {
   const result = await db
     .prepare(
       `select s."id", s."clientId", s."resourceServerId", r."audience", s."allowedScopes", s."enabled"
@@ -157,7 +195,10 @@ async function loadRowsFromD1(db: D1Database, clientId: string): Promise<readonl
   return normalizeRows(result.results ?? []);
 }
 
-async function loadRowsForClient(db: GrantEnv["DB"], clientId: string): Promise<readonly ClientResourceScopeRow[]> {
+async function loadRowsForClient(
+  db: GrantEnv["DB"],
+  clientId: string,
+): Promise<readonly ClientResourceScopeRow[]> {
   if (isAdapterLike(db)) return loadRowsFromAdapter(db, clientId);
   if (isD1Database(db)) return loadRowsFromD1(db, clientId);
   return [];
@@ -174,7 +215,9 @@ export async function loadClientResourceScopes(
 
   const key = cacheKey(clientId);
   const cached = parseCachedRows(
-    await env.KV.get(key, { cacheTtl: authPluginConfig.oauthClientResourceScopeCacheTtlSeconds }),
+    await env.KV.get(key, {
+      cacheTtl: authPluginConfig.oauthClientResourceScopeCacheTtlSeconds,
+    }),
   );
   if (cached) {
     setMemoryRows(clientId, cached, now);
@@ -231,7 +274,9 @@ export async function resolveOAuthClientReferenceId(
   }
   if (isD1Database(db)) {
     const result = await db
-      .prepare(`select "referenceId" from "${OAUTH_CLIENT_MODEL}" where "clientId" = ?`)
+      .prepare(
+        `select "referenceId" from "${OAUTH_CLIENT_MODEL}" where "clientId" = ?`,
+      )
       .bind(clientId)
       .first<{ readonly referenceId?: string | null }>();
     return result?.referenceId ?? null;
@@ -246,14 +291,24 @@ export async function assertClientResourceScope(params: {
   readonly scopes: readonly string[];
   readonly backgroundTaskRunner?: BackgroundTaskRunner;
 }): Promise<void> {
-  const rows = await loadClientResourceScopes(params.env, params.clientId, params.backgroundTaskRunner);
-  const row = rows.find((entry) => entry.audience === params.resource && entry.enabled);
+  const rows = await loadClientResourceScopes(
+    params.env,
+    params.clientId,
+    params.backgroundTaskRunner,
+  );
+  const row = rows.find(
+    (entry) => entry.audience === params.resource && entry.enabled,
+  );
   if (!row) {
-    throw new APIError("FORBIDDEN", { message: "OAuth client has no resource-scope grant" });
+    throw new APIError("FORBIDDEN", {
+      message: "OAuth client has no resource-scope grant",
+    });
   }
   const allowedScopes = new Set(row.allowedScopes);
   const denied = params.scopes.filter((scope) => !allowedScopes.has(scope));
   if (denied.length > 0) {
-    throw new APIError("FORBIDDEN", { message: `OAuth client resource-scope row does not allow scopes: ${denied.join(", ")}` });
+    throw new APIError("FORBIDDEN", {
+      message: `OAuth client resource-scope row does not allow scopes: ${denied.join(", ")}`,
+    });
   }
 }
