@@ -1131,7 +1131,7 @@ Base config:
 - `moduleResolution: "bundler"`
 - `target: "ES2022"`
 
-Each worker owns its own `@/* -> src/*` alias. Packages use package imports, not worker-local aliases.
+`pnpm typecheck` runs `tsgo --noEmit` against the root `tsconfig.json`; `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. The root config includes worker/package source and root config files, maps shared packages through `@id/lib` and `@id/ui`, and maps `@/*` to the UI worker source only. Core source should prefer relative imports or shared package imports so the root checker does not need ambiguous two-worker `@/*` resolution.
 
 ### 10.4 Advisory Pass
 
@@ -1162,7 +1162,7 @@ Root `package.json`:
 - Wrangler bundles workers from per-worker config;
 - current dependencies include Better Auth, OAuth Provider, Hono, Drizzle, Zod, Jose, React, React DOM, and Vinext;
 - UI dependencies such as React Aria, Lucide, Tailwind, and DaisyUI may be added when `packages/ui` grows, but they are not required by the current scaffold;
-- dev dependencies include oxlint, TypeScript, Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
+- dev dependencies include oxlint, TypeScript, TypeScript native preview (`tsgo`), Vitest, Cloudflare Workers types/pool, Wrangler, Fallow, and Aislop.
 
 Workspace:
 
@@ -1229,7 +1229,8 @@ packages:
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:dup": "node scripts/check-duplication-threshold.mjs",
-    "typecheck": "tsc -p packages/lib/tsconfig.json --noEmit && tsc -p packages/ui/tsconfig.json --noEmit && tsc -p workers/core/tsconfig.json --noEmit && tsc -p workers/ui/tsconfig.json --noEmit",
+    "typecheck": "tsgo --noEmit",
+    "typecheck:tsc": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "check": "pnpm lint && pnpm check:dup && pnpm typecheck && pnpm test",

@@ -6,11 +6,22 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
+    "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx"
-  }
+    "jsx": "react-jsx",
+    "types": ["@cloudflare/workers-types", "node", "vitest/globals"],
+    "paths": {
+      "@/*": ["./workers/ui/src/*"],
+      "@id/lib": ["./packages/lib/src/index.ts"],
+      "@id/lib/*": ["./packages/lib/src/*"],
+      "@id/ui": ["./packages/ui/src/index.ts"],
+      "@id/ui/*": ["./packages/ui/src/*"]
+    }
+  },
+  "include": ["packages/*/src", "workers/*/src", "drizzle.config.ts", "vite.config.ts"]
 }
