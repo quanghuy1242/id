@@ -15,16 +15,11 @@ as specified by [doc 017](../../../../../docs/017_scim-directory-and-m2m-princip
 The plugin is registered in `get-auth.ts`. A SCIM M2M client must be provisioned
 before resource servers can call the endpoints:
 
-1. Create a resource server with
-   `audience = systemResourceServerAudience(BETTER_AUTH_URL)` (e.g. `https://id.example/system`).
-   This is shared with the OAuth client picker — one M2M token serves both (doc 020 §2).
-2. Declare `identity:directory:read` on it via `POST /api/auth/admin/oauth-scopes`.
-3. Create an infrastructure M2M client (`referenceId IS NULL`,
-   `grant_types = ["client_credentials"]`).
-4. Attach an `oauthClientResourceScope` row linking the infra client to the SCIM
-   resource server, with `allowedScopes = ["identity:directory:read"]`.
-5. Store the infra client's `client_secret` in consumer secret bindings and issue
-    tokens with `aud = systemResourceServerAudience(...)` + `scope = identity:directory:read`.
+1. Complete first-admin bootstrap. The system access seed creates the shared `/system` resource server (`audience = systemResourceServerAudience(BETTER_AUTH_URL)`, e.g. `https://id.example/system`) and declares `identity:directory:read` plus `oauth:clients:read`.
+2. Create an infrastructure M2M client (`referenceId IS NULL`, `grant_types = ["client_credentials"]`) for the directory channel. This client is per deployment and its id/secret must not be hard-coded.
+3. Attach an `oauthClientResourceScope` row linking the infra client to the seeded `/system` resource server, with `allowedScopes = ["identity:directory:read"]` or `["identity:directory:read", "oauth:clients:read"]` when the same directory bearer token also calls the OAuth client-picker.
+4. Store the infra client's `client_secret` in consumer secret bindings and issue tokens with `aud = systemResourceServerAudience(...)` + `scope = identity:directory:read` before SCIM calls.
+5. Keep this directory-channel credential separate from RFC 7662 introspection credentials. Introspection uses client authentication against `/api/auth/oauth2/introspect`; it is not authorized by a SCIM bearer token.
 
 ## Usage
 

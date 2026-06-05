@@ -2,8 +2,8 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, jwt, openAPI, organization } from "better-auth/plugins";
 
 import {
-  hasOrganizationAccess,
   isPlatformAdmin,
+  resolvePlatformAuthority,
   type AdminDbAdapter,
 } from "./policies/access";
 import { createAuthEmailSender, sendAuthEmail } from "./adapters/auth-email";
@@ -76,6 +76,21 @@ export async function createAuthForRequest(
     },
     runtime,
   );
+}
+
+async function authorizePlatformAccess(
+  organizationId: string | null | undefined,
+  userId: string,
+  role: unknown,
+  adapter: unknown,
+): Promise<boolean> {
+  return (
+    await resolvePlatformAuthority(role, {
+      adapter: adapter as AdminDbAdapter,
+      userId,
+      organizationId,
+    })
+  ).allowed;
 }
 
 export function getAuthOptions(
@@ -153,15 +168,7 @@ export function getAuthOptions(
       }),
       idOAuthM2MBridge(),
       idRegistration({
-        authorize: async (organizationId, userId, role, adapter) =>
-          organizationId === null || organizationId === undefined
-            ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) ||
-              (await hasOrganizationAccess(
-                adapter as AdminDbAdapter,
-                userId,
-                organizationId,
-              )),
+        authorize: authorizePlatformAccess,
       }),
       idAdminSignInGuard({
         sendEmail: ({ to, otp }) =>
@@ -174,15 +181,7 @@ export function getAuthOptions(
       idResourceServer({
         invalidateAudienceCache: () =>
           invalidateResourceServerAudiences(env, runtime.backgroundTaskRunner),
-        authorize: async (organizationId, userId, role, adapter) =>
-          organizationId === null || organizationId === undefined
-            ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) ||
-              (await hasOrganizationAccess(
-                adapter as AdminDbAdapter,
-                userId,
-                organizationId,
-              )),
+        authorize: authorizePlatformAccess,
       }),
       idOAuthScopeCatalog({
         invalidateScopeCache: () =>
@@ -193,39 +192,15 @@ export function getAuthOptions(
             clientId,
             runtime.backgroundTaskRunner,
           ),
-        authorize: async (organizationId, userId, role, adapter) =>
-          organizationId === null || organizationId === undefined
-            ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) ||
-              (await hasOrganizationAccess(
-                adapter as AdminDbAdapter,
-                userId,
-                organizationId,
-              )),
+        authorize: authorizePlatformAccess,
       }),
       idOAuthClientPicker({ issuer }),
       idAdminAudit({
-        authorize: async (organizationId, userId, role, adapter) =>
-          organizationId === null || organizationId === undefined
-            ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) ||
-              (await hasOrganizationAccess(
-                adapter as AdminDbAdapter,
-                userId,
-                organizationId,
-              )),
+        authorize: authorizePlatformAccess,
         jwksGracePeriodMs: authPluginConfig.jwksGracePeriodMs,
       }),
       idAdminActivityLog({
-        authorize: async (organizationId, userId, role, adapter) =>
-          organizationId === null || organizationId === undefined
-            ? isPlatformAdmin(role)
-            : isPlatformAdmin(role) ||
-              (await hasOrganizationAccess(
-                adapter as AdminDbAdapter,
-                userId,
-                organizationId,
-              )),
+        authorize: authorizePlatformAccess,
       }),
       idConsoleScopes({
         isPlatformAdmin,

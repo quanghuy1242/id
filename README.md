@@ -17,9 +17,9 @@ This implementation follows the planning and architecture documents:
 - [docs/002_1_first-batch-gaps.md](docs/002_1_first-batch-gaps.md) — gap analysis: blockers, missing tests, integration readiness
 - [docs/003_future-implementation.md](docs/003_future-implementation.md) — CEL policy engine, onboarding, analytics, pipeline hooks, plugin strategy
 - [docs/004_admin-api-reference.md](docs/004_admin-api-reference.md) — admin API and Better Auth management endpoints
-- [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide
+- [docs/005_oauth2-oidc-integration-guide.md](docs/005_oauth2-oidc-integration-guide.md) — app integration guide for OAuth/OIDC, hosted registration, current-user display, Account Center links, and SCIM boundaries
 - [docs/006_resource-server-jwt-guide.md](docs/006_resource-server-jwt-guide.md) — downstream JWT verification guide
-- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, Sender email, API-only operation, incident runbooks
+- [docs/007_cloudflare-deployment-runbooks.md](docs/007_cloudflare-deployment-runbooks.md) — deploy, smoke, bootstrap, infra service-account provisioning, Sender email, API-only operation, incident runbooks
 - [docs/008_legacy-auth-flow-analysis.md](docs/008_legacy-auth-flow-analysis.md) — analysis of auther/next-blog/payloadcms auth flows; correct OIDC RP-Initiated Logout
 - [docs/009_plugin_first_auth_architecture.md](docs/009_plugin_first_auth_architecture.md) — first custom BA plugin architecture decisions and resource-server table design
 - [docs/010_organization-teams-oauth-flow.md](docs/010_organization-teams-oauth-flow.md) — organization/teams OAuth authorization context selection flow

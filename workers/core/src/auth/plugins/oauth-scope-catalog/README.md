@@ -10,8 +10,9 @@ scope/grant preload helpers.
 
 ## Setup
 
-Registered in `get-auth.ts`. No separate provisioning is required — once a resource server
-exists, admin users define scopes on it and attach M2M clients to those scopes.
+Registered in `get-auth.ts`. The runtime OAuth Provider preloads enabled `oauthResourceScope` rows into Better Auth's supported scope vocabulary and reads `oauthClientResourceScope` rows at token issuance to decide which service account may request which scopes for a resource audience. This plugin is therefore both the permission catalog and the tier classifier: resource servers with `organizationId = null` are system-tier resources, and organization-owned resource servers are tenant-tier resources.
+
+Fresh deployments do not manually prefill the system catalog. First-admin bootstrap runs the system access seed and ensures the `/system` resource server plus `identity:directory:read` and `oauth:clients:read` scope rows from `authPluginConfig`. Operators still provision per-deployment infra service-account clients and bindings after bootstrap; those client ids and secrets are never seeded or hard-coded.
 
 ## Usage
 
@@ -63,3 +64,5 @@ The `(clientId, resourceServerId)` pair is unique. A client with no enabled
 Tenant clients (`referenceId IS NOT NULL`) may only bind to resource servers in their
 `referenceId` organization. Infrastructure clients (`referenceId IS NULL`) may only bind
 to system resource servers (`organizationId IS NULL`) — doc 018 D7.
+
+Scopes stay coarse. A scope row describes an audience-level capability such as `content:read`, `identity:directory:read`, or `oauth:clients:read`; it must not encode object ids, tenant data, or resource-server policy decisions. Resource servers decide object-level authorization after token verification.

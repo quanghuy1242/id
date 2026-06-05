@@ -428,6 +428,8 @@ This document mostly names existing behavior. The optional consolidation, kept d
 
 No schema changes, no new tables, no `pnpm db:generate`. If a future delegated-admin model (028 §8.10) lands, it composes through the same helper and tier matrix.
 
+Implementation note 2026-06-05: the helper consolidation is implemented as `resolvePlatformAuthority` in `workers/core/src/auth/policies/access.ts`, and the registration, resource-server, scope-catalog, admin-audit, and admin-activity plugin `authorize()` callbacks in `get-auth.ts` delegate through one local callback. This remains a pure behavior-preserving refactor; the machine-principal issuance gate stays in the OAuth token path.
+
 ## 12. Test And Verification Plan
 
 Existing enforcement that this model relies on (must stay green): the infra-vs-tenant issuance gate tests, `referenceId` immutability (`oauth-m2m-bridge`) tests, scope-catalog runtime-prefill and client-resource-scope tests, SCIM/client-picker system-audience and `404` cross-org-leak tests, and the M2M token-issuance claim tests (`org_id` present only for tenant clients, `client_id` mirror present for machine tokens).

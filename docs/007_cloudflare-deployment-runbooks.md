@@ -68,6 +68,21 @@ pnpm wrangler secret delete ID_BOOTSTRAP_TOKEN --config workers/core/wrangler.js
 
 The route refuses to run once any native Better Auth `user.role = "admin"` exists. Do not use `BETTER_AUTH_SECRET` as an operator credential and do not bootstrap with manual SQL.
 
+The bootstrap call also runs the idempotent system access seed. It ensures the id-owned `/system` resource server and the `identity:directory:read` / `oauth:clients:read` system scopes exist. It does not create infra service-account clients, client secrets, or `oauthClientResourceScope` bindings; those are deployment-specific credentials and must be provisioned explicitly.
+
+## Infra Service Accounts For Id-Owned Channels
+
+Use this after first-admin bootstrap when a resource server such as `content-api` needs the confidential `id` channels from [docs/031](031_platform-access-control.md): directory validation over SCIM/client-picker on `/system`, and token-active assertion through RFC 7662 introspection. Do not hard-code client ids, client names, or secrets in source; create them per deployment and store returned secrets only in the consuming service's secret store.
+
+1. Authenticate as a platform admin with `pnpm auth:api:login "$ID_CORE_URL" admin@example.com`.
+2. Confirm the seeded system catalog exists: `pnpm auth:api GET /api/auth/admin/resource-servers` and find the row whose `organizationId` is `null`, `slug` is `id-system`, and `audience` is `$ID_CORE_URL/system`; confirm `GET /api/auth/admin/oauth-scopes` includes `identity:directory:read` and `oauth:clients:read` for that resource server.
+3. Create a directory-channel infra client with `grant_types = ["client_credentials"]`, no active organization / `referenceId = null`, and `scope = "identity:directory:read oauth:clients:read"`. This client obtains bearer tokens for SCIM and the OAuth client-picker. Store the returned client id and secret as the consumer's directory-channel secrets, for example `ID_SCIM_CLIENT_ID` and `ID_SCIM_CLIENT_SECRET`.
+4. Bind that directory client to the seeded `/system` resource server with `POST /api/auth/admin/oauth-client-resource-scopes`, `clientId = <directory client id>`, `resourceServerId = <seeded system resource-server id>`, and `allowedScopes = ["identity:directory:read", "oauth:clients:read"]`.
+5. Configure the consumer to request `POST /api/auth/oauth2/token` with `grant_type=client_credentials`, `resource=$ID_CORE_URL/system`, and `scope="identity:directory:read oauth:clients:read"` before calling `/api/auth/scim/v2/*` or `/api/auth/admin/oauth-clients/lookup`.
+6. Create a separate introspection-channel OAuth client for RFC 7662 token-active checks. Store its id/secret separately, for example `ID_INTROSPECTION_CLIENT_ID` and `ID_INTROSPECTION_CLIENT_SECRET`. This channel authenticates directly to `POST /api/auth/oauth2/introspect`; it does not use a `/system` bearer token and does not need an `oauthClientResourceScope` binding unless it also calls a bearer-protected system endpoint.
+7. Rotate the directory-channel and introspection-channel secrets independently. Directory credential compromise exposes principal/client metadata reads; introspection credential compromise exposes token-status lookups. Treat those blast radii and rotation windows separately.
+8. Sign out with `pnpm auth:api:logout`.
+
 ## API-Only Admin Operation
 
 After bootstrap:

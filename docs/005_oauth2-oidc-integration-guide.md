@@ -40,6 +40,34 @@ When `resource` is present and matches an enabled resource server audience, the 
 
 Production browser OAuth uses `id.quanghuy.dev` and `content.quanghuy.dev` with Better Auth cookies scoped to `.quanghuy.dev` and prefixed with `id-auth`. Preview `*.workers.dev` deployments are API-only; do not register preview callback URLs for browser clients.
 
+## Current-User Display And Account Links
+
+Clients should display the signed-in subject from protocol claims, not by scraping the Account shell or calling admin/user-management APIs. Use the ID token for the initial post-login display and the discovered UserInfo endpoint when the app needs to refresh displayable claims for the current access-token subject. In this deployment the UserInfo route is `/api/auth/oauth2/userinfo`; clients should still read `userinfo_endpoint` from OpenID Provider Metadata instead of hard-coding the path.
+
+Recommended claim use:
+
+| Need | Source | Rule |
+|---|---|---|
+| Stable user key | ID token `sub` or UserInfo `sub` | Treat as immutable within the issuer. Do not use email as the database key. |
+| Current display email | ID token or UserInfo `email` | Display only. Email change is not enabled yet, so do not build a client-side email mutation flow. |
+| Email verification state | ID token or UserInfo `email_verified` | Use for UI hints and app policy. Do not infer that the app may verify or change the email itself. |
+| Display name and avatar | ID token or UserInfo `name` / `picture` when present | Good for shared identity display. App-specific bio, preferences, roles, job title, onboarding status, and product profile fields stay in the app database. |
+| Connected app review | First-party `/account/consents` link | This is user self-service for current-user grants, not RFC 7009 token revocation and not admin consent management. |
+
+First-party Account links are product URLs, not OIDC endpoints. A browser client may link users to `/account/profile` for shared profile edits, `/account/security` for password and verification actions, `/account/sessions` for browser-session review, `/account/consents` for connected-app review, and `/account/organizations` for membership/console-entry context. Do not describe `/account` as a portable standard endpoint and do not add arbitrary external `return_to` parameters; external return-to support is deferred until it can be validated against registered OAuth client metadata.
+
+Use SCIM only for trusted machine integrations that need directory-shaped Users and Groups read/query, or future enterprise provisioning after that lifecycle is designed. SCIM is not the browser self-service API, not a replacement for UserInfo, and not how a normal client app edits the current user's profile. Admins acting on other users or tenant resources use the Console and admin APIs, not Account Center current-user endpoints.
+
+The boundary is:
+
+| Task | Use | Do not use |
+|---|---|---|
+| Show "who is signed in" | ID token and UserInfo claims | SCIM, admin APIs, `/account` scraping |
+| Let a user change shared profile/security settings | Link to first-party `/account/*` pages | Client-side direct writes to Better Auth user rows or SCIM |
+| Store product-specific profile data | The client application's own data model | New `id` user columns without an approved claim contract |
+| Directory lookup for resource servers or enterprise systems | Read-only SCIM with a provisioned M2M client | Browser user self-service or app UI profile refresh |
+| Manage another user or tenant resource | Scope-selected Console/admin APIs | Account Center current-user endpoints |
+
 ## Client-Initiated Registration
 
 Clients that are allowed by an enabled registration policy can request hosted account creation with the OIDC standard `prompt=create` parameter:

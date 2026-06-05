@@ -66,15 +66,9 @@ Returns 404 when `client_id` does not exist, `referenceId` does not match
 
 ## Deployment
 
-Provisioning the system audience and the infrastructure M2M client that consumes
-this endpoint is a platform-admin task:
+First-admin bootstrap seeds the system audience and system scopes. The platform-admin provisioning task is only the deployment-specific credential and binding work:
 
-1. Create a resource server with `organizationId = NULL`, `slug = "id-system"`,
-   `audience = systemResourceServerAudience(BETTER_AUTH_URL)`.
-2. Declare `oauth:clients:read` (and any other system scopes, e.g. `scim:read`)
-   on it via `POST /api/auth/admin/oauth-scopes`.
-3. Create the infrastructure M2M client (`referenceId = NULL`,
-   `grant_types = ["client_credentials"]`).
-4. Attach a `oauthClientResourceScope` row for the infra client → system
-   resource server. (D7 invariants block any tenant client from attaching here.)
-5. Store the infra client's `client_secret` in the consumer's secret bindings.
+1. Confirm bootstrap created the `/system` resource server (`organizationId = NULL`, `slug = "id-system"`, `audience = systemResourceServerAudience(BETTER_AUTH_URL)`) and the `oauth:clients:read` scope from `authPluginConfig.systemOAuthClientPickerScope`.
+2. Create a directory-channel infrastructure M2M client (`referenceId = NULL`, `grant_types = ["client_credentials"]`) for SCIM + picker calls. This client may carry both `identity:directory:read` and `oauth:clients:read` because both endpoints use the same `/system` bearer-token channel.
+3. Attach an `oauthClientResourceScope` row for that infra client to the seeded system resource server with `allowedScopes` including `oauth:clients:read`. D7 invariants block tenant clients from attaching here.
+4. Store the infra client's `client_secret` in the consumer's secret bindings. Keep this directory/picker credential separate from any RFC 7662 introspection credential; introspection authenticates to `/oauth2/introspect` as a client and does not use this bearer token.

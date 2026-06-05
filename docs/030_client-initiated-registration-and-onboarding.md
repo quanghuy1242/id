@@ -1109,7 +1109,22 @@ Tests:
 - Inbound SCIM provisioning for enterprise tenants.
 - Dynamic Client Registration changes only if client self-service onboarding becomes a product goal.
 - Registration analytics and abuse-detection dashboards.
-- Identity event emission for registration started, denied, completed, quota full, and invite accepted.
+
+### 16.1 Registration Identity-Event Decision
+
+Registration events remain future work. They do not join the existing identity-event producer now, and the current `idRegistration` plugin remains the synchronous authority for policy evaluation, quota reservation, signup intent consumption, invite acceptance, and OAuth continuation. Events must never become a prerequisite for allowing or denying registration.
+
+The future event plan is intentionally informational/reliability-oriented:
+
+| Candidate event | Current verdict | Classification | Trigger to implement | Boundary before implementation |
+|---|---|---|---|---|
+| Registration started | Parked | Repository-specific SET event candidate | Operators need lifecycle analytics or abuse/retry visibility beyond admin activity logs | Define a SET event URI, subject identifier, policy/client/org fields, privacy filtering, retention, and whether the event is emitted for OAuth, invite, or both paths. |
+| Registration denied | Parked | Repository-specific SET event candidate | Operators need policy-denial analytics, abuse detection, or support diagnostics | Define safe denial reason taxonomy; do not leak domain/invite/quota internals to clients or external subscribers without approval. |
+| Registration completed | Parked | Repository-specific SET event candidate, potentially related to RISC account lifecycle but not a standard RISC signup event | Downstream audit/reconciliation needs to know that `id` created a user through guarded registration | Define subject shape, user/org membership fields, invite/default-role context, and replay/idempotency semantics before any producer writes. |
+| Registration quota full | Parked | Repository-specific SET event candidate | Product needs quota dashboards or alerting | Define aggregation vs per-attempt event behavior so high-volume denial traffic does not become an event-amplification path. |
+| Invite accepted through registration | Parked | Repository-specific SET event candidate | Operators or resource servers need invitation lifecycle history | Define relationship to Better Auth organization invitation state, membership creation timing, and whether ordinary invite acceptance without signup emits the same event. |
+
+If this starts later, define producer payloads in the identity-event program before changing `idRegistration` writes. The first implementation may emit from admin/activity-style mutation hooks or outbox producers, but event delivery remains asynchronous and best-effort relative to the registration decision.
 
 ## 17. Definition Of Done
 
