@@ -28,42 +28,42 @@
 
 ## 1. Problem
 
-The consent screen does not show who the user is granting access to. `consent-form.tsx` parses `client_id` out of the OAuth query string and **fabricates** a display name (`name: \`Client ${client_id}\``); it shows raw scope tokens as badges and renders no logo, terms, or privacy links. This also violates the repository rule that client identity must be DB-driven, not derived/hardcoded.
+The consent screen hides who the user grants access to. `consent-form.tsx` parses `client_id` from the OAuth query string and fabricates a display name of the form `Client <client_id>`, shows raw scope tokens as badges, and renders no logo, terms, or privacy links. It also breaks the repository rule that client identity comes from the database, not from a derived or hardcoded value.
 
-We want the consent screen to be **dynamic per client** the standards-correct way — by reading the registered client's metadata — rather than by introducing operator-authored consent "templates."
+We want the consent screen to vary per client the standards way, by reading the registered client's metadata. No operator-authored consent templates.
 
 ## 2. What The Standard Covers (And What It Does Not)
 
-**RFC 7591 (Dynamic Client Registration) governs the OAuth *client's* metadata**, which is exactly the per-client consent display data: `client_name`, `client_uri`, `logo_uri`, `tos_uri`, `policy_uri`, `contacts`, and `scope`. A consent screen that renders these from the registered client record is the standards-correct way to make consent dynamic per client.
+RFC 7591 (Dynamic Client Registration) governs the OAuth client's metadata, which is the per-client consent display data: `client_name`, `client_uri`, `logo_uri`, `tos_uri`, `policy_uri`, `contacts`, and `scope`. A consent screen that renders these from the registered client record varies per client the standards way.
 
-What RFC 7591 does **not** cover, and where this doc must not over-claim (per the standards-first rule):
+What RFC 7591 leaves out, where the doc avoids over-claiming under the standards-first rule:
 
-- **Human-readable scope descriptions.** RFC 7591 / RFC 6749 treat `scope` as an opaque space-delimited list with no descriptions. Our descriptions come from the `oauth-scope-catalog` plugin (DB rows) — a **repository-specific** (but existing, DB-driven) extension. Legitimate, just not "7591."
-- **The authorization server's own hosted-page branding** — the look of the login/recovery/verify pages and the IdP's own logo/theme. No IETF standard governs AS hosted-UI theming. Out of scope here; if ever wanted, it is a separately-justified repo branding extension, not something 7591 "covers."
+- **Human-readable scope descriptions.** RFC 7591 and RFC 6749 treat `scope` as an opaque space-delimited list with no descriptions. The descriptions come from the `oauth-scope-catalog` plugin (DB rows), a repository-specific extension that already exists. Legitimate, though outside 7591.
+- **The authorization server's own hosted-page branding.** This covers the look of the login, recovery, and verify pages and the IdP's logo or theme. No IETF standard governs AS hosted-UI theming. Out of scope here. If you want it later, scope it as its own repo branding extension; 7591 does not reach it.
 
 Classification summary:
 
 | Surface | Posture |
 |---|---|
-| Consent client identity (name, logo, ToS/privacy, homepage) | **RFC 7591** client metadata — standard |
+| Consent client identity (name, logo, ToS/privacy, homepage) | RFC 7591 client metadata, standard |
 | Consent scope descriptions | Repo extension (scope catalog), DB-driven |
-| Login/recovery/verify page theming, IdP branding | No standard — out of scope |
+| Login/recovery/verify page theming, IdP branding | No standard, out of scope |
 
 ## 3. Current State In Better Auth (verified, 1.6.11)
 
-- The OIDC provider's **DCR registration endpoint accepts the full 7591 set** (`client_name`, `client_uri`, `logo_uri`, `tos_uri`, `policy_uri`, `contacts`) — see `oidc-provider/index.mjs`.
-- The **stored client schema first-classes only `name`, `icon`, and `metadata`** (`oidc-provider/schema.mjs`). On registration, `client_name`→`name` and `logo_uri`→`icon`; `client_uri`, `tos_uri`, `policy_uri`, and `contacts` are folded into the `metadata` JSON blob (or dropped if not mapped). So the 7591 fields are **capturable today inside `metadata`** without a schema migration.
-- The consent flow is **`consent_code`-driven**: `/oauth2/consent` reads a `consent_code` (body or signed cookie) whose verification value holds `clientId`, `scope`, and `requireConsent`. The provider is configured with `consentPage: "/consent"` in `oauth-provider.ts`.
-- The current `consent-form.tsx` ignores all of this and posts `accept` plus the raw OAuth query string; it never fetches the client record.
+- The OIDC provider's DCR registration endpoint accepts the full 7591 set (`client_name`, `client_uri`, `logo_uri`, `tos_uri`, `policy_uri`, `contacts`). See `oidc-provider/index.mjs`.
+- The stored client schema first-classes only `name`, `icon`, and `metadata` (`oidc-provider/schema.mjs`). On registration it maps `client_name` to `name` and `logo_uri` to `icon`, and folds `client_uri`, `tos_uri`, `policy_uri`, and `contacts` into the `metadata` JSON blob. The `metadata` blob can hold the 7591 fields without a schema migration.
+- The consent flow runs on a `consent_code`: `/oauth2/consent` reads a `consent_code` (body or signed cookie) whose verification value holds `clientId`, `scope`, and `requireConsent`. The provider sets `consentPage: "/consent"` in `oauth-provider.ts`.
+- The current `consent-form.tsx` ignores all of this. It posts `accept` plus the raw OAuth query string and never fetches the client record.
 
 ## 4. Target Design
 
 ### 4.1 Consent data source
 
-The consent page must obtain, for the pending request, the client's display metadata and the resolved scope descriptions. Two implementation options (to be settled against BA 1.6.11 during build):
+For the pending request, the consent page needs the client's display metadata and the resolved scope descriptions. Two options, to settle against BA 1.6.11 during build:
 
-- **A — read-only consent-info endpoint:** a small core endpoint that, given the `consent_code` (or `client_id` for the pending authorization), returns `{ client: { name, logoUri, clientUri, tosUri, policyUri }, scopes: [{ value, description }] }`. The page calls it via the `@id/lib` typed helpers. Client display fields come from `name`/`icon`/`metadata`; scope descriptions join the `oauth-scope-catalog` rows.
-- **B — surface the data in the consent redirect:** if BA can carry sufficient client/scope detail into the consent page params, render directly. Lower-effort but constrained by what BA passes; likely insufficient for ToS/privacy/logo, so A is the expected choice.
+- **Option A, a read-only consent-info endpoint.** Given the `consent_code` or the pending `client_id`, a small core endpoint returns `{ client: { name, logoUri, clientUri, tosUri, policyUri }, scopes: [{ value, description }] }`. The page calls it through the `@id/lib` typed helpers. Client fields come from `name`, `icon`, and `metadata`; scope descriptions join the `oauth-scope-catalog` rows.
+- **Option B, data in the consent redirect.** If BA carries enough client and scope detail into the consent page params, render from those. This depends on what BA passes and probably lacks ToS, privacy, and logo. Option A is the expected choice.
 
 ### 4.2 Field mapping
 
@@ -77,38 +77,38 @@ The consent page must obtain, for the pending request, the client's display meta
 | `contacts` | `metadata` JSON | optional; not shown on consent |
 | scope descriptions | `oauth-scope-catalog` rows | join by scope value |
 
-Decision to record at build time: keep `client_uri`/`tos_uri`/`policy_uri` inside `metadata`, or promote them to first-class client columns (via BA `additionalFields`) for cleaner admin editing. First-classing is the cleaner long-term shape and aligns admin forms with 7591 names.
+Decision to record at build time: keep `client_uri`, `tos_uri`, and `policy_uri` inside `metadata`, or promote them to first-class client columns through BA `additionalFields`. Promoting them simplifies admin editing and aligns the admin form fields with the 7591 names.
 
 ### 4.3 Admin management
 
-Operators set these fields where OAuth clients are already managed (the admin OAuth client screens, [docs/026](026_admin-oauth-security-screens-and-api-contracts.md)). No new operator concept is introduced — they edit standard client metadata. Any schema additions follow `pnpm db:generate` (never hand-written SQL) and the screen-spec gate for UI changes.
+Operators set these fields where they already manage OAuth clients (the admin OAuth client screens, [docs/026](026_admin-oauth-security-screens-and-api-contracts.md)). The concept stays the same: they edit standard client metadata. Schema additions go through `pnpm db:generate`, never hand-written SQL, and UI changes go through the screen-spec gate.
 
 ### 4.4 Consent screen rendering
 
-`consent-form.tsx` stops fabricating the name and instead renders: client name + logo, the requested scopes with their catalog descriptions, and ToS/privacy/homepage links when present. It remains a `@id/ui`-composed page calling `/api/auth` through the typed helpers.
+`consent-form.tsx` stops fabricating the name. It renders the client name and logo, the requested scopes with their catalog descriptions, and ToS, privacy, and homepage links when present. It stays a `@id/ui`-composed page that calls `/api/auth` through the typed helpers.
 
 ## 5. Standards Posture Recap
 
-The consent client identity is **standard (RFC 7591)**; scope descriptions are a **DB-driven repo extension** already owned by the scope catalog; AS hosted-page branding is **out of scope** (no governing standard). Nothing here is justified by mixing an unrelated standard.
+Consent client identity follows RFC 7591. Scope descriptions are a DB-driven repo extension that the scope catalog already owns. AS hosted-page branding stays out of scope, since no standard governs it. Nothing here leans on an unrelated standard.
 
 ## 6. Security
 
-- **`logo_uri`:** render as a same-document `<img src>` only; do **not** fetch server-side (SSRF). Enforce `https` and consider a CSP `img-src` allowlist; expect mixed-content/broken images and degrade gracefully to initials.
-- **`client_uri` / `tos_uri` / `policy_uri`:** must be absolute `https` URLs; render with `rel="noopener noreferrer"`; validate on write to avoid `javascript:`/open-redirect payloads.
-- **Trust source:** display metadata comes from the registered client record (admin- or DCR-provisioned), not from the live OAuth query string — the current query-derived name is itself the bug.
+- **`logo_uri`:** render as a same-document `<img src>` only. Never fetch it server-side, which opens SSRF. Enforce `https`, consider a CSP `img-src` allowlist, and fall back to initials on a broken or blocked image.
+- **`client_uri`, `tos_uri`, `policy_uri`:** require absolute `https` URLs, render them with `rel="noopener noreferrer"`, and validate on write to block `javascript:` and open-redirect payloads.
+- **Trust source:** read display metadata from the registered client record that an admin or DCR provisioned. The current code reads it from the live OAuth query string, which is the bug.
 
 ## 7. Phasing
 
-- **Phase 1** — Consent-info read path (endpoint A) + `consent-form.tsx` rendering real client name, logo, and scope descriptions. Read from existing `name`/`icon`/`metadata` + scope catalog; no migration.
-- **Phase 2** — First-class `client_uri`/`tos_uri`/`policy_uri` client fields + admin editing + ToS/privacy/homepage links on consent.
-- **Phase 3 (optional, separate doc)** — AS hosted-page branding, if ever desired. Explicitly not part of this 7591 work.
+- **Phase 1:** consent-info read path (option A) plus `consent-form.tsx` rendering the real client name, logo, and scope descriptions. Read from existing `name`, `icon`, `metadata`, and the scope catalog. No migration.
+- **Phase 2:** first-class `client_uri`, `tos_uri`, and `policy_uri` client fields, admin editing, and ToS, privacy, and homepage links on consent.
+- **Phase 3 (optional, separate doc):** AS hosted-page branding, once you want it. Not part of this 7591 work.
 
 ## 8. Open Items
 
-- Confirm against BA 1.6.11 whether the consent page can retrieve client/scope detail via the `consent_code` lookup, fixing endpoint shape A vs B.
-- Decide `metadata`-blob vs first-class columns for the three URI fields.
-- Confirm scope-catalog join shape for descriptions on the consent path.
+- Confirm against BA 1.6.11 whether the consent page can retrieve client and scope detail through the `consent_code` lookup, which settles option A versus B.
+- Decide between the `metadata` blob and first-class columns for the three URI fields.
+- Confirm the scope-catalog join shape for descriptions on the consent path.
 
 ## 9. Definition Of Done
 
-The consent screen shows the real client name and logo, the requested scopes with human-readable descriptions, and (Phase 2) ToS/privacy/homepage links — all sourced from the DB client record and scope catalog, with no fabricated names and no query-string-derived identity. Link/logo rendering is XSS/SSRF-safe.
+The consent screen shows the real client name and logo, the requested scopes with human-readable descriptions, and (Phase 2) ToS, privacy, and homepage links. All values come from the DB client record and the scope catalog, with no fabricated names and no query-string identity. Logo and link rendering stays XSS-safe and SSRF-safe.
