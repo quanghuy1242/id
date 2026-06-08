@@ -1,6 +1,6 @@
-# DB-Backed Email Templating
+# Email Templating (Build-Time, react-email)
 
-> Status: implementation-grade research and proposal
+> Status: implementation-grade proposal — MVP scope
 >
 > Date: 2026-06-08
 >
@@ -10,177 +10,119 @@
 > - `workers/core/src/auth/adapters/auth-email-render.ts` — the single render seam (`renderAuthEmail`) that today hardcodes all email bodies
 > - `workers/core/src/auth/adapters/resend-email.ts` — Resend transport
 > - `workers/core/src/auth/get-auth.ts` — where the three email callbacks are wired
-> - `workers/core/src/auth/plugins/**` — home of the proposed `idEmailTemplates` plugin (Custom Table Rule)
-> - `workers/ui/src/app/admin/**` and `workers/ui/docs/screens/` — the proposed admin editor screen
+> - the proposed `emails/` source dir and its build-time compile step
 >
 > Source docs and local evidence:
 >
-> - [docs/000_repo-architecture.md](000_repo-architecture.md) — boundaries, Custom Table Rule
-> - [docs/009_plugin_first_auth_architecture.md](009_plugin_first_auth_architecture.md) — BA-plugin-owned table pattern
-> - [docs/022_admin-ui-system.md](022_admin-ui-system.md) — admin UI design system
-> - [docs/023_admin-screen-story-strategy.md](023_admin-screen-story-strategy.md) — screen spec gate
+> - [docs/000_repo-architecture.md](000_repo-architecture.md) — boundaries, framework-free `packages/lib`
+> - [docs/003_future-implementation.md](003_future-implementation.md) §12 — the deferred DB-backed editing, theming, and builder design
 > - [docs/024_admin-login-context-guard.md](024_admin-login-context-guard.md) — the admin-OTP flow (the existing awaited-send precedent)
-> - [docs/028_tenant-scoped-platform-experience.md](028_tenant-scoped-platform-experience.md) — tenant scoping model
-> - `workers/core/src/auth/plugins/resource-server/audiences.ts` — the KV-cache + D1-fallback pattern reused here
+> - `workers/core/src/auth/types.ts` — `AuthEmailKind` and `AuthEmailMessage` (three kinds today)
+> - `workers/core/src/auth/get-auth.ts:128` — `sendOnSignUp: true` (signup fires the `verification` kind)
 >
 > External references checked on 2026-06-08:
 >
-> - LiquidJS options (`outputEscape`) — https://liquidjs.com/tutorials/options.html (no autoescape by default; templates "not sandboxed")
-> - Liquid stored-XSS advisory — https://github.com/CentauriSolutions/EyeDP/security/advisories/GHSA-w4c8-gjjh-cwq5
-> - LiquidJS SSTI → arbitrary file read — https://www.hacefresko.com/posts/liquidjs-ssti-to-arbitrary-file-read
-> - Handlebars SSTI → RCE — https://mahmoudsec.blogspot.com/2019/04/handlebars-template-injection-and-rce.html
-> - react-email + Resend on Cloudflare Workers — https://resend.com/docs/send-with-cloudflare-workers (bundling caveats: resend-node #587, react-email #1508)
+> - react-email — component-to-HTML rendering, by Resend (the transport this repo already uses)
+> - react-email + Resend on Cloudflare Workers — https://resend.com/docs/send-with-cloudflare-workers (runtime bundling caveats: resend-node #587, react-email #1508; not exercised by the build-time MVP)
 
 ## 1. Problem And Current State
 
-Today every transactional email body is hardcoded in `renderAuthEmail(message)` (`auth-email-render.ts`) as string-concatenated HTML/text. Operators cannot change subject lines, copy, or branding without a code deploy. We want operators to author templates in the admin UI, store them in the database, and have every email flow pick the stored template at send time.
+`renderAuthEmail(message)` in `auth-email-render.ts` builds every transactional email body as string-concatenated HTML and text. Changing copy, layout, or branding means editing that function. The bodies are unstyled and share no layout, so the three emails look ad hoc.
 
-Two facts make this tractable here:
+The MVP keeps templates developer-authored and replaces the string concatenation with react-email components compiled to HTML at build time. Operators do not edit templates yet. The DB-backed editing, theming, and builder work moves to [docs/003 §12](003_future-implementation.md#12-email-templating-future) as deferred design, because that work depends on rendering inside the Worker at send time, which the MVP does not need.
 
-- **One render seam.** All three flows funnel through `sendAuthEmail` → `createResendAuthEmailSender.send()` → `renderAuthEmail(message)`. Intercept there to cover every flow, including future kinds added to the `AuthEmailMessage` union.
-- **Three flows exist.** `verification` (`emailVerification.sendVerificationEmail`), `password-reset` (`emailAndPassword.sendResetPassword`), and `admin-otp` (the `idAdminSignInGuard` plugin). Organization invitations and change-email confirmations are not wired.
+Two facts shape the design:
 
-The seam carries one observability gap, marked as `TODO(email-observability)` in `auth-email.ts`. Production sends go out through `waitUntil`, so a Resend rejection stays invisible. Backgrounding is the right call for verification and reset. The auth flow must not block on a third-party send, and returning the provider's status would leak account existence. Making production sends synchronous stays out of scope. The template work needs only the interactive awaited path, which admin-OTP uses today and test-send adds below, to report a real send result.
+- **One render seam.** All three flows funnel through `sendAuthEmail` → `createResendAuthEmailSender.send()` → `renderAuthEmail(message)`. Changing that one function covers every flow, including future kinds added to the `AuthEmailMessage` union.
+- **Three kinds, two flows.** `AuthEmailMessage` carries `verification`, `password-reset`, and `admin-otp` (`workers/core/src/auth/types.ts`). `sendOnSignUp: true` (`get-auth.ts:128`) makes signup fire the `verification` kind, so signup needs no separate template. A distinct welcome email would be a new kind and a new Better Auth hook, out of MVP scope.
 
-## 2. Goals / Non-Goals
+## 2. Decision Summary
 
-Goals:
+- **Renderer: react-email, compiled at build time.** Author one component per kind plus one shared layout. A build step renders each to an HTML string with placeholder tokens, emitted as a generated TypeScript module. The Worker imports the strings and never runs react-email at runtime.
+- **Why react-email over MJML.** Same TypeScript and React stack as the rest of the repo, so the lint, type, and test gates apply to the templates. Resend authors it and this repo sends through Resend. Slots become typed component props, so the compiler enforces the per-kind variable contract. It also keeps the runtime-render door open for the deferred work in 003 §12; MJML, a build-time-only compiler, closes that door.
+- **Slots: a fixed per-kind allowlist, interpolated at runtime.** The compiled HTML carries `{{token}}` placeholders. At send time, `renderAuthEmail` replaces each token with its escaped value (§5).
+- **Theme: a developer-owned `<EmailLayout>` component.** Brand color, logo, and footer live in that component. Changing the look means editing the layout and recompiling.
 
-- Operators edit subject and content for each email kind in the admin UI; values persist in D1.
-- Every flow resolves the stored template at send time, with a guaranteed safe fallback.
-- Authoring stays safe by construction against XSS, email header injection, and SSTI.
-- A test-send and a live preview let operators validate before relying on a template.
+## 3. Architecture
 
-Non-goals (v1):
+### 3.1 Source layout
 
-- Free-form full-document HTML authored by operators. Rejected on security grounds; see §6.
-- Logic in templates (conditionals, loops). Deferred; see §4.4 and §9.
-- Per-locale templates. Seam left open; see §7.
-- Reworking the production async send into a synchronous one; see §1.
+```
+emails/
+  layout.tsx            # <EmailLayout> — shared shell, brand tokens
+  verification.tsx      # renders <EmailLayout> + verification body
+  password-reset.tsx
+  admin-otp.tsx
+  build.ts              # compiles each component to HTML + text strings
+```
 
-## 3. Standards Classification
+Each kind component renders `<EmailLayout>` around its body and leaves slot values as placeholder tokens (`{{url}}`, `{{otp}}`, and so on). The component never receives real user data. It receives the literal token strings, so the compiled output contains the tokens verbatim.
 
-Per the repo's standards-first rule, no protocol or interoperability standard governs email body content. A DB-backed template store is a **repository-specific extension**. It fits the rule because the unmet requirement, operator-editable templates, is real and no standard covers it. RFC 7591 sits in a separate workstream: it governs OAuth client metadata for the consent screen (see [docs/035](035_oauth-consent-client-metadata.md)). Do not conflate the two.
+### 3.2 Build step
 
-## 4. Architecture
+`build.ts` renders each component through `@react-email/render` to an HTML string and a plain-text string, then writes a generated module, for example `auth-email-templates.generated.ts`:
 
-### 4.1 The single seam is the leverage point
+```ts
+export const AUTH_EMAIL_TEMPLATES = {
+  verification: { subject: "...", html: "...{{url}}...", text: "...{{url}}..." },
+  "password-reset": { subject: "...", html: "...", text: "..." },
+  "admin-otp": { subject: "...", html: "...{{otp}}...", text: "..." },
+} as const;
+```
 
-Keep `renderAuthEmail` as a pure, framework-free function and change its inputs. Instead of producing hardcoded bodies, it interpolates a resolved template (subject/html/text strings plus a variable map). A new adapter loads the template from DB/KV, and the send orchestrator passes it in. The pure interpolation stays inside the framework-free lint boundary; the adapter owns the async load with env access.
+Two effort levels for running it:
 
-### 4.2 Resolution pipeline
+- **Manual (start here).** Run the build script with a package script (`pnpm build:emails`) when a template changes, commit the generated module. No bundler wiring. Three rarely-changed emails do not justify more.
+- **Wired.** Add `build:emails` as a prebuild step so the generated module rebuilds before the Worker bundles. Adopt this once manual regeneration becomes a chore.
 
-At send time:
+One build-time check to confirm: react-email may URL-encode an `href`, which would turn `{{url}}` into an encoded form. If that happens, switch the href slot to a sentinel string the renderer leaves intact (for example `HREF_URL_SLOT`) and map it back in the generated module. Verify the tokens survive in the compiled output before relying on them.
 
-1. **Load** the template for `(kind, organizationId?)` from KV (cached), then D1, then the hardcoded default that `renderAuthEmail` ships today.
-2. **Resolve order:** organization override → platform default → hardcoded fallback. A missing, disabled, or invalid template falls through to the next tier and never blocks a verification, reset, or OTP.
-3. **Interpolate** the resolved subject/html/text with the kind's variable map (the pure step, §4.4).
-4. **Send** through the existing Resend transport, unchanged.
+### 3.3 Runtime seam
 
-### 4.3 Two safety concerns, two tools
+`renderAuthEmail` stays a pure, framework-free function. It reads the generated strings for the message kind, interpolates the message's slot values with escaping (§5), strips newlines from the subject, and returns `{ subject, html, text }`. The Resend transport stays unchanged. The send paths stay unchanged: verification and reset go through `waitUntil` as today, admin-OTP stays awaited because it is interactive.
 
-These concerns are orthogonal. Solve each with its own tool:
+## 4. Slot Allowlist
 
-- **(a) Variable-interpolation safety.** Stop XSS and SSTI from operator-authored text. The engine choice handles it (§4.4).
-- **(b) Email-client-safe HTML.** The layout has to render across Gmail, Outlook, and Apple Mail. A fixed developer-owned base layout handles it (§4.4); operators edit slots only.
+The per-kind contract is the component's typed props. The build step renders with token strings, and the runtime interpolator accepts only these keys per kind:
 
-### 4.4 Engine decision (committed)
-
-**Variables: a small logic-less `{{variable}}` interpolator over a fixed per-kind allowlist, built on the existing `escapeHtml`.** It matches Mustache for safety: `{{x}}` always HTML-escapes, no `{{{raw}}}` opt-out reaches operators, and it evaluates no expressions. Zero dependency, no SSTI surface, and short enough to audit inside the framework-free render module.
-
-The popular "safe" engines stay safe only when a team configures them with care, and they carry real advisories when a team ships the defaults:
-
-- **LiquidJS** (Shopify's customer-facing engine) skips autoescape by default; you must set `outputEscape`. Its docs state templates are "not sandboxed." It has a stored-XSS advisory and an SSTI-to-arbitrary-file-read advisory.
-- **Handlebars** has a documented SSTI-to-RCE writeup. Version 4.6.0 hardened it, though the surface stays larger.
-- **Mustache** is logic-less and escapes by default. The custom interpolator copies that behavior.
-
-**Layout: a fixed, email-client-safe base shell owned by developers.** react-email fits well: Resend builds it, we already send through Resend, it renders components to inlined email-safe HTML, and it runs on Workers with known bundling caveats. A hand-tuned MJML or HTML shell is the dependency-free alternative. Operators edit slots (subject, heading, body copy, CTA label, footer) and leave the surrounding markup alone. Postmark, Customer.io, and Shopify ship this same pattern: a safe layout plus safe slots, with operators kept away from raw HTML on a sensitive origin.
-
-If templates need conditionals or loops later, move to LiquidJS with `outputEscape: "escape"`, a restricted tag and filter allowlist, and input sanitization. Treat that as a documented upgrade, not a starting point.
-
-### 4.5 Per-kind variable contracts (the allowlist)
-
-The editor validates at save time that a template references only its kind's variables, and it rejects an unknown `{{x}}` before save.
-
-| Kind | Allowed variables |
+| Kind | Slots |
 |---|---|
-| `verification` | `url`, `email`, `appName`, `expiresIn` |
+| `verification` (also signup) | `url`, `email`, `appName`, `expiresIn` |
 | `password-reset` | `url`, `email`, `appName`, `expiresIn` |
 | `admin-otp` | `otp`, `email`, `expiryMinutes` |
 
-The interpolator escapes system values (`url`, `otp`) per output context and strips newlines from the subject to block header injection.
+An unknown slot in a message fails fast in development. The template components, being typed, cannot reference a slot outside the contract without a type error at build.
 
-### 4.6 Storage — `idEmailTemplates` Better Auth plugin
+## 5. Safety Model
 
-Per the Custom Table Rule, a Better Auth plugin owns the table through its `schema`, never a standalone Drizzle schema. Proposed `emailTemplate` model. Run `pnpm db:generate` after editing the plugin schema; never hand-write SQL.
+The compiled HTML is developer-authored, reviewed in the repo, and passes the gates, so it is trusted. The runtime values poured into it are the surface. Build-time rendering means react-email already ran before any real value exists, so React auto-escaping does not protect these values. The runtime interpolator carries the protection:
 
-| Field | Type | Notes |
+| Slot | Source | Control |
 |---|---|---|
-| `id` | text PK | |
-| `organizationId` | text, nullable | `NULL` = platform default; non-null = org override |
-| `kind` | text | one of the `AuthEmailMessage` kinds |
-| `locale` | text, default `"en"` | i18n seam (§7) |
-| `subject` | text | |
-| `html` | text | slot content, not full document |
-| `text` | text | |
-| `enabled` | boolean | disabled falls through to the next tier |
-| `version` | integer | optimistic concurrency / rollback seam |
-| `updatedAt` | timestamp | |
-| `updatedBy` | text | actor id, for audit |
+| `email` | user-controlled (set at signup) | HTML-escape on interpolation. This is the live one. |
+| `url` | Better Auth | HTML-escape, and validate the scheme is `https` before it lands in an `href`. HTML escaping alone does not block a `javascript:` link. |
+| `otp` | Better Auth | HTML-escape for defense. |
+| `appName`, `expiresIn`, `expiryMinutes` | system | escape anyway. |
+| subject | template + slots | strip newlines to block header injection. |
 
-Uniqueness on `(organizationId, kind, locale)`. CRUD runs through `createAuthEndpoint`, mounts under `/api/auth/admin/email-templates...`, authorizes through the injected `authorize` callback (the `idResourceServer` pattern), and writes an audit record.
+Controls in the interpolator:
 
-### 4.7 Caching and invalidation
+- HTML-escape every interpolated value, reusing the existing `escapeHtml`.
+- Reject any value bound to an `href` slot whose scheme is not `https`.
+- Strip CR and LF from the subject.
+- No raw-output path. The interpolator does no expression evaluation, no property traversal, and no helpers, so there is no SSTI surface.
 
-Reuse the resource-server audience pattern (`resource-server/audiences.ts`): a KV write-through cache keyed by `(kind, organizationId, locale)` with a D1 fallback, invalidated on each template write. This adds one cached read per send, which costs little on `waitUntil` sends and stays acceptable on the awaited OTP and test paths.
+There is no operator-authored HTML in the MVP, so no sanitizer is needed.
 
-### 4.8 Send paths
+## 6. Theme
 
-- **Production (verification, reset):** `waitUntil`, async, non-blocking, same as today. Resolution and interpolation run before dispatch, and the hardcoded fallback guarantees a rendered email.
-- **Interactive (admin-OTP, test-send):** awaited, and the caller sees the real send result. admin-OTP already works this way; test-send reuses the path. Template work touches the synchronous contract only here.
+`<EmailLayout>` owns the shell: a single-column email-client-safe structure with the brand color, logo, header, and footer. The three kind components render their body inside it. A developer changes branding by editing `layout.tsx` and recompiling. The MVP ships one platform theme. Per-org and operator-editable theming live in [docs/003 §12](003_future-implementation.md#12-email-templating-future).
 
-## 5. Admin UI
+## 7. Testing And Definition Of Done
 
-Hard gate: a screen spec in `workers/ui/docs/screens/` (for example `email-templates.md`) with ASCII sketch, `Components:`, and `Data:` must exist and earn approval before any `/admin` route file. The screen, in brief:
-
-- **List** of kinds with platform/override status badges.
-- **Editor** per kind: `TextInput` (subject), `CodeEditor` (html/text slots), a variable palette (the §4.5 allowlist), and a live preview that renders sample data in a sandboxed surface.
-- **Test-send** button into the awaited send path (§4.8), which reports the true Resend result.
-- All `/api/auth` calls go through the `@id/lib` typed helpers; route files compose `@id/ui` primitives only.
-
-## 6. Security Model
-
-- **XSS:** autoescape-by-default `{{var}}`, no raw-output escape hatch for operators, slot editing only.
-- **Header injection:** the interpolator strips newlines from the subject.
-- **SSTI:** none by construction. The interpolator runs no expression evaluation, no property traversal, and no helpers.
-- **Fallback safety:** a disabled, missing, or invalid template degrades to the platform default and then the hardcoded default; a broken template never blocks auth.
-- **Audit:** every template write flows through `idAdminAudit` and `idAdminActivityLog`.
-- **Preview isolation:** preview renders sample data only and executes no operator-controlled script.
-
-## 7. Tenancy And i18n
-
-The schema carries `organizationId` (nullable) and `locale` from the start, so adding org overrides or locales later needs no migration. Exposing per-org editing and locale switching in the v1 UI is a scoping choice on top of the same schema. Default posture: platform-level editing first, per-org override second.
-
-## 8. Phasing
-
-- **Phase 0:** test-send foundation plus email observability hooks (logs, optional delivery/audit record). Establishes the awaited interactive path and closes the `TODO(email-observability)` gap.
-- **Phase 1:** `idEmailTemplates` plugin, table, KV/D1 resolver, custom `{{var}}` interpolator, and hardcoded fallback wired through the seam. Platform-level only.
-- **Phase 2:** admin editor screen (spec → mocks → actions → content → story → route) with preview and test-send.
-- **Phase 3:** per-organization overrides in the UI.
-- **Phase 4 (deferred):** locale support, and a richer engine (hardened LiquidJS) once conditionals or loops become necessary.
-
-## 9. Open Decisions
-
-- **Engine power:** committed to logic-less escaped `{{var}}` for v1. Revisit once a concrete template needs conditionals or loops.
-- **Tenancy in v1 UI:** platform-only, or per-org from the start. The schema supports both; the recommendation is platform-first.
-- **Layout dependency:** react-email, or a dependency-free MJML/HTML shell, given react-email's Workers bundling caveats.
-
-## 10. Testing And Definition Of Done
-
-- Unit-test the interpolator: escaping, unknown-variable rejection, subject newline stripping, and per-kind allowlist enforcement, with no BA context.
-- Unit-test the resolver: org → platform → hardcoded fallback, plus cache hit, miss, and invalidation.
-- Integration-test the plugin CRUD endpoints through `auth.handler()`.
-- Verify every existing email flow still sends with no template rows present (the hardcoded fallback path).
+- Unit-test the interpolator with no Better Auth context: HTML escaping, unknown-slot rejection, `https`-only href enforcement, and subject newline stripping.
+- Snapshot-test the generated templates so a render change is visible in review.
+- Verify the three flows still send after the seam change, with the generated strings in place.
 - `pnpm check` green; `pnpm advise` handled per repo guidance.
 
-**Definition of done:** operators edit subject and content per kind, persisted to D1; all flows render from the stored template with a guaranteed safe fallback; authoring cannot inject script or headers; preview and test-send work; audit records every edit.
+**Definition of done:** the three emails render from react-email components compiled at build time, share one themed layout, and interpolate their slots at runtime with escaping plus an `https` href check. No operator editing, no DB, no runtime react-email. The deferred path is recorded in 003 §12.

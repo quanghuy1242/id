@@ -46,6 +46,13 @@
 - [9. API-First Scope Catalog, Token Claims, And Tooling](#9-api-first-scope-catalog-token-claims-and-tooling)
 - [10. Identity Events, SCIM Directory, And M2M Principal Contracts (Docs 013-018)](#10-identity-events-scim-directory-and-m2m-principal-contracts-docs-013-018)
 - [11. Design System Specification Format](#11-design-system-specification-format)
+- [12. Email Templating (Future)](#12-email-templating-future)
+  - [12.1 The Pivot — Render Inside The Worker](#121-the-pivot--render-inside-the-worker)
+  - [12.2 The Two-Column Idea And Why Raw TSX In The DB Is Rejected](#122-the-two-column-idea-and-why-raw-tsx-in-the-db-is-rejected)
+  - [12.3 The Safe Version — Data In The DB, Components In The Repo](#123-the-safe-version--data-in-the-db-components-in-the-repo)
+  - [12.4 Phases Stacked On Runtime Render](#124-phases-stacked-on-runtime-render)
+  - [12.5 XSS Posture Across Phases](#125-xss-posture-across-phases)
+  - [12.6 Rejected](#126-rejected)
 
 ## 1. Plugin Architecture Strategy
 
@@ -1188,3 +1195,68 @@ Page(layout="dashboard", bg="base-200")
 - It lives in the repo next to the code it describes — a single `docs/screens/applications-list.md` is the complete specification
 
 The component layer still benefits from JSON schemas (Section 11.5) — defining what props `DataTable`, `Panel`, `Badge` accept, what variants exist, what tokens they bind to. But screen composition belongs in this hybrid format.
+
+## 12. Email Templating (Future)
+
+> Status: deferred design — revisit when operators ask to edit emails without a deploy
+>
+> Date: 2026-06-09
+
+The MVP ([docs/034](034_email-templating.md)) renders three developer-authored react-email components to HTML at build time and interpolates slots at runtime. Operators do not edit anything. This section records what operator-editable templating, theming, and a safe builder look like, and the one capability they all depend on.
+
+### 12.1 The Pivot — Render Inside The Worker
+
+react-email runs in two modes, and every future feature here pivots on which one you use:
+
+- **Build-time render.** Render components to HTML once during the build with placeholder tokens, ship the HTML, fill slots at runtime by string replacement. The MVP uses this.
+- **Runtime render.** Render the components inside the Worker at send time with the real values as props.
+
+Operator slot editing, real theming, and a schema-driven builder all need runtime render. MJML cannot reach it, because its compiler is too heavy for the Worker. react-email can, with a spike to confirm it bundles and performs on `workerd` (the caveats noted in [docs/034](034_email-templating.md): resend-node #587, react-email #1508). Reaching runtime render is the single gating task. Do it first, behind a smoke test, before building anything below.
+
+Runtime render also shifts the XSS posture in your favor: React auto-escapes text children, so the manual escaping interpolator from the MVP narrows to href-scheme validation plus a ban on `dangerouslySetInnerHTML` (§12.5).
+
+### 12.2 The Two-Column Idea And Why Raw TSX In The DB Is Rejected
+
+One tempting shape: a table with two columns, one holding the raw TSX source an editor saves, the other holding the compiled HTML with `{{}}` placeholders. On each edit, recompile the TSX into the HTML column, and serve the HTML column until the next edit. The caching half of this (serve the compiled output until the source changes) is sound and matches the KV-cache-until-write pattern the resource-server loader uses.
+
+The compile half breaks the trust boundary. TSX is code, not data. Turning TSX into HTML means transpiling JSX to JavaScript and executing it as a React component through react-email. Compiling a DB-stored TSX column executes code that came out of the database. That is arbitrary code execution, a far larger surface than the XSS the slot model guards. The slot model is safe because operators supply data and never code. A column of operator TSX that the system compiles and runs hands an operator, or anyone who takes over an operator account, a way to run JavaScript that can reach the Worker's env secrets, D1, and KV bindings.
+
+There is also no safe place to run that compile:
+
+- **In the Worker** at send or edit time: ships a TSX transpiler plus React plus react-email into the Worker and then executes DB-sourced code. A bug or an abusive operator gives full Worker compromise.
+- **In CI / the build**: CI runs on deploy, operators edit at any time, so recompile-on-edit in CI means every edit triggers a deploy, which defeats the no-deploy editing the feature exists to provide.
+- **In a separate sandboxed compile service**: a hardened isolate that compiles TSX in isolation and writes HTML back. This is real infrastructure, and JavaScript sandboxes have a long record of escapes.
+
+Raw-TSX-in-DB makes sense only if the "operators" are in fact trusted developers and the team accepts the sandboxed compile service and its escape risk. For that audience, deploying is simpler and safer than building a code-execution pipeline. So this is rejected.
+
+### 12.3 The Safe Version — Data In The DB, Components In The Repo
+
+Keep the components as developer-owned TSX in the repo: version-controlled, reviewed, lint-and-typechecked, compiled in CI. Store in the DB only data:
+
+- slot text (subject, body copy, button label),
+- theme tokens (brand color, logo URL, footer text),
+- a constrained block tree (§12.4) for structural edits.
+
+At send, the runtime renderer fills the components with that data and caches the output until the data changes (the sound half of §12.2). No operator code ever executes. This reuses everything from the MVP and the runtime-render pivot.
+
+Storage is a Better Auth plugin (`idEmailTemplates`) owning its table through `schema`, per the Custom Table Rule, never a standalone Drizzle schema. Resolution is org override → platform default → built-in default, the same tiering the resource-server loader uses, so a missing or disabled row falls through and never blocks a verification, reset, or OTP. Management endpoints run through `createAuthEndpoint`, authorize through a named platform scope in the scope catalog ([docs/031](031_platform-access-control.md), so the permission stays DB-driven), and write an audit record.
+
+### 12.4 Phases Stacked On Runtime Render
+
+Each phase is a drop-in on the runtime-render capability, not a rewrite, and ships only when someone asks for it:
+
+1. **Runtime render in the Worker.** The gating spike. Nothing below starts until this works behind a smoke test.
+2. **DB slot text.** Operators edit subject and body copy. Slots stay the typed props from the MVP allowlist, so the typed contract still holds.
+3. **DB theme tokens.** Operators set brand color, logo, and footer. The layout consumes a `theme` prop the renderer fills from DB.
+4. **Schema-driven block builder.** The builder UI emits a constrained JSON tree (`{ type: "text" | "button" | "image", props }`), and the runtime renderer maps each block to one vetted react-email component. No operator HTML exists at any point. This is the only "builder" worth building, and it is large (builder UI, block schema, renderer). Defer until demand is real.
+
+### 12.5 XSS Posture Across Phases
+
+- **MVP (build-time).** React already ran before any real value exists, so the manual interpolator carries the protection: HTML-escape every slot, validate `https` on href slots, strip subject newlines. See [docs/034 §5](034_email-templating.md#5-safety-model).
+- **Runtime render and beyond.** React auto-escapes text children, so the work narrows to href-scheme validation and a ban on `dangerouslySetInnerHTML`. Slot text and theme tokens stay data the components escape. The block builder stays safe by mapping a constrained schema to vetted components.
+
+### 12.6 Rejected
+
+- **Operator-authored raw HTML.** Needs a sanitizer, fights Outlook and Gmail rendering, and reintroduces the XSS surface the slot model removes.
+- **Raw TSX stored and compiled from the DB.** Arbitrary code execution with no safe place to run (§12.2).
+- **MJML for any operator-editing future.** Build-time only, so it cannot render in the Worker. Fine for a static MVP, a dead end for editing.
