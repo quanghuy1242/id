@@ -7,7 +7,6 @@ import {
   revokeAccountSession,
   sendVerificationEmail,
   updateProfile,
-  verifyEmail,
 } from "@/app/account/_actions/account";
 import { mockAccountSummary } from "@/app/account/_mocks/account";
 
@@ -69,7 +68,6 @@ describe("account actions", () => {
   it("uses hosted account utility callback paths for recovery and verification", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ status: true }))
-      .mockResolvedValueOnce(jsonResponse({ status: true }))
       .mockResolvedValueOnce(jsonResponse({ status: true }));
 
     await requestPasswordReset("person@example.test");
@@ -83,10 +81,5 @@ describe("account actions", () => {
       email: "person@example.test",
       callbackURL: "/verify-email",
     });
-
-    await verifyEmail("verify_token");
-    expect(lastCall().url).toBe(
-      "/api/auth/verify-email?token=verify_token&callbackURL=%2Faccount%2Fsecurity",
-    );
   });
 });

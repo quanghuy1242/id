@@ -133,11 +133,13 @@ export function AccountSecurityContent({
             </Stack>
             {data.user.emailVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="warning">Unverified</Badge>}
           </Inline>
-          <Inline justify="end">
-            <Button variant="secondary" onClick={handleSendVerification} disabled={sendingVerification}>
-              {sendingVerification ? "Sending..." : "Send verification email"}
-            </Button>
-          </Inline>
+          {data.user.emailVerified ? null : (
+            <Inline justify="end">
+              <Button variant="secondary" onClick={handleSendVerification} disabled={sendingVerification}>
+                {sendingVerification ? "Sending..." : "Send verification email"}
+              </Button>
+            </Inline>
+          )}
         </Stack>
       </Panel>
       <Panel>

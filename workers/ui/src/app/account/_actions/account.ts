@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  authApiGet,
-  authApiGetOrThrow,
-  authApiPost,
-  authApiPostOrThrow,
-} from "@id/lib";
+import { authApiGetOrThrow, authApiPost, authApiPostOrThrow } from "@id/lib";
 
 export type AccountUser = {
   readonly id: string;
@@ -110,7 +105,7 @@ export async function changePassword(input: {
 }
 
 export async function sendVerificationEmail(email: string): Promise<void> {
-  await authApiPost("/send-verification-email", {
+  await authApiPostOrThrow("/send-verification-email", {
     email,
     callbackURL: "/verify-email",
   });
@@ -168,17 +163,6 @@ export async function resetPassword(
   token: string,
 ): Promise<void> {
   await authApiPostOrThrow("/reset-password", { newPassword, token });
-}
-
-export async function verifyEmail(token: string): Promise<{
-  readonly status?: boolean;
-  readonly error?: string;
-  readonly message?: string;
-}> {
-  return authApiGet<{ status?: boolean; error?: string; message?: string }>(
-    "/verify-email",
-    { token, callbackURL: "/account/security" },
-  );
 }
 
 export async function signOut(): Promise<void> {

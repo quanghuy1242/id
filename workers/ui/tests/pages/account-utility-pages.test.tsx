@@ -10,7 +10,6 @@ import { renderWithSwr as render } from "../_utils/swr-render";
 const mockPush = vi.fn<() => void>();
 const mockRequestPasswordReset = vi.fn<(...args: unknown[]) => Promise<void>>();
 const mockResetPassword = vi.fn<(...args: unknown[]) => Promise<void>>();
-const mockVerifyEmail = vi.fn<(...args: unknown[]) => Promise<{ status?: boolean; error?: string; message?: string }>>();
 let searchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
@@ -21,7 +20,6 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/account/_actions/account", () => ({
   requestPasswordReset: (...args: unknown[]) => mockRequestPasswordReset(...args),
   resetPassword: (...args: unknown[]) => mockResetPassword(...args),
-  verifyEmail: (...args: unknown[]) => mockVerifyEmail(...args),
 }));
 
 describe("account utility pages", () => {
@@ -30,7 +28,6 @@ describe("account utility pages", () => {
     searchParams = new URLSearchParams();
     mockRequestPasswordReset.mockResolvedValue(undefined);
     mockResetPassword.mockResolvedValue(undefined);
-    mockVerifyEmail.mockResolvedValue({ status: true });
   });
 
   it("requests a password reset and shows neutral success copy", async () => {
@@ -66,20 +63,16 @@ describe("account utility pages", () => {
     expect(mockResetPassword).not.toHaveBeenCalled();
   });
 
-  it("verifies email tokens and renders success", async () => {
-    searchParams = new URLSearchParams("token=verify_token");
+  it("renders success when Better Auth redirects back without an error", () => {
     render(<VerifyEmailStatus />);
 
-    await waitFor(() => {
-      expect(mockVerifyEmail).toHaveBeenCalledWith("verify_token");
-    });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Email verified.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Email verified.");
   });
 
-  it("renders invalid verification links without calling the endpoint", () => {
+  it("renders an error state when Better Auth redirects back with an error param", () => {
+    searchParams = new URLSearchParams("error=undefined");
     render(<VerifyEmailStatus />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("missing a token");
-    expect(mockVerifyEmail).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("invalid or has expired");
   });
 });

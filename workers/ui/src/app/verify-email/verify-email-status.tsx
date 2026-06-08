@@ -1,32 +1,20 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import useSWR from "swr";
-import { Alert, LinkButton, Skeleton, Stack, Text } from "@id/ui";
-import { verifyEmail } from "../account/_actions/account";
+import { Alert, LinkButton, Stack, Text } from "@id/ui";
 
 export function VerifyEmailStatus() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  const { data, isLoading } = useSWR(token ? ["/verify-email", token] : null, () => verifyEmail(token));
+  // Better Auth's GET /api/auth/verify-email is the verification endpoint: it
+  // consumes the token server-side and 302-redirects here. On failure it appends
+  // an `error` query param; on success it redirects with no `error`. This page is
+  // only a result surface — it must not attempt to re-verify a token.
+  const hasError = searchParams.has("error");
 
-  if (!token) {
+  if (hasError) {
     return (
       <Stack>
-        <Alert tone="error">This verification link is missing a token.</Alert>
-        <LinkButton href="/account/security" variant="secondary">Open security settings</LinkButton>
-      </Stack>
-    );
-  }
-
-  if (isLoading) {
-    return <Skeleton rows={3} />;
-  }
-
-  if (data?.error) {
-    return (
-      <Stack>
-        <Alert tone="error">{data.message ?? "Verification link is invalid or expired."}</Alert>
+        <Alert tone="error">This verification link is invalid or has expired. Request a new one from your security settings.</Alert>
         <LinkButton href="/account/security" variant="secondary">Open security settings</LinkButton>
       </Stack>
     );
@@ -40,4 +28,3 @@ export function VerifyEmailStatus() {
     </Stack>
   );
 }
-

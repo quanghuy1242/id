@@ -2,6 +2,18 @@
   "suppressions": [
     {
       "tool": "aislop",
+      "file": "workers/core/src/auth/adapters/auth-email.ts",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Deliberate TODO(email-observability) at the email-send seam: documents why waitUntil backgrounding is correct (latency + enumeration safety) and what the real gap is (Resend dispatch failures are unobservable). Load-bearing rationale that must not be stripped; see email-templating work."
+    },
+    {
+      "tool": "aislop",
+      "file": "workers/ui/src/app/verify-email/verify-email-status.tsx",
+      "rule": "ai-slop/narrative-comment",
+      "reason": "Documents the Better Auth verify-email redirect contract (token consumed server-side, error appended as query param) so the page is correctly understood as a result surface, not a re-verifier."
+    },
+    {
+      "tool": "aislop",
       "file": "scripts/oxlint-js-plugins/architecture.js",
       "rule": "complexity/file-too-large",
       "reason": "Architecture plugin is intentionally centralized so all custom oxlint rules are loaded as one JS plugin."
