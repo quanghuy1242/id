@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@source "../../../../packages/ui/src/**/*.tsx";
+@source "../../../../node_modules/@idco/ui/src/**/*.tsx";
+@source "../../../../node_modules/@idco/ui/dist/**/*.js";
 @source "../../src/**/*.{tsx,ts,jsx,js}";
 @plugin "daisyui";
 
