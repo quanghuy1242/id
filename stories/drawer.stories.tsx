@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Button, DescriptionList, Drawer, Stack, Text } from "@id/ui";
+import { Badge, Button, DescriptionList, Drawer, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Drawer" } satisfies StoryDefault;

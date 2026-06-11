@@ -1,4 +1,4 @@
-import { Stack, Text, Timeline } from "@id/ui";
+import { Stack, Text, Timeline } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Timeline" } satisfies StoryDefault;

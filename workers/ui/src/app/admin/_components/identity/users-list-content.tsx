@@ -25,7 +25,7 @@ import {
   Text,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   createUser as createUserAction,
   listUsers as listUsersAction,

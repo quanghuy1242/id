@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PageBody, Stack, Tabs } from "@id/ui";
+import { PageBody, Stack, Tabs } from "@idco/ui";
 import { AdminShell } from "./shell";
 
 type SecurityShellProps = {

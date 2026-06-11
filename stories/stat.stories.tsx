@@ -1,4 +1,4 @@
-import { Stat, StatGroup, StatSummaryGroup, Stack, Text } from "@id/ui";
+import { Stat, StatGroup, StatSummaryGroup, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Stat" } satisfies StoryDefault;

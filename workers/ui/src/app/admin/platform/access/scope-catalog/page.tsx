@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ScopeCatalogContent } from "../../../_components/oauth/scope-catalog-content";
 
 const routePath = "/admin/platform/access/scope-catalog";

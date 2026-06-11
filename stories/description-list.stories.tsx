@@ -1,4 +1,4 @@
-import { Badge, DescriptionList, Stack, Text } from "@id/ui";
+import { Badge, DescriptionList, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Description List" } satisfies StoryDefault;

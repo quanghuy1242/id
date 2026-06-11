@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody, Stack } from "@id/ui";
+import { PageBody, Stack } from "@idco/ui";
 import { UsersListContent } from "../../workers/ui/src/app/admin/_components/identity/users-list-content";
 import { UserDetailProvider } from "../../workers/ui/src/app/admin/_components/identity/user-detail-context";
 import { UserDetailHeaderContent } from "../../workers/ui/src/app/admin/_components/identity/user-detail-header-content";

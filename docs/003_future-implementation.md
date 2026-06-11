@@ -666,7 +666,7 @@ Dynamic Workers remain the right choice if pipeline scripts need arbitrary npm p
 
 The first batch scaffolds `ui-id` under `/admin/*` with hosted login/consent pages, `/ui-health`, and a `/admin/api` placeholder. Full admin pages and the admin dashboard are deferred.
 
-**Temporary OAuth page scaffold:** `workers/ui/src/main.ts` currently serves raw HTML/CSS/JavaScript for `/login` and `/consent`. This is a first-release browser OAuth testing scaffold only. Phase 7 must replace these routes with proper Vinext App Router pages using `@id/ui` primitives such as `Page`, `Stack`, `Panel`, and `Button`. The replacement pages must live under `workers/ui/src/app/login/` and `workers/ui/src/app/consent/` so the `ui-route-composition` lint rule covers them.
+**Temporary OAuth page scaffold:** `workers/ui/src/main.ts` currently serves raw HTML/CSS/JavaScript for `/login` and `/consent`. This is a first-release browser OAuth testing scaffold only. Phase 7 must replace these routes with proper Vinext App Router pages using `@idco/ui` primitives such as `Page`, `Stack`, `Panel`, and `Button`. The replacement pages must live under `workers/ui/src/app/login/` and `workers/ui/src/app/consent/` so the `ui-route-composition` lint rule covers them.
 
 **Architecture note (2026-05-20):** The inline `GET /api/admin/dashboard` endpoint was removed during the Phase 5.7 architecture cleanup (see `002_implementation-sequence.md`). When the dashboard is reimplemented, it must follow the clean-architecture pattern: domain entity/interface, application use case, infrastructure repository (via BA adapter), http route handler with `requireActor(c)`. `app.ts` no longer exists; route registration goes through `composition/create-app.ts` and `http/routes/*.routes.ts`.
 
@@ -719,9 +719,9 @@ export function registerAdminRoutes(app: Hono<{ Bindings: CoreEnv; Variables: { 
 | Consents | `/admin/consents` | List, revoke per-user client authorizations |
 | Settings | `/admin/settings` | Issuer URL, metadata health, JWKS status, runtime versions |
 
-### 6.2 Lumina UI Contract
+### 6.2 idco UI Contract
 
-All admin pages follow the Lumina UI system from `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md`:
+All admin pages follow the idco UI system from `/home/quanghuy1242/pjs/books/docs/001_idco_ui_system_daisyui_tailwind.md`:
 - Token props, not raw `className`.
 - Composition-only route files — no raw HTML, Tailwind, or DaisyUI classes.
 - `packages/ui/` components for all visual primitives.

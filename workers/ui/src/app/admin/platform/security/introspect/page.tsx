@@ -1,4 +1,4 @@
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { TokenIntrospectContent } from "../../../_components/security/token-introspect-content";
 
 export default function PlatformSecurityIntrospectPage() {

@@ -130,7 +130,7 @@ Content components manage search, filter, sort, pagination, and modal open/close
 
 ```ts
 // _actions/users.ts
-import type { User } from "@id/lib";
+import type { User } from "@idco/lib";
 
 export type ListUsersParams = {
   searchValue?: string;
@@ -224,7 +224,7 @@ Every content component must:
 3. **Manage internal UI state with `useState`.** Search text, filter selection, sort column/direction, current page, modal open/close — all internal. Accept optional override props for each (route file passes them from `useSearchParams`).
 4. **Fire navigation callbacks** (`onRowClick`, `onBackClick`). Never call `router.push()` directly.
 5. **Own zero URL logic.** No `useSearchParams`, no `usePathname`, no `useRouter`.
-6. **Render only `@id/ui` components.** No raw Tailwind, no raw DaisyUI, no raw HTML layout tags.
+6. **Render only `@idco/ui` components.** No raw Tailwind, no raw DaisyUI, no raw HTML layout tags.
 
 ### Prop shape template
 
@@ -293,7 +293,7 @@ export function UsersListContent({ loading: loadingOverride, error: errorOverrid
 Every `_actions/<domain>.ts` file:
 
 1. Exports typed async functions — one per API endpoint the domain touches.
-2. Takes typed params objects; returns typed response objects. Types align with `@id/lib` schemas or inline-match the API contract.
+2. Takes typed params objects; returns typed response objects. Types align with `@idco/lib` schemas or inline-match the API contract.
 3. Constructs URLs with `new URL(path, window.location.origin)`.
 4. Throws on non-ok responses with the response text as the error message.
 5. Never imports React. Never uses hooks. Never references the DOM beyond `window.location.origin`.
@@ -314,7 +314,7 @@ Every `page.tsx`:
 // workers/ui/src/app/admin/identity/users/page.tsx
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { UsersListContent } from "../../_components/identity/users-list-content";
 
 export default function UsersPage() {
@@ -406,7 +406,7 @@ The decorator mirrors `workers/ui/src/app/admin/layout.tsx` exactly, using the r
 ```tsx
 // stories/_decorators/shell.tsx
 import type { ReactNode } from "react";
-import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@idco/ui";
 import { AdminTopbar, AdminSidebarNav, AdminMobileNav } from "../../workers/ui/src/app/admin/_components/admin-nav";
 import { setMockPathname } from "../../.ladle/mocks/next-navigation";
 
@@ -444,11 +444,11 @@ This replaces the per-story pattern in `stories/admin.stories.tsx` where `AdminL
 
 ## Mock Data
 
-Each `_mocks/<domain>.ts` exports one array typed against the `@id/lib` schema, with enough variety to cover all badge states, filter combinations, and edge cases:
+Each `_mocks/<domain>.ts` exports one array typed against the `@idco/lib` schema, with enough variety to cover all badge states, filter combinations, and edge cases:
 
 ```ts
 // workers/ui/src/app/admin/_mocks/users.ts
-import type { User } from "@id/lib";
+import type { User } from "@idco/lib";
 
 export const mockUsers: User[] = [
   {

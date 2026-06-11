@@ -21,11 +21,7 @@
       "vitest/globals"
     ],
     "paths": {
-      "@/*": ["./workers/ui/src/*"],
-      "@id/lib": ["./packages/lib/src/index.ts"],
-      "@id/lib/*": ["./packages/lib/src/*"],
-      "@id/ui": ["./packages/ui/src/index.ts"],
-      "@id/ui/*": ["./packages/ui/src/*"]
+      "@/*": ["./workers/ui/src/*"]
     }
   },
   "include": [

@@ -1051,7 +1051,7 @@ function isUiWorker(filename) {
 function isImportingOtherWorker(filename, spec) {
   if (!spec) return false;
   if (isCoreWorker(filename)) {
-    return spec.includes("workers/ui") || spec.includes("/ui/") || spec === "@id/ui";
+    return spec.includes("workers/ui") || spec.includes("/ui/") || spec === "@idco/ui";
   }
   if (isUiWorker(filename)) {
     return spec.includes("workers/core") || spec.includes("/core/");
@@ -1083,7 +1083,7 @@ var workerIsolationRule = {
 };
 
 // ─── Rule 18: core-no-ui-deps ─────────────────────────────────────────────
-var CORE_UI_DEPS = ["react", "react-dom", "vinext", "@vitejs/", "@id/ui", "react-aria-components", "lucide-react"];
+var CORE_UI_DEPS = ["react", "react-dom", "vinext", "@vitejs/", "@idco/ui", "react-aria-components", "lucide-react"];
 
 function matchesPackage(spec, name) {
   return spec === name || spec.startsWith(name + "/");
@@ -1155,7 +1155,7 @@ var packagesLibIsolationRule = {
         var spec = extractImportSource(node);
         if (!spec) return;
         if (spec.startsWith("./") || spec.startsWith("../")) return;
-        if (spec === "@id/lib" || spec.startsWith("@id/lib/")) return;
+        if (spec === "@idco/lib" || spec.startsWith("@idco/lib/")) return;
         if (spec === "jose") return;
         context.report({ node: node.source, message: "packages/lib may only import itself, relative files, or jose: " + spec });
       },

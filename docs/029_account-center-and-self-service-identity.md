@@ -9,8 +9,8 @@
 > - `/home/quanghuy1242/pjs/auth` — `core-id` authorization server and `ui-id` hosted user/admin UI
 > - `workers/core/src/auth/**` — Better Auth configuration, plugins, OAuth/OIDC, SCIM, email/password recovery, sessions, consents, and auth-owned API wrappers
 > - `workers/ui/src/app/**` — hosted auth pages, proposed account pages, login context behavior, route protection, and UI-owned actions
-> - `packages/lib/src/auth-fetch.ts` — same-origin typed `/api/auth/*` client helpers
-> - `packages/ui/src/**` — shared UI primitives used by hosted auth/account/admin surfaces
+> - `@idco/lib/auth-fetch` — same-origin typed `/api/auth/*` client helpers from the sibling idco package
+> - `@idco/ui` — shared UI primitives used by hosted auth/account/admin surfaces
 >
 > Source docs and local evidence:
 >
@@ -164,7 +164,7 @@ F3. `workers/ui/src/proxy.ts` protects `/admin` and `/admin/:path*` by requiring
 
 F4. `workers/ui/src/proxy.ts` (`adminLoginTarget`) and `workers/ui/src/app/login/login-form.tsx` (`safeAdminCallbackURL`, `loginPayload`) treat safe first-party callbacks as admin-only: `safeAdminCallbackURL()` accepts `/admin` and rejects every other local path, and `loginPayload()` defaults non-OAuth sign-in to `/admin`. The Account shell requires a generalized safe first-party callback helper that accepts `/account` and `/admin` and still rejects absolute/external paths.
 
-F5. `workers/ui/src/app/login/login-form.tsx` uses `authApiPost` and `OAUTH_QUERY_PARAM` from `@id/lib`, matching the repo rule that UI `/api/auth` calls use shared helpers. It has no forgot-password link.
+F5. `workers/ui/src/app/login/login-form.tsx` uses `authApiPost` and `OAUTH_QUERY_PARAM` from `@idco/lib`, matching the repo rule that UI `/api/auth` calls use shared helpers. It has no forgot-password link.
 
 F6. `workers/ui/docs/screens/auth-flow.md` documents the current centered-panel auth screens. Recovery/verification pages follow that pattern; the Account shell is a first-party account shell, not the operator shell.
 
@@ -178,7 +178,7 @@ F10. Better Auth's installed `GET /list-sessions` returns session rows that incl
 
 F11. Existing admin audit consent endpoints are platform-admin-only: `GET /api/auth/admin/list-consents` and `POST /api/auth/admin/revoke-consent` operate across users after `requireAdmin`. The Account shell needs current-user consent projections and current-user revocation, not reuse of the platform-admin aggregate endpoints.
 
-F12. `packages/ui/src/index.ts` already exports the primitives account pages need: `Page`, `Panel`, `Stack`, `Inline`, `Text`, `Button`, `Form`, `TextInput`, `Alert`, `Badge`, `Tabs`, `DataTable`, `DescriptionList`, `Avatar`, `Menu`, `Switch`, `ConfirmDialog`, and `Toast` (verified present). No design-system rewrite is needed.
+F12. `@idco/ui` already exports the primitives account pages need: `Page`, `Panel`, `Stack`, `Inline`, `Text`, `Button`, `Form`, `TextInput`, `Alert`, `Badge`, `Tabs`, `DataTable`, `DescriptionList`, `Avatar`, `Menu`, `Switch`, `ConfirmDialog`, and `Toast` (verified present). No design-system rewrite is needed.
 
 F13. [docs/028](028_tenant-scoped-platform-experience.md) defines the two-shell model and the `console-scopes` endpoint. This document reuses that endpoint's scope/membership data for the account organizations page rather than re-deriving memberships.
 
@@ -284,8 +284,8 @@ The Account shell is a small first-party shell, not the operator `AdminShell`.
 - Navigation: Overview, Profile, Security, Sessions, Connected apps, Organizations.
 - No platform metrics, no scope selector, no operator sidebar, no admin route tree.
 - On mobile, use tabs or a compact menu; avoid nesting cards inside cards.
-- Reuse `@id/ui` primitives: `Page`, `Stack`, `Inline`, `Text`, `Button`, `Badge`, `Tabs`, `DescriptionList`, `DataTable`, `Avatar`, `ConfirmDialog`, `Alert`, `Toast`, `Menu`.
-- Account content components own data with SWR like admin content components; action wrappers stay plain functions that call `@id/lib` helpers.
+- Reuse `@idco/ui` primitives: `Page`, `Stack`, `Inline`, `Text`, `Button`, `Badge`, `Tabs`, `DescriptionList`, `DataTable`, `Avatar`, `ConfirmDialog`, `Alert`, `Toast`, `Menu`.
+- Account content components own data with SWR like admin content components; action wrappers stay plain functions that call `@idco/lib` helpers.
 
 Public recovery/verification pages keep the existing auth-flow pattern: centered panel, no account/admin shell, server page component plus a `"use client"` form component.
 
@@ -401,7 +401,7 @@ Forgot / reset / verify (centered panels):
 
 ### 8.1 API Rules
 
-Every browser-facing account action calls same-origin `/api/auth/*` through `@id/lib` helpers. Do not call `fetch()` directly inside account route files, public auth utility form components, or action modules.
+Every browser-facing account action calls same-origin `/api/auth/*` through `@idco/lib` helpers. Do not call `fetch()` directly inside account route files, public auth utility form components, or action modules.
 
 The Account Center API is a projection layer. It introduces no second account database. It uses Better Auth endpoints directly where safe, and a Better Auth plugin where a safe current-user shape is missing. New custom account endpoints live under `/api/auth/account/*`, implemented as a Better Auth plugin under `workers/core/src/auth/plugins/account-center/**`, keeping auth-owned behavior inside the auth boundary so `ui-id` never imports Better Auth, Drizzle, D1/KV, or core source.
 
@@ -515,7 +515,7 @@ Suggested files:
 - `workers/ui/src/app/verify-email/verify-email-status.tsx`
 
 ```ts
-import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import { authApiGetOrThrow, authApiPostOrThrow } from "@idco/lib";
 
 export async function getAccountSummary(): Promise<AccountSummary> {
   return authApiGetOrThrow<AccountSummary>("/account/summary");
@@ -699,7 +699,7 @@ Manual smoke: request and complete a password reset from the email link; sign in
 The work is sequenced; each phase is independently shippable and testable.
 
 1. Login context (security-sensitive): generalize the safe-callback helper to `/admin` + `/account`, default direct login to `/account`, move OTP to Console platform-scope entry per docs/028, and cover OAuth/Console/Account/unsafe/signed-in-admin cases. Acceptance: account users sign in to `/account`; platform-scope entry still requires step-up; context-less or unsafe login mints no elevated session.
-2. Hosted recovery/verification pages: public centered-panel pages calling Better Auth through `@id/lib`; tested reset/verification callback shapes; `wrangler.jsonc` route + `run_worker_first` entries. Acceptance: a user can request reset, complete reset, and verify email through hosted UI without enumeration leakage.
+2. Hosted recovery/verification pages: public centered-panel pages calling Better Auth through `@idco/lib`; tested reset/verification callback shapes; `wrangler.jsonc` route + `run_worker_first` entries. Acceptance: a user can request reset, complete reset, and verify email through hosted UI without enumeration leakage.
 3. Account shell + summary: account route protection in proxy, account shell, overview page, `idAccountCenter` `GET /account/summary`. Acceptance: a signed-in user opens `/account`; an unauthenticated user is redirected; the summary contains no secrets.
 4. Profile + security: profile form for `name`/`image`, password-change form, resend-verification action, email change shown as unavailable. Acceptance: a user updates supported fields and changes password; the UI exposes no unsupported email change.
 5. Sessions, consents, organizations: safe session list/revoke, current-user consent list/revoke, current-user organization membership endpoint, UI pages with confirmation dialogs. Acceptance: no session tokens reach browser code; a user cannot see or mutate another user's sessions/consents; organization Console links are authorization-backed and agree with `console-scopes`.
@@ -724,7 +724,7 @@ This section is the Account future-decision ledger. The items are intentionally 
 - A hosted Account shell exists at `/account` with profile, security, sessions, consents, and organizations, plus public `/forgot-password`, `/reset-password`, and `/verify-email` pages, all in the UI worker route config.
 - The Account shell is distinct from the operator Console (028); a non-admin user lands in the Account shell, never an empty console.
 - Login context supports OAuth, Console, and Account destinations; step-up is enforced by the Console on sensitive scopes/actions, not by an admin-persona login, and the docs/024 security property holds.
-- Account Center APIs are Better Auth plugin endpoints or direct Better Auth endpoint calls through `@id/lib`; browser UI never receives session tokens or other bearer secret material.
+- Account Center APIs are Better Auth plugin endpoints or direct Better Auth endpoint calls through `@idco/lib`; browser UI never receives session tokens or other bearer secret material.
 - The account organizations endpoint and the Console `console-scopes` endpoint agree on which organizations are operable.
 - SCIM remains a directory boundary and is not used for normal-user self-service.
 - Automated tests cover route protection, callback safety, account endpoint authorization, token stripping, recovery/verification states, and the step-up reframe.

@@ -1,4 +1,4 @@
-import { PageBody, Panel, Stack, Text, Heading, LinkButton } from "@id/ui";
+import { PageBody, Panel, Stack, Text, Heading, LinkButton } from "@idco/ui";
 
 export default function AdminCatchAll() {
   return (

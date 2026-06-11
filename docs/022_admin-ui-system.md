@@ -7,7 +7,7 @@
 > Scope:
 >
 > - `/home/quanghuy1242/pjs/auth` — the `id` identity provider monorepo
-> - `packages/ui/` — shared component library
+> - `/home/quanghuy1242/pjs/idco/packages/ui/` — shared component library
 > - `workers/ui/` — admin UI worker
 > - `workers/ui/docs/screens/` — screen spec folder
 >
@@ -15,7 +15,7 @@
 >
 > - `docs/003_future-implementation.md` §6, §11
 > - `workers/ui/src/app/globals.css`
-> - `packages/ui/src/**`
+> - `/home/quanghuy1242/pjs/idco/packages/ui/src/**`
 >
 > Related docs:
 >
@@ -52,7 +52,7 @@ Maintain visual and structural consistency across all `/admin/*` pages in `worke
 The design system establishes three layers:
 
 1. **Tokens** — color, spacing, typography values that cannot be overridden at the component or page level.
-2. **Component library** — `packages/ui` primitives that route files must use; raw DaisyUI/Tailwind classes are forbidden in route files.
+2. **Component library** — `@idco/ui` primitives from the sibling idco repo that route files must use; raw DaisyUI/Tailwind classes are forbidden in route files.
 3. **Screen specs** — per-page planning artifacts in `workers/ui/docs/screens/` that define layout and component composition before implementation. The spec is the brief that constrains an agent session.
 
 Non-goals:
@@ -65,10 +65,10 @@ Non-goals:
 
 ```
 globals.css (workers/ui/src/app/globals.css)
-  └── DaisyUI 5 theme: lumina-light / lumina-dark
+  └── DaisyUI 5 theme: idco-light / idco-dark
       └── CSS custom properties: base-100/200/300, base-content, primary
 
-packages/ui/src/
+@idco/ui (/home/quanghuy1242/pjs/idco/packages/ui/src/)
   └── Layout: Page, AppShell, PageHeader, PageBody, Container, Panel, Stack, Inline, Grid, Columns, Spacer
   └── Typography: Text, Heading
   └── Interactive: Button, LinkButton
@@ -81,7 +81,7 @@ packages/ui/src/
   └── Interactive leaves: react-aria-components (Dialog, Modal, Select, SearchField)
 
 workers/ui/src/app/admin/**
-  └── Route files: composition only — assemble @id/ui primitives, no raw HTML/DaisyUI/Tailwind
+  └── Route files: composition only — assemble @idco/ui primitives, no raw HTML/DaisyUI/Tailwind
 
 workers/ui/docs/screens/
   └── One .md per admin page section — ASCII + component list + data + states
@@ -95,15 +95,15 @@ The lint rule `ui-route-composition` in `scripts/oxlint-js-plugins/architecture.
 
 **File:** `workers/ui/src/app/globals.css`
 
-The token layer is fully defined as a DaisyUI 5 CSS-first theme. Two themes exist: `lumina-light` (default) and `lumina-dark` (prefers-dark). The theme is applied automatically by DaisyUI based on `prefers-color-scheme`.
+The token layer is fully defined as a DaisyUI 5 CSS-first theme. Two themes exist: `idco-light` (default) and `idco-dark` (prefers-dark). The theme is applied automatically by DaisyUI based on `prefers-color-scheme`.
 
-`packages/ui/src/theme/index.ts` exports only `themeName = "lumina"`. This is used to reference the theme name in tests or configuration and is not a token definition file.
+`/home/quanghuy1242/pjs/idco/packages/ui/src/theme/index.ts` exports only `themeName = "idco"`. This is used to reference the theme name in tests or configuration and is not a token definition file.
 
 No `.tokens.json` file exists. The CSS file is the single source of truth.
 
 ### 3.2 Layer 2 — Component Library
 
-**Package:** `packages/ui` (`@id/ui`)
+**Package:** `packages/ui` (`@idco/ui`)
 
 **Dependencies:** `react@19.2.6`, `react-aria-components@1.17.0`, `lucide-react@1.16.0`
 
@@ -163,7 +163,7 @@ The `ui-route-composition` rule in `scripts/oxlint-js-plugins/architecture.js` f
 
 Do not redefine token values anywhere else. Do not add inline `style={{ color: "#155eef" }}` — reference the DaisyUI semantic classes (`text-primary`, `bg-base-100`, etc.) inside `packages/ui` components. If a new color, radius, or spacing value is needed, add it to `globals.css` as a CSS custom property and map it to a DaisyUI semantic role.
 
-**Token values (lumina-light):**
+**Token values (idco-light):**
 
 | Token | Value | Usage |
 |---|---|---|
@@ -180,16 +180,16 @@ Dark theme uses the same structure with inverted base values; primary remains `#
 
 ### 4.2 Layer 2 — Component Library
 
-**Package:** `@id/ui` at `packages/ui/src/`
+**Package:** `@idco/ui` at `/home/quanghuy1242/pjs/idco/packages/ui/src/`
 
-Every visual element in a route file must come from `@id/ui`. No exceptions. The component library grows as pages are added — when a required component does not exist, add it to `packages/ui` first, then use it in the route.
+Every visual element in a route file must come from `@idco/ui`. No exceptions. The component library grows as pages are added — when a required component does not exist, add it to the sibling idco package first, publish/repin, then use it in the route.
 
 **Adding a new component:**
 
-1. Create `packages/ui/src/<component-name>.tsx`.
+1. Create `/home/quanghuy1242/pjs/idco/packages/ui/src/<component-name>.tsx`.
 2. Add a JSDoc link comment at the top of the file pointing to the relevant DaisyUI 5 component documentation. For React Aria wrapper components, add a second link to the React Aria component page.
 3. Expose only tokenized props (`variant`, `tone`, `size`, `gap`, `padding`). Do not expose `className` as the primary API.
-4. Export from `packages/ui/src/index.ts`.
+4. Export from `/home/quanghuy1242/pjs/idco/packages/ui/src/index.ts`.
 
 **Example component header:**
 
@@ -258,7 +258,7 @@ Notes: non-obvious behavior, authorization guards, confirmation flows
 
 **Component list rules:**
 
-- Use exact `@id/ui` export names. If the component does not exist yet, write it anyway and create the component before implementing the page.
+- Use exact `@idco/ui` export names. If the component does not exist yet, write it anyway and create the component before implementing the page.
 - Show nesting hierarchy with `>`.
 - Note `variant` and `tone` only when non-default.
 - Do not list every prop — only the ones that vary from defaults.
@@ -272,7 +272,7 @@ Notes: non-obvious behavior, authorization guards, confirmation flows
 
 The screen spec is the consistency gate between agent sessions. An agent implementing a page reads the spec and is constrained to:
 
-- The component names listed — it must use those exact `@id/ui` exports.
+- The component names listed — it must use those exact `@idco/ui` exports.
 - The spatial layout in the ASCII sketch — it cannot invert the column order or move actions to a different position.
 - The data sources listed — it calls the stated endpoints and maps the stated fields.
 - The states defined — it handles loading, empty, and error with the named components.

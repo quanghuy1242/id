@@ -1,4 +1,4 @@
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { AccountOverviewContent } from "./_components/account-overview-content";
 
 export default function AccountOverviewPage() {

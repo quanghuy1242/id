@@ -22,7 +22,7 @@ import {
   TopbarBrandLink,
   TopbarEnd,
   TopbarStart,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountSummaryKey } from "../_data/swr-keys";
 import { defaultAccountActions, signOut, type AccountActions } from "../_actions/account";
 

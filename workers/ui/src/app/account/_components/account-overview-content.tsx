@@ -15,7 +15,7 @@ import {
   Stat,
   StatGroup,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountOrganizationsKey, accountSummaryKey } from "../_data/swr-keys";
 import { defaultAccountActions, type AccountActions } from "../_actions/account";
 import { roleLabel, roleTone } from "./account-format";

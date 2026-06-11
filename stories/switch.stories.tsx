@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Stack, Switch, Text } from "@id/ui";
+import { Stack, Switch, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Switch" } satisfies StoryDefault;

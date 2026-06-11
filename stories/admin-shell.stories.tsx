@@ -1,6 +1,6 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@id/lib";
-import { PageBody, Panel, Stack, Text } from "@id/ui";
+import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@idco/lib";
+import { PageBody, Panel, Stack, Text } from "@idco/ui";
 import { AdminShell } from "./_decorators/shell";
 
 const orgPermissions: readonly ConsolePermission[] = [

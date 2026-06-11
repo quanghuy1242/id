@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Form, Inline, RadioGroup, Stack, Text } from "@id/ui";
-import { authApiGetOrThrow, authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
+import { Alert, Button, Form, Inline, RadioGroup, Stack, Text } from "@idco/ui";
+import { authApiGetOrThrow, authApiPost, OAUTH_QUERY_PARAM } from "@idco/lib";
 import { useOauthQuery, useOauthRequestDescription } from "@/lib/oauth-query";
 import { DIRECT_SHARE_VALUE, WORKSPACE_CONTEXT_PREFIX } from "@/shared/constants";
 

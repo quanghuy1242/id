@@ -548,7 +548,7 @@ User-facing copy should be short and policy-aware:
 
 ### 9.1 Admin Policy Endpoints
 
-All endpoints are Better Auth plugin endpoints under `/api/auth/admin/registration-policies*`, require admin or future delegated org admin authorization, and use `@id/lib` helpers from UI.
+All endpoints are Better Auth plugin endpoints under `/api/auth/admin/registration-policies*`, require admin or future delegated org admin authorization, and use `@idco/lib` helpers from UI.
 
 ```text
 POST   /api/auth/admin/registration-policies
@@ -876,7 +876,7 @@ Phase 1: Policy schema and admin API.
 Phase 2: Hosted registration UI.
 
 - Add `/register` route, `/register/invite` route if needed, and route config.
-- Add UI action functions through `@id/lib`.
+- Add UI action functions through `@idco/lib`.
 - Show allowed/denied states.
 
 Phase 3: OAuth integration.
@@ -1042,7 +1042,7 @@ Tasks:
 
 Acceptance criteria:
 
-- Registration UI calls only `@id/lib` auth helpers.
+- Registration UI calls only `@idco/lib` auth helpers.
 - UI never trusts client-provided names/scopes without server evaluation.
 
 Tests:

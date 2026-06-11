@@ -15,7 +15,7 @@ import {
   StatGroup,
   StatSummaryGroup,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import { listAdminConsents, listActivityLog } from "../../_actions/audit";
 import {
   clientType,

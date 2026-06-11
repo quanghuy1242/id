@@ -2,7 +2,7 @@ import type { Story, StoryDefault } from "@ladle/react";
 import { ConsentsContent } from "../../workers/ui/src/app/admin/_components/security/consents-content";
 import type { AdminConsent, ConsentListParams, Paginated } from "../../workers/ui/src/app/admin/_actions/audit";
 import type { OAuthClient } from "../../workers/ui/src/app/admin/_actions/oauth";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import { mockConsents } from "../../workers/ui/src/app/admin/_mocks/security";
 import { mockClients } from "../../workers/ui/src/app/admin/_mocks/oauth";
 import { SecurityShell } from "../_decorators/security-shell";

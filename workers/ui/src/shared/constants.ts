@@ -1,4 +1,4 @@
-import type { ActiveScope, ConsolePermission, ConsoleScope } from "@id/lib";
+import type { ActiveScope, ConsolePermission, ConsoleScope } from "@idco/lib";
 
 /** OAuth authorization context selection values passed to the PostLogin flow. */
 export const DIRECT_SHARE_VALUE = "direct-share";

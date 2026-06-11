@@ -1,6 +1,6 @@
 ---
 name: id-admin-ui
-description: Maintain UI consistency for the `/home/quanghuy1242/pjs/auth` admin UI. Use when creating, modifying, or reviewing any file under `workers/ui/src/app/admin/**`, adding or changing components in `packages/ui/src/**`, writing or updating screen specs in `workers/ui/docs/screens/`, or when any session needs to know what components exist, what the token values are, or what format the screen spec must follow.
+description: Maintain UI consistency for the `/home/quanghuy1242/pjs/auth` admin UI. Use when creating, modifying, or reviewing any file under `workers/ui/src/app/admin/**`, composing `@idco/ui` in auth routes/stories, writing or updating screen specs in `workers/ui/docs/screens/`, or when any session needs to know what components exist, what token values are, or what format the screen spec must follow.
 ---
 
 # id Admin UI
@@ -9,7 +9,7 @@ description: Maintain UI consistency for the `/home/quanghuy1242/pjs/auth` admin
 
 Every agent session working on admin UI must load this skill. It contains the component registry, token values, screen spec format, and hard rules that keep multiple sessions from producing divergent output.
 
-Before implementing a page, read the screen spec at `workers/ui/docs/screens/`. Before adding a component, check the registry below.
+Before implementing a page, read the screen spec at `workers/ui/docs/screens/`. Before using a component, check the registry below.
 
 Full architecture rationale lives in `docs/022_admin-ui-system.md`.
 
@@ -18,17 +18,12 @@ Full architecture rationale lives in `docs/022_admin-ui-system.md`.
 1. Confirm you are working in `/home/quanghuy1242/pjs/auth`.
 2. **Always load this skill before any admin-UI task.** Do not skip this.
 3. For a **new page**: read the screen spec in `workers/ui/docs/screens/<section>.md` before writing any code. If no spec exists, draft one and get approval before implementing.
-4. For a **new component**: add it to `packages/ui/src/`, add the DaisyUI 5 link comment (see below), export from `packages/ui/src/index.ts`, then use it. **Update this registry immediately** after the component is added.
-   **DaisyUI 5 link comment format:** Every file in `packages/ui/src/` must start with a comment citing the relevant DaisyUI component page. Even if the file uses only Tailwind utilities or third-party libraries, cite the DaisyUI component that the sizing/styling conventions come from.
-   ```ts
-   // DaisyUI 5: https://daisyui.com/components/menu/
-   ```
-   **Tree-shaking constraint:** `packages/ui/package.json` declares `"sideEffects": false`. Every component file must be side-effect-free at module level — no `import "./styles.css"`, no global registry calls, no top-level mutations. If a file must have a side effect, add it to the `sideEffects` array in package.json explicitly (e.g. `"sideEffects": ["./src/that-file.tsx"]`) rather than changing `false` to `true`.
+4. For a **new shared component**: implement it in the sibling `/home/quanghuy1242/pjs/idco` repo under `packages/ui/src/` using the `idco-ui` skill, add/extend the package test under `tests/ui/`, publish idco, then repin auth. Do not recreate `packages/ui` or package component tests inside auth.
 5. For a **spec draft**: use the exact format in the Screen Spec Format section below.
-6. Keep route files under `workers/ui/src/app/admin/**` as composition boundaries — assemble `@id/ui` primitives, pass data, no raw markup.
+6. Keep route files under `workers/ui/src/app/admin/**` as composition boundaries — assemble `@idco/ui` primitives, pass data, no raw markup.
 7. Run `pnpm lint` and `pnpm check` after any change to `packages/ui` or `workers/ui`.
-8. Run `pnpm deploy:ui:dry-run` after any non-trivial change to `packages/ui` or `workers/ui`. This does a full Cloudflare Worker build and verifies the bundle assembles correctly without deploying. Fix any build errors before completing.
-9. **Every `packages/ui` component change or addition must include tests.** Add tests to `workers/ui/tests/packages-ui/<component>.test.tsx` and register the file in `workers/ui/tests/all.test.ts`. Test at minimum: rendering, interaction callbacks (`onChange`, `onClick`, `onSort`), state variants (selected, disabled, error, empty), sizing props, and DaisyUI class presence. Do not submit component code without corresponding tests.
+8. Run `pnpm deploy:ui:dry-run` after any non-trivial change to `workers/ui`. This does a full Cloudflare Worker build and verifies the bundle assembles correctly without deploying. Fix any build errors before completing.
+9. Package-level `@idco/ui` component tests live in `/home/quanghuy1242/pjs/idco/tests/ui/`. Auth tests under `workers/ui/tests` should cover product page composition, actions, SWR/cache behavior, route topology, and integration with the published `@idco/*` packages.
 
 ## Screen Implementation Workflow
 
@@ -45,7 +40,7 @@ Every new admin screen follows this order. Do not skip or reorder steps. Full ra
    - Manage internal `useState` for all UI state when overrides are not provided.
    - Fire navigation callbacks (`onRowClick`, `onBackClick`) — never call `router.push()` directly.
    - Own zero URL logic — no `useSearchParams`, no `usePathname`, no `useRouter`.
-   - Render only `@id/ui` components.
+   - Render only `@idco/ui` components.
 6. **Story** — create `stories/<section>/<name>.stories.tsx`. Minimum exports: `Populated`, `Empty`, `Loading`, `Error`. Pass a fake `actions` object (the injection seam) or `vi.mock` the `_actions/` module. Wrap every story in `<AdminShell activePath="...">` — the decorator already provides a fresh per-story SWR cache, so one story never serves another's cached data. **Always wrap the content component in `<PageBody>` inside `AdminShell`** — `AdminShell` puts children directly in `<MainContent>` with no padding; without `PageBody` the story has no content padding and looks different from the real app.
 7. **Ladle verify** — run `pnpm dev:i` and confirm all four states render correctly. This gate must pass before the route file is created.
 8. **Route file** — create `workers/ui/src/app/admin/<path>/page.tsx` (≤ 40 lines). Read URL params via `useSearchParams`, pass as override props to the content component, pass navigation callbacks wired to `router.push()`. **Split the page into two components**: the outer component owns the `<Suspense fallback={<Content loading />}>` boundary; an inner component (`PageContent`) calls `useSearchParams()`. Never call `useSearchParams()` in the same component that owns the Suspense boundary — Next.js App Router de-opts the entire route to dynamic rendering and causes hydration flicker.
@@ -77,7 +72,7 @@ Use this pattern for admin detail areas where multiple child routes share the sa
 
 ```tsx
 import { SWRConfig } from "swr";
-import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@id/ui";
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock } from "@idco/ui";
 import { AdminTopbar, AdminSidebarNav, AdminMobileNav, AdminMobileRouteTabs } from "../../workers/ui/src/app/admin/_components/admin-nav";
 import { ADMIN_SWR_CONFIG } from "../../workers/ui/src/shared/swr-config";
 import { setMockPathname } from "../../.ladle/mocks/next-navigation";
@@ -176,12 +171,12 @@ const showError = errorOverride ?? (error instanceof Error ? error.message : err
 - Do not put raw `div`, `main`, `section`, `header`, `nav`, `aside`, `footer` in route files.
 - Do not put raw typography tags (`h1`–`h3`, `p`, `span`) in route files. Use `Text` or `Heading`.
 - Do not put DaisyUI classes (`btn`, `card`, `menu`, `navbar`, `input`, `badge`, `alert`, `table`, etc.) in route files.
-- Do not put Tailwind visual utilities (`flex`, `grid`, `gap-*`, `p-*`, `m-*`, `text-*`, `bg-*`, `border-*`, `rounded-*`, `size-*`, `shrink-*`, etc.) in route files — not even as className overrides on `@id/ui` components. If a component needs size or style control, add a typed prop to the component.
+- Do not put Tailwind visual utilities (`flex`, `grid`, `gap-*`, `p-*`, `m-*`, `text-*`, `bg-*`, `border-*`, `rounded-*`, `size-*`, `shrink-*`, etc.) in route files — not even as className overrides on `@idco/ui` components. If a component needs size or style control, add a typed prop to the component.
 - Do not expose raw `className` as the primary styling API on new `packages/ui` components. Use typed props (variant, size, tone) that map to DaisyUI classes internally.
-- Do not import `react-aria-components` directly in route files. Use `@id/ui` wrappers only.
-- Do not import `lucide-react` directly in route files. Use `NavIcon` from `@id/ui` via `iconName` string props on navigational components.
+- Do not import `react-aria-components` directly in route files. Use `@idco/ui` wrappers only.
+- Do not import `lucide-react` directly in route files. Use `NavIcon` from `@idco/ui` via `iconName` string props on navigational components.
 - Do not create a new `/admin` route without a spec entry in `workers/ui/docs/screens/`.
-- Do not invent new component names — use exact exports from `@id/ui` listed in the registry below.
+- Do not invent new component names — use exact exports from `@idco/ui` listed in the registry below.
 - Do not construct ReactNode icons (JSX `<SomeIcon/>`) in route files. Pass icon names as strings via `iconName` props.
 - **Do not call `fetch()` directly inside content components or route files.** All API calls go through `_actions/<domain>.ts` functions.
 - **Do not use `useSearchParams`, `usePathname`, or `useRouter` inside content components.** URL logic belongs exclusively in the route file.
@@ -195,7 +190,7 @@ const showError = errorOverride ?? (error instanceof Error ? error.message : err
 - **Do not hardcode `sm` as a default size in any `packages/ui` component.** Default is always `md`. Expose size as a typed `"sm" | "md"` prop. Hardcoded `sm` on controls like `FilterDropdown`, `SearchInput`, or `DataTable` causes height mismatches with `Button` (which defaults to `md`) in the same toolbar row.
 - **Do not use `btn-neutral` for any button variant.** The `secondary` variant maps to `btn-outline`. `btn-neutral` uses DaisyUI's default dark/near-black neutral (undefined in the custom theme) and looks wrong in the light theme.
 - **Do not call `useSearchParams()` in the same component that owns the Suspense boundary.** See route file rule above.
-- **When DaisyUI classes depend on native element selectors (`:checked`, `:is([type="radio"])`, etc.), prefer `react-aria` hooks over `react-aria-components` wrappers.** RAC wraps the native input in `HiddenInput` (clipped to 1px) and renders custom indicator elements — DaisyUI classes applied to those indicators cannot produce `:checked` styles, size variants, or animations. Instead, use the corresponding hook from `react-aria` (`useRadioGroup`/`useRadio` for radio groups, `useCheckbox`/`useToggleState` for checkboxes) paired with a native `<input>` element. The hook provides `inputProps` (containing `type`, `checked`, `onChange`, keyboard handlers, and ARIA attributes) to spread onto the native input. This gives full React Aria keyboard navigation + ARIA while the native input carries DaisyUI classes directly. Dependencies: `react-aria` and `react-stately` are declared in `packages/ui/package.json`. See `packages/ui/src/form.tsx` for the reference implementation.
+- **When DaisyUI classes depend on native element selectors (`:checked`, `:is([type="radio"])`, etc.), prefer `react-aria` hooks over `react-aria-components` wrappers.** RAC wraps the native input in `HiddenInput` (clipped to 1px) and renders custom indicator elements — DaisyUI classes applied to those indicators cannot produce `:checked` styles, size variants, or animations. Instead, use the corresponding hook from `react-aria` (`useRadioGroup`/`useRadio` for radio groups, `useCheckbox`/`useToggleState` for checkboxes) paired with a native `<input>` element. The hook provides `inputProps` (containing `type`, `checked`, `onChange`, keyboard handlers, and ARIA attributes) to spread onto the native input. This gives full React Aria keyboard navigation + ARIA while the native input carries DaisyUI classes directly. Dependencies: `react-aria` and `react-stately` are declared in idco's `packages/ui/package.json`. See `/home/quanghuy1242/pjs/idco/packages/ui/src/form.tsx` for the reference implementation.
 - **Do not create a fake indicator (`<span>`/`<div>` with DaisyUI classes) as a workaround for RAC's hidden input.** This loses native pseudo-class behavior (`:checked`, `:focus-visible`) and DaisyUI animations. Use hooks + native inputs instead.
 
 ## DaisyUI Convention Rules
@@ -221,7 +216,7 @@ These rules prevent re-learning the same mistakes:
 9. **ConfirmDialog DaisyUI classes:** Use `modal modal-open bg-black/40` on `ModalOverlay`, `modal-box` on `Modal`, `modal-action` on the button row. Always keep `bg-black/40` — `div.modal` has no backdrop color (`dialog::backdrop` is a pseudo-element only available on native `<dialog>` elements, not React Aria's div-based overlay). `modal-open` is required on div-based modals because DaisyUI hides `div.modal` by default. Do not put `data-theme` on the overlay itself; the global `[data-theme]` background rule can override the dimmed backdrop. Put the theme attribute on the `modal-box` panel instead.
 10. **Modal enter/exit animations:** React Aria sets `data-entering` and `data-exiting` on `ModalOverlay` and `Modal` during transitions, and holds elements in the DOM until the exit animation completes. Define `@keyframes` and `@theme` animation variables in `globals.css`. Apply as `data-[entering]:animate-modal-overlay-in data-[exiting]:animate-modal-overlay-out` etc. No plugin needed — this is native Tailwind v4 + React Aria.
 11. **Ladle portal theme scope:** React Aria portals (`ConfirmDialog`, `FilterDropdown` popover) render on `<body>`, which is outside the Ladle Provider's `<div data-theme="...">` wrapper. The `useEffect` in `.ladle/components.tsx` that stamps `data-theme` onto both `document.documentElement` and `document.body` is **essential** — without it, portals in stories get no theme tokens and show wrong colors. Do not remove or simplify this effect.
-12. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, `"RefreshCw"`, `"Copy"`, etc.).
+12. **Icon registration before use:** Before using any `iconName` string in `Button`, `NavLink`, or `DockLink`, verify the icon is registered in `/home/quanghuy1242/pjs/idco/packages/ui/src/nav-icons.tsx`'s `iconMap`. Add the named lucide-react export to both the import list and the `iconMap` object in idco, publish, then repin auth. Icon names are PascalCase (`"Plus"`, `"Users"`, `"KeyRound"`, `"RefreshCw"`, `"Copy"`, etc.).
 
 ## Token Reference
 
@@ -258,9 +253,9 @@ Use DaisyUI semantic classes (`bg-base-100`, `text-primary`, `border-base-300`) 
 
 ## Component Registry
 
-> **When adding, removing, or changing a component in `packages/ui/src/`, update this registry immediately.** Outdated registries cause sessions to recommend non-existent props.
+> **When idco adds, removes, or changes a component, update this registry after auth repins the new package.** Outdated registries cause sessions to recommend non-existent props.
 
-All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
+All components are exported from `@idco/ui` in the sibling idco package.
 
 ### Layout — Shell
 
@@ -400,7 +395,7 @@ All components are exported from `@id/ui` (`packages/ui/src/index.ts`).
 
 ### Enrichment Toolkit (docs/027 §5)
 
-Reusable primitives for the detail-route redesigns. All default to `size="md"` where sized; tests live in `workers/ui/tests/packages-ui/`; stories at `stories/<name>.stories.tsx`.
+Reusable primitives for the detail-route redesigns. All default to `size="md"` where sized; package tests live in `/home/quanghuy1242/pjs/idco/tests/ui/`; auth stories remain at `stories/<name>.stories.tsx`.
 
 | Component | Key props | Notes |
 |---|---|---|
@@ -428,14 +423,14 @@ One file per admin section. Use second-level headings for detail pages within a 
 
 ### Spec structure
 
-Include a "Component gaps" table at the top listing any referenced components that don't exist yet in `@id/ui`:
+Include a "Component gaps" table at the top listing any referenced components that don't exist yet in `@idco/ui`:
 
 ```markdown
 ## Component gaps
 
 | Component | Used on | Notes |
 |---|---|---|
-| `Avatar` | User detail | Image with fallback initials. Not yet in `@id/ui`. |
+| `Avatar` | User detail | Image with fallback initials. Not yet in `@idco/ui`. |
 ```
 
 Then the screen spec:
@@ -487,7 +482,7 @@ Notes: ...
 - Note any schema gaps (e.g., "Member schema has no user.name — must join via get-user").
 
 The ASCII sketch resolves spatial relationships (left/right, stacked/inline, column order).
-The Components block resolves exact `@id/ui` names and nesting — this is the LLM anchor.
+The Components block resolves exact `@idco/ui` names and nesting — this is the LLM anchor.
 Do not omit either. Both are required.
 
 ## References
@@ -496,8 +491,8 @@ Do not omit either. Both are required.
 - `docs/023_admin-screen-story-strategy.md` — screen + story implementation contract (content component contract, actions file contract, route file contract, story file contract, shell decorator, workflow)
 - `workers/ui/docs/screens/` — screen specs for all implemented and planned admin pages
 - `workers/ui/src/app/globals.css` — DaisyUI theme definition (token source of truth)
-- `packages/ui/src/` — component implementations (source of truth for prop shapes)
-- `stories/_decorators/shell.tsx` — `AdminShell` decorator (for stories only, not exported from `@id/ui`)
+- `/home/quanghuy1242/pjs/idco/packages/ui/src/` — component implementations (source of truth for prop shapes)
+- `stories/_decorators/shell.tsx` — `AdminShell` decorator (for stories only, not exported from `@idco/ui`)
 - DaisyUI 5 docs: https://daisyui.com/components/
 - DaisyUI 5 llms.txt (contract): https://daisyui.com/llms.txt
 - React Aria Components docs: https://react-spectrum.adobe.com/react-aria/components.html

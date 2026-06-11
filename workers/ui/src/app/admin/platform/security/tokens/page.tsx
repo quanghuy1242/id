@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { TokensContent, type TokenType } from "../../../_components/security/tokens-content";
 
 function PlatformSecurityTokensPageContent() {

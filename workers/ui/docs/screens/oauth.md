@@ -2,7 +2,7 @@
 
 ## Component registry (all implemented)
 
-All components exist in `packages/ui/src/` with the exact props described in this spec:
+All components exist in `@idco/ui` with the exact props described in this spec:
 `AppShell`, `Topbar`, `TopbarStart`, `TopbarEnd`, `TopbarBrandLink`, `TopbarBreadcrumb`, `TopbarAvatarMenu`,
 `Sidebar`, `SidebarLayout`, `MainContent`, `MobileDock`,
 `PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock, ToastRegion } from "@id/ui";
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock, ToastRegion } from "@idco/ui";
 import { AdminTopbar, AdminSidebarNav, AdminMobileNav, AdminMobileRouteTabs } from "./_components/admin-nav";
 import { AdminScopeProvider } from "./_components/admin-scope-provider";
 import { AdminSwrProvider } from "./_components/admin-swr-provider";

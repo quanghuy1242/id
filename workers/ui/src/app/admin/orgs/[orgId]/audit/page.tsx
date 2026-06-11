@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody, Stack } from "@id/ui";
+import { PageBody, Stack } from "@idco/ui";
 import { OrgDetailProvider, useOrgDetail } from "../../../_components/identity/org-detail-context";
 import { OrgDetailHeaderContent } from "../../../_components/identity/org-detail-header-content";
 import { ActivityLogContent } from "../../../_components/activity-log-content";

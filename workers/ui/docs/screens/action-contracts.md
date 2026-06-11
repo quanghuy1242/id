@@ -11,17 +11,17 @@ Use this order when adding or changing an action:
 3. Generated OpenAPI: use it as a discovery index only when it agrees with runtime source.
 4. UI `_actions`: normalize runtime quirks here, not inside content components.
 5. `_mocks` and stories: keep them on the UI-normalized shapes, plus add raw-wire fixtures when a mismatch is known.
-6. Tests: add contract tests in `workers/ui/tests/pages/*actions*.test.ts` before any barrel import that globally mocks `@id/lib`.
+6. Tests: add contract tests in `workers/ui/tests/pages/*actions*.test.ts` before any barrel import that globally mocks `@idco/lib`.
 
 ## Boundary Rules
 
-- `_actions` functions call only the typed `@id/lib` auth helpers; no component or route file calls `/api/auth` directly.
+- `_actions` functions call only the typed `@idco/lib` auth helpers; no component or route file calls `/api/auth` directly.
 - Snake-case OAuth client management fields stay snake_case through `_actions` because the OAuth provider route is RFC 7591-shaped.
 - Better Auth admin and organization mutations are POST endpoints even when their semantic action is update, delete, revoke, or remove.
 - Repo-owned OAuth admin plugins use REST verbs for their plugin-owned endpoints: `PATCH` for flat updates and `DELETE` for deletes.
 - Optional array fields with Better Auth `min(1)` schemas are omitted when empty; sending `[]` is a request-shape bug.
 - Runtime responses that are raw objects or nullable values are normalized in `_actions` when screens expect an envelope or list.
-- The shared `@id/lib` `*OrThrow` helpers normalize Better Auth and OAuth error bodies to a display-safe `AuthApiError`; alerts should render `error.message`, not raw response JSON.
+- The shared `@idco/lib` `*OrThrow` helpers normalize Better Auth and OAuth error bodies to a display-safe `AuthApiError`; alerts should render `error.message`, not raw response JSON.
 - Browser UI must never consume live Better Auth session tokens. Use the repo-owned `admin-audit` list/revoke-by-id endpoints for session rows; Better Auth's `revoke-user-session` route is server-side only because it requires a bearer token.
 
 ## Audit Actions

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { ConsoleScopeEnvelope } from "@id/lib";
+import type { ConsoleScopeEnvelope } from "@idco/lib";
 
 const matcher = [
   "/admin",

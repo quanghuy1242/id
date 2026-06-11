@@ -1,4 +1,4 @@
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { SessionsContent } from "../../../_components/security/sessions-content";
 
 export default function PlatformSecuritySessionsPage() {

@@ -1,4 +1,4 @@
-import { Page, Panel, Stack, Text } from "@id/ui";
+import { Page, Panel, Stack, Text } from "@idco/ui";
 import { ConsentForm } from "./consent-form";
 
 export default function ConsentPage() {

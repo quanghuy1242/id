@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import {
   Badge,
   Button,
@@ -27,7 +27,7 @@ import {
   Textarea,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listScopes as listScopesAction,
   createScope as createScopeAction,

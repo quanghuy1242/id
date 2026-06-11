@@ -20,7 +20,7 @@ import {
   Text,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listMembers as listMembersAction,
   updateMemberRole as updateMemberRoleAction,

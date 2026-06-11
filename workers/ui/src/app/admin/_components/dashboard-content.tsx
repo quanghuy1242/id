@@ -12,7 +12,7 @@ import {
   StatGroup,
   StatSummaryGroup,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listAdminConsents,
   listAdminJwks,

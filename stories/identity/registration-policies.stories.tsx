@@ -1,5 +1,5 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { RegistrationPoliciesContent } from "../../workers/ui/src/app/admin/_components/identity/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "../../workers/ui/src/app/admin/_mocks/registration-policies";
 import type { RegistrationPolicy } from "../../workers/ui/src/app/admin/_actions/registration-policies";

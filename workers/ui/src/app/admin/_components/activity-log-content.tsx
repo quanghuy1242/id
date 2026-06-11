@@ -13,7 +13,7 @@ import {
   Skeleton,
   Stack,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import { useActivityLog, type ActivityLogActions } from "../_data/use-activity-log";
 import type { AdminActivity } from "../_actions/audit";
 

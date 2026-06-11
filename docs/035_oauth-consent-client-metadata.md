@@ -62,7 +62,7 @@ Classification summary:
 
 For the pending request, the consent page needs the client's display metadata and the resolved scope descriptions. Two options, to settle against BA 1.6.11 during build:
 
-- **Option A, a read-only consent-info endpoint.** Given the `consent_code` or the pending `client_id`, a small core endpoint returns `{ client: { name, logoUri, clientUri, tosUri, policyUri }, scopes: [{ value, description }] }`. The page calls it through the `@id/lib` typed helpers. Client fields come from `name`, `icon`, and `metadata`; scope descriptions join the `oauth-scope-catalog` rows.
+- **Option A, a read-only consent-info endpoint.** Given the `consent_code` or the pending `client_id`, a small core endpoint returns `{ client: { name, logoUri, clientUri, tosUri, policyUri }, scopes: [{ value, description }] }`. The page calls it through the `@idco/lib` typed helpers. Client fields come from `name`, `icon`, and `metadata`; scope descriptions join the `oauth-scope-catalog` rows.
 - **Option B, data in the consent redirect.** If BA carries enough client and scope detail into the consent page params, render from those. This depends on what BA passes and probably lacks ToS, privacy, and logo. Option A is the expected choice.
 
 ### 4.2 Field mapping
@@ -85,7 +85,7 @@ Operators set these fields where they already manage OAuth clients (the admin OA
 
 ### 4.4 Consent screen rendering
 
-`consent-form.tsx` stops fabricating the name. It renders the client name and logo, the requested scopes with their catalog descriptions, and ToS, privacy, and homepage links when present. It stays a `@id/ui`-composed page that calls `/api/auth` through the typed helpers.
+`consent-form.tsx` stops fabricating the name. It renders the client name and logo, the requested scopes with their catalog descriptions, and ToS, privacy, and homepage links when present. It stays a `@idco/ui`-composed page that calls `/api/auth` through the typed helpers.
 
 ## 5. Standards Posture Recap
 

@@ -17,7 +17,7 @@ import {
   Text,
   toast,
   type DataTableColumn,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountSessionsKey } from "../_data/swr-keys";
 import { defaultAccountActions, type AccountActions, type AccountSession } from "../_actions/account";
 import { dateLabel } from "./account-format";

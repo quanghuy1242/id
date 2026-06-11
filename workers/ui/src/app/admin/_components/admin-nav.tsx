@@ -22,7 +22,7 @@ import {
   TopbarBrandLink,
   TopbarEnd,
   TopbarStart,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   ADMIN_LOGIN_REDIRECT_URL,
   visibleNavSections,

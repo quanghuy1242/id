@@ -1,4 +1,4 @@
-import { Button, ThemeDialog } from "@id/ui";
+import { Button, ThemeDialog } from "@idco/ui";
 import { useState } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
 

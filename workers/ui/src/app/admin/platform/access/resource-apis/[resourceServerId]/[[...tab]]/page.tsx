@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ResourceApiDetailContent, type ResourceApiDetailTab } from "../../../../../_components/oauth/resource-api-detail-content";
 
 function activeTab(value: unknown): ResourceApiDetailTab {

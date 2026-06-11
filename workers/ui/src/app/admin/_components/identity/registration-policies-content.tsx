@@ -20,8 +20,8 @@ import {
   StatGroup,
   Text,
   toast,
-} from "@id/ui";
-import type { ActiveScope } from "@id/lib";
+} from "@idco/ui";
+import type { ActiveScope } from "@idco/lib";
 import {
   archiveRegistrationPolicy as archiveRegistrationPolicyAction,
   enableRegistrationPolicy as enableRegistrationPolicyAction,

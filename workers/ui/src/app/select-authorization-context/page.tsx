@@ -1,4 +1,4 @@
-import { Page, Panel, Stack, Text } from "@id/ui";
+import { Page, Panel, Stack, Text } from "@idco/ui";
 import { SelectContextForm } from "./select-context-form";
 
 export default function SelectAuthorizationContextPage() {

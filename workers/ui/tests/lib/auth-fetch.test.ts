@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 //
-// Imports the helpers from the real source (relative path) rather than the
-// `@id/lib` alias, because other barrel tests `vi.mock("@id/lib", …)` with a
-// partial factory — the alias is globally mocked for the whole run, so a direct
-// source import is the only way to exercise the real PATCH/DELETE helpers here.
+// Imports the helpers from the `@idco/lib/auth-fetch` subpath rather than the
+// `@idco/lib` barrel, because other barrel tests `vi.mock("@idco/lib", …)` with
+// a partial factory — the barrel is globally mocked for the whole run, so the
+// real-module subpath is the only way to exercise the real PATCH/DELETE helpers
+// here.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -13,7 +14,7 @@ import {
   authApiFormPostOrThrow,
   authApiPatchOrThrow,
   authApiDeleteOrThrow,
-} from "../../../../packages/lib/src/auth-fetch";
+} from "@idco/lib/auth-fetch";
 
 const fetchMock = vi.fn<typeof fetch>();
 

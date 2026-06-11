@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { readonly children: ReactNode }) {
   const cookieStore = await cookies();
-  const themePref = cookieStore.get("lumina-theme")?.value;
+  const themePref = cookieStore.get("idco-theme")?.value;
   const dataTheme =
-    themePref === "light" ? "lumina-light" : themePref === "dark" ? "lumina-dark" : undefined;
+    themePref === "light" ? "idco-light" : themePref === "dark" ? "idco-dark" : undefined;
 
   return (
     <html lang="en" suppressHydrationWarning {...(dataTheme ? { "data-theme": dataTheme } : {})}>

@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { RegistrationPoliciesContent } from "../../../../_components/identity/registration-policies-content";
 
 export default function OrgRegistrationPoliciesPage() {

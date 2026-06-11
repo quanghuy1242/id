@@ -168,7 +168,7 @@ Delegated admin: a future user, group, or OAuth client with a custom role over a
 
 The repo topology already fits this change. `core-id` owns Better Auth, OAuth, D1/KV, JWKS, SCIM, admin APIs, and plugin schemas. `ui-id` owns hosted pages and admin presentation. Workers must not import each other; shared contracts live in `packages/lib`.
 
-The existing admin UI rules carry over unchanged: route files under `workers/ui/src/app/admin/**` are composition boundaries, they use `@id/ui` primitives rather than raw markup, content components fetch via SWR, `/api/auth` calls go through `@id/lib` helpers (`authApiGetOrThrow`, `authApiPostOrThrow`), and a new `/admin` route needs a screen spec entry in `workers/ui/docs/screens/<section>.md` before implementation. The one-console model reuses all of these; it changes information architecture and authorization, not the UI architecture.
+The existing admin UI rules carry over unchanged: route files under `workers/ui/src/app/admin/**` are composition boundaries, they use `@idco/ui` primitives rather than raw markup, content components fetch via SWR, `/api/auth` calls go through `@idco/lib` helpers (`authApiGetOrThrow`, `authApiPostOrThrow`), and a new `/admin` route needs a screen spec entry in `workers/ui/docs/screens/<section>.md` before implementation. The one-console model reuses all of these; it changes information architecture and authorization, not the UI architecture.
 
 ### 4.2 Existing Organization And Token Context
 
@@ -545,7 +545,7 @@ Rules:
 - The renderer is pure: given the active `ConsoleScope` and the definition, the visible set is deterministic and unit-testable. This single filter is the highest-value test target in the model ([13](#13-test-and-verification-plan)).
 - `requiredPermission` gates visibility only. The server independently enforces every request ([8.7](#87-server-side-authorization-and-scoping)); the nav is never the authorization boundary.
 
-This definition replaces the static arrays in `workers/ui/src/shared/constants.ts`. It lives in UI-owned constants (it is presentation), but its `ConsolePermission` and `ActiveScope` types come from `@id/lib` so the server and UI share one permission vocabulary.
+This definition replaces the static arrays in `workers/ui/src/shared/constants.ts`. It lives in UI-owned constants (it is presentation), but its `ConsolePermission` and `ActiveScope` types come from `@idco/lib` so the server and UI share one permission vocabulary.
 
 ### 8.5 Better Auth Active Organization Bridge
 
@@ -571,7 +571,7 @@ So org-scoped OAuth client create/list/update/delete cannot be fully URL-owned u
 Every admin action accepts the active scope, derived from the route, never parsed from a string inside the action:
 
 ```ts
-import { authApiGetOrThrow, type ActiveScope } from "@id/lib";
+import { authApiGetOrThrow, type ActiveScope } from "@idco/lib";
 
 function orgParams(scope: ActiveScope) {
   return scope.kind === "organization" ? { organizationId: scope.organizationId } : undefined;

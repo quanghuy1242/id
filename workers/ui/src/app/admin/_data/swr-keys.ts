@@ -1,5 +1,5 @@
 import type { Arguments } from "swr";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import type { ListUsersParams } from "../_actions/users";
 import {
   USERS_LIST,

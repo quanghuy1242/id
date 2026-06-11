@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { PageBody, Stack } from "@id/ui";
+import { PageBody, Stack } from "@idco/ui";
 import { OrgDetailProvider } from "../../../../_components/identity/org-detail-context";
 import { OrgDetailHeaderContent } from "../../../../_components/identity/org-detail-header-content";
 

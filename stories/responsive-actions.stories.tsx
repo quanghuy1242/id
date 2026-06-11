@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type ResponsiveAction, ResponsiveActions, Stack, Text } from "@id/ui";
+import { type ResponsiveAction, ResponsiveActions, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Responsive Actions" } satisfies StoryDefault;

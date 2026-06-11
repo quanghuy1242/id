@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CodeEditor, Stack, Text } from "@id/ui";
+import { CodeEditor, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Code Editor" } satisfies StoryDefault;

@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { Alert, Button, Form, Inline, LinkButton, Stack, Text, TextInput } from "@id/ui";
+import { Alert, Button, Form, Inline, LinkButton, Stack, Text, TextInput } from "@idco/ui";
 import { requestPasswordReset } from "../account/_actions/account";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;

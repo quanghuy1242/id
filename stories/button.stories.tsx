@@ -1,4 +1,4 @@
-import { Button, Form, LinkButton, Stack, Inline, Text } from "@id/ui";
+import { Button, Form, LinkButton, Stack, Inline, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Button" } satisfies StoryDefault;

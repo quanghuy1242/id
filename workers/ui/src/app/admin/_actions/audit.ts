@@ -2,7 +2,7 @@ import {
   authApiFormPostOrThrow,
   authApiGetOrThrow,
   authApiPostOrThrow,
-} from "@id/lib";
+} from "@idco/lib";
 
 /**
  * Aggregate admin-audit reads (sessions, tokens, consents, JWKS metadata) and

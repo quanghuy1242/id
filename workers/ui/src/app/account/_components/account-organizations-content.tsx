@@ -14,7 +14,7 @@ import {
   Stack,
   Text,
   type DataTableColumn,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountOrganizationsKey } from "../_data/swr-keys";
 import { defaultAccountActions, type AccountActions, type AccountOrganization } from "../_actions/account";
 import { roleLabel, roleTone } from "./account-format";

@@ -18,7 +18,7 @@ import {
   StatGroup,
   Textarea,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listAdminJwks as listAdminJwksAction,
   rotateAdminJwks as rotateAdminJwksAction,

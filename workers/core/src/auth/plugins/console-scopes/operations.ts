@@ -3,7 +3,7 @@ import type {
   ConsolePermission,
   ConsoleScope,
   ConsoleScopeEnvelope,
-} from "@id/lib";
+} from "@idco/lib";
 import {
   CONSOLE_ADMIN_ROLE_RANK,
   CONSOLE_MEMBER_ROLE_RANK,

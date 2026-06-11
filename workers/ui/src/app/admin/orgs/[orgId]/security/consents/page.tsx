@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ConsentsContent } from "../../../../_components/security/consents-content";
 
 export default function OrgSecurityConsentsPage() {

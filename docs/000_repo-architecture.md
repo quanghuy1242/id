@@ -17,7 +17,7 @@
 > - `/home/quanghuy1242/pjs/content-api/.oxlintrc.json` — verified strict layer-import, route, entity, mapper, repository, constants, and test override rules
 > - `/home/quanghuy1242/pjs/content-api/.oxfmtrc.json` — verified 80-column oxfmt configuration and generated/snapshot/migration ignores
 > - `/home/quanghuy1242/pjs/content-api/scripts/check-duplication-threshold.mjs` — verified 3% Fallow hard gate
-> - `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md` — Lumina UI system reference
+> - `/home/quanghuy1242/pjs/books/docs/001_idco_ui_system_daisyui_tailwind.md` — idco UI system reference
 > - `/home/quanghuy1242/pjs/auther/package.json`
 > - `/home/quanghuy1242/pjs/auther/src/lib/auth.ts`
 > - `/home/quanghuy1242/pjs/auther/src/db/app-schema.ts`
@@ -53,7 +53,7 @@
   - [4.3 Worker Isolation](#43-worker-isolation)
   - [4.4 Local Multi-Worker Development](#44-local-multi-worker-development)
 - [5. Shared Packages](#5-shared-packages)
-  - [5.1 `packages/ui` — Lumina Component Library](#51-packagesui--lumina-component-library)
+  - [5.1 `packages/ui` — idco Component Library](#51-packagesui--idco-component-library)
   - [5.2 `packages/lib` — Shared Types, Constants, API Client](#52-packageslib--shared-types-constants-api-client)
   - [5.3 Package Isolation](#53-package-isolation)
 - [6. Core Layer Architecture](#6-core-layer-architecture)
@@ -71,7 +71,7 @@
   - [7.7 Better Auth Factory Pattern](#77-better-auth-factory-pattern)
   - [7.8 CrudAdapter Pattern](#78-crudadapter-pattern)
 - [8. UI Architecture](#8-ui-architecture)
-  - [8.1 Lumina System Contract](#81-lumina-system-contract)
+  - [8.1 idco System Contract](#81-idco-system-contract)
   - [8.2 Route File Rules](#82-route-file-rules)
   - [8.3 Admin Page Convention](#83-admin-page-convention)
   - [8.4 UI Enforcement](#84-ui-enforcement)
@@ -386,15 +386,15 @@ Acceptance requirement:
 
 ## 5. Shared Packages
 
-### 5.1 `packages/ui` — Lumina Component Library
+### 5.1 `packages/ui` — idco Component Library
 
-Reusable React components follow the Lumina UI system from `/home/quanghuy1242/pjs/books/docs/001_lumina_ui_system_daisyui_tailwind.md`.
+Reusable React components follow the idco UI system from `/home/quanghuy1242/pjs/books/docs/001_idco_ui_system_daisyui_tailwind.md`.
 
 Design contract:
 
 - token props, not raw `className`: `<Button variant="primary" size="sm">`, not `<button className="btn btn-primary btn-sm">`;
 - DaisyUI v5 and Tailwind v4 CSS-first setup;
-- two themes: `lumina-light` and `lumina-dark`;
+- two themes: `idco-light` and `idco-dark`;
 - compact density everywhere;
 - React Aria wrapped at leaf components only;
 - `"use client"` stays at leaves and shell providers, never at route pages by default;
@@ -898,9 +898,9 @@ Rules:
 
 ## 8. UI Architecture
 
-### 8.1 Lumina System Contract
+### 8.1 idco System Contract
 
-The admin dashboard follows Lumina.
+The admin dashboard follows idco.
 
 Core rules:
 
@@ -908,7 +908,7 @@ Core rules:
 - token props on public components.
 - no raw `className` in route files.
 - `unstable_className` only on internal primitives and only with review explanation.
-- two themes: `lumina-light` and `lumina-dark`.
+- two themes: `idco-light` and `idco-dark`.
 - compact density.
 - React Aria only at leaf interactive components or shell/provider boundaries.
 - no `"use client"` at page level unless a specific page is a client-only island and the exception is documented.
@@ -938,7 +938,7 @@ Forbidden:
 
 ```tsx
 // workers/ui/src/app/admin/organizations/page.tsx
-import { Page, PageBody, PageHeader, Panel, Stack, Text, Button } from "@id/ui";
+import { Page, PageBody, PageHeader, Panel, Stack, Text, Button } from "@idco/ui";
 
 export default function OrganizationsPage() {
   return (
@@ -1133,7 +1133,7 @@ Base config:
 - `moduleResolution: "bundler"`
 - `target: "ES2025"`
 
-`pnpm typecheck` runs `tsgo --noEmit` against the root `tsconfig.json`; `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. The root config includes worker/package source, worker tests, UI mocks, and root config files, maps shared packages through `@id/lib` and `@id/ui`, and maps `@/*` to the UI worker source only. Core source should prefer relative imports or shared package imports so the root checker does not need ambiguous two-worker `@/*` resolution.
+`pnpm typecheck` runs `tsgo --noEmit` against the root `tsconfig.json`; `pnpm typecheck:tsc` keeps the classic `tsc --noEmit` fallback. The root config includes worker/package source, worker tests, UI mocks, and root config files, maps shared packages through `@idco/lib` and `@idco/ui`, and maps `@/*` to the UI worker source only. Core source should prefer relative imports or shared package imports so the root checker does not need ambiguous two-worker `@/*` resolution.
 
 Formatting is a hard gate through oxfmt. `.oxfmtrc.json` matches the content-api configuration: 80-column print width, generated/snapshot/migration/dist ignores, and the root scripts scope formatting to source TypeScript under `packages/**` and `workers/**`.
 
@@ -1328,7 +1328,7 @@ Acceptance:
 
 ### Spike D: UI Composition Gate
 
-Purpose: prove admin pages cannot bypass Lumina.
+Purpose: prove admin pages cannot bypass idco.
 
 Acceptance:
 
@@ -1404,7 +1404,7 @@ Required repository outcomes:
 
 - [ ] `001_first-batch-plan.md` stays aligned with this document on two-Worker topology.
 - [ ] root layout matches this spec.
-- [ ] `packages/ui` exists and exports Lumina primitives.
+- [ ] `packages/ui` exists and exports idco primitives.
 - [ ] `packages/lib` exists and remains framework-free.
 - [ ] `workers/core` has full clean architecture layers plus `src/auth`.
 - [ ] `workers/ui` has Vinext admin pages and no auth/persistence/signing imports.
@@ -1444,6 +1444,6 @@ Required auth/platform outcomes:
 
 `id` is a strict two-worker identity-provider monorepo.
 
-`core-id` owns root `/`, auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`, account presentation under `/account/*`, hosted auth pages, `/ui-health`, and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable Lumina UI components.
+`core-id` owns root `/`, auth, OAuth, tokens, JWKS, D1/KV, custom admin APIs, resource audiences, and authorization checks. `ui-id` owns admin presentation under `/admin/*`, account presentation under `/account/*`, hosted auth pages, `/ui-health`, and client-side assets under `/assets/*`; browser code calls same-origin core `/api/auth/*` routes directly when it needs Better Auth endpoints. It never owns persistence, Better Auth, signing, or domain rules. `packages/lib` carries only framework-free contracts. `packages/ui` carries reusable idco UI components.
 
 The clean architecture from content-api is strong enough for the core Worker. The correct improvement is not to loosen it; the correct improvement is to add the missing Better Auth boundary, UI route ownership/composition enforcement, and strict worker authorization invariant.

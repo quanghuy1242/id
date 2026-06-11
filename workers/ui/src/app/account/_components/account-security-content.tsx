@@ -17,7 +17,7 @@ import {
   Text,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountSummaryKey } from "../_data/swr-keys";
 import { defaultAccountActions, type AccountActions } from "../_actions/account";
 

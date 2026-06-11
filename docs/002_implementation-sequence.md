@@ -57,7 +57,7 @@ Status on 2026-05-19: implemented and clean. `scripts/oxlint-js-plugins/architec
 - [x] Implement `packages-lib-isolation` — packages/lib imports nothing but itself
 - [x] Implement `auth-boundary` — Better Auth imports only from approved core files
 - [x] Implement `admin-auth-required` — admin route handlers always call requireActor
-- [x] Implement `ui-route-composition` — admin route files compose `@id/ui` primitives instead of raw markup/classes/fetch
+- [x] Implement `ui-route-composition` — admin route files compose `@idco/ui` primitives instead of raw markup/classes/fetch
 - [x] Prove the id-specific boundary rules that affect this batch's current source: worker isolation, UI auth deps, and UI route composition. Remaining id-specific rules are active as hard errors and get fixture expansion when their owned source areas are introduced.
 - [x] Add built-in rules: `no-console`, `eqeqeq`, `import/no-cycle`, `typescript/no-explicit-any`
 

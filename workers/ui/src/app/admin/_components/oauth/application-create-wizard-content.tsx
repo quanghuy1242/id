@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import {
   Button,
   CodeBlock,
@@ -19,7 +19,7 @@ import {
   TextInput,
   UrlListBuilder,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   createClient as createClientAction,
   listScopes as listScopesAction,

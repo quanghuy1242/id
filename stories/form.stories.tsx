@@ -1,4 +1,4 @@
-import { Checkbox, Form, RadioGroup, Stack, Text } from "@id/ui";
+import { Checkbox, Form, RadioGroup, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Form" } satisfies StoryDefault;

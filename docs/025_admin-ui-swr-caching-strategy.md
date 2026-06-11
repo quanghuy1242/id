@@ -36,7 +36,7 @@
 >
 > - Core-id rate limit is approximately **10 requests per 10 seconds per IP**. Treated as a hard ceiling to design under, not a measured guarantee.
 > - Admin UI is client-component-only; there is no server-side rendering or worker-side data fetching for admin data pages.
-> - All API calls go through `authApiGetOrThrow` / `authApiPostOrThrow` / `authApiGet` / `authApiPost` from `@id/lib`.
+> - All API calls go through `authApiGetOrThrow` / `authApiPostOrThrow` / `authApiGet` / `authApiPost` from `@idco/lib`.
 > - One admin principal is active per browser context (cookie-scoped session). This is an explicit deployment assumption, not a runtime guarantee — see §9.6.
 > - SWR (`swr@2.x`) is the chosen library. Alternatives evaluated in §5.
 
@@ -129,7 +129,7 @@ Browser tab (admin session)
               └─ then: mutate(affectedKey) or mutate(key, nextData, { revalidate: false })
 ```
 
-Data flows browser-only. Every admin page is a client component that reads from SWR and writes through `_actions/`. The action layer and `@id/lib` are unchanged: SWR sits *between* the component and the action, not inside the action.
+Data flows browser-only. Every admin page is a client component that reads from SWR and writes through `_actions/`. The action layer and `@idco/lib` are unchanged: SWR sits *between* the component and the action, not inside the action.
 
 ## 3. Current-State Findings
 
@@ -246,7 +246,7 @@ Use `swr@2.x` with a single site-wide `<SWRConfig>` mounted in the admin layout,
 - It is ~4.4 KB and the cache is a module-level singleton — no provider is required for correctness; we add one only to distribute defaults.
 - It deduplicates concurrent requests and integrates with the React lifecycle, which a hand-rolled `Map` cache does not.
 - It adds at most one hook (`useSWR`) to the architecture for reads; mutation invalidation uses the imperative `mutate`. `useSWRMutation` is deferred (§11).
-- The `_actions/*.ts` layer and `@id/lib` stay untouched.
+- The `_actions/*.ts` layer and `@idco/lib` stay untouched.
 
 ### 5.2 The Site-Wide Config, And Why Each Flag Is Set The Way It Is
 
@@ -632,6 +632,6 @@ Behavior:
   429                     → no retry; last good data stays behind an error banner
 ```
 
-The action layer (`_actions/*.ts`) and the `@id/lib` auth-fetch helpers are unchanged. SWR is a component- and provider-level cache that sits between rendering and the action functions: it deduplicates requests, serves cache across navigation, and revalidates only when explicitly told to.
+The action layer (`_actions/*.ts`) and the `@idco/lib` auth-fetch helpers are unchanged. SWR is a component- and provider-level cache that sits between rendering and the action functions: it deduplicates requests, serves cache across navigation, and revalidates only when explicitly told to.
 </content>
 </invoke>

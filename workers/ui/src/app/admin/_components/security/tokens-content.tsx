@@ -18,7 +18,7 @@ import {
   Stat,
   StatGroup,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listAdminTokens as listAdminTokensAction,
   type AdminToken,

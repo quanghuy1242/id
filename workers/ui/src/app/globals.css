@@ -8,7 +8,7 @@
    read as intentional rather than flat white, and a warm terracotta accent
    provides a complementary lift against the cool field. */
 @plugin "daisyui/theme" {
-  name: "lumina-light";
+  name: "idco-light";
   default: true;
   prefersdark: false;
   color-scheme: light;
@@ -101,7 +101,7 @@
    tints of the brand hue (not neutral gray), the primary lifts to a luminous
    petrol so it reads on dark, and the terracotta accent warms up to balance. */
 @plugin "daisyui/theme" {
-  name: "lumina-dark";
+  name: "idco-dark";
   prefersdark: true;
   color-scheme: dark;
   --color-base-100: #182530;

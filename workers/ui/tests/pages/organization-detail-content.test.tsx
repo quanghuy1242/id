@@ -3,7 +3,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithSwr as render } from "../_utils/swr-render";
 import { describe, expect, it, vi } from "vitest";
-import { Stack } from "@id/ui";
+import { Stack } from "@idco/ui";
 import { OrgDetailProvider } from "@/app/admin/_components/identity/org-detail-context";
 import { OrgDetailHeaderContent } from "@/app/admin/_components/identity/org-detail-header-content";
 import { OrgDetailOverviewContent } from "@/app/admin/_components/identity/org-detail-overview-content";
@@ -17,7 +17,7 @@ import { mockActivities } from "@/app/admin/_mocks/audit";
 import { mockBindings, mockClients, mockResourceServers, mockScopes } from "@/app/admin/_mocks/oauth";
 import { mockConsents } from "@/app/admin/_mocks/security";
 import type { AdminActivity, AdminConsent, Paginated } from "@/app/admin/_actions/audit";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import type { Organization } from "@/app/admin/_actions/organizations";
 import type { ClientResourceScope, OAuthClient, OAuthResourceScope, ResourceServer } from "@/app/admin/_actions/oauth";
 

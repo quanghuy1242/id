@@ -92,14 +92,27 @@ Versions are pinned in `package.json`. Verified package metadata on May 19, 2026
 - Custom tables are defined through Better Auth plugin `schema` definitions and generated into the Drizzle/D1 migration path. Plugin-owned natural-key invariants are represented by supported unique fields in those schemas, so generated schema output is never post-processed.
 - Raw D1 access is forbidden outside `workers/core/src/infrastructure/persistence/`. Even there, it is only allowed when the Better Auth adapter is genuinely unavailable. Canonical auth-boundary exceptions are plugin-owned runtime companions that preload audiences, OAuth scopes/grants, or token team facts before the Better Auth OAuth Provider can be constructed. Plugin CRUD still uses the Better Auth adapter.
 - Custom Better Auth plugin conventions are documented in [.agents/skills/id-auth-plugin/SKILL.md](.agents/skills/id-auth-plugin/SKILL.md).
-- Workers never cross-import. Shared code lives in `packages/lib` (framework-free) and `packages/ui` (Lumina components, ui-id only).
+- Workers never cross-import. Shared code lives in the `@idco/lib` (framework-free) and `@idco/ui` (component system, ui-id only) packages, which are external dependencies owned by the sibling `~/pjs/idco` repo and consumed from GitHub Packages — not in-repo packages. See [The shared idco design system](#the-shared-idco-design-system).
+
+## The shared idco design system
+
+`@idco/ui` and `@idco/lib` are the shared design system and helpers, owned by the sibling `~/pjs/idco` repo and published to GitHub Packages under the personal scope (`@quanghuy1242/idco-*`). This repo (`id`) consumes them as ordinary external dependencies. The model: registry at ship time, link at dev time, and the committed graph is always the registry graph. This matches the `content-api` setup exactly.
+
+- **Committed truth (CI + deploys).** `package.json` pins the published artifacts through npm aliases that keep the `@idco/*` import name: `"@idco/ui": "npm:@quanghuy1242/idco-ui@^0.1.11"`. `.npmrc` maps the `@quanghuy1242` scope to GitHub Packages; CI authenticates via `actions/setup-node` and installs `--frozen-lockfile`, resolving exactly what is committed with no local-path assumptions and no rewrite step.
+- **Local inner loop (`pnpm dev:link`).** Sets `IDCO_LINK=1` and reinstalls; the committed env-gated `.pnpmfile.cjs` rewrites the `@idco/*` keys to `link:` against `~/pjs/idco` so edits there show up immediately without publishing. The overlay is opt-in, `node_modules`-only, and needs no GitHub Packages token. `pnpm dev:unlink` returns to the published packages. Build idco (`pnpm build`, or `tsc -w`) so linked `dist` types stay current.
+- **Lockfile safety.** A `dev:link` install produces a `link:`-shaped lockfile that must never be committed. `pnpm check:lockfile` (also a CI step) and CI `--frozen-lockfile` both reject it.
+- **Shipping a cross-repo change.** Order is fixed: publish idco first (bump versions in `~/pjs/idco`, `git tag vX.Y.Z && git push --tags`), then here run `pnpm update @idco/ui@latest` (re-pins and re-locks), commit `package.json` + `pnpm-lock.yaml`, and deploy.
+
+The published `@idco/*` packages are available, so the default install path is registry mode. Use `pnpm dev:link` only when co-editing the sibling `~/pjs/idco` checkout locally.
 
 ## Local Setup
 
-1. Install dependencies:
+1. Install dependencies. Registry-mode `pnpm install` resolves the published `@idco/*` packages; if you are co-developing the sibling `~/pjs/idco` checkout (or it has not published yet), use `pnpm dev:link` instead (see [The shared idco design system](#the-shared-idco-design-system)):
 
 ```bash
-pnpm install
+pnpm install        # consume published @idco/* from GitHub Packages
+# or, for local idco co-development:
+pnpm dev:link       # IDCO_LINK=1: link ~/pjs/idco; pnpm dev:unlink to revert
 ```
 
 2. Create remote resources (one-time):
@@ -144,7 +157,7 @@ pnpm db:migrate:local
 ```bash
 pnpm dev:core                    # core-id Worker
 pnpm dev:ui                      # ui-id Worker (Vinext dev)
-pnpm dev:ladle                   # Ladle component workshop for @id/ui
+pnpm dev:ladle                   # Ladle component workshop for @idco/ui
 ```
 
 In production, route specificity sends `/admin*`, `/account*`, `/login*`, `/register*`, `/consent*`, `/select-authorization-context*`, `/forgot-password*`, `/reset-password*`, `/verify-email*`, `/ui-health`, and `/assets/*` to `ui-id`; `/`, `/api/auth/*`, core `/health`, plus metadata routes stay on `core-id`. The core root `/` redirects to `/account`, where the UI account guard sends unauthenticated users to `/login?callbackURL=/account`. The wildcard suffix is required on browser page routes because Cloudflare Worker route matching includes query strings. Hosted UI auth pages call core endpoints directly with same-origin `/api/auth/*` requests.
@@ -240,7 +253,7 @@ Vitest runs through one barrel per project (`workers/core/tests/all.test.ts`, `w
 `pnpm smoke:remote` requires `ID_CORE_URL` and `ID_UI_URL`. UI smoke checks use `/ui-health` for the public UI Worker liveness probe and `/admin/*` for admin page routing, because production only routes explicit UI paths to `ui-id`.
 `pnpm build` builds core-id through the root `@cloudflare/vite-plugin` config, reads `workers/core/wrangler.jsonc`, and emits the prebuilt Worker config at `dist/id_core/wrangler.json` with `no_bundle: true`. `pnpm deploy:core` runs that build and deploys the generated config; `pnpm deploy:core:dry-run` runs the same Vite build and a Wrangler dry-run against the generated config.
 `pnpm deploy:ui:dry-run` mirrors the Cloudflare deploy path: it builds from `workers/ui`, lets Vinext/@cloudflare/vite-plugin generate `workers/ui/dist/server/wrangler.json`, then runs Wrangler deploy with `--dry-run`.
-`pnpm dev:ladle` serves the shared `@id/ui` component stories from `.ladle/` and `stories/` without booting the full UI worker. `pnpm build:ladle` generates a static Ladle build under `.ladle/build`.
+`pnpm dev:ladle` serves the shared `@idco/ui` component stories from `.ladle/` and `stories/` without booting the full UI worker. `pnpm build:ladle` generates a static Ladle build under `.ladle/build`.
 
 ## Deployment
 

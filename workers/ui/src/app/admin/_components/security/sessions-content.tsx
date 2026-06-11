@@ -19,7 +19,7 @@ import {
   Stat,
   StatGroup,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listAdminSessions as listAdminSessionsAction,
   revokeAdminSession as revokeAdminSessionAction,

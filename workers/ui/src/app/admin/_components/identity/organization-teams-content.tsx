@@ -20,7 +20,7 @@ import {
   Text,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listTeams as listTeamsAction,
   listTeamMembers as listTeamMembersAction,

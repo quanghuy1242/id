@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Page, Panel, Skeleton, Stack, Text } from "@id/ui";
+import { Page, Panel, Skeleton, Stack, Text } from "@idco/ui";
 import { ResetPasswordForm } from "./reset-password-form";
 
 export default function ResetPasswordPage() {

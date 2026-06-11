@@ -1,4 +1,4 @@
-import { Button, Inline, Stack, Text, Tooltip } from "@id/ui";
+import { Button, Inline, Stack, Text, Tooltip } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Tooltip" } satisfies StoryDefault;

@@ -1,4 +1,4 @@
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { AdminsRolesContent } from "../../../_components/access/admins-roles-content";
 
 export default function PlatformAccessAdminsRolesPage() {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import {
   Badge,
   Button,
@@ -20,7 +20,7 @@ import {
   Textarea,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   deleteResourceServer as deleteResourceServerAction,
   disableResourceServer as disableResourceServerAction,

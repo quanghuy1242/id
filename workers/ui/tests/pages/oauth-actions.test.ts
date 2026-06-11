@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // NOTE: the HTTP behaviour of the action layer is covered by
-// tests/lib/auth-fetch.test.ts (the `@id/lib` alias is globally mocked in this
+// tests/lib/auth-fetch.test.ts (the `@idco/lib` alias is globally mocked in this
 // barrel run, so the real helpers can only be exercised via a source import
 // there). This file covers the pure derivation logic, which needs no network.
 

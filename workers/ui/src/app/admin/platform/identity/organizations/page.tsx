@@ -1,6 +1,6 @@
 "use client";
 
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { useRouter } from "next/navigation";
 import { OrganizationsListContent } from "../../../_components/identity/organizations-list-content";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody, Stack } from "@id/ui";
+import { PageBody, Stack } from "@idco/ui";
 import { ActivityLogContent } from "../../../../../_components/activity-log-content";
 import { UserDetailProvider } from "../../../../../_components/identity/user-detail-context";
 import { UserDetailHeaderContent } from "../../../../../_components/identity/user-detail-header-content";

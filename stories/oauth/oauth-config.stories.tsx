@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
 import { useRouter } from "next/navigation";
-import { PageBody, Stack, Tabs } from "@id/ui";
+import { PageBody, Stack, Tabs } from "@idco/ui";
 import { ApplicationsContent } from "../../workers/ui/src/app/admin/_components/oauth/applications-content";
 import { ApplicationCreateWizardContent } from "../../workers/ui/src/app/admin/_components/oauth/application-create-wizard-content";
 import { ApplicationDetailContent, type ApplicationDetailTab } from "../../workers/ui/src/app/admin/_components/oauth/application-detail-content";

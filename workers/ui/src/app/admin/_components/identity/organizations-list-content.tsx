@@ -22,7 +22,7 @@ import {
   Text,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listOrganizations as listOrgsAction,
   createOrganization as createOrgAction,

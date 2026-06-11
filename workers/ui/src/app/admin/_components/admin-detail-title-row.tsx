@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Inline, LinkButton, Text } from "@id/ui";
+import { Inline, LinkButton, Text } from "@idco/ui";
 
 type AdminDetailTitleRowProps = {
   readonly backHref: string;

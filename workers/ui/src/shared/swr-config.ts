@@ -1,5 +1,5 @@
 import type { SWRConfiguration } from "swr";
-import { AuthApiError } from "@id/lib";
+import { AuthApiError } from "@idco/lib";
 
 /**
  * Site-wide SWR defaults for the admin UI, tuned for the core-id rate limit

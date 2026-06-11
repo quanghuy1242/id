@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ApplicationsContent } from "../../../../_components/oauth/applications-content";
 
 export default function OrgApplicationsPage() {

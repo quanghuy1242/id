@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { JwksDetailContent, type JwksDetailTab } from "../../../../../_components/security/jwks-detail-content";
 
 function activeTab(value: unknown): JwksDetailTab {

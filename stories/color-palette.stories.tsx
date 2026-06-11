@@ -1,5 +1,5 @@
 import type { Story } from "@ladle/react";
-import { Text, Stack, Inline, Button, Badge, Alert, Panel } from "@id/ui";
+import { Text, Stack, Inline, Button, Badge, Alert, Panel } from "@idco/ui";
 
 type ThemeKey = "light" | "dark";
 
@@ -60,7 +60,7 @@ function Swatch({ item, theme }: { item: SwatchDef; theme: ThemeKey }) {
 }
 
 function ThemePanel({ theme }: { theme: ThemeKey }) {
-  const themeName = theme === "light" ? "lumina-light" : "lumina-dark";
+  const themeName = theme === "light" ? "idco-light" : "idco-dark";
   const subtitle = theme === "light" ? "Default theme" : "prefers-color-scheme: dark";
   return (
     <div data-theme={themeName} className="rounded-box border border-base-300 bg-base-200 text-base-content p-6">
@@ -118,8 +118,8 @@ function ThemePanel({ theme }: { theme: ThemeKey }) {
 export const Palette: Story = () => (
   <div className="p-6">
     <Stack gap="lg">
-      <div data-theme="lumina-light" className="rounded-box bg-base-100 p-4">
-        <Text variant="h2">Lumina color system</Text>
+      <div data-theme="idco-light" className="rounded-box bg-base-100 p-4">
+        <Text variant="h2">idco color system</Text>
         <Text variant="body">
           Anchored on the brand petrol #3a5a6b. Both themes shown below so you can compare light and dark at a glance.
         </Text>

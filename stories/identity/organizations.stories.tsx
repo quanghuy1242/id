@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody, Stack } from "@id/ui";
+import { PageBody, Stack } from "@idco/ui";
 import { OrganizationsListContent } from "../../workers/ui/src/app/admin/_components/identity/organizations-list-content";
 import { OrgDetailProvider } from "../../workers/ui/src/app/admin/_components/identity/org-detail-context";
 import { OrgDetailHeaderContent } from "../../workers/ui/src/app/admin/_components/identity/org-detail-header-content";
@@ -29,7 +29,7 @@ import {
   mockScopes,
 } from "../../workers/ui/src/app/admin/_mocks/oauth";
 import { mockConsents } from "../../workers/ui/src/app/admin/_mocks/security";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 
 export default { title: "Admin / Identity / Organizations" } satisfies StoryDefault;
 

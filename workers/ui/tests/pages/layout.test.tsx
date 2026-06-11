@@ -17,7 +17,7 @@ const mockCookies = vi.mocked(cookies);
 
 function createCookieStore(value?: string): CookieStore {
   return {
-    get: (name: string) => (name === "lumina-theme" ? { name, value } : undefined),
+    get: (name: string) => (name === "idco-theme" ? { name, value } : undefined),
   } as CookieStore;
 }
 
@@ -35,16 +35,16 @@ describe("RootLayout", () => {
     mockCookies.mockResolvedValue(createCookieStore());
   });
 
-  it("sets data-theme lumina-light when cookie is light", async () => {
+  it("sets data-theme idco-light when cookie is light", async () => {
     withThemeCookie("light");
     await renderLayout(<div>child</div>);
-    expect(document.documentElement).toHaveAttribute("data-theme", "lumina-light");
+    expect(document.documentElement).toHaveAttribute("data-theme", "idco-light");
   });
 
-  it("sets data-theme lumina-dark when cookie is dark", async () => {
+  it("sets data-theme idco-dark when cookie is dark", async () => {
     withThemeCookie("dark");
     await renderLayout(<div>child</div>);
-    expect(document.documentElement).toHaveAttribute("data-theme", "lumina-dark");
+    expect(document.documentElement).toHaveAttribute("data-theme", "idco-dark");
   });
 
   it("omits data-theme when cookie is system", async () => {

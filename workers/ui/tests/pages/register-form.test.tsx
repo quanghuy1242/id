@@ -17,7 +17,7 @@ vi.mock("@/lib/oauth-query", () => ({
   useOauthQuery: () => mockOauthQuery,
 }));
 
-vi.mock("@id/lib", () => ({
+vi.mock("@idco/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
   authApiPost: (...args: unknown[]) => mockAuthApiPost(...args),
   authApiPostOrThrow: (...args: unknown[]) => mockAuthApiPostOrThrow(...args),

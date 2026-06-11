@@ -16,7 +16,7 @@ import {
   Stat,
   StatGroup,
   Text,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   getUser as getUserAction,
   listAdminsRoles as listAdminsRolesAction,

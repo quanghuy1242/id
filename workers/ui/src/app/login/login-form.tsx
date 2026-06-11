@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Alert, Button, Form, HiddenInput, Inline, LinkButton, Stack, Text, TextInput } from "@id/ui";
-import { authApiPost, authApiPostOrThrow, OAUTH_QUERY_PARAM } from "@id/lib";
+import { Alert, Button, Form, HiddenInput, Inline, LinkButton, Stack, Text, TextInput } from "@idco/ui";
+import { authApiPost, authApiPostOrThrow, OAUTH_QUERY_PARAM } from "@idco/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

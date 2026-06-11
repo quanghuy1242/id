@@ -1,4 +1,4 @@
-import { Button, Inline, Stack, Text, ToastRegion, toast } from "@id/ui";
+import { Button, Inline, Stack, Text, ToastRegion, toast } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Toast" } satisfies StoryDefault;

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import type { ConsoleScope } from "@id/lib";
+import type { ConsoleScope } from "@idco/lib";
 import {
   CONSOLE_NAV_ITEMS,
   DIRECT_SHARE_VALUE,

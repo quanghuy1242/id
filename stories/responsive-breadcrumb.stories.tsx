@@ -1,4 +1,4 @@
-import { ResponsiveBreadcrumb, Stack, Text } from "@id/ui";
+import { ResponsiveBreadcrumb, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Responsive Breadcrumb" } satisfies StoryDefault;

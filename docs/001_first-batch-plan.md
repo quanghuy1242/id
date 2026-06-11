@@ -1042,7 +1042,7 @@ Failure behavior:
 
 The admin UI is an authenticated operational app. Full UI implementation is deferred. First batch delivers:
 
-- A scaffolded `ui-id` Worker with Vinext App Router, Lumina component stubs, and a health-check page.
+- A scaffolded `ui-id` Worker with Vinext App Router, idco component stubs, and a health-check page.
 - The admin API on `core-id` supports all CRUD operations for organizations, OAuth clients, resource servers, users, and consents. These APIs are tested and documented so an admin UI can be built on them without rework.
 - Admin API authorization is enforced server-side (platform role + org role).
 
@@ -1267,7 +1267,7 @@ Acceptance criteria:
 
 Scaffold the UI Worker with minimal content:
 
-- Vinext App Router project skeleton with Lumina component stubs.
+- Vinext App Router project skeleton with idco component stubs.
 - A health-check route at `/ui-health` that confirms the worker is running without bypassing admin page protection.
 - A placeholder `/admin/api` endpoint for future UI-owned BFF behavior.
 - No full admin pages implemented.

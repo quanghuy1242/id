@@ -109,8 +109,8 @@ Both login and consent pages follow the same structure:
 
 - `workers/ui/src/app/login/page.tsx` — server component wrapping a client form
 - `workers/ui/src/app/consent/page.tsx` — server component wrapping a client form
-- Client forms use `@id/ui` components: `Page`, `Panel`, `Stack`, `Text`, `Button`, `Badge`, `Alert`, `Inline`
-- Client forms call `postAuthApi` from `@id/lib` for OAuth flows
+- Client forms use `@idco/ui` components: `Page`, `Panel`, `Stack`, `Text`, `Button`, `Badge`, `Alert`, `Inline`
+- Client forms call `postAuthApi` from `@idco/lib` for OAuth flows
 - The consent form reads OAuth query params from `useOauthQuery()` hook
 
 No selection page or form exists under `workers/ui/src/app/select-authorization-context/`.
@@ -167,7 +167,7 @@ Rejected: hardcoded workspace-only option. The user needs to know which org they
 
 ### 5.2 Follow Existing Consent Form Integration Pattern
 
-Use `useOauthQuery()` to read OAuth params, `postAuthApi` to submit the selection, and `@id/ui` components for presentation. This mirrors `consent-form.tsx` exactly.
+Use `useOauthQuery()` to read OAuth params, `postAuthApi` to submit the selection, and `@idco/ui` components for presentation. This mirrors `consent-form.tsx` exactly.
 
 ### 5.3 Direct-Share Available Even Without Organization Membership
 
@@ -220,7 +220,7 @@ Implementation tasks:
 - [ ] Create `workers/ui/src/app/select-authorization-context/page.tsx`:
 
 ```tsx
-import { Page, Panel, Stack, Text } from "@id/ui";
+import { Page, Panel, Stack, Text } from "@idco/ui";
 import { SelectContextForm } from "./select-context-form";
 
 export default function SelectAuthorizationContextPage() {

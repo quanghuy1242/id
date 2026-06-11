@@ -80,12 +80,6 @@
     },
     {
       "tool": "aislop",
-      "file": "packages/lib/src/constants.ts",
-      "rule": "ai-slop/narrative-comment",
-      "reason": "Comment explains the cross-reference design contract of OAuth query parameters."
-    },
-    {
-      "tool": "aislop",
       "file": "scripts/bootstrap_admin.py",
       "rule": "security/hardcoded-secret",
       "reason": "False positive on getpass prompt text; no password or secret value is hardcoded."
@@ -139,12 +133,6 @@
     },
     {
       "tool": "aislop",
-      "file": "packages/ui/src/nav-icons.tsx",
-      "rule": "code-quality/duplicate-block",
-      "reason": "Import block and icon map literal both enumerate the same icon names; explicit one-to-one name-to-component registry mapping is structurally required like mapper files."
-    },
-    {
-      "tool": "aislop",
       "file": "workers/ui/src/app/admin/_components/admin-nav.tsx",
       "rule": "code-quality/duplicate-block",
       "reason": "Two NavLink render blocks (top-level items and group children) follow identical active-icon-link pattern across different data sources; structurally analogous to route-file duplication."
@@ -169,12 +157,6 @@
     },
     {
       "tool": "aislop",
-      "file": "packages/ui/src/avatar.tsx",
-      "rule": "next/no-img-element",
-      "reason": "Shared UI Avatar accepts arbitrary user-supplied image URLs across Vinext/Ladle contexts; Next Image optimization and remote allowlists are not appropriate at this primitive boundary."
-    },
-    {
-      "tool": "aislop",
       "file": "workers/ui/src/app/admin/page.tsx",
       "rule": "ai-slop/narrative-comment",
       "reason": "Comment points to docs/024 explaining that admin-login MFA is enforced server-side by id-admin-sign-in-guard; account-level TOTP and session-freshness remain documented future work."
@@ -193,21 +175,9 @@
     },
     {
       "tool": "aislop",
-      "file": "packages/ui/src/mobile-filter-menu.tsx",
-      "rule": "ai-slop/narrative-comment",
-      "reason": "DaisyUI and React Aria link comments are required on every packages/ui component file — all existing components use the same pattern."
-    },
-    {
-      "tool": "aislop",
       "file": "stories/mobile-filter-menu.stories.tsx",
       "rule": "code-quality/duplicate-block",
       "reason": "Story files have structurally similar filter group configurations by design — each story sets up the same filter groups with different initial values."
-    },
-    {
-      "tool": "aislop",
-      "file": "packages/ui/src/responsive-breadcrumb.tsx",
-      "rule": "complexity/function-too-long",
-      "reason": "ResizeObserver overflow measurement logic is inherently verbose; splitting would scatter sibling DOM reads/writes across helpers and obscure the collapse/expand algorithm."
     },
     {
       "tool": "aislop",
@@ -226,12 +196,6 @@
       "file": "workers/ui/src/app/admin/_actions/oauth.ts",
       "rule": "ai-slop/narrative-comment",
       "reason": "Section-separator comments group the clients/resource-servers/scopes/bindings action families; same house style as packages/lib/src/auth-fetch.ts."
-    },
-    {
-      "tool": "aislop",
-      "file": "packages/lib/src/auth-fetch.ts",
-      "rule": "ai-slop/narrative-comment",
-      "reason": "Section-separator comments delimit the GET/POST/PATCH/DELETE helper families; pre-existing house style in this file."
     },
     {
       "tool": "aislop",
@@ -296,18 +260,6 @@
       "tool": "fallow",
       "files": "workers/core/src/auth/plugins/admin-audit/schema.ts|workers/ui/src/app/admin/_actions/audit.ts",
       "reason": "Cross-worker contract shapes: core presents the admin-audit response types and the UI declares its binding types independently (workers never import each other), the same intentional duplication as resource-server/oauth entity types."
-    },
-    {
-      "tool": "aislop",
-      "file": "packages/ui/src/button.tsx",
-      "rule": "complexity/too-many-params",
-      "reason": "Reviewed: public @id/ui button primitives expose typed props consumed across admin routes; refactoring the stable API is unrelated to this OAuth/security redesign."
-    },
-    {
-      "tool": "aislop",
-      "file": "packages/ui/src/filter-dropdown.tsx",
-      "rule": "complexity/too-many-params",
-      "reason": "Reviewed: public @id/ui select/filter primitive keeps a small typed prop surface matching the design-system registry; changing it would churn finalized identity screens."
     },
     {
       "tool": "aislop",

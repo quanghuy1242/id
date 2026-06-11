@@ -3,7 +3,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithSwr as render } from "../_utils/swr-render";
 import { describe, expect, it, vi } from "vitest";
-import { Stack } from "@id/ui";
+import { Stack } from "@idco/ui";
 import { UserDetailProvider } from "@/app/admin/_components/identity/user-detail-context";
 import { UserDetailHeaderContent } from "@/app/admin/_components/identity/user-detail-header-content";
 import { UserDetailOverviewContent } from "@/app/admin/_components/identity/user-detail-overview-content";

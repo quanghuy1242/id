@@ -2,7 +2,7 @@
 
 ## Component registry (all implemented)
 
-Same component set as identity.md and oauth.md. All components exist in `@id/ui`.
+Same component set as identity.md and oauth.md. All components exist in `@idco/ui`.
 
 **Mobile patterns:** See identity.md "Mobile patterns" section — FilterDropdown folding via MobileFilterMenu, breadcrumb via ResponsiveBreadcrumb, visibility props on Button/LinkButton.
 

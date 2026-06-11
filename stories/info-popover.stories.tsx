@@ -1,4 +1,4 @@
-import { InfoPopover, Inline, Stack, Text } from "@id/ui";
+import { InfoPopover, Inline, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Info Popover" } satisfies StoryDefault;

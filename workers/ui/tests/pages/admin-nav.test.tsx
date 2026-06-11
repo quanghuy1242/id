@@ -10,7 +10,7 @@ import {
 } from "@/app/admin/_components/admin-nav";
 import { AdminScopeProvider } from "@/app/admin/_components/admin-scope-provider";
 import { ADMIN_LOGIN_REDIRECT_URL } from "@/shared/constants";
-import type { ConsoleScopeEnvelope } from "@id/lib";
+import type { ConsoleScopeEnvelope } from "@idco/lib";
 
 const navigationMock = vi.hoisted(() => ({ pathname: "/admin" }));
 

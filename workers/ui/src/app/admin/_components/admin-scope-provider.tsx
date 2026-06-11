@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@id/lib";
+import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@idco/lib";
 import { getConsoleScopes as getConsoleScopesAction } from "../_actions/console-scopes";
 import { consoleScopesKey } from "../_data/swr-keys";
 

@@ -8,7 +8,7 @@ import { mockConsents } from "@/app/admin/_mocks/security";
 import { mockClients } from "@/app/admin/_mocks/oauth";
 import type { AdminConsent, ConsentListParams, Paginated } from "@/app/admin/_actions/audit";
 import type { OAuthClient } from "@/app/admin/_actions/oauth";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 
 function makeActions(consents: AdminConsent[]) {
   let current = [...consents];

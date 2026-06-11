@@ -34,6 +34,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@quanghuy1242"
+
+      - name: Guard lockfile is registry-clean
+        run: node scripts/check-lockfile-clean.mjs
 
       - name: Resolve pnpm store path
         shell: bash
@@ -47,8 +52,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      # Consume the published @idco/* GitHub Packages artifacts exactly as
+      # committed — no link rewrite, frozen against the lockfile. The shared
+      # design system must be published (idco tag -> publish) before this runs.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.IDCO_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Check
         run: pnpm check

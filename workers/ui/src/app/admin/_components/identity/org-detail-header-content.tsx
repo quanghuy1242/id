@@ -17,7 +17,7 @@ import {
   Tabs,
   TextInput,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   updateOrganization as updateOrganizationAction,
   deleteOrganization as deleteOrganizationAction,

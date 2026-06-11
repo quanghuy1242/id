@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
 import { SWRConfig } from "swr";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ADMIN_SWR_CONFIG } from "../../workers/ui/src/shared/swr-config";
 import { setMockPathname } from "../../.ladle/mocks/next-navigation";
 import { AccountShell } from "../../workers/ui/src/app/account/_components/account-shell";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { M2mBindingsContent } from "../../../../_components/oauth/m2m-bindings-content";
 
 export default function OrgAccessM2mBindingsPage() {

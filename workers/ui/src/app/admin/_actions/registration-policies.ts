@@ -2,7 +2,7 @@ import {
   authApiGetOrThrow,
   authApiPostOrThrow,
   type ActiveScope,
-} from "@id/lib";
+} from "@idco/lib";
 
 const platformScope: ActiveScope = { kind: "platform" };
 

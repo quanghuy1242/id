@@ -6,7 +6,7 @@ import { SWRConfig } from "swr";
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationsContent } from "@/app/admin/_components/oauth/applications-content";
 import { oauthClientsKey, resourceServersKey } from "@/app/admin/_data/swr-keys";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import type { OAuthClient } from "@/app/admin/_actions/oauth";
 
 const orgA: ActiveScope = { kind: "organization", organizationId: "org_a" };

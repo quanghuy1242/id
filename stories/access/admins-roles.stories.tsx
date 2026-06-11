@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Story, StoryDefault } from "@ladle/react";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { AdminsRolesContent } from "../../workers/ui/src/app/admin/_components/access/admins-roles-content";
 import type { AdminsRolesSnapshot } from "../../workers/ui/src/app/admin/_actions/access";
 import { mockMembers, mockOrganizations } from "../../workers/ui/src/app/admin/_mocks/organizations";

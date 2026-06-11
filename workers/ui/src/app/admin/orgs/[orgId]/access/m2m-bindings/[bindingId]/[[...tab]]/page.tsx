@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { M2mBindingDetailContent, type M2mBindingDetailTab } from "../../../../../../_components/oauth/m2m-binding-detail-content";
 
 function activeTab(value: unknown): M2mBindingDetailTab {

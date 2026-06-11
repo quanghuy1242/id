@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Inline, Stack, Text } from "@id/ui";
-import { authApiPost, OAUTH_QUERY_PARAM } from "@id/lib";
+import { Alert, Badge, Button, Inline, Stack, Text } from "@idco/ui";
+import { authApiPost, OAUTH_QUERY_PARAM } from "@idco/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 type ClientInfo = {

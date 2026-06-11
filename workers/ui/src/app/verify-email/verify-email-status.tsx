@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Alert, LinkButton, Stack, Text } from "@id/ui";
+import { Alert, LinkButton, Stack, Text } from "@idco/ui";
 
 export function VerifyEmailStatus() {
   const searchParams = useSearchParams();

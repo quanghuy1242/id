@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ApplicationDetailContent, type ApplicationDetailTab } from "../../../../../../_components/oauth/application-detail-content";
 
 function activeTab(value: unknown): ApplicationDetailTab {

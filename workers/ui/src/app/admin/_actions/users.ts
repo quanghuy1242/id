@@ -1,4 +1,4 @@
-import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import { authApiGetOrThrow, authApiPostOrThrow } from "@idco/lib";
 import { listAdminSessions, revokeAdminSession } from "./audit";
 
 export type User = {

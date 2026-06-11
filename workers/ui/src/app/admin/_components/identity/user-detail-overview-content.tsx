@@ -9,7 +9,7 @@ import {
   Panel,
   Skeleton,
   Stack,
-} from "@id/ui";
+} from "@idco/ui";
 import { useUserDetail } from "./user-detail-context";
 
 export function UserDetailOverviewContent() {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAuth } from "../../src/auth/get-auth";
 import { consoleScopeEnvelopeSchema } from "../../src/auth/plugins/console-scopes/schema";
-import type { ConsoleScopeEnvelope } from "@id/lib";
+import type { ConsoleScopeEnvelope } from "@idco/lib";
 import {
   signInViaAdminOtp,
   type InspectableTestKv,

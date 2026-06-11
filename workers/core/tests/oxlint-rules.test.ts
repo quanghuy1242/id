@@ -75,7 +75,7 @@ describe.concurrent("oxlint architecture rules", () => {
     const fixture = writeFixture(
       "ui-route-fetch",
       "workers/ui/src/app/admin/fetch/page.tsx",
-      `import { Page } from "@id/ui";\nexport default async function PageFile() {\n  await fetch("/api/admin/dashboard");\n  return <Page>bad</Page>;\n}\n`,
+      `import { Page } from "@idco/ui";\nexport default async function PageFile() {\n  await fetch("/api/admin/dashboard");\n  return <Page>bad</Page>;\n}\n`,
     );
     const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
@@ -86,7 +86,7 @@ describe.concurrent("oxlint architecture rules", () => {
     const fixture = writeFixture(
       "ui-core-import",
       "workers/ui/src/app/admin/core-import/page.tsx",
-      `import "../../../../core/src/main";\nimport { Page } from "@id/ui";\nexport default function PageFile() {\n  return <Page>bad</Page>;\n}\n`,
+      `import "../../../../core/src/main";\nimport { Page } from "@idco/ui";\nexport default function PageFile() {\n  return <Page>bad</Page>;\n}\n`,
     );
     const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);
@@ -97,7 +97,7 @@ describe.concurrent("oxlint architecture rules", () => {
     const fixture = writeFixture(
       "ui-auth-dep",
       "workers/ui/src/app/admin/auth-import/page.tsx",
-      `import { betterAuth } from "better-auth";\nimport { Page } from "@id/ui";\nexport default function PageFile() {\n  betterAuth;\n  return <Page>bad</Page>;\n}\n`,
+      `import { betterAuth } from "better-auth";\nimport { Page } from "@idco/ui";\nexport default function PageFile() {\n  betterAuth;\n  return <Page>bad</Page>;\n}\n`,
     );
     const result = await runOxlint(fixture);
     expect(result.status).not.toBe(0);

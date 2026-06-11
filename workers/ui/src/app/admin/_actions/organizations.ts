@@ -1,4 +1,4 @@
-import { authApiGetOrThrow, authApiPostOrThrow } from "@id/lib";
+import { authApiGetOrThrow, authApiPostOrThrow } from "@idco/lib";
 
 export type Organization = {
   id: string;

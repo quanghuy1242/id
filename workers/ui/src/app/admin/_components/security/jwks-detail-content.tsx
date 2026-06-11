@@ -16,7 +16,7 @@ import {
   Tabs,
   Text,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listAdminJwks as listAdminJwksAction,
   type AdminJwk,

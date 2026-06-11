@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import type { ActiveScope } from "@id/lib";
+import type { ActiveScope } from "@idco/lib";
 import {
   Badge,
   Button,
@@ -23,7 +23,7 @@ import {
   StatGroup,
   Text,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listBindings as listBindingsAction,
   createBinding as createBindingAction,

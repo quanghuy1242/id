@@ -2,7 +2,7 @@
 
 ## Component registry (all implemented)
 
-All components exist in `packages/ui/src/` with the exact props described in this spec:
+All components exist in `@idco/ui` with the exact props described in this spec:
 `AppShell`, `Topbar`, `TopbarStart`, `TopbarEnd`, `TopbarBrandLink`, `TopbarSearchField`, `TopbarBreadcrumb`, `TopbarAvatarMenu`,
 `Sidebar`, `SidebarLayout`, `MainContent`, `MobileDock`,
 `PageHeader`, `PageBody`, `PageSection`, `Panel`, `Stack`, `Inline`, `Grid`, `Columns`, `Spacer`,
@@ -27,7 +27,7 @@ All components exist in `packages/ui/src/` with the exact props described in thi
 
 **Icon names registered in nav-icons.tsx:** Activity, AppWindow, Bot, Building2, ChevronDown, ChevronLeft, ChevronRight,
 Ellipsis, FileCheck2, Fingerprint, Globe, HeartPulse, KeyRound, LayoutDashboard, Link2, Pencil, Plus, Server, Settings, Tags, Trash2, Users.
-Add new icons to `iconMap` in `packages/ui/src/nav-icons.tsx` before using them.
+Add new icons to `iconMap` in `/home/quanghuy1242/pjs/idco/packages/ui/src/nav-icons.tsx`, publish idco, then repin auth before using them.
 
 **Icon-only LinkButton:** Pass `iconName` + `ariaLabel` + `href` with no `children`.
 ```tsx
@@ -435,10 +435,10 @@ Notes:
   - Delete modal: compare typedEmail against user.email; disable Confirm until match.
   - Impersonate opens new session; redirect admin to /. On re-entering this page while impersonating,
     show "Stop Impersonating" button (detect via current session.impersonatedBy field).
-  - Avatar: no dedicated @id/ui Avatar component exists. Options:
+  - Avatar: no dedicated @idco/ui Avatar component exists. Options:
     a) Implement inline in the route file (one-off, acceptable for detail page).
     b) Skip avatar for now and just show text-only profile.
-    c) Create a small Avatar component in packages/ui/ if used in multiple pages.
+    c) Create a small Avatar component in idco's packages/ui if used in multiple pages.
     Prefer option (a) or (b) for initial implementation.
 
 ---

@@ -1,4 +1,4 @@
-import { Button, PageIntro, Stack } from "@id/ui";
+import { Button, PageIntro, Stack } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Page Intro" } satisfies StoryDefault;

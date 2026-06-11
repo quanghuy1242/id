@@ -15,7 +15,7 @@ vi.mock("@/lib/oauth-query", () => ({
   useOauthRequestDescription: () => "An application is requesting access.",
 }));
 
-vi.mock("@id/lib", () => ({
+vi.mock("@idco/lib", () => ({
   OAUTH_QUERY_PARAM: "oauth_query",
   authApiPost: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   authApiGetOrThrow: vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue([]),

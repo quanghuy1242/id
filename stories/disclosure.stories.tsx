@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureGroup, DescriptionList, Stack, Text } from "@id/ui";
+import { Disclosure, DisclosureGroup, DescriptionList, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Disclosure" } satisfies StoryDefault;

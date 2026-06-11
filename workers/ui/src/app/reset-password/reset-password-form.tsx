@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Form, Inline, LinkButton, Stack, TextInput } from "@id/ui";
+import { Alert, Button, Form, Inline, LinkButton, Stack, TextInput } from "@idco/ui";
 import { resetPassword } from "../account/_actions/account";
 
 function passwordError(value: string): string | undefined {

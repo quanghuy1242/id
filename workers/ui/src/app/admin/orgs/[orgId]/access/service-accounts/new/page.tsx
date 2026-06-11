@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { ApplicationCreateWizardContent } from "../../../../../_components/oauth/application-create-wizard-content";
 
 export default function OrgServiceAccountCreatePage() {

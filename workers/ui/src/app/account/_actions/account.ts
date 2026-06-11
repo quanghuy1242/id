@@ -1,6 +1,6 @@
 "use client";
 
-import { authApiGetOrThrow, authApiPost, authApiPostOrThrow } from "@id/lib";
+import { authApiGetOrThrow, authApiPost, authApiPostOrThrow } from "@idco/lib";
 
 export type AccountUser = {
   readonly id: string;

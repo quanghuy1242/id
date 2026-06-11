@@ -4,7 +4,7 @@ import {
   authApiPatchOrThrow,
   authApiDeleteOrThrow,
   type ActiveScope,
-} from "@id/lib";
+} from "@idco/lib";
 
 // ─── OAuth2 clients (applications) ────────────────────────────────
 // The OAuth2 endpoints speak snake_case (RFC 7591). `scope` is a

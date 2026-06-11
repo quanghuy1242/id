@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Badge, DataTable, type DataTableColumn, Inline, Stack, type SortDirection, Text } from "@id/ui";
+import { Badge, DataTable, type DataTableColumn, Inline, Stack, type SortDirection, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Data Table" } satisfies StoryDefault;

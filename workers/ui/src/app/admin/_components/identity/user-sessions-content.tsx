@@ -17,7 +17,7 @@ import {
   Stack,
   Text,
   toast,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   listUserSessions as listUserSessionsAction,
   revokeUserSession as revokeUserSessionAction,

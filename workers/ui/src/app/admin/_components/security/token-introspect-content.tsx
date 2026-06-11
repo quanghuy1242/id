@@ -18,7 +18,7 @@ import {
   StatGroup,
   Text,
   TextInput,
-} from "@id/ui";
+} from "@idco/ui";
 import {
   introspectToken as introspectTokenAction,
   type TokenIntrospectionResult,

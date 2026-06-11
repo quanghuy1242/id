@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ResourceSelector, type ResourceOption, Stack, Text } from "@id/ui";
+import { ResourceSelector, type ResourceOption, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / Resource Selector" } satisfies StoryDefault;

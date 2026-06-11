@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Form, Inline, Stack, Text, TextInput } from "@id/ui";
-import { authApiPost, authApiPostOrThrow, OAUTH_QUERY_PARAM } from "@id/lib";
+import { Alert, Badge, Button, Form, Inline, Stack, Text, TextInput } from "@idco/ui";
+import { authApiPost, authApiPostOrThrow, OAUTH_QUERY_PARAM } from "@idco/lib";
 import { useOauthQuery } from "@/lib/oauth-query";
 
 type RegistrationDecision =

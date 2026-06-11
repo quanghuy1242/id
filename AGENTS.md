@@ -78,18 +78,30 @@ When new findings appear, handle them autonomously:
 
 `pnpm@11.1.3` via corepack.
 
+## Shared idco design system workflow
+
+`@idco/ui` and `@idco/lib` are external dependencies owned by the sibling `~/pjs/idco` repo and published to GitHub Packages as `@quanghuy1242/idco-*`. They are not in-repo packages. This is not simple — read this before touching `@idco/*` deps, `.pnpmfile.cjs`, `.npmrc`, the lockfile, or the CI install. This mirrors the `content-api` setup; the user-facing summary is in README "The shared idco design system".
+
+- **The committed graph is always the registry graph.** `package.json` pins the published artifacts through committed npm aliases that keep the import name: `"@idco/ui": "npm:@quanghuy1242/idco-ui@^0.1.11"`. Never reintroduce a `link:`/`workspace:`/`file:` dependency, a `packages/ui`/`packages/lib` symlink, an `@idco/*` tsconfig path, or a CI script that rewrites these (the old `scripts/use-idco-registry.mjs` shim was removed precisely because it made the deployed graph differ from the committed one). CI installs `--frozen-lockfile`; auth comes from `actions/setup-node`.
+- **Local inner loop:** `pnpm dev:link` (sets `IDCO_LINK=1`) makes the env-gated `.pnpmfile.cjs` rewrite the `@idco/*` keys to `link:` against `~/pjs/idco` — `node_modules`-only, opt-in, no token, no committed-file change. `pnpm dev:unlink` returns to the published packages. Build idco (`pnpm build` or `tsc -w` there) so linked `dist` types are current. `pnpm check` runs fine in link mode; that is the normal dev state.
+- **Never commit a link-shaped lockfile.** A `dev:link` install rewrites `pnpm-lock.yaml` to `link:` entries. Run `pnpm check:lockfile` (also a CI step) before committing; CI `--frozen-lockfile` independently rejects the drift. The committed lockfile must describe the registry graph, regenerated with `pnpm dev:unlink` (registry-mode install) after idco has published the pinned versions.
+- **Shipping a cross-repo change is ordered:** publish idco first — bump versions in `~/pjs/idco`, `git tag vX.Y.Z && git push --tags` (the idco `publish` workflow verifies tag == versions and publishes) — then here run `pnpm update @idco/ui@latest` (re-pins and re-locks in one step), commit `package.json` + `pnpm-lock.yaml`, deploy. No float-to-latest, no git-SHA deps, no auto-versioning.
+- **Activation gate:** idco is published. Registry-mode install is the default; use link mode only for the local inner loop while editing `~/pjs/idco`.
+
 ## Admin UI
 
 Load the `id-admin-ui` skill when working on any of the following:
 
 - Any file under `workers/ui/src/app/admin/**`
-- Any component in `packages/ui/src/**`
+- Any auth route, story, or screen spec that composes `@idco/ui`
 - Any screen spec in `workers/ui/docs/screens/`
 - Any question about what components exist, what token values are, or what the screen spec format is
 
 The skill contains the full component registry, token reference, screen spec format, and hard rules. Do not implement admin UI pages without it.
 
-All admin UI `/api/auth` calls must use the type-safe helpers from `@id/lib` (`authApiGetOrThrow`, `authApiPostOrThrow`, `authApiGet`, `authApiPost`); never write raw `fetch()` against `/api/auth` in admin or UI action files.
+`@idco/ui` component implementation and package-level component tests live in the sibling `/home/quanghuy1242/pjs/idco` repo under `packages/ui/src/**` and `tests/ui/**`. Do not add package component tests under `workers/ui/tests`; auth tests should cover product pages, route composition, actions, SWR wiring, and consumer integration with the published package.
+
+All admin UI `/api/auth` calls must use the type-safe helpers from `@idco/lib` (`authApiGetOrThrow`, `authApiPostOrThrow`, `authApiGet`, `authApiPost`); never write raw `fetch()` against `/api/auth` in admin or UI action files.
 
 **Hard gate:** A new `/admin` route file must not be created before a corresponding spec entry exists in `workers/ui/docs/screens/<section>.md`. Draft the spec, get approval, then implement. The spec must contain at minimum the ASCII sketch, the `Components:` block, and the `Data:` line.
 

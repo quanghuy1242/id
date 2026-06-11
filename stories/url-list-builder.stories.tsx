@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Stack, Text, UrlListBuilder } from "@id/ui";
+import { Stack, Text, UrlListBuilder } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / URL List Builder" } satisfies StoryDefault;

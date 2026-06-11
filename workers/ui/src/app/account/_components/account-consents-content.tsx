@@ -16,7 +16,7 @@ import {
   Text,
   toast,
   type DataTableColumn,
-} from "@id/ui";
+} from "@idco/ui";
 import { accountConsentsKey } from "../_data/swr-keys";
 import { defaultAccountActions, type AccountActions, type AccountConsent } from "../_actions/account";
 import { shortDateLabel } from "./account-format";

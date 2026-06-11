@@ -1,4 +1,4 @@
-import { Button, JsonViewer, Stack, Text } from "@id/ui";
+import { Button, JsonViewer, Stack, Text } from "@idco/ui";
 import type { Story, StoryDefault } from "@ladle/react";
 
 export default { title: "Packages UI / JSON Viewer" } satisfies StoryDefault;

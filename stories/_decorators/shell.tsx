@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { SWRConfig } from "swr";
-import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@id/lib";
-import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock, ToastRegion } from "@id/ui";
+import type { ConsolePermission, ConsoleScope, ConsoleScopeEnvelope } from "@idco/lib";
+import { AppShell, Topbar, SidebarLayout, Sidebar, MainContent, MobileDock, ToastRegion } from "@idco/ui";
 import {
   AdminTopbar,
   AdminSidebarNav,

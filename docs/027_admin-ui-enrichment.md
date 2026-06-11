@@ -87,7 +87,7 @@ This document is **redesign-first**: most of its length is in §5 (components) a
 
 ## 2. System Summary
 
-The admin UI is the `ui-id` worker. Every `/admin/*` route is a thin composition file that assembles `@id/ui` primitives; data lives in content components that fetch through `useSWR` and injected `actions` (see [docs/023](023_admin-screen-story-strategy.md), [docs/025](025_admin-ui-swr-caching-strategy.md)). The chrome (`AppShell > Topbar + SidebarLayout(Sidebar + MainContent) + MobileDock`) is fixed; pages render inside `PageBody`. Cross-navigation caching is manual-revalidation SWR keyed on server params only.
+The admin UI is the `ui-id` worker. Every `/admin/*` route is a thin composition file that assembles `@idco/ui` primitives; data lives in content components that fetch through `useSWR` and injected `actions` (see [docs/023](023_admin-screen-story-strategy.md), [docs/025](025_admin-ui-swr-caching-strategy.md)). The chrome (`AppShell > Topbar + SidebarLayout(Sidebar + MainContent) + MobileDock`) is fixed; pages render inside `PageBody`. Cross-navigation caching is manual-revalidation SWR keyed on server params only.
 
 Data flows from the `core-id` worker's Better Auth endpoints under `/api/auth/*`. Users come from the Better Auth **admin** plugin (`/api/auth/admin/*`, server-side search + pagination); organizations, teams, members, and invitations from the **organization** plugin (`/api/auth/organization/*`, list-and-filter). The OAuth2 client API is snake_case (RFC 7591); admin aggregate reads (sessions, tokens, consents, JWKS metadata) come from the `admin-audit` plugin ([docs/026](026_admin-oauth-security-screens-and-api-contracts.md)). Custom tables are Better Auth plugin schemas; `workers/core/src/db/schema.ts` stays empty.
 
@@ -98,7 +98,7 @@ Data flows from the `core-id` worker's Better Auth endpoints under `/api/auth/*`
 - Files: [applications-content.tsx](../workers/ui/src/app/admin/_components/oauth/applications-content.tsx), route [oauth/applications/page.tsx](../workers/ui/src/app/admin/oauth/applications), actions `_actions/oauth.ts`, SWR key `oauthClientsKey()`.
 - The page is **already more advanced than its spec**: a `DataTable<OAuthClient>` (Application / Type / Redirects / Scopes / Grants / Actions), a `SearchInput` over `client_name` + `client_id`, and a **tabbed `ConfirmDialog`** create flow (RadioGroup type → Name → auth method → `Tabs[Access, Metadata]`). `clientType()` derives M2M / Public / Confidential from `grant_types` + `token_endpoint_auth_method`.
 - Mutations are pessimistic: `createClient`/`updateClient`/`rotateClientSecret`/`deleteClient`, each followed by `mutate()`. Secret reveal is a show-once `ConfirmDialog` + `CodeBlock`.
-- `Textarea`, `PageIntro`, `DataTable`, `ConfirmDialog`, `Tabs`, `RadioGroup` all exist in `@id/ui` (the skill registry omits `Textarea` — it is present and used here).
+- `Textarea`, `PageIntro`, `DataTable`, `ConfirmDialog`, `Tabs`, `RadioGroup` all exist in `@idco/ui` (the skill registry omits `Textarea` — it is present and used here).
 
 **Problems.** Everything is crammed into one route: no per-client detail surface, no connections/audit/quickstart home, free-text redirect URIs (no validation), space-delimited free-text scopes (no catalog autocomplete), and a tall branching create modal.
 
@@ -156,8 +156,8 @@ Any **[Repo]** item carries a one-line justification of why the relevant standar
 
 ### 4.2 UI invariants (inherited, non-negotiable)
 
-- Route files compose `@id/ui` only: no raw HTML tags, no DaisyUI classes, no Tailwind visual utilities, no `react-aria-components`/`lucide-react` imports, no `useSearchParams`/`useRouter` inside content components. New visual control is added as **typed props on a component**, never as `className`.
-- New `packages/ui` files: DaisyUI cite comment on line 1, side-effect-free at module scope (`sideEffects: false`), default size `md`, tests under `workers/ui/tests/packages-ui/`, registry update.
+- Route files compose `@idco/ui` only: no raw HTML tags, no DaisyUI classes, no Tailwind visual utilities, no `react-aria-components`/`lucide-react` imports, no `useSearchParams`/`useRouter` inside content components. New visual control is added as **typed props on a component**, never as `className`.
+- New `@idco/ui` files live in the sibling idco repo: DaisyUI cite comment on line 1, side-effect-free at module scope (`sideEffects: false`), default size `md`, tests under `/home/quanghuy1242/pjs/idco/tests/ui/`, registry update after auth repins.
 - New `/admin` routes are gated on a screen spec in `workers/ui/docs/screens/`.
 - Content components own their data via `useSWR` with keys built from `_data/swr-keys.ts`; mutations are pessimistic with cross-surface invalidation by predicate.
 
@@ -188,7 +188,7 @@ The first draft of this plan under-credited React Aria. Correction and posture:
 
 ## 5. Component Toolkit (Detailed)
 
-Each component below is specified to implementation grade: file path, DaisyUI cite, React Aria base, typed prop surface, internal class mapping, states, and an ASCII anatomy. All live in `packages/ui/src/`, export from `packages/ui/src/index.ts`, register in the `id-admin-ui` skill registry on add, and carry tests under `workers/ui/tests/packages-ui/` (registered in `tests/all.test.ts`).
+Each component below is specified to implementation grade: file path, DaisyUI cite, React Aria base, typed prop surface, internal class mapping, states, and an ASCII anatomy. These components now live in `/home/quanghuy1242/pjs/idco/packages/ui/src/`, export from idco's `packages/ui/src/index.ts`, register in the `id-admin-ui` skill registry after auth repins, and carry package tests under `/home/quanghuy1242/pjs/idco/tests/ui/`.
 
 ### 5.1 StatGroup / Stat
 
@@ -601,7 +601,7 @@ Run `pnpm check` and `pnpm deploy:ui:dry-run` at each phase boundary.
 
 ## 16. Definition Of Done
 
-- All §5 components exist in `@id/ui`, exported, registered in the skill, with tests; `pnpm check` green. `ScopeBuilder` and `ResourceSelector` are built on `Autocomplete` + `TagGroup`/`ListBox` + `useListData`/`useAsyncList`/`useFilter` (not bespoke).
+- All §5 components exist in `@idco/ui`, exported, registered in the skill, with tests; `pnpm check` green. `ScopeBuilder` and `ResourceSelector` are built on `Autocomplete` + `TagGroup`/`ListBox` + `useListData`/`useAsyncList`/`useFilter` (not bespoke).
 - Grants section (§6) unified under `/admin/security` with URL-addressable tabs; old path redirects; specs updated.
 - `admin-activity-log` plugin exists with generated schema, read endpoint, and write integration on client/scope/JWKS/binding/user/team mutations; a test asserts no secret material is logged.
 - JWKS, OAuth Applications, **Identity (users/orgs)**, and Scope Catalog match §7–§10: stats headers, detail routes, builder/selector inputs, emergency-rotate (JWKS), creation wizard (Applications), `ResourceSelector` for team membership (Identity), bulk import (Scopes). Every entity exposes an Audit tab fed by `admin-activity-log`.

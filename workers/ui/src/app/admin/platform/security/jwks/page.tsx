@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PageBody } from "@id/ui";
+import { PageBody } from "@idco/ui";
 import { JwksContent } from "../../../_components/security/jwks-content";
 
 export default function PlatformSecurityJwksPage() {
