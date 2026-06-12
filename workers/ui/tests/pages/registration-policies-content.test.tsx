@@ -6,6 +6,20 @@ import { renderWithSwr as render } from "../_utils/swr-render";
 import { RegistrationPoliciesContent } from "@/app/admin/_components/access/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "@/app/admin/_mocks/registration-policies";
 import type { RegistrationPolicy, RegistrationPolicyFormInput } from "@/app/admin/_actions/registration-policies";
+import type { OAuthClient } from "@/app/admin/_actions/oauth";
+
+const mockClients: OAuthClient[] = [
+  {
+    client_id: "cli_content_web",
+    client_name: "Content Web",
+    redirect_uris: ["https://content.example.test/callback"],
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "client_secret_basic",
+    scope: "openid profile email",
+    type: "web",
+  },
+];
 
 function pressTrigger(button: HTMLElement) {
   button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
@@ -64,6 +78,11 @@ function makeActions(policies: RegistrationPolicy[]) {
     pauseRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "paused")),
     archiveRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "archived")),
     listRegistrationPolicyIntents: vi.fn<() => Promise<typeof mockRegistrationIntents>>().mockResolvedValue(mockRegistrationIntents),
+    listClients: vi.fn<() => Promise<OAuthClient[]>>().mockResolvedValue(mockClients),
+    listResourceServers: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    listScopes: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    listOrganizations: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    listTeams: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
   };
 }
 
@@ -102,22 +121,35 @@ describe("RegistrationPoliciesContent", () => {
     await waitFor(() => expect(actions.pauseRegistrationPolicy).toHaveBeenCalledWith("regpol_content_beta"));
   });
 
-  it("creates a client registration policy from the dialog", async () => {
+  it("creates a client registration policy by picking a client and building scopes", async () => {
     const actions = makeActions(mockRegistrationPolicies);
     render(<RegistrationPoliciesContent actions={actions} />);
     await waitFor(() => expect(screen.getByText("Content beta")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /new policy/i }));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Client launch" } });
     fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "client-launch" } });
-    fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "client_launch" } });
-    fireEvent.change(screen.getByLabelText("Allowed scopes"), { target: { value: "openid profile content:read" } });
-    fireEvent.change(screen.getByLabelText("Quota limit"), { target: { value: "25" } });
+
+    // Pick the OAuth client from the picker instead of typing a raw id.
+    pressTrigger(screen.getByRole("button", { name: /^client$/i }));
+    fireEvent.click(await screen.findByText("Content Web"));
+
+    // Build an allowed scope via the catalog-aware scope builder.
+    pressTrigger(screen.getByRole("button", { name: /allowed scopes/i }));
+    const scopeSearch = await screen.findByRole("searchbox", { name: /search allowed scopes/i });
+    fireEvent.change(scopeSearch, { target: { value: "content:read" } });
+    fireEvent.keyDown(scopeSearch, { key: "Enter" });
+
+    // Set quota via the number field.
+    const quota = screen.getByRole("textbox", { name: /quota limit/i });
+    fireEvent.change(quota, { target: { value: "25" } });
+    fireEvent.blur(quota);
+
     fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
     await waitFor(() => expect(actions.createRegistrationPolicy).toHaveBeenCalledWith(expect.objectContaining({
       slug: "client-launch",
       name: "Client launch",
-      clientId: "client_launch",
-      allowedScopes: ["openid", "profile", "content:read"],
+      clientId: "cli_content_web",
+      allowedScopes: expect.arrayContaining(["content:read"]),
       quotaLimit: 25,
     })));
   });

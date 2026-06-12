@@ -31,12 +31,15 @@ Platform and organization lenses for registration admission policy. Legacy `/adm
 │                  │ ┌── New/Edit Policy modal ────────────────────┐ │
 │                  │ │ Name [Content beta] Slug [content-beta]     │ │
 │                  │ │ Mode ○ Client ● Invite ○ Public             │ │
-│                  │ │ Client ID [content-ui] Org ID [org_acme]    │ │
-│                  │ │ Scopes [openid profile content:read]        │ │
-│                  │ │ Domains [acme.com beta.acme.com]            │ │
-│                  │ │ Quota [1000] Target ○ Accounts ● Membership │ │
-│                  │ │ Require email verification ●                │ │
-│                  │ │ Starts [2026-06-01] Expires [2026-07-01]    │ │
+│                  │ │ Client  [▼ Content Web      ] (picker)      │ │
+│                  │ │ Org     [▼ Acme Inc         ] (picker)      │ │
+│                  │ │ Resource[▼ Content API      ] (picker)      │ │
+│                  │ │ Scopes  [+ openid][+ content:read] (builder)│ │
+│                  │ │ Domains [acme.com✕][beta.acme.com✕] (chips) │ │
+│                  │ │ Teams   [▼ Readers ✕][▼ +add] (multi pick)  │ │
+│                  │ │ Quota   [− 1000 +] Target ○ Acct ● Member   │ │
+│                  │ │ Require email verification (toggle) ●       │ │
+│                  │ │ Starts [📅 2026-06-01 09:00][cal] Expires…  │ │
 │                  │ │                         [Cancel] [Save]     │ │
 │                  │ └──────────────────────────────────────────────┘ │
 └──────────────────┴──────────────────────────────────────────────────┘
@@ -79,17 +82,17 @@ Components:
         TextInput(label="Name", name="name", required)
         TextInput(label="Slug", name="slug", required)
         RadioGroup(title="Mode", name="mode", options=[client_initiated,invite_only,public_limited], defaultValue)
-        TextInput(label="Client ID", name="clientId")
-        TextInput(label="Organization ID", name="organizationId")
-        TextInput(label="Resource server ID", name="resourceServerId")
-        TextInput(label="Allowed scopes", name="allowedScopes")
-        TextInput(label="Email domains", name="emailDomains")
-        TextInput(label="Default team IDs", name="defaultTeamIds")
-        TextInput(label="Quota limit", name="quotaLimit")
+        ResourceSelector(kind="oauth-client", label="Client", variant="menu", name="clientId", value=form.clientId, onChange, source=sync clientOptions)
+        ResourceSelector(kind="organization", label="Organization", variant="menu", name="organizationId", value=form.organizationId, onChange, source=sync organizationOptions)
+        ResourceSelector(kind="resource-server", label="Resource server", variant="menu", name="resourceServerId", value=form.resourceServerId, onChange, source=sync resourceServerOptions)
+        ScopeBuilder(label="Allowed scopes", name="allowedScopes", variant="menu", allowCustom, value=form.allowedScopes, onChange, suggestions=scopeSuggestions from oauth-scopes catalog)
+        TagInput(label="Email domains", name="emailDomains", validate=defaultDomainValidate, normalize=lowercase, value=form.emailDomains, onChange)
+        ResourceSelector(kind="team", label="Default teams", variant="menu", selectionMode="multiple", name="defaultTeamIds", value=form.defaultTeamIds, onChange, source=sync teamOptions for selected org)
+        NumberInput(label="Quota limit", name="quotaLimit", minValue=1, value=form.quotaLimit, onChange, description)
         RadioGroup(title="Quota target", name="quotaTarget", options=[memberships,accounts], defaultValue)
-        Switch(label="Require email verification", name="requiresEmailVerification", selected, onChange)
-        TextInput(label="Starts at", name="startsAt")
-        TextInput(label="Expires at", name="expiresAt")
+        Switch(label="Require email verification", selected=form.requiresEmailVerification, onChange)
+        DateTimeInput(label="Starts at", name="startsAt", value=form.startsAt, onChange)
+        DateTimeInput(label="Expires at", name="expiresAt", value=form.expiresAt, onChange)
 
 Data: GET /api/auth/admin/registration-policies → { policies: RegistrationPolicy[] }
       POST /api/auth/admin/registration-policies body: { slug, name, mode, clientId?, organizationId?, resourceServerId?, allowedScopes, emailDomains, defaultRole: "member", defaultTeamIds, quotaLimit?, quotaTarget, requiresEmailVerification, startsAt?, expiresAt? } → RegistrationPolicy
@@ -98,6 +101,12 @@ Data: GET /api/auth/admin/registration-policies → { policies: RegistrationPoli
       POST /api/auth/admin/registration-policies/:id/pause → RegistrationPolicy, invalidates active intents
       POST /api/auth/admin/registration-policies/:id/archive → RegistrationPolicy, invalidates active intents
       GET /api/auth/admin/registration-policies/:id/intents → { intents: RegistrationIntent[] }
+      Dialog picker catalogs (lazy, dialog-open only):
+        GET /api/auth/oauth2/get-clients → OAuthClient[] (client picker)
+        GET /api/auth/organization/list → Organization[] (org picker)
+        GET /api/auth/admin/resource-servers → { resourceServers } (resource picker)
+        GET /api/auth/admin/oauth-scopes → { oauthScopes } (scope suggestions)
+        GET /api/auth/organization/list-teams?organizationId → Team[] (default-team picker)
 
 Route URL params: q, status, sortBy, sortDir, selected
 Content defaults: q="", status="all", sortBy="updatedAt", sortDirection="desc"
@@ -107,7 +116,8 @@ Behavior:
   - Search and status filter are client-side over the fetched policy list; the SWR key contains only the active scope.
   - Platform route sends no organization param; org route passes the active organization scope and defaults the create/edit organization field to that org id.
   - New Policy opens a dialog and creates a draft policy. Edit opens the same dialog prefilled from the selected policy. Successful create/update refreshes the policy list, selects the saved row, and renders toast feedback.
-  - Allowed scopes, email domains, and default team ids are typed as space/comma-separated values in the dialog and sent as arrays to the plugin endpoint.
+  - The dialog never asks the operator to type identifiers. Client, organization, and resource server are chosen with `ResourceSelector` pickers; allowed scopes use the catalog-aware `ScopeBuilder`; email domains use validated `TagInput` chips; default teams use a multi-select `ResourceSelector` scoped to the selected organization; quota uses `NumberInput`; start/expiry use `DateTimeInput` (segmented field + calendar). The hidden inputs each control emits feed the same FormData submission, and number/date/toggle values are read from the controlled form state.
+  - The picker catalogs are fetched lazily only while the dialog is open (`oauthClientsKey`, `orgsListKey`, `resourceServersKey`, `oauthScopesKey`, and `orgTeamsKey` for the chosen org), so closed-dialog navigation pays no extra request.
   - Enable/Pause/Archive call actions, refresh the policy list and selected intent detail, and render toast feedback.
   - Pause and Archive are operational close-switches: active started/submitted intents become unusable in core before any account can be created.
   - UI displays client IDs, organization IDs, scopes, domains, and quota values returned by the server; it never trusts OAuth request text or client-supplied display names.

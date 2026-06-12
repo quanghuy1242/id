@@ -3,11 +3,70 @@ import { PageBody } from "@idco/ui";
 import { RegistrationPoliciesContent } from "../../workers/ui/src/app/admin/_components/access/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "../../workers/ui/src/app/admin/_mocks/registration-policies";
 import type { RegistrationPolicy, RegistrationPolicyFormInput } from "../../workers/ui/src/app/admin/_actions/registration-policies";
+import type { OAuthClient, OAuthResourceScope, ResourceServer } from "../../workers/ui/src/app/admin/_actions/oauth";
+import type { Organization, Team } from "../../workers/ui/src/app/admin/_actions/organizations";
 import { AdminShell } from "../_decorators/shell";
 
 export default { title: "Admin / Access / Registration Policies" } satisfies StoryDefault;
 
 const platformPath = "/admin/platform/access/registration-policies";
+
+const mockClients: OAuthClient[] = [
+  {
+    client_id: "cli_content_web",
+    client_name: "Content Web",
+    redirect_uris: ["https://content.example.test/callback"],
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "client_secret_basic",
+    scope: "openid profile email",
+    type: "web",
+  },
+  {
+    client_id: "cli_mobile",
+    client_name: "Mobile App",
+    redirect_uris: ["com.acme.app://callback"],
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    scope: "openid profile",
+    type: "native",
+    public: true,
+  },
+];
+
+const mockOrganizations: Organization[] = [
+  { id: "org_001", name: "Acme Inc", slug: "acme", logo: null, metadata: null, createdAt: new Date().toISOString() },
+  { id: "org_002", name: "Globex", slug: "globex", logo: null, metadata: null, createdAt: new Date().toISOString() },
+];
+
+const mockResourceServers: ResourceServer[] = [
+  {
+    id: "rs_content",
+    organizationId: null,
+    slug: "content-api",
+    name: "Content API",
+    audience: "https://content.example.test",
+    description: "Content delivery API",
+    enabled: true,
+    createdBy: "admin",
+    updatedBy: "admin",
+    disabledAt: null,
+    disabledBy: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  },
+];
+
+const mockScopes: OAuthResourceScope[] = [
+  { id: "sc_read", resourceServerId: "rs_content", scope: "content:read", description: "Read content", enabled: true, createdBy: "admin", updatedBy: "admin", createdAt: Date.now(), updatedAt: Date.now() },
+  { id: "sc_write", resourceServerId: "rs_content", scope: "content:write", description: "Write content", enabled: true, createdBy: "admin", updatedBy: "admin", createdAt: Date.now(), updatedAt: Date.now() },
+];
+
+const mockTeams: Team[] = [
+  { id: "team_readers", name: "Readers", organizationId: "org_001", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "team_writers", name: "Writers", organizationId: "org_001", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+];
 
 function actions(policies: RegistrationPolicy[]) {
   let current = [...policies];
@@ -59,6 +118,11 @@ function actions(policies: RegistrationPolicy[]) {
     pauseRegistrationPolicy: (id: string) => setStatus(id, "paused"),
     archiveRegistrationPolicy: (id: string) => setStatus(id, "archived"),
     listRegistrationPolicyIntents: async () => mockRegistrationIntents,
+    listClients: async () => mockClients,
+    listResourceServers: async () => mockResourceServers,
+    listScopes: async () => mockScopes,
+    listOrganizations: async () => mockOrganizations,
+    listTeams: async () => mockTeams,
   };
 }
 

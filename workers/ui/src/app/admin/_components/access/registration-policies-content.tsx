@@ -5,7 +5,6 @@ import useSWR from "swr";
 import {
   Badge,
   Button,
-  ConfirmDialog,
   DataTable,
   type DataTableColumn,
   DescriptionList,
@@ -15,15 +14,14 @@ import {
   Inline,
   PageIntro,
   Panel,
-  RadioGroup,
+  type ResourceOption,
+  type ScopeSuggestion,
   SearchInput,
   Skeleton,
   Stack,
   Stat,
   StatGroup,
-  Switch,
   Text,
-  TextInput,
   toast,
 } from "@idco/ui";
 import type { ActiveScope } from "@idco/lib";
@@ -36,11 +34,34 @@ import {
   pauseRegistrationPolicy as pauseRegistrationPolicyAction,
   updateRegistrationPolicy as updateRegistrationPolicyAction,
   type RegistrationIntent,
-  type RegistrationPolicyFormInput,
   type RegistrationPolicy,
   type RegistrationPolicyStatus,
 } from "../../_actions/registration-policies";
-import { registrationPoliciesKey, registrationPolicyIntentsKey } from "@/app/admin/_data/swr-keys";
+import {
+  listClients as listClientsAction,
+  listResourceServers as listResourceServersAction,
+  listScopes as listScopesAction,
+} from "../../_actions/oauth";
+import {
+  listOrganizations as listOrganizationsAction,
+  listTeams as listTeamsAction,
+} from "../../_actions/organizations";
+import {
+  oauthClientsKey,
+  oauthScopesKey,
+  orgTeamsKey,
+  orgsListKey,
+  registrationPoliciesKey,
+  registrationPolicyIntentsKey,
+  resourceServersKey,
+} from "@/app/admin/_data/swr-keys";
+import {
+  PolicyDialog,
+  type PolicyDialogState,
+  type PolicyFormState,
+  initialFormState,
+  policyInputFromForm,
+} from "./registration-policy-dialog";
 
 const platformScope: ActiveScope = { kind: "platform" };
 const statusOptions = [
@@ -49,15 +70,6 @@ const statusOptions = [
   { value: "enabled", label: "Enabled" },
   { value: "paused", label: "Paused" },
   { value: "archived", label: "Archived" },
-];
-const modeOptions = [
-  { value: "client_initiated", label: "Client initiated" },
-  { value: "invite_only", label: "Invite only" },
-  { value: "public_limited", label: "Public limited" },
-];
-const quotaTargetOptions = [
-  { value: "memberships", label: "Memberships" },
-  { value: "accounts", label: "Accounts" },
 ];
 
 const defaultActions = {
@@ -68,6 +80,11 @@ const defaultActions = {
   pauseRegistrationPolicy: pauseRegistrationPolicyAction,
   archiveRegistrationPolicy: archiveRegistrationPolicyAction,
   listRegistrationPolicyIntents: listRegistrationPolicyIntentsAction,
+  listClients: listClientsAction,
+  listResourceServers: listResourceServersAction,
+  listScopes: listScopesAction,
+  listOrganizations: listOrganizationsAction,
+  listTeams: listTeamsAction,
 };
 
 type RegistrationPoliciesActions = typeof defaultActions;
@@ -135,71 +152,6 @@ function sortPolicies(policies: readonly RegistrationPolicy[], sortBy: string, s
   });
 }
 
-type PolicyDialogState =
-  | { readonly mode: "create"; readonly requiresEmailVerification: boolean }
-  | { readonly mode: "edit"; readonly policy: RegistrationPolicy; readonly requiresEmailVerification: boolean };
-
-function textValue(value: FormDataEntryValue | null): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function nullableText(value: FormDataEntryValue | null): string | null {
-  const text = textValue(value);
-  return text ? text : null;
-}
-
-function splitList(value: FormDataEntryValue | null): string[] {
-  const text = textValue(value);
-  if (!text) return [];
-  return text.split(/[\s,]+/u).map((entry) => entry.trim()).filter(Boolean);
-}
-
-function optionalPositiveInteger(value: FormDataEntryValue | null, label: string): number | null {
-  const text = textValue(value);
-  if (!text) return null;
-  const parsed = Number(text);
-  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${label} must be a positive integer.`);
-  return parsed;
-}
-
-function optionalTimestamp(value: FormDataEntryValue | null, label: string): number | null {
-  const text = textValue(value);
-  if (!text) return null;
-  const numeric = Number(text);
-  if (Number.isInteger(numeric) && numeric > 0) return numeric;
-  const parsed = Date.parse(text);
-  if (Number.isNaN(parsed)) throw new Error(`${label} must be a timestamp or a date string.`);
-  return parsed;
-}
-
-function policyInputFromForm(formData: FormData, requiresEmailVerification: boolean): RegistrationPolicyFormInput {
-  const name = textValue(formData.get("name"));
-  const slug = textValue(formData.get("slug"));
-  if (!name) throw new Error("Name is required.");
-  if (!slug) throw new Error("Slug is required.");
-  return {
-    slug,
-    name,
-    mode: textValue(formData.get("mode")) || "client_initiated",
-    clientId: nullableText(formData.get("clientId")),
-    organizationId: nullableText(formData.get("organizationId")),
-    resourceServerId: nullableText(formData.get("resourceServerId")),
-    allowedScopes: splitList(formData.get("allowedScopes")),
-    emailDomains: splitList(formData.get("emailDomains")),
-    defaultRole: "member",
-    defaultTeamIds: splitList(formData.get("defaultTeamIds")),
-    quotaLimit: optionalPositiveInteger(formData.get("quotaLimit"), "Quota limit"),
-    quotaTarget: (textValue(formData.get("quotaTarget")) || "memberships") as "accounts" | "memberships",
-    requiresEmailVerification,
-    startsAt: optionalTimestamp(formData.get("startsAt"), "Starts at"),
-    expiresAt: optionalTimestamp(formData.get("expiresAt"), "Expires at"),
-  };
-}
-
-function listValue(values: readonly string[]): string {
-  return values.join(" ");
-}
-
 const intentColumns: DataTableColumn<RegistrationIntent>[] = [
   { key: "email", label: "Email", render: (intent) => intent.email ?? "—" },
   { key: "status", label: "Status", render: (intent) => <Badge tone={statusTone(intent.status)}>{intent.status}</Badge> },
@@ -221,6 +173,7 @@ export function RegistrationPoliciesContent({
   const [internalSortDirection, setInternalSortDirection] = useState<"asc" | "desc">("desc");
   const [internalSelectedId, setInternalSelectedId] = useState<string | undefined>();
   const [policyDialog, setPolicyDialog] = useState<PolicyDialogState | null>(null);
+  const [form, setForm] = useState<PolicyFormState>(() => initialFormState(null, scope));
   const [policyDialogError, setPolicyDialogError] = useState<string | undefined>();
 
   const search = props.search ?? internalSearch;
@@ -237,6 +190,10 @@ export function RegistrationPoliciesContent({
     setInternalSortDirection(dir);
   });
 
+  function setField<K extends keyof PolicyFormState>(key: K, value: PolicyFormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
   const { data, isLoading, error, mutate } = useSWR(
     loadingOverride || errorOverride ? null : registrationPoliciesKey(scope),
     () => actions.listRegistrationPolicies(scope),
@@ -248,6 +205,55 @@ export function RegistrationPoliciesContent({
   const { data: intents, isLoading: intentsLoading, error: intentsError, mutate: mutateIntents } = useSWR(
     selectedPolicy && !loadingOverride && !errorOverride ? registrationPolicyIntentsKey(selectedPolicy.id) : null,
     () => actions.listRegistrationPolicyIntents(selectedPolicy!.id),
+  );
+
+  // Catalogs powering the create/edit pickers — only fetched while the dialog is open.
+  const dialogOpen = policyDialog !== null;
+  const { data: clients } = useSWR(
+    dialogOpen ? oauthClientsKey(scope) : null,
+    () => actions.listClients(scope),
+  );
+  const { data: organizations } = useSWR(
+    dialogOpen ? orgsListKey() : null,
+    () => actions.listOrganizations(),
+  );
+  const { data: resourceServers } = useSWR(
+    dialogOpen ? resourceServersKey(scope) : null,
+    () => actions.listResourceServers(scope),
+  );
+  const { data: scopeCatalog } = useSWR(
+    dialogOpen ? oauthScopesKey(scope) : null,
+    () => actions.listScopes(scope),
+  );
+  const { data: teams } = useSWR(
+    dialogOpen && form.organizationId ? orgTeamsKey(form.organizationId) : null,
+    () => actions.listTeams(form.organizationId),
+  );
+
+  const clientOptions = useMemo<ResourceOption[]>(
+    () => (clients ?? []).map((client) => ({
+      id: client.client_id,
+      label: client.client_name || client.client_id,
+      sublabel: client.client_id,
+      badge: client.type ?? (client.public ? "public" : undefined),
+    })),
+    [clients],
+  );
+  const organizationOptions = useMemo<ResourceOption[]>(
+    () => (organizations ?? []).map((org) => ({ id: org.id, label: org.name || org.slug, sublabel: org.slug })),
+    [organizations],
+  );
+  const resourceServerOptions = useMemo<ResourceOption[]>(
+    () => (resourceServers ?? []).map((server) => ({ id: server.id, label: server.name, sublabel: server.audience })),
+    [resourceServers],
+  );
+  const teamOptions = useMemo<ResourceOption[]>(
+    () => (teams ?? []).map((team) => ({ id: team.id, label: team.name, sublabel: team.id })),
+    [teams],
+  );
+  const scopeSuggestions = useMemo<ScopeSuggestion[]>(
+    () => (scopeCatalog ?? []).map((entry) => ({ value: entry.scope, description: entry.description ?? undefined })),
+    [scopeCatalog],
   );
 
   const filteredPolicies = useMemo(
@@ -281,7 +287,7 @@ export function RegistrationPoliciesContent({
     if (!policyDialog) return true;
     setPolicyDialogError(undefined);
     try {
-      const input = policyInputFromForm(formData, policyDialog.requiresEmailVerification);
+      const input = policyInputFromForm(formData, form);
       const saved = policyDialog.mode === "create"
         ? await actions.createRegistrationPolicy(input)
         : await actions.updateRegistrationPolicy(policyDialog.policy.id, input);
@@ -301,12 +307,14 @@ export function RegistrationPoliciesContent({
 
   function openCreateDialog() {
     setPolicyDialogError(undefined);
-    setPolicyDialog({ mode: "create", requiresEmailVerification: true });
+    setForm(initialFormState(null, scope));
+    setPolicyDialog({ mode: "create" });
   }
 
   function openEditDialog(policy: RegistrationPolicy) {
     setPolicyDialogError(undefined);
-    setPolicyDialog({ mode: "edit", policy, requiresEmailVerification: policy.requiresEmailVerification });
+    setForm(initialFormState(policy, scope));
+    setPolicyDialog({ mode: "edit", policy });
   }
 
   const policyColumns: DataTableColumn<RegistrationPolicy>[] = [
@@ -428,80 +436,19 @@ export function RegistrationPoliciesContent({
       ) : null}
       <PolicyDialog
         state={policyDialog}
-        scope={scope}
+        form={form}
+        setField={setField}
         error={policyDialogError}
+        clientOptions={clientOptions}
+        organizationOptions={organizationOptions}
+        resourceServerOptions={resourceServerOptions}
+        teamOptions={teamOptions}
+        scopeSuggestions={scopeSuggestions}
         onOpenChange={(open) => {
           if (!open) setPolicyDialog(null);
-        }}
-        onRequiresEmailVerificationChange={(selected) => {
-          setPolicyDialog((current) => current ? { ...current, requiresEmailVerification: selected } : current);
         }}
         onConfirm={submitPolicyDialog}
       />
     </Stack>
-  );
-}
-
-function PolicyDialog({
-  state,
-  scope,
-  error,
-  onOpenChange,
-  onRequiresEmailVerificationChange,
-  onConfirm,
-}: {
-  readonly state: PolicyDialogState | null;
-  readonly scope: ActiveScope;
-  readonly error?: string;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly onRequiresEmailVerificationChange: (selected: boolean) => void;
-  readonly onConfirm: (formData: FormData) => Promise<boolean>;
-}) {
-  const policy = state?.mode === "edit" ? state.policy : null;
-  const organizationId = policy?.organizationId ?? (scope.kind === "organization" ? scope.organizationId : "");
-  return (
-    <ConfirmDialog
-      open={state !== null}
-      onOpenChange={onOpenChange}
-      title={policy ? "Edit Registration Policy" : "New Registration Policy"}
-      description="Policy changes affect hosted registration immediately. Disabled clients still cannot create accounts unless policy and OAuth checks both pass."
-      confirmLabel={policy ? "Save" : "Create"}
-      error={error}
-      onConfirm={onConfirm}
-    >
-      <Stack gap="sm">
-        <TextInput label="Name" name="name" required defaultValue={policy?.name ?? ""} />
-        <TextInput label="Slug" name="slug" required defaultValue={policy?.slug ?? ""} />
-        <RadioGroup
-          title="Mode"
-          name="mode"
-          options={modeOptions}
-          defaultValue={policy?.mode ?? "client_initiated"}
-          required
-        />
-        <TextInput label="Client ID" name="clientId" defaultValue={policy?.clientId ?? ""} />
-        <TextInput label="Organization ID" name="organizationId" defaultValue={organizationId} />
-        <TextInput label="Resource server ID" name="resourceServerId" defaultValue={policy?.resourceServerId ?? ""} />
-        <TextInput label="Allowed scopes" name="allowedScopes" defaultValue={policy ? listValue(policy.allowedScopes) : ""} />
-        <TextInput label="Email domains" name="emailDomains" defaultValue={policy ? listValue(policy.emailDomains) : ""} />
-        <TextInput label="Default team IDs" name="defaultTeamIds" defaultValue={policy ? listValue(policy.defaultTeamIds) : ""} />
-        <TextInput label="Quota limit" name="quotaLimit" defaultValue={policy?.quotaLimit?.toString() ?? ""} />
-        <RadioGroup
-          title="Quota target"
-          name="quotaTarget"
-          options={quotaTargetOptions}
-          defaultValue={policy?.quotaTarget ?? "memberships"}
-          required
-        />
-        <Switch
-          label="Require email verification"
-          name="requiresEmailVerification"
-          selected={state?.requiresEmailVerification ?? true}
-          onChange={onRequiresEmailVerificationChange}
-        />
-        <TextInput label="Starts at" name="startsAt" defaultValue={policy?.startsAt ? new Date(policy.startsAt).toISOString() : ""} />
-        <TextInput label="Expires at" name="expiresAt" defaultValue={policy?.expiresAt ? new Date(policy.expiresAt).toISOString() : ""} />
-      </Stack>
-    </ConfirmDialog>
   );
 }
