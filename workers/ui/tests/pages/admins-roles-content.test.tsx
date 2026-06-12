@@ -9,34 +9,72 @@ import { mockMembers, mockOrganizations } from "@/app/admin/_mocks/organizations
 import { mockUsers } from "@/app/admin/_mocks/users";
 import type { User } from "@/app/admin/_actions/users";
 
-function snapshot(platformAdmins = mockUsers.filter((user) => user.role === "admin")): AdminsRolesSnapshot {
+function snapshot(
+  platformAdmins = mockUsers.filter((user) => user.role === "admin"),
+): AdminsRolesSnapshot {
   return {
     platformAdmins,
+    delegatedRoles: [
+      {
+        id: "role_registration",
+        slug: "registration-manager",
+        label: "Registration Manager",
+        description: "Manage registration policy",
+        permissions: ["members:write"],
+        system: false,
+        createdBy: "user_001",
+        updatedBy: "user_001",
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      },
+    ],
+    delegatedBindings: [
+      {
+        id: "binding_registration",
+        bindingKey: "user:user_002:role_registration:organization:org_001",
+        principalType: "user",
+        principalId: "user_002",
+        roleId: "role_registration",
+        scope: "organization:org_001",
+        expiresAt: null,
+        createdBy: "user_001",
+        createdAt: 1_700_000_000_000,
+      },
+    ],
     organizationAuthorities: mockMembers
       .filter((member) => member.role === "owner" || member.role === "admin")
       .map((member) => ({
         member,
-        organization: mockOrganizations.find((organization) => organization.id === member.organizationId) ?? mockOrganizations[0],
+        organization:
+          mockOrganizations.find(
+            (organization) => organization.id === member.organizationId,
+          ) ?? mockOrganizations[0],
       })),
   };
 }
 
 function actions(data: AdminsRolesSnapshot) {
   return {
-    listAdminsRoles: vi.fn<() => Promise<AdminsRolesSnapshot>>().mockResolvedValue(data),
-    getUser: vi.fn<(userId: string) => Promise<{ user: User }>>().mockImplementation(async (userId) => ({
-      user: mockUsers.find((user) => user.id === userId) ?? mockUsers[0]!,
-    })),
+    listAdminsRoles: vi.fn<() => Promise<AdminsRolesSnapshot>>()
+      .mockResolvedValue(data),
+    getUser: vi.fn<(userId: string) => Promise<{ user: User }>>()
+      .mockImplementation(async (userId) => ({
+        user: mockUsers.find((user) => user.id === userId) ?? mockUsers[0]!,
+      })),
   };
 }
 
 describe("AdminsRolesContent", () => {
   it("renders platform admins and organization authority rows", async () => {
-    const { container } = render(<AdminsRolesContent actions={actions(snapshot())} />);
+    const { container } = render(
+      <AdminsRolesContent actions={actions(snapshot())} />,
+    );
 
     await waitFor(() => expect(screen.getByText("Platform Admin")).toBeInTheDocument());
     expect(screen.getByText("Owner")).toBeInTheDocument();
     expect(screen.getByText("Org Admin")).toBeInTheDocument();
+    expect(screen.getByText("Registration Manager")).toBeInTheDocument();
+    expect(screen.getByText("Organization org_001")).toBeInTheDocument();
     expect(screen.getAllByText("Acme Corp").length).toBeGreaterThan(0);
     expect(screen.getAllByText("#acme").length).toBeGreaterThan(0);
     expect(screen.queryByText("org_001")).toBeNull();
@@ -50,10 +88,12 @@ describe("AdminsRolesContent", () => {
   it("filters the derived rows by search", async () => {
     render(<AdminsRolesContent actions={actions(snapshot())} />);
 
-    await waitFor(() => expect(screen.getAllByText("John Doe").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText("John Doe").length).toBeGreaterThan(0)
+    );
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "jane" } });
 
-    expect(screen.getByText("Jane Adams")).toBeInTheDocument();
+    expect(screen.getAllByText("Jane Adams")).toHaveLength(2);
     expect(screen.queryByText("Platform Admin")).toBeNull();
   });
 
@@ -66,7 +106,12 @@ describe("AdminsRolesContent", () => {
   });
 
   it("renders the error override", () => {
-    render(<AdminsRolesContent error="Failed to load admins" actions={actions(snapshot())} />);
+    render(
+      <AdminsRolesContent
+        error="Failed to load admins"
+        actions={actions(snapshot())}
+      />,
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to load admins");
   });
 });

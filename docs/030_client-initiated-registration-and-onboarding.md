@@ -798,16 +798,26 @@ Rules:
 
 ### 10.4 Admin Policy Screens
 
-Admin UI later needs a registration policy section. It can live under the tenant-scoped console from [docs/028](028_tenant-scoped-platform-experience.md), likely:
+Admin UI manages registration policies under the Access section because policies admit clients, invitations, domains, quotas, scopes, and default organization grants:
+
+```text
+/admin/platform/access/registration-policies
+/admin/orgs/:orgId/access/registration-policies
+```
+
+OAuth client detail pages link to these canonical Access routes with `q=<client_id>` so an operator can manage registration for a specific client without duplicating the policy editor under OAuth.
+
+Legacy Identity URLs redirect to the Access routes while preserving query params:
 
 ```text
 /admin/platform/identity/registration-policies
 /admin/orgs/:orgId/identity/registration-policies
 ```
 
-First screen needs:
+The screen supports:
 
 - list policies;
+- create/edit policy fields for client, organization, resource, allowed scopes, domains, default teams, quota, quota target, email verification, starts, and expires;
 - status badge;
 - mode;
 - client;

@@ -41,6 +41,9 @@ describe("constants", () => {
 
     expect(visible.map((item) => item.id)).toContain("identity-users");
     expect(visible.map((item) => item.id)).toContain("identity-organizations");
+    expect(visible.map((item) => item.id)).toContain(
+      "access-registration-policies",
+    );
     expect(visible.map((item) => item.id)).toContain("security-jwks");
     expect(visible.map((item) => item.id)).not.toContain("system-health");
     expect(visible.map((item) => item.id)).not.toContain("identity-teams");
@@ -75,6 +78,9 @@ describe("constants", () => {
       href: "/admin/orgs/org_123/identity/members",
     });
     expect(visible.map((item) => item.id)).toContain("identity-teams");
+    expect(visible.map((item) => item.id)).toContain(
+      "access-registration-policies",
+    );
     expect(visible.map((item) => item.id)).toContain("access-resource-apis");
     expect(
       visible.find((item) => item.id === "security-consents"),

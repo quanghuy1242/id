@@ -515,6 +515,41 @@ export const adminActivityLog = sqliteTable(
   ],
 );
 
+export const adminRole = sqliteTable("adminRole", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description"),
+  permissions: text("permissions", { mode: "json" }).notNull(),
+  system: integer("system", { mode: "boolean" }).default(false).notNull(),
+  createdBy: text("createdBy"),
+  updatedBy: text("updatedBy"),
+  createdAt: integer("createdAt").notNull(),
+  updatedAt: integer("updatedAt").notNull(),
+});
+
+export const adminRoleBinding = sqliteTable(
+  "adminRoleBinding",
+  {
+    id: text("id").primaryKey(),
+    bindingKey: text("bindingKey").notNull().unique(),
+    principalType: text("principalType").notNull(),
+    principalId: text("principalId").notNull(),
+    roleId: text("roleId")
+      .notNull()
+      .references(() => adminRole.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    expiresAt: integer("expiresAt"),
+    createdBy: text("createdBy"),
+    createdAt: integer("createdAt").notNull(),
+  },
+  (table) => [
+    index("adminRoleBinding_principalId_idx").on(table.principalId),
+    index("adminRoleBinding_roleId_idx").on(table.roleId),
+    index("adminRoleBinding_scope_idx").on(table.scope),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
@@ -724,6 +759,20 @@ export const oauthClientResourceScopeRelations = relations(
     resourceServer: one(resourceServer, {
       fields: [oauthClientResourceScope.resourceServerId],
       references: [resourceServer.id],
+    }),
+  }),
+);
+
+export const adminRoleRelations = relations(adminRole, ({ many }) => ({
+  adminRoleBindings: many(adminRoleBinding),
+}));
+
+export const adminRoleBindingRelations = relations(
+  adminRoleBinding,
+  ({ one }) => ({
+    adminRole: one(adminRole, {
+      fields: [adminRoleBinding.roleId],
+      references: [adminRole.id],
     }),
   }),
 );

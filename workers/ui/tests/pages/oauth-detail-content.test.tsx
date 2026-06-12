@@ -32,7 +32,26 @@ describe("OAuth detail content", () => {
     render(<ApplicationDetailContent clientId="cli_contentapi_a1b2c3d4e5f6" actions={makeOauthActions()} />);
     await waitFor(() => expect(screen.getAllByText("Content API").length).toBeGreaterThan(0));
     expect(screen.getByText("client_secret_post")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /registration/i })).toHaveAttribute(
+      "href",
+      "/admin/platform/access/registration-policies?q=cli_contentapi_a1b2c3d4e5f6",
+    );
     expect(screen.queryByText(/client_secret.*sk-/i)).toBeNull();
+  });
+
+  it("links organization application detail to organization registration policies", async () => {
+    render(
+      <ApplicationDetailContent
+        clientId="cli_contentapi_a1b2c3d4e5f6"
+        scope={{ kind: "organization", organizationId: "org_001" }}
+        actions={makeOauthActions()}
+      />,
+    );
+    await waitFor(() => expect(screen.getAllByText("Content API").length).toBeGreaterThan(0));
+    expect(screen.getByRole("link", { name: /registration/i })).toHaveAttribute(
+      "href",
+      "/admin/orgs/org_001/access/registration-policies?q=cli_contentapi_a1b2c3d4e5f6",
+    );
   });
 
   it("renders resource API overview with actor metadata", async () => {

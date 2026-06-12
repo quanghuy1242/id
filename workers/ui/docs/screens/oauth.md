@@ -218,7 +218,7 @@ Deep-linkable OAuth client detail route backed by `GET /api/auth/oauth2/get-clie
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
 │ ‹ OAuth Applications                                                  │
-│ Content API                       [M2M] cli_contentapi_a1b2…          │
+│ Content API             [M2M] cli_contentapi_a1b2… [Registration]     │
 │ [ Overview | Credentials | URIs | Scopes & Grants | Connections | Quickstart | Audit ] │
 ├──────────────────┬────────────────────────────────────────────────────┤
 │   (sidebar)      │ Overview: DescriptionList for type, status, auth   │
@@ -233,7 +233,7 @@ Deep-linkable OAuth client detail route backed by `GET /api/auth/oauth2/get-clie
 
 Components:
   ApplicationDetailContent(clientId, activeTab)
-    Header: LinkButton back + Text(h1 client.client_name) + Badge(clientType) + Text(client_id, mono)
+    Header: LinkButton back + Text(h1 client.client_name) + Badge(clientType) + Text(client_id, mono) + LinkButton(href="/admin/platform/access/registration-policies?q=:clientId" or "/admin/orgs/:orgId/access/registration-policies?q=:clientId", iconName="UserPlus", "Registration") + Button("Edit Application") + Button("Rotate Secret") + Button("Delete")
     Tabs(items=[Overview, Credentials, URIs, Scopes & Grants, Connections, Quickstart, Audit])
     Overview: Panel > DescriptionList(columns=2)
     Credentials: Panel > DescriptionList(client_id, token_endpoint_auth_method, public/confidential) + copy button
@@ -247,6 +247,7 @@ Data: GET /api/auth/oauth2/get-clients → OAuthClient[] | null (UI action norma
 
 Behavior:
   - Missing `clientId` shows ErrorAlert("Application not found").
+  - Registration opens the canonical Access registration-policy screen filtered to this `client_id`; OAuth detail does not duplicate the policy editor.
   - Secret value is never displayed except the existing one-time create/rotate modal; credentials tab only states whether a secret exists.
   - The Connections tab composes the client's default `scope` with active M2M bindings' `allowedScopes` so admins can see effective resource access without issuing a test token.
   - Edit uses POST `/api/auth/oauth2/update-client` with `{ client_id, update }`. Optional array fields are sent only when non-empty because Better Auth rejects `[]` for fields with `min(1)`; clearing existing `post_logout_redirect_uris` or `contacts` is not supported through this public update route.

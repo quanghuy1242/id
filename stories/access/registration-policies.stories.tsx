@@ -1,13 +1,13 @@
 import type { Story, StoryDefault } from "@ladle/react";
 import { PageBody } from "@idco/ui";
-import { RegistrationPoliciesContent } from "../../workers/ui/src/app/admin/_components/identity/registration-policies-content";
+import { RegistrationPoliciesContent } from "../../workers/ui/src/app/admin/_components/access/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "../../workers/ui/src/app/admin/_mocks/registration-policies";
-import type { RegistrationPolicy } from "../../workers/ui/src/app/admin/_actions/registration-policies";
+import type { RegistrationPolicy, RegistrationPolicyFormInput } from "../../workers/ui/src/app/admin/_actions/registration-policies";
 import { AdminShell } from "../_decorators/shell";
 
-export default { title: "Admin / Identity / Registration Policies" } satisfies StoryDefault;
+export default { title: "Admin / Access / Registration Policies" } satisfies StoryDefault;
 
-const platformPath = "/admin/platform/identity/registration-policies";
+const platformPath = "/admin/platform/access/registration-policies";
 
 function actions(policies: RegistrationPolicy[]) {
   let current = [...policies];
@@ -20,6 +20,41 @@ function actions(policies: RegistrationPolicy[]) {
   };
   return {
     listRegistrationPolicies: async () => current,
+    createRegistrationPolicy: async (input: RegistrationPolicyFormInput) => {
+      const next = {
+        ...mockRegistrationPolicies[0]!,
+        ...input,
+        id: "regpol_created",
+        status: "draft" as const,
+        quota: {
+          policyId: "regpol_created",
+          quotaLimit: input.quotaLimit ?? null,
+          quotaUsed: 0,
+          quotaReserved: 0,
+          quotaTarget: input.quotaTarget ?? "memberships",
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      current = [next, ...current];
+      return next;
+    },
+    updateRegistrationPolicy: async (id: string, input: Partial<RegistrationPolicyFormInput>) => {
+      const policy = current.find((entry) => entry.id === id);
+      if (!policy) throw new Error("Policy not found");
+      const next = {
+        ...policy,
+        ...input,
+        quota: {
+          ...policy.quota,
+          quotaLimit: input.quotaLimit === undefined ? policy.quota.quotaLimit : input.quotaLimit,
+          quotaTarget: input.quotaTarget ?? policy.quota.quotaTarget,
+        },
+        updatedAt: Date.now(),
+      };
+      current = current.map((entry) => entry.id === id ? next : entry);
+      return next;
+    },
     enableRegistrationPolicy: (id: string) => setStatus(id, "enabled"),
     pauseRegistrationPolicy: (id: string) => setStatus(id, "paused"),
     archiveRegistrationPolicy: (id: string) => setStatus(id, "archived"),

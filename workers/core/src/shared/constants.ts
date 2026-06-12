@@ -60,6 +60,12 @@ export const REGISTRATION_INTENT_MODEL = "registrationIntent" as const;
 export const REGISTRATION_QUOTA_RESERVATION_MODEL =
   "registrationQuotaReservation" as const;
 
+/** BA model name for delegated admin role definitions. */
+export const ADMIN_ROLE_MODEL = "adminRole" as const;
+
+/** BA model name for delegated admin role bindings. */
+export const ADMIN_ROLE_BINDING_MODEL = "adminRoleBinding" as const;
+
 /** Sort rank for organization owner memberships in console scope discovery. */
 export const CONSOLE_OWNER_ROLE_RANK = 3;
 

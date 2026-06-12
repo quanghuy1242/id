@@ -21,6 +21,7 @@ import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
 import { idAdminAudit } from "./plugins/admin-audit";
 import { idAdminActivityLog } from "./plugins/admin-activity-log";
+import { idAdminDelegation } from "./plugins/admin-delegation";
 import { idConsoleScopes } from "./plugins/console-scopes";
 import { idAccountCenter } from "./plugins/account-center";
 import { idRegistration } from "./plugins/registration";
@@ -201,6 +202,9 @@ export function getAuthOptions(
       }),
       idAdminActivityLog({
         authorize: authorizePlatformAccess,
+      }),
+      idAdminDelegation({
+        authorize: (_userId, role, _adapter) => isPlatformAdmin(role),
       }),
       idConsoleScopes({
         isPlatformAdmin,

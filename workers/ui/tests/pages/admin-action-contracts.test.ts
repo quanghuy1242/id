@@ -442,6 +442,37 @@ describe("admin action contracts", () => {
       )
       .mockResolvedValueOnce(jsonResponse([mockOrganizations[0]]))
       .mockResolvedValueOnce(
+        jsonResponse({
+          roles: [
+            {
+              id: "role_registration",
+              slug: "registration-manager",
+              label: "Registration Manager",
+              permissions: ["members:write"],
+              system: false,
+              createdAt: 1_700_000_000_000,
+              updatedAt: 1_700_000_000_000,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          bindings: [
+            {
+              id: "binding_registration",
+              bindingKey:
+                "user:user_002:role_registration:organization:org_001",
+              principalType: "user",
+              principalId: "user_002",
+              roleId: "role_registration",
+              scope: "organization:org_001",
+              createdAt: 1_700_000_000_000,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
         jsonResponse({ members: mockMembers, total: mockMembers.length }),
       );
 
@@ -457,6 +488,12 @@ describe("admin action contracts", () => {
           member: expect.objectContaining({ role: "admin" }),
         }),
       ],
+      delegatedRoles: [
+        expect.objectContaining({ slug: "registration-manager" }),
+      ],
+      delegatedBindings: [
+        expect.objectContaining({ scope: "organization:org_001" }),
+      ],
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
@@ -464,6 +501,12 @@ describe("admin action contracts", () => {
     );
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/organization/list");
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "/api/auth/admin/delegation/roles",
+    );
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
+      "/api/auth/admin/delegation/bindings",
+    );
+    expect(fetchMock.mock.calls[4]?.[0]).toBe(
       `/api/auth/organization/list-members?organizationId=${mockOrganizations[0].id}`,
     );
   });

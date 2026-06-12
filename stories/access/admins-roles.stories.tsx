@@ -14,6 +14,33 @@ const activePath = "/admin/platform/access/admins-roles";
 function snapshot(platformAdmins = mockUsers.filter((user) => user.role === "admin")): AdminsRolesSnapshot {
   return {
     platformAdmins,
+    delegatedRoles: [
+      {
+        id: "role_registration",
+        slug: "registration-manager",
+        label: "Registration Manager",
+        description: "Manage registration policy",
+        permissions: ["members:write"],
+        system: false,
+        createdBy: "user_001",
+        updatedBy: "user_001",
+        createdAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      },
+    ],
+    delegatedBindings: [
+      {
+        id: "binding_registration",
+        bindingKey: "user:user_002:role_registration:organization:org_001",
+        principalType: "user",
+        principalId: "user_002",
+        roleId: "role_registration",
+        scope: "organization:org_001",
+        expiresAt: null,
+        createdBy: "user_001",
+        createdAt: 1_700_000_000_000,
+      },
+    ],
     organizationAuthorities: mockMembers
       .filter((member) => member.role === "owner" || member.role === "admin")
       .map((member) => ({
@@ -46,7 +73,7 @@ export const Populated: Story = () => (
 
 export const Empty: Story = () => (
   <Frame>
-    <AdminsRolesContent actions={actions({ platformAdmins: [], organizationAuthorities: [] })} />
+    <AdminsRolesContent actions={actions({ platformAdmins: [], organizationAuthorities: [], delegatedRoles: [], delegatedBindings: [] })} />
   </Frame>
 );
 

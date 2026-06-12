@@ -137,6 +137,9 @@ describe("Better Auth installed contract", () => {
       options.plugins?.some((plugin) => plugin.id === "id-console-scopes"),
     ).toBe(true);
     expect(
+      options.plugins?.some((plugin) => plugin.id === "id-admin-delegation"),
+    ).toBe(true);
+    expect(
       options.plugins?.some((plugin) => plugin.id === "id-registration"),
     ).toBe(true);
     expect(

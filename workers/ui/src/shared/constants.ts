@@ -149,9 +149,9 @@ const identityUsersNavItem: ConsoleNavItem = {
 };
 
 const registrationPoliciesNavItem: ConsoleNavItem = {
-  id: "identity-registration-policies",
+  id: "access-registration-policies",
   label: "Registration Policies",
-  section: "identity",
+  section: "access",
   appliesTo: "both",
   requiredPermission: {
     platform: "platform:read",
@@ -159,8 +159,8 @@ const registrationPoliciesNavItem: ConsoleNavItem = {
   },
   href: (scope) =>
     scope.kind === "platform"
-      ? "/admin/platform/identity/registration-policies"
-      : `/admin/orgs/${scope.organizationId}/identity/registration-policies`,
+      ? "/admin/platform/access/registration-policies"
+      : `/admin/orgs/${scope.organizationId}/access/registration-policies`,
   icon: "ListChecks",
 };
 

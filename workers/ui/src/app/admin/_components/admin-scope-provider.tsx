@@ -100,11 +100,12 @@ function equivalentTail(tail: string, target: ConsoleScope, currentOrgId: string
   if (tail.startsWith("access/resource-apis")) return "access/resource-apis";
   if (tail.startsWith("access/scope-catalog")) return "access/scope-catalog";
   if (tail.startsWith("access/m2m-bindings")) return "access/m2m-bindings";
+  if (tail.startsWith("access/registration-policies")) return "access/registration-policies";
   if (tail.startsWith("security/consents")) return "security/consents";
   if (tail.startsWith("security/") || tail.startsWith("system/")) return target.kind === "platform" ? tail : "";
   if (tail.startsWith("identity/users")) return target.kind === "platform" ? "identity/users" : "identity/members";
   if (tail.startsWith("identity/organizations")) return target.kind === "platform" ? tail : "";
-  if (tail.startsWith("identity/registration-policies")) return "identity/registration-policies";
+  if (tail.startsWith("identity/registration-policies")) return "access/registration-policies";
   if (tail.startsWith("identity/members")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/members";
   if (tail.startsWith("identity/teams")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/teams";
   if (tail.startsWith("identity/invitations")) return target.kind === "platform" && currentOrgId ? "identity/organizations" : "identity/invitations";

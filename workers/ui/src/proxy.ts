@@ -179,7 +179,23 @@ function legacyPlatformTarget(
     return `/admin/platform/access/m2m-bindings${pathname.slice("/admin/oauth/m2m-bindings".length)}`;
   if (pathname === "/admin/security" || pathname === "/admin/security/")
     return "/admin/platform/security/sessions";
+  if (pathname.startsWith("/admin/identity/registration-policies"))
+    return `/admin/platform/access/registration-policies${pathname.slice("/admin/identity/registration-policies".length)}`;
   return `/admin/platform/${pathname.slice("/admin/".length)}`;
+}
+
+function movedCanonicalTarget(pathname: string): string | null {
+  if (pathname.startsWith("/admin/platform/identity/registration-policies")) {
+    return `/admin/platform/access/registration-policies${pathname.slice("/admin/platform/identity/registration-policies".length)}`;
+  }
+  const orgMatch =
+    /^\/admin\/orgs\/([^/]+)\/identity\/registration-policies(\/.*)?$/u.exec(
+      pathname,
+    );
+  if (orgMatch?.[1]) {
+    return `/admin/orgs/${orgMatch[1]}/access/registration-policies${orgMatch[2] ?? ""}`;
+  }
+  return null;
 }
 
 function legacyPlatformRedirect(
@@ -187,6 +203,12 @@ function legacyPlatformRedirect(
   envelope: ConsoleScopeEnvelope,
 ): NextResponse | null {
   const pathname = request.nextUrl.pathname;
+  const movedTarget = movedCanonicalTarget(pathname);
+  if (movedTarget) {
+    const next = new URL(movedTarget, request.url);
+    next.search = request.nextUrl.search;
+    return NextResponse.redirect(next);
+  }
   if (isCanonicalAdminPath(pathname)) return null;
   if (pathname === "/admin") {
     return NextResponse.redirect(

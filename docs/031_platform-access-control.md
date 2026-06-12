@@ -300,11 +300,11 @@ Scope catalog (tier-aware)
 
 Routing follows the 028 URL scheme; the existing `/admin/oauth/{scope-catalog,resource-apis,m2m-bindings}` and System → Service Accounts screens migrate (with redirects) under `/admin/platform/access/*` and `/admin/orgs/:orgId/access/*`. Per the admin UI hard gate, screen-spec entries in `workers/ui/docs/screens/` precede any new route file; this section is the proposal those specs draw from.
 
-> Deferred (intentional): the **Admins & Roles** screen is the only Access item not fully specified here. Its v1 is a read-only derived view — list the principals holding platform authority (`user.role === "admin"`) and, per org, the owner/admin members (`hasOrganizationAccess`) — with no role-management UI. Full role/delegation management (creating roles, binding principals to resource scopes) is the delegated-admin model in [8.10] / [docs/028 §8.10](028_tenant-scoped-platform-experience.md), and ships only when a concrete partial-admin requirement exists. Spec the concrete screen (derived-view v1 + the delegated-roles growth path) as its own follow-up before implementing this nav item; do not invent a management UI ahead of the delegated-admin decision.
+The **Admins & Roles** screen started as the v1 read-only derived view — principals holding platform authority (`user.role === "admin"`) and, per org, owner/admin members (`hasOrganizationAccess`). The delegated-admin base from [8.10] / [docs/028 §8.10](028_tenant-scoped-platform-experience.md) now adds plugin-owned role and binding tables plus management/read endpoints under `/api/auth/admin/delegation/*`; the screen can show delegated bindings as a distinct authority source instead of reinterpreting organization owner/admin membership as delegation. Console entry and permission projection still need an explicit follow-up before delegated bindings grant access to routes.
 
 ### 4.9 Access API Surface
 
-The Access section composes existing plugin endpoints — this model proposes no new admin endpoints. Every endpoint below is gated by platform access control ([4.1](#41-the-two-tier-two-principal-kind-matrix)): system-tier rows require platform admin; org-tier rows require platform admin or the org's owner/admin (or, for issuance, the bound service account).
+The Access section composes existing plugin endpoints plus the delegated-admin plugin base. Every endpoint below is gated by platform access control ([4.1](#41-the-two-tier-two-principal-kind-matrix)): system-tier rows require platform admin; org-tier rows require platform admin or the org's owner/admin (or, for issuance, the bound service account).
 
 | Access concept | Endpoints | Owner |
 |---|---|---|
@@ -313,7 +313,7 @@ The Access section composes existing plugin endpoints — this model proposes no
 | Scope catalog (permissions) | `POST/GET /api/auth/admin/oauth-scopes`, `PUT/DELETE /…/:id` | scope-catalog plugin |
 | M2M bindings (grants) | `POST/GET /api/auth/admin/oauth-client-resource-scopes`, `PUT/DELETE /…/:id` | scope-catalog plugin |
 | Service accounts (machine principals) | Better Auth OAuth Provider client endpoints (create/get/update/delete/rotate-secret), filtered to `client_credentials`; org tier via the active-org bridge (028 §8.5) | OAuth Provider + `oauth-m2m-bridge` |
-| Admins & Roles (human principals) | Better Auth admin role + organization membership endpoints; delegated roles deferred to 028 §8.10 | admin plugin / organization plugin |
+| Admins & Roles (human principals) | Better Auth admin role + organization membership endpoints; `/api/auth/admin/delegation/{roles,bindings}` for delegated role catalog and bindings | admin plugin / organization plugin / `idAdminDelegation` |
 
 The **confidential id-to-client channels** are consumed by resource servers, not by the Access UI, and are listed here only for completeness: SCIM `/scim/v2/*` and client-picker `GET /api/auth/admin/oauth-clients/lookup` (both `aud = {base}/system`), and introspection `POST /oauth2/introspect` (RFC 7662, client-authenticated). The system access seed ([4.7](#47-default-system-scope-catalog-and-seed)) is an internal bootstrap routine, not a public endpoint.
 
@@ -426,7 +426,7 @@ This document mostly names existing behavior. The optional consolidation, kept d
 - Document the scope catalog's runtime-prefill and tier-classifier roles in `oauth-scope-catalog/README.md`, and the coarse-scope bright line (D7) where scope rows are created.
 - Document the two-channel infra-service-account model and the per-channel credential rule (D5) in `oauth-client-picker/README.md` and the SCIM/introspection-facing docs so consumers provision separate credentials by default.
 
-No schema changes, no new tables, no `pnpm db:generate`. If a future delegated-admin model (028 §8.10) lands, it composes through the same helper and tier matrix.
+The initial Access consolidation required no schema changes. The later delegated-admin base adds Better Auth plugin-owned `adminRole` and `adminRoleBinding` tables through `idAdminDelegation`; it composes with the same helper and tier matrix once console-scope projection is deliberately enabled.
 
 Implementation note 2026-06-05: the helper consolidation is implemented as `resolvePlatformAuthority` in `workers/core/src/auth/policies/access.ts`, and the registration, resource-server, scope-catalog, admin-audit, and admin-activity plugin `authorize()` callbacks in `get-auth.ts` delegate through one local callback. This remains a pure behavior-preserving refactor; the machine-principal issuance gate stays in the OAuth token path.
 

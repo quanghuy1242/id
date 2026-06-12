@@ -10,6 +10,7 @@ export type AuthRouteContract = {
     | "oauth-provider-plugin"
     | "id-resource-server-plugin"
     | "id-console-scopes-plugin"
+    | "id-admin-delegation-plugin"
     | "open-api-plugin";
 };
 
@@ -155,5 +156,41 @@ export const authRouteMap = [
     path: publicAuthPath("/admin/console-scopes"),
     method: "GET",
     source: "id-console-scopes-plugin",
+  },
+  {
+    name: "listAdminRoles",
+    path: publicAuthPath("/admin/delegation/roles"),
+    method: "GET",
+    source: "id-admin-delegation-plugin",
+  },
+  {
+    name: "createAdminRole",
+    path: publicAuthPath("/admin/delegation/roles"),
+    method: "POST",
+    source: "id-admin-delegation-plugin",
+  },
+  {
+    name: "updateAdminRole",
+    path: publicAuthPath("/admin/delegation/roles/:id"),
+    method: "PATCH",
+    source: "id-admin-delegation-plugin",
+  },
+  {
+    name: "listAdminRoleBindings",
+    path: publicAuthPath("/admin/delegation/bindings"),
+    method: "GET",
+    source: "id-admin-delegation-plugin",
+  },
+  {
+    name: "createAdminRoleBinding",
+    path: publicAuthPath("/admin/delegation/bindings"),
+    method: "POST",
+    source: "id-admin-delegation-plugin",
+  },
+  {
+    name: "deleteAdminRoleBinding",
+    path: publicAuthPath("/admin/delegation/bindings/:id"),
+    method: "DELETE",
+    source: "id-admin-delegation-plugin",
   },
 ] as const satisfies readonly AuthRouteContract[];

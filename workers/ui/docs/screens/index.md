@@ -50,6 +50,7 @@ The planned `/admin/platform/system/**` rows are registry placeholders only; the
 | `/admin/platform/identity/organizations/:orgId[/members|/teams|/invitations|/audit]` | Platform organization detail tabs — overview, members, teams, invitations, audit | [identity.md](identity.md#adminplatformidentityorganizationsorgid) | implemented |
 | `/admin/platform/oauth/applications` | OAuth client-facing application list | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/platform/oauth/applications/:clientId[/...]` | OAuth application detail tabs — overview, credentials, URIs, scopes/grants, connections, quickstart, audit | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/platform/access/registration-policies` | Registration admission policies — client/org/domain/quota/scope controls plus intent detail | [access.md](access.md#adminplatformaccessregistration-policies-and-adminorgsorgidaccessregistration-policies) | implemented |
 | `/admin/platform/access/admins-roles` | Derived admins and roles view — platform admins plus org owner/admin memberships; role management deferred | [access.md](access.md#adminplatformaccessadmins-roles) | implemented |
 | `/admin/platform/access/service-accounts` | Service accounts — system and tenant M2M clients grouped by tier | [access.md](access.md#adminplatformaccessservice-accounts) | implemented |
 | `/admin/platform/access/service-accounts/new` | Service-account creation wizard — fixed M2M OAuth client flow with app-only choices hidden | [access.md](access.md#adminplatformaccessservice-accountsnew) | implemented |
@@ -84,6 +85,7 @@ Canonical organization console route prefix. The shell renders the selected orga
 | `/admin/orgs/:orgId/identity/invitations` | Pending invitations — create, resend, cancel | [identity.md](identity.md#adminplatformidentityorganizationsorgidinvitations) | implemented |
 | `/admin/orgs/:orgId/oauth/applications` | Org-owned OAuth client-facing applications (`reference_id == orgId`) | [oauth.md](oauth.md#adminoauthapplications) | implemented |
 | `/admin/orgs/:orgId/oauth/applications/:clientId[/...]` | Org-owned OAuth application detail tabs | [oauth.md](oauth.md#adminoauthapplicationsclientid) | implemented |
+| `/admin/orgs/:orgId/access/registration-policies` | Organization registration admission policies — client/domain/quota/scope controls plus intent detail | [access.md](access.md#adminplatformaccessregistration-policies-and-adminorgsorgidaccessregistration-policies) | implemented |
 | `/admin/orgs/:orgId/access/service-accounts` | Tenant service accounts (`client_credentials`, `reference_id == orgId`) | [access.md](access.md#adminorgsorgidaccessservice-accounts) | implemented |
 | `/admin/orgs/:orgId/access/service-accounts/new` | Tenant service-account creation wizard — fixed M2M OAuth client flow with app-only choices hidden | [access.md](access.md#adminorgsorgidaccessservice-accountsnew) | implemented |
 | `/admin/orgs/:orgId/access/resource-apis` | Org-owned resource APIs (`organizationId == orgId`) | [oauth.md](oauth.md#adminoauthresource-apis) | implemented |

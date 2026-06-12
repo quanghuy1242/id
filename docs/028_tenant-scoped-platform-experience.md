@@ -294,7 +294,7 @@ One definition, declared once. Each item carries the scope(s) it applies to, the
 | Identity | Teams | org | `members:read` | |
 | Identity | Invitations | org | `members:write` | |
 | Applications | Applications | platform + org | `oauth-clients:read` | Client-facing OAuth apps (authorization-code). Org scope filters to `reference_id == orgId`. |
-| Access | Admins & Roles | platform + org | `platform:read` / `members:read` | Human principals holding admin authority; delegated roles are future ([8.10](#810-future-delegated-administration), [docs/031 §4.8](031_platform-access-control.md)). |
+| Access | Admins & Roles | platform + org | `platform:read` / `members:read` | Human principals holding admin authority; delegated role/binding state is visible through the plugin-owned base, while permission projection remains the activation follow-up ([8.10](#810-future-delegated-administration), [docs/031 §4.8](031_platform-access-control.md)). |
 | Access | Service Accounts | platform + org | `oauth-clients:read` | Machine principals (`client_credentials`): system/infra tier at platform scope, tenant tier at org scope ([docs/031](031_platform-access-control.md)). |
 | Access | Resource APIs | platform + org | `resource-servers:read` | Org scope filters to `organizationId == orgId`. |
 | Access | Scope Catalog | platform + org | `resource-servers:read` | Org scope derives from org-owned resource servers; tier-aware ([docs/031 §4.8](031_platform-access-control.md)). |
@@ -625,7 +625,7 @@ Endpoint placement:
 | session/token/consent aggregate reads | Existing `idAdminAudit` plugin | Keep platform-only until bounded org scoping exists. |
 | dashboard aggregate | Hono `/api/admin/dashboard` only if already allowlisted | Cross-domain aggregate exception. Confirm the route and its architecture-lint allowlist entry exist before relying on them; if not, adding it is itself a gated change. |
 
-Do not add standalone Drizzle tables for delegated admin. Future partial-admin state requires a Better Auth plugin schema and `pnpm db:generate`.
+Do not add standalone Drizzle tables for delegated admin. Partial-admin state uses the Better Auth `idAdminDelegation` plugin schema and generated migration/schema artifacts from `pnpm db:generate`.
 
 ### 8.8 Step-Up On Sensitive Scopes And Actions
 
@@ -765,7 +765,7 @@ Recommended: require step-up for the platform scope and high-impact actions, not
 
 ### D6. Keep First-Release Role Model Small
 
-Recommended: platform admin plus organization owner/admin for v1. Rejected for v1: a delegated-admin/roles-on-scope plugin. Reasoning: roles-on-scope is the right future shape ([8.10](#810-future-delegated-administration)) but is a real authorization system; ship it only when a concrete partial-admin role exists.
+Recommended: platform admin plus organization owner/admin for the initial active authorization model. Rejected for v1 activation: granting console route authority from delegated roles before a concrete partial-admin product role and projection semantics exist. Reasoning: roles-on-scope is the right shape ([8.10](#810-future-delegated-administration)) and now has plugin-owned base state, but it becomes an authorization system only when `ConsoleScope.permissions` projection is deliberately enabled.
 
 ### D7. Keep Protocol Claims Standards-Aware
 

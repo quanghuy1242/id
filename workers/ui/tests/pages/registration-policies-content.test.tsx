@@ -3,9 +3,9 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithSwr as render } from "../_utils/swr-render";
-import { RegistrationPoliciesContent } from "@/app/admin/_components/identity/registration-policies-content";
+import { RegistrationPoliciesContent } from "@/app/admin/_components/access/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "@/app/admin/_mocks/registration-policies";
-import type { RegistrationPolicy } from "@/app/admin/_actions/registration-policies";
+import type { RegistrationPolicy, RegistrationPolicyFormInput } from "@/app/admin/_actions/registration-policies";
 
 function pressTrigger(button: HTMLElement) {
   button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
@@ -25,6 +25,41 @@ function makeActions(policies: RegistrationPolicy[]) {
     });
   return {
     listRegistrationPolicies: vi.fn<() => Promise<RegistrationPolicy[]>>().mockImplementation(async () => current),
+    createRegistrationPolicy: vi.fn<(input: RegistrationPolicyFormInput) => Promise<RegistrationPolicy>>().mockImplementation(async (input) => {
+      const next = {
+        ...mockRegistrationPolicies[0]!,
+        ...input,
+        id: "regpol_created",
+        status: "draft" as const,
+        quota: {
+          policyId: "regpol_created",
+          quotaLimit: input.quotaLimit ?? null,
+          quotaUsed: 0,
+          quotaReserved: 0,
+          quotaTarget: input.quotaTarget ?? "memberships",
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      current = [next, ...current];
+      return next;
+    }),
+    updateRegistrationPolicy: vi.fn<(id: string, input: Partial<RegistrationPolicyFormInput>) => Promise<RegistrationPolicy>>().mockImplementation(async (id, input) => {
+      const policy = current.find((entry) => entry.id === id);
+      if (!policy) throw new Error("Policy not found");
+      const next = {
+        ...policy,
+        ...input,
+        quota: {
+          ...policy.quota,
+          quotaLimit: input.quotaLimit === undefined ? policy.quota.quotaLimit : input.quotaLimit,
+          quotaTarget: input.quotaTarget ?? policy.quota.quotaTarget,
+        },
+        updatedAt: Date.now(),
+      };
+      current = current.map((entry) => entry.id === id ? next : entry);
+      return next;
+    }),
     enableRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "enabled")),
     pauseRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "paused")),
     archiveRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "archived")),
@@ -65,5 +100,37 @@ describe("RegistrationPoliciesContent", () => {
     pressTrigger(row.querySelector("button[aria-label='Actions']")!);
     fireEvent.click(await screen.findByRole("menuitem", { name: /^pause$/i }));
     await waitFor(() => expect(actions.pauseRegistrationPolicy).toHaveBeenCalledWith("regpol_content_beta"));
+  });
+
+  it("creates a client registration policy from the dialog", async () => {
+    const actions = makeActions(mockRegistrationPolicies);
+    render(<RegistrationPoliciesContent actions={actions} />);
+    await waitFor(() => expect(screen.getByText("Content beta")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /new policy/i }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Client launch" } });
+    fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "client-launch" } });
+    fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "client_launch" } });
+    fireEvent.change(screen.getByLabelText("Allowed scopes"), { target: { value: "openid profile content:read" } });
+    fireEvent.change(screen.getByLabelText("Quota limit"), { target: { value: "25" } });
+    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await waitFor(() => expect(actions.createRegistrationPolicy).toHaveBeenCalledWith(expect.objectContaining({
+      slug: "client-launch",
+      name: "Client launch",
+      clientId: "client_launch",
+      allowedScopes: ["openid", "profile", "content:read"],
+      quotaLimit: 25,
+    })));
+  });
+
+  it("updates an existing policy from the edit dialog", async () => {
+    const actions = makeActions(mockRegistrationPolicies);
+    render(<RegistrationPoliciesContent actions={actions} selectedId="regpol_content_beta" />);
+    await waitFor(() => expect(screen.getAllByText("Content beta").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Content launch" } });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(actions.updateRegistrationPolicy).toHaveBeenCalledWith("regpol_content_beta", expect.objectContaining({
+      name: "Content launch",
+    })));
   });
 });

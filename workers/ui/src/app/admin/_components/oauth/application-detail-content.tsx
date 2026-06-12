@@ -14,6 +14,7 @@ import {
   EmptyState,
   ErrorAlert,
   Inline,
+  LinkButton,
   Menu,
   MenuItem,
   MenuTrigger,
@@ -97,6 +98,14 @@ function tabs(routeBasePath: string) {
   ];
 }
 
+function registrationPoliciesHref(scope: ActiveScope, clientId: string): string {
+  const query = `q=${encodeURIComponent(clientId)}`;
+  if (scope.kind === "organization") {
+    return `/admin/orgs/${encodeURIComponent(scope.organizationId)}/access/registration-policies?${query}`;
+  }
+  return `/admin/platform/access/registration-policies?${query}`;
+}
+
 function scopeList(scope: string | undefined): string[] {
   return (scope ?? "").split(/\s+/).filter(Boolean);
 }
@@ -172,6 +181,7 @@ function Header({
   onEdit,
   onRotate,
   onDelete,
+  registrationHref,
 }: {
   readonly client: OAuthClient | undefined;
   readonly clientId: string;
@@ -182,6 +192,7 @@ function Header({
   readonly onEdit?: () => void;
   readonly onRotate?: () => void;
   readonly onDelete?: () => void;
+  readonly registrationHref: string;
 }) {
   const type = client ? clientType(client) : "confidential";
   return (
@@ -197,6 +208,9 @@ function Header({
         </AdminDetailTitleRow>
         {client ? (
           <Inline gap="sm" justify="end">
+            <LinkButton href={registrationHref} variant="secondary" hideOnMobile iconName="UserPlus">
+              Registration
+            </LinkButton>
             <Button variant="secondary" hideOnMobile iconName="Pencil" onClick={onEdit}>
               Edit Application
             </Button>
@@ -215,6 +229,7 @@ function Header({
                 if (key === "rotate") onRotate?.();
                 if (key === "delete") onDelete?.();
               }}>
+                <MenuItem id="registration" href={registrationHref}>Registration</MenuItem>
                 <MenuItem id="edit">Edit Application</MenuItem>
                 {type !== "public" ? <MenuItem id="rotate">Rotate Secret</MenuItem> : null}
                 <MenuItem id="delete">Delete</MenuItem>
@@ -415,6 +430,7 @@ export function ApplicationDetailContent({
   const showLoading = loadingOverride ?? isLoading;
   const showError = errorOverride ?? (error instanceof Error ? error.message : error ? String(error) : undefined);
   const client = clients?.find((item) => item.client_id === clientId);
+  const clientRegistrationHref = registrationPoliciesHref(scope, clientId);
 
   async function handleEdit(formData: FormData) {
     if (!client) return false;
@@ -496,7 +512,7 @@ export function ApplicationDetailContent({
   if (showLoading) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} registrationHref={clientRegistrationHref} />
         <Skeleton rows={6} />
       </Stack>
     );
@@ -505,7 +521,7 @@ export function ApplicationDetailContent({
   if (showError) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} registrationHref={clientRegistrationHref} />
         <ErrorAlert message={showError} onRetry={() => void mutate()} />
       </Stack>
     );
@@ -514,7 +530,7 @@ export function ApplicationDetailContent({
   if (!client) {
     return (
       <Stack gap="md">
-        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} />
+        <Header client={undefined} clientId={clientId} activeTab={activeTab} routeBasePath={routeBasePath} backHref={backHref} backLabel={backLabel} registrationHref={clientRegistrationHref} />
         <ErrorAlert message="Application not found" onRetry={() => void mutate()} />
       </Stack>
     );
@@ -532,6 +548,7 @@ export function ApplicationDetailContent({
         onEdit={() => setEditOpen(true)}
         onRotate={() => { setRotateError(undefined); setRotateOpen(true); }}
         onDelete={() => { setDeleteError(undefined); setDeleteOpen(true); }}
+        registrationHref={clientRegistrationHref}
       />
       {renderTab(activeTab, client, actions, scope)}
       <ConfirmDialog

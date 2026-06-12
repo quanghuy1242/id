@@ -52,29 +52,30 @@ Each workstream uses the same shape: **Objective**, **Current state**, **Directi
 
 **Objective:** Place registration policy where it belongs in the console IA and build delegated-admin management on a real authority model.
 
-**Current state:** `workers/ui/docs/screens/identity.md` places registration policies under Identity. The policy also controls client eligibility, default org membership, quota, and invite/domain rules, which makes it an admission surface, not a pure Identity record. `/admin/platform/access/admins-roles` exists today as a read-only derived view of platform admins plus organization owner/admin memberships.
+**Current state:** Registration policies are canonical under Access because they control client eligibility, default org membership, quota, invite/domain rules, scopes, and registration admission. `/admin/platform/access/admins-roles` started as a read-only derived view of platform admins plus organization owner/admin memberships; the first delegated-admin base now adds plugin-owned role and binding state plus a delegated-binding read projection without granting route authority from those bindings yet.
 
-**Direction:** Move the registration policy UI conceptually under Access — candidate routes `/admin/platform/access/registration-policies` and `/admin/orgs/:orgId/access/registration-policies` — and keep the existing Identity routes as redirects during migration. The API stays `POST/GET /api/auth/admin/registration-policies*`; this is a console IA correction, not a protocol change. Build Admins & Roles write management only through the delegated administration model from `docs/028` §8.10: `idAdminDelegation`, `adminRole` (permission sets from `ConsolePermission`), and `adminRoleBinding` (binds user/team/group or explicitly approved OAuth clients to typed scopes such as `platform`, `organization:org_123`, or a finer resource scope), projecting into `ConsoleScope.permissions`.
+**Direction:** Registration policy UI is canonical under Access at `/admin/platform/access/registration-policies` and `/admin/orgs/:orgId/access/registration-policies`; existing Identity routes remain compatibility redirects. The API stays `POST/GET/PATCH /api/auth/admin/registration-policies*`; this is a console IA correction and policy-management surface, not a protocol change. Admin IAM grows through the delegated administration model from `docs/028` §8.10: `idAdminDelegation`, `adminRole` (permission sets from `ConsolePermission`), and `adminRoleBinding` (binds user/team/group or explicitly approved OAuth clients to typed scopes such as `platform`, `organization:org_123`, or a finer resource scope), projecting into `ConsoleScope.permissions` only after the activation semantics are deliberately defined.
 
-**Decision gate:** Whether Access owns all policy-like admin screens, including registration policies, and what minimum delegated-admin use case unlocks role/binding management.
+**Decision gate:** Access owns admission and IAM policy screens. The base delegated-admin schema and platform-admin-managed API exist; the remaining gate is how delegated bindings become active console authority, which minimum roles are product-supported first, and which write controls should appear on Admins & Roles.
 
-**Depends on:** `idAdminDelegation` schema/runtime before any write controls on Admins & Roles.
+**Depends on:** Console-scope projection and route-authorization semantics before delegated bindings grant access, plus the first concrete delegated-admin product role before full write controls on Admins & Roles.
 
 ### 3.2 Registration Reliability And Protocol Growth
 
 **Objective:** Grow registration past the first-release model only when a specific need — correctness, protocol integrity, or operator workflow — is identified.
 
-**Current state:** First release uses `prompt=create`, policy-gated signup, and soft quota.
+**Current state:** First release uses `prompt=create`, policy-gated signup, and soft quota. The next practical maturity slice is operator management of registration policy definitions per client/org, while strict quota and protocol growth remain trigger-based.
 
 **Direction:** Keep the first-release base. Add capabilities discretely rather than as a generic "registration v2":
 
+- **Policy management UI** — manage each client's registration policy under Access: create/edit draft policies, bind client/org/resource ids, set allowed scopes/domains/default teams, quota limit/target, email-verification requirement, and validity window. OAuth client detail links into the canonical Access policy screen filtered by client id so client-centered management does not duplicate the editor. This is product/operator maturity using the existing `idRegistration` plugin endpoints, not a new protocol.
 - **Strict atomic quota** — when quota correctness must survive concurrent signup bursts without soft-reservation overrun. Needs a plugin-owned D1 concurrency contract and tests proving simultaneous registrations cannot exceed policy limits.
 - **PAR** — when registration requests become too large or sensitive for browser redirects.
 - **RAR** — only when flat OAuth scopes cannot express the authorization request without unsafe custom JSON.
 - **Admin approval / waitlist / analytics / abuse dashboards** — when the product needs an operator workflow beyond allow/deny policy.
 - **Dynamic client registration changes** — require a separate client-management contract.
 
-**Decision gate:** Whether the next registration need is correctness, protocol integrity, or operator workflow. Each produces a different design.
+**Decision gate:** Policy management UI is the current operator-workflow target. Future maturity still requires choosing whether the next need is correctness, protocol integrity, or a larger operator workflow. Each produces a different design.
 
 **Depends on:** None for strict quota beyond architecture approval; protocol items are independent.
 
@@ -124,16 +125,16 @@ Each workstream uses the same shape: **Objective**, **Current state**, **Directi
 
 Default order. Each step's gate must be settled before its build.
 
-1. **Settle Access IA** — decide whether registration policies move under Access; update the route/spec contract with redirects from existing Identity paths. (Workstream 3.1)
+1. **Settle Access IA** — registration policies move under Access; update the route/spec contract with redirects from existing Identity paths. (Workstream 3.1)
 2. **Define Admin IAM** — write the delegated-admin product contract: minimum roles, bindable principals, scopes, audit details, and how `ConsolePermission` changes. (Workstream 3.1)
-3. **Pick the next registration maturity target** — strict quota, PAR/RAR, approval/waitlist, or analytics. (Workstream 3.2)
+3. **Pick the next registration maturity target** — policy management UI first, then strict quota, PAR/RAR, approval/waitlist, or analytics only when a specific trigger exists. (Workstream 3.2)
 4. **Define the org security read model** — before expanding org sessions/tokens or joined-field search. (Workstream 3.3)
 5. **Pick one Account capability** — only after its standards boundary and owner surface are clear. (Workstream 3.4)
 6. **Start identity events** — when a specific visible-history or downstream-reliability need exists. (Workstream 3.5)
 
 ## 5. Decisions To Record Before Build
 
-- **Access IA** — Access owns admission and IAM policy surfaces; Identity owns people and memberships. If accepted, registration policy screens move under Access and Identity routes become compatibility redirects.
+- **Access IA** — Access owns admission and IAM policy surfaces; Identity owns people and memberships. Registration policy screens move under Access and Identity routes become compatibility redirects.
 - **Delegated admin** — partial admin authority is roles-on-scope through `idAdminDelegation`, not hard-coded UI conditionals.
 - **Registration quota** — soft quota stays acceptable until product or abuse pressure requires strict atomic enforcement.
 - **Org security** — org-scoped sessions/tokens require a bounded read model before UI.
@@ -157,9 +158,9 @@ Maps each source item from the `docs/032` deferred/re-evaluation table to its wo
 
 | Source item | Prior position | Workstream | Retained detail |
 |---|---|---|---|
-| Registration policy admin console | Pulled forward as D5, L | 3.1 Access Policy And Admin IAM | Console exists; route placement is the open decision. The screen controls client admission, invite/domain/quota rules, and default grants. If Access owns policy surfaces, move the UI from Identity to Access with compatibility redirects. |
-| Admins & Roles management screen | Deferred, XL | 3.1 Access Policy And Admin IAM | Current screen is read-only derived state. Write controls require the delegated-admin model first: roles, bindable principals, bindable scopes, audit details, and permission projection into `ConsoleScope.permissions`. |
-| `idAdminDelegation` plugin | Deferred, XL | 3.1 Access Policy And Admin IAM | Schema/runtime half of Admin IAM. `adminRole` defines permission sets from `ConsolePermission`; `adminRoleBinding` binds user/team/group or approved OAuth clients to typed scopes (`platform`, `organization:org_123`, finer resource scopes). |
+| Registration policy admin console | Pulled forward as D5, L | 3.1 Access Policy And Admin IAM | Console is canonical under Access. The screen controls client admission, invite/domain/quota rules, scopes, validity, email verification, and default grants. Identity routes remain compatibility redirects. |
+| Admins & Roles management screen | Deferred, XL | 3.1 Access Policy And Admin IAM | Current screen shows platform admins, organization owner/admin memberships, and delegated role bindings as distinct authority sources. Full write controls still require console permission projection, activation semantics, audit behavior, and product-approved roles. |
+| `idAdminDelegation` plugin | Deferred, XL | 3.1 Access Policy And Admin IAM | Base plugin schema/runtime exists. `adminRole` defines permission sets from `ConsolePermission`; `adminRoleBinding` binds user/team/group or approved OAuth clients to typed scopes (`platform`, `organization:org_123`, finer resource scopes). Bindings are managed/readable by platform admins but do not grant console route authority until projection is enabled. |
 | Strict atomic quota | Deferred, L | 3.2 Registration Reliability And Protocol Growth | Soft quota stays the first-release model. Strict quota needs a plugin-owned D1 concurrency contract and tests proving simultaneous registrations cannot exceed policy limits. |
 | Registration PAR/RAR, admin approval, waitlist, analytics/abuse dashboards, dynamic client registration | Deferred, M–XL | 3.2 Registration Reliability And Protocol Growth | Separate upgrades. PAR for large/sensitive requests; RAR for structured authorization beyond flat scopes; approval/waitlist/analytics are operator workflows; dynamic client registration needs a separate client-management contract. |
 | Org-scoped sessions/tokens | Deferred, XL | 3.3 Org-Scoped Security Observability | Do not scan global session/token tables for org admins. Build only after a bounded read side exists. |
@@ -185,3 +186,11 @@ Maps each source item from the `docs/032` deferred/re-evaluation table to its wo
 - Admins & Roles and `idAdminDelegation` are treated as one delegated-admin IAM workstream.
 - Each workstream states the contract to settle before build.
 - Already-shipped items are separated from active roadmap work.
+
+## 9. Implementation Status
+
+2026-06-12:
+
+- 3.1 Access IA moved registration policies to Access routes: `/admin/platform/access/registration-policies` and `/admin/orgs/:orgId/access/registration-policies`. Existing Identity routes remain compatibility redirects and the Better Auth plugin API path stays `/api/auth/admin/registration-policies*`.
+- 3.1 delegated-admin base added the `idAdminDelegation` Better Auth plugin with plugin-owned `adminRole` and `adminRoleBinding` tables, platform-admin-managed role/binding endpoints under `/api/auth/admin/delegation/*`, route-contract coverage, generated migration/schema artifacts, and an Admins & Roles read projection for delegated bindings. Delegated bindings are visible management state only for this slice; console-scope permission projection and route authorization remain the next activation contract.
+- 3.2 operator maturity started with policy-management UI on the existing `idRegistration` endpoints: create/edit draft policies, bind client/org/resource ids, configure allowed scopes/domains/default teams, quota limit/target, email verification, and validity windows. OAuth client detail now links to the Access registration-policy screen filtered to that client. Strict atomic quota, PAR, RAR, approval/waitlist, analytics, and dynamic client-registration changes remain trigger-based follow-up designs, not bundled into this UI slice.

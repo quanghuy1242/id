@@ -268,6 +268,21 @@ describe("admin middleware", () => {
         "/admin/platform/identity/organizations/org_123/teams",
         "",
       ],
+      [
+        "/admin/identity/registration-policies?selected=regpol_123",
+        "/admin/platform/access/registration-policies",
+        "?selected=regpol_123",
+      ],
+      [
+        "/admin/platform/identity/registration-policies?status=enabled",
+        "/admin/platform/access/registration-policies",
+        "?status=enabled",
+      ],
+      [
+        "/admin/orgs/org_123/identity/registration-policies?q=beta",
+        "/admin/orgs/org_123/access/registration-policies",
+        "?q=beta",
+      ],
     ] as const;
 
     for (const [source, expectedPath, expectedSearch] of cases) {

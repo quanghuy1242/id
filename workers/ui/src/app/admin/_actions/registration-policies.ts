@@ -1,5 +1,6 @@
 import {
   authApiGetOrThrow,
+  authApiPatchOrThrow,
   authApiPostOrThrow,
   type ActiveScope,
 } from "@idco/lib";
@@ -68,6 +69,30 @@ export type RegistrationIntent = {
   readonly failureReason: string | null;
 };
 
+export type RegistrationPolicyFormInput = {
+  readonly slug: string;
+  readonly name: string;
+  readonly mode: string;
+  readonly clientId?: string | null;
+  readonly organizationId?: string | null;
+  readonly resourceServerId?: string | null;
+  readonly allowedScopes?: readonly string[];
+  readonly emailDomains?: readonly string[];
+  readonly defaultRole?: "member";
+  readonly defaultTeamIds?: readonly string[];
+  readonly quotaLimit?: number | null;
+  readonly quotaTarget?: "accounts" | "memberships";
+  readonly requiresEmailVerification?: boolean;
+  readonly startsAt?: number | null;
+  readonly expiresAt?: number | null;
+};
+
+export type RegistrationPolicyUpdateInput = Partial<
+  RegistrationPolicyFormInput & {
+    readonly status: RegistrationPolicyStatus;
+  }
+>;
+
 export async function listRegistrationPolicies(
   scope: ActiveScope = platformScope,
 ): Promise<RegistrationPolicy[]> {
@@ -76,6 +101,25 @@ export async function listRegistrationPolicies(
     orgParams(scope),
   );
   return response.policies ?? [];
+}
+
+export async function createRegistrationPolicy(
+  input: RegistrationPolicyFormInput,
+): Promise<RegistrationPolicy> {
+  return authApiPostOrThrow<RegistrationPolicy>(
+    "/admin/registration-policies",
+    input,
+  );
+}
+
+export async function updateRegistrationPolicy(
+  policyId: string,
+  input: RegistrationPolicyUpdateInput,
+): Promise<RegistrationPolicy> {
+  return authApiPatchOrThrow<RegistrationPolicy>(
+    `/admin/registration-policies/${encodeURIComponent(policyId)}`,
+    input,
+  );
 }
 
 export async function enableRegistrationPolicy(

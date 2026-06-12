@@ -332,8 +332,23 @@
     },
     {
       "tool": "fallow",
-      "files": "workers/ui/src/app/admin/orgs/[orgId]/identity/registration-policies/page.tsx|workers/ui/src/app/admin/platform/identity/registration-policies/page.tsx",
+      "files": "workers/ui/src/app/admin/orgs/[orgId]/access/registration-policies/page.tsx|workers/ui/src/app/admin/platform/access/registration-policies/page.tsx",
       "reason": "Platform and organization registration-policy route files intentionally mirror the route-bound URL adapter pattern while passing different ActiveScope and routePath values; moving useSearchParams out of route files would violate the admin UI route-boundary rule."
+    },
+    {
+      "tool": "fallow",
+      "files": "stories/access/admins-roles.stories.tsx|workers/ui/tests/pages/admins-roles-content.test.tsx",
+      "reason": "Admins & Roles story and page test intentionally share explicit delegated-admin fixture data so the visual scenario and assertion scenario cover the same authority sources."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/admin-delegation/schema.ts|workers/core/src/auth/plugins/registration/schema.ts",
+      "reason": "Better Auth plugin schema modules intentionally repeat endpoint metadata helper shape so each plugin owns its OpenAPI tags, path params, request body, and response schema."
+    },
+    {
+      "tool": "fallow",
+      "files": "workers/core/src/auth/plugins/admin-delegation/schema.ts|workers/core/src/auth/plugins/registration/schema.ts|workers/core/src/auth/plugins/resource-server/schema.ts",
+      "reason": "Better Auth plugin schema modules intentionally repeat endpoint metadata helper shape across plugin-owned OpenAPI contracts instead of sharing a generic CRUD abstraction."
     }
   ]
 }
