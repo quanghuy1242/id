@@ -3,13 +3,13 @@
 import {
   ConfirmDialog,
   DateTimeInput,
+  Grid,
   NumberInput,
   RadioGroup,
   ResourceSelector,
   type ResourceOption,
   ScopeBuilder,
   type ScopeSuggestion,
-  Stack,
   Switch,
   TagInput,
   TextInput,
@@ -139,9 +139,10 @@ export function PolicyDialog({
       description="Policy changes affect hosted registration immediately. Disabled clients still cannot create accounts unless policy and OAuth checks both pass."
       confirmLabel={policy ? "Save" : "Create"}
       error={error}
+      size="lg"
       onConfirm={onConfirm}
     >
-      <Stack gap="sm">
+      <Grid columns="two" gap="md">
         <TextInput label="Name" name="name" required defaultValue={policy?.name ?? ""} />
         <TextInput label="Slug" name="slug" required defaultValue={policy?.slug ?? ""} />
         <RadioGroup
@@ -246,7 +247,7 @@ export function PolicyDialog({
           value={form.expiresAt}
           onChange={(next) => setField("expiresAt", next)}
         />
-      </Stack>
+      </Grid>
     </ConfirmDialog>
   );
 }
