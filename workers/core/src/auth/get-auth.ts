@@ -19,6 +19,7 @@ import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
 import { idAdminSignInGuard } from "./plugins/admin-sign-in-guard";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
+import { idOAuthClientAdmin } from "./plugins/oauth-client-admin";
 import { idAdminAudit } from "./plugins/admin-audit";
 import { idAdminActivityLog } from "./plugins/admin-activity-log";
 import { idAdminDelegation } from "./plugins/admin-delegation";
@@ -196,6 +197,9 @@ export function getAuthOptions(
         authorize: authorizePlatformAccess,
       }),
       idOAuthClientPicker({ issuer }),
+      idOAuthClientAdmin({
+        authorize: authorizePlatformAccess,
+      }),
       idAdminAudit({
         authorize: authorizePlatformAccess,
         jwksGracePeriodMs: authPluginConfig.jwksGracePeriodMs,

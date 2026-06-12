@@ -279,23 +279,34 @@ describe("idResourceServer plugin endpoint", () => {
       ),
     );
     expect(platformOrgList.status).toBe(200);
-    await expect(platformOrgList.json()).resolves.toEqual({
+    await expect(platformOrgList.json()).resolves.toMatchObject({
       resourceServers: [
         expect.objectContaining({
           id: createdOne.id,
           organizationId: organizationOne.id,
         }),
       ],
+      items: [
+        expect.objectContaining({
+          id: createdOne.id,
+          organizationId: organizationOne.id,
+        }),
+      ],
+      total: 1,
     });
 
     const list = await auth.handler(
-      new Request("https://id.example.test/api/auth/admin/resource-servers", {
-        headers: { cookie: ownerCookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers?organizationId=${organizationOne.id}`,
+        {
+          headers: { cookie: ownerCookie },
+        },
+      ),
     );
     expect(list.status).toBe(200);
-    await expect(list.json()).resolves.toEqual({
+    await expect(list.json()).resolves.toMatchObject({
       resourceServers: [expect.objectContaining({ id: createdOne.id })],
+      items: [expect.objectContaining({ id: createdOne.id })],
     });
 
     const crossOrg = await auth.handler(
@@ -315,11 +326,13 @@ describe("idResourceServer plugin endpoint", () => {
     expect(memberSignIn.status).toBe(200);
     const memberCookie = memberSignIn.headers.get("set-cookie") ?? "";
     const memberList = await auth.handler(
-      new Request("https://id.example.test/api/auth/admin/resource-servers", {
-        headers: { cookie: memberCookie },
-      }),
+      new Request(
+        `https://id.example.test/api/auth/admin/resource-servers?organizationId=${organizationOne.id}`,
+        {
+          headers: { cookie: memberCookie },
+        },
+      ),
     );
-    expect(memberList.status).toBe(200);
-    await expect(memberList.json()).resolves.toEqual({ resourceServers: [] });
+    expect(memberList.status).toBe(403);
   });
 });

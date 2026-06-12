@@ -1,6 +1,6 @@
 # Scalable Resource Pickers and Server-Side List Pagination
 
-> Status: implementation-grade design and proposal, approved for build (scope + OAuth-client direction approved 2026-06-12)
+> Status: implemented locally in auth + idco link mode (2026-06-12); external release handoff remains for publishing idco and repinning the registry graph
 >
 > Date: 2026-06-12
 >
@@ -14,6 +14,13 @@
 > - `workers/ui/src/app/admin/_data/swr-keys.ts`, `workers/ui/src/shared/swr-endpoints.ts` — param-aware keys / endpoint constant
 > - `workers/core/src/auth/plugins/resource-server/**` and `oauth-scope-catalog/**` — add `q`/`limit`/`offset`/`ids`
 > - new endpoint for paginated OAuth client listing (placement decision in §7.1)
+>
+> Implementation notes (2026-06-12):
+>
+> - Phase 1 is implemented in `~/pjs/idco`: `ResourceSelector` now supports debounced async loading, `minQueryLength`, and `initialOptions` hydration, including placeholder-to-label replacement when edit-mode ids hydrate after mount.
+> - Phase 2 is implemented in auth: the registration-policy dialog uses async picker loaders, bounded edit hydration, and no longer fetches the full OAuth client/resource-server/scope catalogs when opened. Organization/team search remains bounded client-filtered with a TODO because Better Auth does not expose paginated org/team search.
+> - Phase 3 is implemented in auth: resource servers and OAuth scopes accept `q`/`limit`/`offset`/`ids`; `idOAuthClientAdmin` exposes session-authenticated `GET /admin/oauth-clients`; the existing M2M `oauth-client-picker` keeps its bearer-token contract while sharing client presentation/query helpers.
+> - Verified locally in `pnpm dev:link` mode against the sibling idco checkout. Shipping still requires the documented cross-repo release: publish a new idco tag, then repin auth's committed registry dependency/lockfile.
 >
 > Local evidence (verified 2026-06-12):
 >
@@ -264,7 +271,7 @@ Verify the adapter supports the `in` operator for the model in use; if not, fall
 
 ### 7.1 Placement decision
 
-The existing `oauth-client-picker` plugin is **M2M bearer-token** only; mixing a session-authed endpoint into it muddies its identity. Recommended: a new small plugin `idOAuthClientAdmin` (`workers/core/src/auth/plugins/oauth-client-admin/`) exposing a single session-authed read endpoint, wired in `get-auth.ts`. Alternative: co-locate in an existing admin-oriented plugin. **Open decision (§14).** Either way: Better Auth imports stay under `workers/core/src/auth/**`; the endpoint reads the oauth-provider-owned `oauthClient` table via the adapter and **adds no new table** (no Drizzle schema change, no `db:generate`).
+The existing `oauth-client-picker` plugin is **M2M bearer-token** only; mixing a session-authed endpoint into it muddies its identity. Chosen implementation: a new small plugin `idOAuthClientAdmin` (`workers/core/src/auth/plugins/oauth-client-admin/`) exposing a single session-authed read endpoint, wired in `get-auth.ts`. Better Auth imports stay under `workers/core/src/auth/**`; the endpoint reads the oauth-provider-owned `oauthClient` table via the adapter and **adds no new table** (no Drizzle schema change, no `db:generate`).
 
 ### 7.2 Route and query schema
 
@@ -404,9 +411,8 @@ This removes the duplicated read/query/secret-stripping logic (the real consolid
 
 ## 14. Open decisions
 
-1. **Client-admin endpoint placement & shared layer:** new `idOAuthClientAdmin` plugin (recommended) vs co-locating in an existing admin plugin. Either way, extract the shared client read/query/secret-strip module that both the new session endpoint and the existing M2M `oauth-client-picker` lookup import (§7.8) — confirm the refactor keeps `oauth-client-picker`'s bearer-token contract byte-for-byte.
-2. **Migrate the main OAuth clients list *screen* to server pagination** now, or only the picker? (This doc only requires the picker; the screen migration is a clean follow-up reusing the same endpoint.)
-3. **Organizations pagination:** accept Better Auth's full `/organization/list` for the org picker, or add a repo org-list endpoint later. Deferred here.
+1. **Migrate the main OAuth clients list *screen* to server pagination** now, or only the picker? (This doc only requires the picker; the screen migration is a clean follow-up reusing the same endpoint.)
+2. **Organizations pagination:** accept Better Auth's full `/organization/list` for the org picker, or add a repo org-list endpoint later. Deferred here.
 
 ## 15. Out of scope
 

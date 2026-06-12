@@ -1,13 +1,19 @@
 export type AdapterContext = {
   readonly findOne: <T>(query: {
     model: string;
-    where: { field: string; value: unknown }[];
+    where: { field: string; value: unknown; operator?: string }[];
   }) => Promise<T | null>;
   readonly findMany: <T>(query: {
     model: string;
-    where?: { field: string; value: unknown }[];
+    where?: { field: string; value: unknown; operator?: string }[];
+    limit?: number;
+    offset?: number;
     sortBy?: { field: string; direction: "asc" | "desc" };
   }) => Promise<T[]>;
+  readonly count: (query: {
+    model: string;
+    where?: { field: string; value: unknown; operator?: string }[];
+  }) => Promise<number | bigint>;
   readonly create: <T>(query: {
     model: string;
     data: Record<string, unknown>;

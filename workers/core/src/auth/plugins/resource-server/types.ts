@@ -15,8 +15,15 @@ export type AdapterContext = {
   }) => Promise<T | null>;
   readonly findMany: <T>(params: {
     model: string;
-    where?: Array<{ field: string; value: unknown }>;
+    where?: Array<{ field: string; value: unknown; operator?: string }>;
+    limit?: number;
+    offset?: number;
+    sortBy?: { field: string; direction: "asc" | "desc" };
   }) => Promise<T[]>;
+  readonly count: (params: {
+    model: string;
+    where?: Array<{ field: string; value: unknown; operator?: string }>;
+  }) => Promise<number | bigint>;
   readonly create: <T>(params: {
     model: string;
     data: Record<string, unknown>;

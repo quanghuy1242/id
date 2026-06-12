@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Badge,
@@ -39,21 +39,25 @@ import {
 } from "../../_actions/registration-policies";
 import {
   listClients as listClientsAction,
+  listClientsPage as listClientsPageAction,
   listResourceServers as listResourceServersAction,
+  listResourceServersPage as listResourceServersPageAction,
   listScopes as listScopesAction,
+  listScopesPage as listScopesPageAction,
+  type OAuthClient,
+  type OAuthResourceScope,
+  type ResourceServer,
 } from "../../_actions/oauth";
 import {
   listOrganizations as listOrganizationsAction,
   listTeams as listTeamsAction,
+  type Organization,
+  type Team,
 } from "../../_actions/organizations";
 import {
-  oauthClientsKey,
-  oauthScopesKey,
-  orgTeamsKey,
-  orgsListKey,
   registrationPoliciesKey,
   registrationPolicyIntentsKey,
-  resourceServersKey,
+  registrationPolicyScopeSuggestionsKey,
 } from "@/app/admin/_data/swr-keys";
 import {
   PolicyDialog,
@@ -81,8 +85,11 @@ const defaultActions = {
   archiveRegistrationPolicy: archiveRegistrationPolicyAction,
   listRegistrationPolicyIntents: listRegistrationPolicyIntentsAction,
   listClients: listClientsAction,
+  listClientsPage: listClientsPageAction,
   listResourceServers: listResourceServersAction,
+  listResourceServersPage: listResourceServersPageAction,
   listScopes: listScopesAction,
+  listScopesPage: listScopesPageAction,
   listOrganizations: listOrganizationsAction,
   listTeams: listTeamsAction,
 };
@@ -152,6 +159,63 @@ function sortPolicies(policies: readonly RegistrationPolicy[], sortBy: string, s
   });
 }
 
+function clientOption(client: OAuthClient): ResourceOption {
+  return {
+    id: client.client_id,
+    label: client.client_name || client.client_id,
+    sublabel: client.client_id,
+    badge: client.type ?? (client.public ? "public" : undefined),
+  };
+}
+
+function organizationOption(org: Organization): ResourceOption {
+  return { id: org.id, label: org.name || org.slug, sublabel: org.slug };
+}
+
+function resourceServerOption(server: ResourceServer): ResourceOption {
+  return { id: server.id, label: server.name, sublabel: server.audience };
+}
+
+function teamOption(team: Team): ResourceOption {
+  return { id: team.id, label: team.name, sublabel: team.id };
+}
+
+function scopeSuggestion(entry: OAuthResourceScope): ScopeSuggestion {
+  return { value: entry.scope, description: entry.description ?? undefined };
+}
+
+function optionFallback(id: string): ResourceOption {
+  return { id, label: id };
+}
+
+function optionMatches(option: ResourceOption, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [option.id, option.label, option.sublabel, option.badge].some((value) => value?.toLowerCase().includes(q));
+}
+
+function useDebouncedValue(value: string, delayMs: number): string {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timeout);
+  }, [delayMs, value]);
+
+  return debounced;
+}
+
+type InitialPickerOptions = {
+  readonly clients: ResourceOption[];
+  readonly organizations: ResourceOption[];
+  readonly resourceServers: ResourceOption[];
+  readonly teams: ResourceOption[];
+};
+
+function emptyInitialPickerOptions(): InitialPickerOptions {
+  return { clients: [], organizations: [], resourceServers: [], teams: [] };
+}
+
 const intentColumns: DataTableColumn<RegistrationIntent>[] = [
   { key: "email", label: "Email", render: (intent) => intent.email ?? "—" },
   { key: "status", label: "Status", render: (intent) => <Badge tone={statusTone(intent.status)}>{intent.status}</Badge> },
@@ -175,6 +239,9 @@ export function RegistrationPoliciesContent({
   const [policyDialog, setPolicyDialog] = useState<PolicyDialogState | null>(null);
   const [form, setForm] = useState<PolicyFormState>(() => initialFormState(null, scope));
   const [policyDialogError, setPolicyDialogError] = useState<string | undefined>();
+  const [scopeSearch, setScopeSearch] = useState("");
+  const [initialPickerOptions, setInitialPickerOptions] = useState<InitialPickerOptions>(() => emptyInitialPickerOptions());
+  const debouncedScopeSearch = useDebouncedValue(scopeSearch, 250);
 
   const search = props.search ?? internalSearch;
   const status = props.status ?? internalStatus;
@@ -207,53 +274,53 @@ export function RegistrationPoliciesContent({
     () => actions.listRegistrationPolicyIntents(selectedPolicy!.id),
   );
 
-  // Catalogs powering the create/edit pickers — only fetched while the dialog is open.
   const dialogOpen = policyDialog !== null;
-  const { data: clients } = useSWR(
-    dialogOpen ? oauthClientsKey(scope) : null,
-    () => actions.listClients(scope),
-  );
-  const { data: organizations } = useSWR(
-    dialogOpen ? orgsListKey() : null,
-    () => actions.listOrganizations(),
-  );
-  const { data: resourceServers } = useSWR(
-    dialogOpen ? resourceServersKey(scope) : null,
-    () => actions.listResourceServers(scope),
-  );
-  const { data: scopeCatalog } = useSWR(
-    dialogOpen ? oauthScopesKey(scope) : null,
-    () => actions.listScopes(scope),
-  );
-  const { data: teams } = useSWR(
-    dialogOpen && form.organizationId ? orgTeamsKey(form.organizationId) : null,
-    () => actions.listTeams(form.organizationId),
-  );
-
-  const clientOptions = useMemo<ResourceOption[]>(
-    () => (clients ?? []).map((client) => ({
-      id: client.client_id,
-      label: client.client_name || client.client_id,
-      sublabel: client.client_id,
-      badge: client.type ?? (client.public ? "public" : undefined),
-    })),
-    [clients],
-  );
-  const organizationOptions = useMemo<ResourceOption[]>(
-    () => (organizations ?? []).map((org) => ({ id: org.id, label: org.name || org.slug, sublabel: org.slug })),
-    [organizations],
-  );
-  const resourceServerOptions = useMemo<ResourceOption[]>(
-    () => (resourceServers ?? []).map((server) => ({ id: server.id, label: server.name, sublabel: server.audience })),
-    [resourceServers],
-  );
-  const teamOptions = useMemo<ResourceOption[]>(
-    () => (teams ?? []).map((team) => ({ id: team.id, label: team.name, sublabel: team.id })),
-    [teams],
+  const { data: scopeCatalogPage } = useSWR(
+    dialogOpen ? registrationPolicyScopeSuggestionsKey(scope, debouncedScopeSearch) : null,
+    () => actions.listScopesPage({ scope, q: debouncedScopeSearch || undefined, limit: 20, offset: 0 }),
   );
   const scopeSuggestions = useMemo<ScopeSuggestion[]>(
-    () => (scopeCatalog ?? []).map((entry) => ({ value: entry.scope, description: entry.description ?? undefined })),
-    [scopeCatalog],
+    () => (scopeCatalogPage?.items ?? []).map(scopeSuggestion),
+    [scopeCatalogPage],
+  );
+
+  const loadClients = useCallback(
+    async (query: string, signal: AbortSignal): Promise<ResourceOption[]> => {
+      if (!query.trim()) return [];
+      const page = await actions.listClientsPage({ scope, q: query || undefined, limit: 20, offset: 0 }, signal);
+      return page.items.map(clientOption);
+    },
+    [actions, scope],
+  );
+
+  const loadResourceServers = useCallback(
+    async (query: string, signal: AbortSignal): Promise<ResourceOption[]> => {
+      if (!query.trim()) return [];
+      const page = await actions.listResourceServersPage({ scope, q: query || undefined, limit: 20, offset: 0 }, signal);
+      return page.items.map(resourceServerOption);
+    },
+    [actions, scope],
+  );
+
+  const loadOrganizations = useCallback(
+    async (query: string): Promise<ResourceOption[]> => {
+      if (!query.trim()) return [];
+      // docs/036 §14: Better Auth organization/team endpoints remain client-filtered until those APIs grow paginated search.
+      const organizations = await actions.listOrganizations();
+      return organizations.map(organizationOption).filter((option) => optionMatches(option, query)).slice(0, 20);
+    },
+    [actions],
+  );
+
+  const loadTeams = useCallback(
+    async (query: string): Promise<ResourceOption[]> => {
+      if (!query.trim()) return [];
+      if (!form.organizationId) return [];
+      // docs/036 §14: Better Auth organization/team endpoints remain client-filtered until those APIs grow paginated search.
+      const teams = await actions.listTeams(form.organizationId);
+      return teams.map(teamOption).filter((option) => optionMatches(option, query)).slice(0, 20);
+    },
+    [actions, form.organizationId],
   );
 
   const filteredPolicies = useMemo(
@@ -305,16 +372,55 @@ export function RegistrationPoliciesContent({
     }
   }
 
+  async function hydratePickerOptions(policy: RegistrationPolicy) {
+    const nextForm = initialFormState(policy, scope);
+    const [clientPage, resourceServerPage, organizations, teams] = await Promise.all([
+      policy.clientId
+        ? actions.listClientsPage({ scope, ids: [policy.clientId], limit: 1, offset: 0 })
+        : Promise.resolve({ items: [] }),
+      policy.resourceServerId
+        ? actions.listResourceServersPage({ scope, ids: [policy.resourceServerId], limit: 1, offset: 0 })
+        : Promise.resolve({ items: [] }),
+      nextForm.organizationId ? actions.listOrganizations() : Promise.resolve([]),
+      nextForm.organizationId && nextForm.defaultTeamIds.length > 0
+        ? actions.listTeams(nextForm.organizationId)
+        : Promise.resolve([]),
+    ]);
+    const organizationOptions = nextForm.organizationId
+      ? organizations.map(organizationOption).filter((option) => option.id === nextForm.organizationId)
+      : [];
+    const teamIds = new Set(nextForm.defaultTeamIds);
+    const teamOptions = teams.map(teamOption).filter((option) => teamIds.has(option.id));
+    setInitialPickerOptions({
+      clients: clientPage.items.length > 0 ? clientPage.items.map(clientOption) : nextForm.clientId ? [optionFallback(nextForm.clientId)] : [],
+      organizations: organizationOptions.length > 0 ? organizationOptions : nextForm.organizationId ? [optionFallback(nextForm.organizationId)] : [],
+      resourceServers: resourceServerPage.items.length > 0 ? resourceServerPage.items.map(resourceServerOption) : nextForm.resourceServerId ? [optionFallback(nextForm.resourceServerId)] : [],
+      teams: teamOptions.length > 0 ? teamOptions : nextForm.defaultTeamIds.map(optionFallback),
+    });
+  }
+
   function openCreateDialog() {
     setPolicyDialogError(undefined);
+    setScopeSearch("");
+    setInitialPickerOptions(emptyInitialPickerOptions());
     setForm(initialFormState(null, scope));
     setPolicyDialog({ mode: "create" });
   }
 
   function openEditDialog(policy: RegistrationPolicy) {
     setPolicyDialogError(undefined);
+    setScopeSearch("");
+    setInitialPickerOptions({
+      clients: policy.clientId ? [optionFallback(policy.clientId)] : [],
+      organizations: policy.organizationId ? [optionFallback(policy.organizationId)] : [],
+      resourceServers: policy.resourceServerId ? [optionFallback(policy.resourceServerId)] : [],
+      teams: policy.defaultTeamIds.map(optionFallback),
+    });
     setForm(initialFormState(policy, scope));
     setPolicyDialog({ mode: "edit", policy });
+    void hydratePickerOptions(policy).catch((cause) => {
+      setPolicyDialogError(cause instanceof Error ? cause.message : String(cause));
+    });
   }
 
   const policyColumns: DataTableColumn<RegistrationPolicy>[] = [
@@ -439,11 +545,17 @@ export function RegistrationPoliciesContent({
         form={form}
         setField={setField}
         error={policyDialogError}
-        clientOptions={clientOptions}
-        organizationOptions={organizationOptions}
-        resourceServerOptions={resourceServerOptions}
-        teamOptions={teamOptions}
+        initialClientOptions={initialPickerOptions.clients}
+        initialOrganizationOptions={initialPickerOptions.organizations}
+        initialResourceServerOptions={initialPickerOptions.resourceServers}
+        initialTeamOptions={initialPickerOptions.teams}
+        loadClients={loadClients}
+        loadOrganizations={loadOrganizations}
+        loadResourceServers={loadResourceServers}
+        loadTeams={loadTeams}
         scopeSuggestions={scopeSuggestions}
+        scopeSearch={scopeSearch}
+        onScopeSearchChange={setScopeSearch}
         onOpenChange={(open) => {
           if (!open) setPolicyDialog(null);
         }}

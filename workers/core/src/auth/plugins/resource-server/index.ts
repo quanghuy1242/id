@@ -4,7 +4,10 @@ import {
   sessionMiddleware,
 } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
-import { RESOURCE_SERVER_MODEL } from "../../../shared/constants";
+import {
+  ADMIN_TYPEAHEAD_MAX_LIST_LIMIT,
+  RESOURCE_SERVER_MODEL,
+} from "../../../shared/constants";
 import type { AdapterContext, ResourceServerPluginOptions } from "./types";
 import {
   assertResourceServerAccess,
@@ -29,6 +32,10 @@ import {
 } from "./schema";
 
 export type { ResourceServerPluginOptions } from "./types";
+
+function cloneResourceServerRow(row: ResourceServerRow): ResourceServerRow {
+  return Object.assign({}, row);
+}
 
 const createResourceServerMetadata = resourceServerEndpointMeta({
   description: "Create a new resource server",
@@ -85,6 +92,43 @@ function requestedOrganizationId(
   return typeof query?.organizationId === "string" && query.organizationId
     ? query.organizationId
     : undefined;
+}
+
+function queryString(
+  query: Record<string, unknown> | undefined,
+  field: string,
+): string | undefined {
+  const value = query?.[field];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function queryNumber(
+  query: Record<string, unknown> | undefined,
+  field: string,
+  min: number,
+  max: number,
+): number | undefined {
+  const value = queryString(query, field);
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new APIError("BAD_REQUEST", {
+      message: `${field} must be an integer between ${min} and ${max}`,
+    });
+  }
+  return parsed;
+}
+
+function queryIds(
+  query: Record<string, unknown> | undefined,
+): readonly string[] | undefined {
+  const value = queryString(query, "ids");
+  if (!value) return undefined;
+  const ids = value
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? ids : undefined;
 }
 
 function assertRequestedOrganization(
@@ -153,32 +197,66 @@ export const idResourceServer = (
         if (!session) throw new APIError("UNAUTHORIZED");
         const organizationId = requestedOrganizationId(ctx.query);
 
-        const rows = await ctx.context.adapter.findMany<ResourceServerRow>({
+        await assertResourceServerAccess(
+          options.authorize,
+          organizationId ?? null,
+          session.user.id,
+          session.user.role,
+          ctx.context.adapter,
+        );
+        const adapter = ctx.context.adapter as AdapterContext;
+        const where: Array<{
+          field: string;
+          value: unknown;
+          operator?: string;
+        }> = [];
+        if (organizationId)
+          where.push({ field: "organizationId", value: organizationId });
+        const ids = queryIds(ctx.query);
+        if (ids?.length) {
+          const items = await adapter.findMany<ResourceServerRow>({
+            model: RESOURCE_SERVER_MODEL,
+            where: [...where, { field: "id", value: [...ids], operator: "in" }],
+            sortBy: { field: "createdAt", direction: "desc" },
+          });
+          return ctx.json({
+            resourceServers: items,
+            items: items.map(cloneResourceServerRow),
+          });
+        }
+
+        const q = queryString(ctx.query, "q");
+        if (q) where.push({ field: "name", value: q, operator: "contains" });
+        const filters = where.length > 0 ? where : undefined;
+        const limit = queryNumber(
+          ctx.query,
+          "limit",
+          1,
+          ADMIN_TYPEAHEAD_MAX_LIST_LIMIT,
+        );
+        const offset = queryNumber(
+          ctx.query,
+          "offset",
+          0,
+          Number.MAX_SAFE_INTEGER,
+        );
+        const total = Number(
+          await adapter.count({ model: RESOURCE_SERVER_MODEL, where: filters }),
+        );
+        const items = await adapter.findMany<ResourceServerRow>({
           model: RESOURCE_SERVER_MODEL,
+          where: filters,
+          limit,
+          offset,
           sortBy: { field: "createdAt", direction: "desc" },
         });
-        const access = await Promise.all(
-          rows.map(async (row) => ({
-            row,
-            visible: await canAccessResourceServer(
-              options.authorize,
-              row,
-              session.user.id,
-              session.user.role,
-              ctx.context.adapter,
-            ),
-          })),
-        );
-        const visible = access
-          .filter((entry) => entry.visible)
-          .map((entry) => entry.row)
-          .filter(
-            (row) =>
-              organizationId === undefined ||
-              row.organizationId === organizationId,
-          );
-
-        return ctx.json({ resourceServers: visible });
+        return ctx.json({
+          resourceServers: items,
+          items: items.map(cloneResourceServerRow),
+          total,
+          limit,
+          offset,
+        });
       },
     ),
 

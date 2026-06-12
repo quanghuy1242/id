@@ -6,7 +6,8 @@ import { renderWithSwr as render } from "../_utils/swr-render";
 import { RegistrationPoliciesContent } from "@/app/admin/_components/access/registration-policies-content";
 import { mockRegistrationIntents, mockRegistrationPolicies } from "@/app/admin/_mocks/registration-policies";
 import type { RegistrationPolicy, RegistrationPolicyFormInput } from "@/app/admin/_actions/registration-policies";
-import type { OAuthClient } from "@/app/admin/_actions/oauth";
+import type { ListPage, OAuthClient, OAuthResourceScope, ResourceServer } from "@/app/admin/_actions/oauth";
+import type { Organization, Team } from "@/app/admin/_actions/organizations";
 
 const mockClients: OAuthClient[] = [
   {
@@ -20,6 +21,40 @@ const mockClients: OAuthClient[] = [
     type: "web",
   },
 ];
+const mockResourceServers: ResourceServer[] = [
+  {
+    id: "rs_content",
+    organizationId: null,
+    slug: "content",
+    name: "Content API",
+    audience: "https://content.example.test",
+    description: null,
+    enabled: true,
+    createdBy: "admin",
+    updatedBy: "admin",
+    disabledAt: null,
+    disabledBy: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  },
+];
+const mockScopes: OAuthResourceScope[] = [
+  {
+    id: "scope_content_read",
+    resourceServerId: "rs_content",
+    scope: "content:read",
+    description: "Read content",
+    enabled: true,
+    createdBy: "admin",
+    updatedBy: "admin",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  },
+];
+
+function page<T>(items: T[]): ListPage<T> {
+  return { items, total: items.length, limit: 20, offset: 0 };
+}
 
 function pressTrigger(button: HTMLElement) {
   button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
@@ -79,10 +114,13 @@ function makeActions(policies: RegistrationPolicy[]) {
     archiveRegistrationPolicy: vi.fn<(id: string) => Promise<RegistrationPolicy>>().mockImplementation((id) => setStatus(id, "archived")),
     listRegistrationPolicyIntents: vi.fn<() => Promise<typeof mockRegistrationIntents>>().mockResolvedValue(mockRegistrationIntents),
     listClients: vi.fn<() => Promise<OAuthClient[]>>().mockResolvedValue(mockClients),
-    listResourceServers: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
-    listScopes: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
-    listOrganizations: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
-    listTeams: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    listClientsPage: vi.fn<() => Promise<ListPage<OAuthClient>>>().mockResolvedValue(page(mockClients)),
+    listResourceServers: vi.fn<() => Promise<ResourceServer[]>>().mockResolvedValue(mockResourceServers),
+    listResourceServersPage: vi.fn<() => Promise<ListPage<ResourceServer>>>().mockResolvedValue(page(mockResourceServers)),
+    listScopes: vi.fn<() => Promise<OAuthResourceScope[]>>().mockResolvedValue(mockScopes),
+    listScopesPage: vi.fn<() => Promise<ListPage<OAuthResourceScope>>>().mockResolvedValue(page(mockScopes)),
+    listOrganizations: vi.fn<() => Promise<Organization[]>>().mockResolvedValue([]),
+    listTeams: vi.fn<() => Promise<Team[]>>().mockResolvedValue([]),
   };
 }
 
@@ -131,6 +169,11 @@ describe("RegistrationPoliciesContent", () => {
 
     // Pick the OAuth client from the picker instead of typing a raw id.
     pressTrigger(screen.getByRole("button", { name: /^client$/i }));
+    fireEvent.change(await screen.findByPlaceholderText("Select an OAuth client"), { target: { value: "Content" } });
+    await waitFor(() => expect(actions.listClientsPage).toHaveBeenCalledWith(
+      expect.objectContaining({ q: "Content", limit: 20, offset: 0 }),
+      expect.any(AbortSignal),
+    ));
     fireEvent.click(await screen.findByText("Content Web"));
 
     // Build an allowed scope via the catalog-aware scope builder.
@@ -159,10 +202,28 @@ describe("RegistrationPoliciesContent", () => {
     render(<RegistrationPoliciesContent actions={actions} selectedId="regpol_content_beta" />);
     await waitFor(() => expect(screen.getAllByText("Content beta").length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+    await waitFor(() => expect(actions.listClientsPage).toHaveBeenCalledWith(
+      expect.objectContaining({ ids: ["cli_content_web"], limit: 1, offset: 0 }),
+    ));
+    await waitFor(() => expect(screen.getByText("Content Web")).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Content launch" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => expect(actions.updateRegistrationPolicy).toHaveBeenCalledWith("regpol_content_beta", expect.objectContaining({
       name: "Content launch",
     })));
+  });
+
+  it("does not fetch full OAuth catalogs when opening the policy dialog", async () => {
+    const actions = makeActions(mockRegistrationPolicies);
+    render(<RegistrationPoliciesContent actions={actions} />);
+    await waitFor(() => expect(screen.getByText("Content beta")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /new policy/i }));
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    await waitFor(() => expect(actions.listScopesPage).toHaveBeenCalled());
+    expect(actions.listClients).not.toHaveBeenCalled();
+    expect(actions.listResourceServers).not.toHaveBeenCalled();
+    expect(actions.listScopes).not.toHaveBeenCalled();
+    expect(actions.listClientsPage).not.toHaveBeenCalled();
+    expect(actions.listResourceServersPage).not.toHaveBeenCalled();
   });
 });

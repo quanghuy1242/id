@@ -110,11 +110,17 @@ export function PolicyDialog({
   form,
   setField,
   error,
-  clientOptions,
-  organizationOptions,
-  resourceServerOptions,
-  teamOptions,
+  initialClientOptions,
+  initialOrganizationOptions,
+  initialResourceServerOptions,
+  initialTeamOptions,
+  loadClients,
+  loadOrganizations,
+  loadResourceServers,
+  loadTeams,
   scopeSuggestions,
+  scopeSearch,
+  onScopeSearchChange,
   onOpenChange,
   onConfirm,
 }: {
@@ -122,15 +128,27 @@ export function PolicyDialog({
   readonly form: PolicyFormState;
   readonly setField: <K extends keyof PolicyFormState>(key: K, value: PolicyFormState[K]) => void;
   readonly error?: string;
-  readonly clientOptions: ResourceOption[];
-  readonly organizationOptions: ResourceOption[];
-  readonly resourceServerOptions: ResourceOption[];
-  readonly teamOptions: ResourceOption[];
+  readonly initialClientOptions: ResourceOption[];
+  readonly initialOrganizationOptions: ResourceOption[];
+  readonly initialResourceServerOptions: ResourceOption[];
+  readonly initialTeamOptions: ResourceOption[];
+  readonly loadClients: (query: string, signal: AbortSignal) => Promise<ResourceOption[]>;
+  readonly loadOrganizations: (query: string, signal: AbortSignal) => Promise<ResourceOption[]>;
+  readonly loadResourceServers: (query: string, signal: AbortSignal) => Promise<ResourceOption[]>;
+  readonly loadTeams: (query: string, signal: AbortSignal) => Promise<ResourceOption[]>;
   readonly scopeSuggestions: ScopeSuggestion[];
+  readonly scopeSearch: string;
+  readonly onScopeSearchChange: (value: string) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly onConfirm: (formData: FormData) => Promise<boolean>;
 }) {
   const policy = state?.mode === "edit" ? state.policy : null;
+  const asyncPickerProps = {
+    variant: "menu" as const,
+    minQueryLength: 1,
+    searchDebounceMs: 250,
+    showLabel: true,
+  };
   return (
     <ConfirmDialog
       open={state !== null}
@@ -153,37 +171,40 @@ export function PolicyDialog({
           required
         />
         <ResourceSelector
+          {...asyncPickerProps}
           kind="oauth-client"
           label="Client"
-          variant="menu"
           name="clientId"
           placeholder="Select an OAuth client"
           value={form.clientId}
           onChange={(next) => setField("clientId", String(next))}
-          source={{ mode: "sync", items: clientOptions }}
-          showLabel
+          source={{ mode: "async", load: loadClients }}
+          initialOptions={initialClientOptions}
         />
         <ResourceSelector
+          {...asyncPickerProps}
           kind="organization"
           label="Organization"
-          variant="menu"
           name="organizationId"
           placeholder="Select an organization"
           value={form.organizationId}
-          onChange={(next) => setField("organizationId", String(next))}
-          source={{ mode: "sync", items: organizationOptions }}
-          showLabel
+          onChange={(next) => {
+            setField("organizationId", String(next));
+            setField("defaultTeamIds", []);
+          }}
+          source={{ mode: "async", load: loadOrganizations }}
+          initialOptions={initialOrganizationOptions}
         />
         <ResourceSelector
+          {...asyncPickerProps}
           kind="resource-server"
           label="Resource server"
-          variant="menu"
           name="resourceServerId"
           placeholder="Select a resource server"
           value={form.resourceServerId}
           onChange={(next) => setField("resourceServerId", String(next))}
-          source={{ mode: "sync", items: resourceServerOptions }}
-          showLabel
+          source={{ mode: "async", load: loadResourceServers }}
+          initialOptions={initialResourceServerOptions}
         />
         <ScopeBuilder
           label="Allowed scopes"
@@ -191,6 +212,8 @@ export function PolicyDialog({
           value={form.allowedScopes}
           onChange={(next) => setField("allowedScopes", next)}
           suggestions={scopeSuggestions}
+          searchValue={scopeSearch}
+          onSearchValueChange={onScopeSearchChange}
           variant="menu"
           allowCustom
         />
@@ -204,16 +227,16 @@ export function PolicyDialog({
           placeholder="acme.com, then Enter"
         />
         <ResourceSelector
+          {...asyncPickerProps}
           kind="team"
           label="Default teams"
-          variant="menu"
           selectionMode="multiple"
           name="defaultTeamIds"
           placeholder={form.organizationId ? "Add a default team" : "Select an organization first"}
           value={form.defaultTeamIds}
           onChange={(next) => setField("defaultTeamIds", Array.isArray(next) ? next : [next])}
-          source={{ mode: "sync", items: teamOptions }}
-          showLabel
+          source={{ mode: "async", load: loadTeams }}
+          initialOptions={initialTeamOptions}
         />
         <NumberInput
           label="Quota limit"

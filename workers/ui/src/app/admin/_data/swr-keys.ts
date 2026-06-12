@@ -70,6 +70,20 @@ export const resourceServersKey = (scope: ActiveScope = platformScope) =>
   [RESOURCE_SERVERS, scope] as const;
 export const oauthScopesKey = (scope: ActiveScope = platformScope) =>
   [OAUTH_SCOPES, scope] as const;
+export const registrationPolicyScopeSuggestionsKey = (
+  scope: ActiveScope = platformScope,
+  q?: string,
+) =>
+  [
+    OAUTH_SCOPES,
+    {
+      scope,
+      q: q || undefined,
+      limit: 20,
+      offset: 0,
+      purpose: "registration-policy-scope-suggestions",
+    },
+  ] as const;
 export const m2mBindingsKey = (scope: ActiveScope = platformScope) =>
   [OAUTH_CLIENT_RESOURCE_SCOPES, scope] as const;
 export const jwksKey = () => [JWKS] as const;

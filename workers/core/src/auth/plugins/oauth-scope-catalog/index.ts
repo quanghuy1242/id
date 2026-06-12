@@ -5,8 +5,10 @@ import {
 } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import {
+  ADMIN_TYPEAHEAD_MAX_LIST_LIMIT,
   OAUTH_CLIENT_RESOURCE_SCOPE_MODEL,
   OAUTH_RESOURCE_SCOPE_MODEL,
+  RESOURCE_SERVER_MODEL,
 } from "../../../shared/constants";
 import {
   assertCatalogAccess,
@@ -48,12 +50,55 @@ function adapterContext(adapter: unknown): AdapterContext {
   return adapter as AdapterContext;
 }
 
+function cloneOAuthResourceScope(
+  row: ReturnType<typeof presentOAuthResourceScope>,
+): ReturnType<typeof presentOAuthResourceScope> {
+  return Object.assign({}, row);
+}
+
 function requestedOrganizationId(
   query: Record<string, unknown> | undefined,
 ): string | undefined {
   return typeof query?.organizationId === "string" && query.organizationId
     ? query.organizationId
     : undefined;
+}
+
+function queryString(
+  query: Record<string, unknown> | undefined,
+  field: string,
+): string | undefined {
+  const value = query?.[field];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function queryNumber(
+  query: Record<string, unknown> | undefined,
+  field: string,
+  min: number,
+  max: number,
+): number | undefined {
+  const value = queryString(query, field);
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new APIError("BAD_REQUEST", {
+      message: `${field} must be an integer between ${min} and ${max}`,
+    });
+  }
+  return parsed;
+}
+
+function queryIds(
+  query: Record<string, unknown> | undefined,
+): readonly string[] | undefined {
+  const value = queryString(query, "ids");
+  if (!value) return undefined;
+  const ids = value
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? ids : undefined;
 }
 
 function assertRequestedOrganization(
@@ -132,41 +177,101 @@ export const idOAuthScopeCatalog = (
         if (!session) throw new APIError("UNAUTHORIZED");
         const organizationId = requestedOrganizationId(ctx.query);
 
-        const rows = await ctx.context.adapter.findMany<OAuthResourceScopeRow>({
-          model: OAUTH_RESOURCE_SCOPE_MODEL,
-          sortBy: { field: "createdAt", direction: "desc" },
-        });
-        const access = await Promise.all(
-          rows.map(async (row) => {
-            const resourceServer = await findResourceServerOrThrow(
-              adapterContext(ctx.context.adapter),
-              row.resourceServerId,
-            );
-            if (
-              organizationId !== undefined &&
-              resourceServer.organizationId !== organizationId
-            ) {
-              return { row, visible: false };
-            }
-            try {
-              await assertCatalogAccess(
-                options.authorize,
-                resourceServer.organizationId,
-                session.user.id,
-                session.user.role,
-                ctx.context.adapter,
-              );
-              return { row, visible: true };
-            } catch (error) {
-              if (!(error instanceof APIError)) throw error;
-              return { row, visible: false };
-            }
+        await assertCatalogAccess(
+          options.authorize,
+          organizationId ?? null,
+          session.user.id,
+          session.user.role,
+          ctx.context.adapter,
+        );
+        const adapter = adapterContext(ctx.context.adapter);
+        const where: Array<{
+          field: string;
+          value: unknown;
+          operator?: string;
+        }> = [];
+        if (organizationId) {
+          const resourceServers = await adapter.findMany<{
+            readonly id: string;
+          }>({
+            model: RESOURCE_SERVER_MODEL,
+            where: [{ field: "organizationId", value: organizationId }],
+          });
+          const resourceServerIds = resourceServers.map((row) => row.id);
+          if (resourceServerIds.length === 0) {
+            return ctx.json({
+              oauthScopes: [],
+              items: [],
+              total: 0,
+              limit: queryNumber(
+                ctx.query,
+                "limit",
+                1,
+                ADMIN_TYPEAHEAD_MAX_LIST_LIMIT,
+              ),
+              offset: queryNumber(
+                ctx.query,
+                "offset",
+                0,
+                Number.MAX_SAFE_INTEGER,
+              ),
+            });
+          }
+          where.push({
+            field: "resourceServerId",
+            value: resourceServerIds,
+            operator: "in",
+          });
+        }
+        const ids = queryIds(ctx.query);
+        if (ids?.length) {
+          const rows = await adapter.findMany<OAuthResourceScopeRow>({
+            model: OAUTH_RESOURCE_SCOPE_MODEL,
+            where: [...where, { field: "id", value: [...ids], operator: "in" }],
+            sortBy: { field: "createdAt", direction: "desc" },
+          });
+          const items = rows.map((row) => presentOAuthResourceScope(row));
+          return ctx.json({
+            oauthScopes: items,
+            items: items.map(cloneOAuthResourceScope),
+          });
+        }
+        const q = queryString(ctx.query, "q");
+        if (q) where.push({ field: "scope", value: q, operator: "contains" });
+        const filters = where.length > 0 ? where : undefined;
+        const limit = queryNumber(
+          ctx.query,
+          "limit",
+          1,
+          ADMIN_TYPEAHEAD_MAX_LIST_LIMIT,
+        );
+        const offset = queryNumber(
+          ctx.query,
+          "offset",
+          0,
+          Number.MAX_SAFE_INTEGER,
+        );
+        const total = Number(
+          await adapter.count({
+            model: OAUTH_RESOURCE_SCOPE_MODEL,
+            where: filters,
           }),
         );
-        const visible = access
-          .filter((entry) => entry.visible)
-          .map((entry) => presentOAuthResourceScope(entry.row));
-        return ctx.json({ oauthScopes: visible });
+        const rows = await adapter.findMany<OAuthResourceScopeRow>({
+          model: OAUTH_RESOURCE_SCOPE_MODEL,
+          where: filters,
+          limit,
+          offset,
+          sortBy: { field: "createdAt", direction: "desc" },
+        });
+        const items = rows.map((row) => presentOAuthResourceScope(row));
+        return ctx.json({
+          oauthScopes: items,
+          items: items.map(cloneOAuthResourceScope),
+          total,
+          limit,
+          offset,
+        });
       },
     ),
 

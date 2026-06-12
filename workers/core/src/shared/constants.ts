@@ -66,6 +66,9 @@ export const ADMIN_ROLE_MODEL = "adminRole" as const;
 /** BA model name for delegated admin role bindings. */
 export const ADMIN_ROLE_BINDING_MODEL = "adminRoleBinding" as const;
 
+/** Admin picker max page size. */
+export const ADMIN_TYPEAHEAD_MAX_LIST_LIMIT = 100;
+
 /** Sort rank for organization owner memberships in console scope discovery. */
 export const CONSOLE_OWNER_ROLE_RANK = 3;
 

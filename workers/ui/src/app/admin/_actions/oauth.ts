@@ -20,6 +20,18 @@ function orgParams(
     : undefined;
 }
 
+function pageParams(
+  params: ListPageParams,
+): Record<string, string | number | undefined> {
+  return {
+    ...orgParams(params.scope ?? platformScope),
+    q: params.q,
+    limit: params.limit,
+    offset: params.offset,
+    ids: params.ids?.join(","),
+  };
+}
+
 function scopedPath(path: string, scope: ActiveScope): string {
   if (scope.kind !== "organization") return path;
   return `${path}?organizationId=${encodeURIComponent(scope.organizationId)}`;
@@ -62,6 +74,21 @@ export type OAuthClient = {
   require_pkce?: boolean;
   subject_type?: "public" | "pairwise";
   reference_id?: string;
+};
+
+export type ListPageParams = {
+  readonly scope?: ActiveScope;
+  readonly q?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly ids?: readonly string[];
+};
+
+export type ListPage<T> = {
+  readonly items: T[];
+  readonly total?: number;
+  readonly limit?: number;
+  readonly offset?: number;
 };
 
 export type NonEmptyStringArray = [string, ...string[]];
@@ -110,6 +137,19 @@ export async function listClients(
   return scope.kind === "organization"
     ? clients.filter((client) => client.reference_id === scope.organizationId)
     : clients;
+}
+
+export async function listClientsPage(
+  params: ListPageParams = {},
+  signal?: AbortSignal,
+): Promise<ListPage<OAuthClient>> {
+  const scope = params.scope ?? platformScope;
+  await setActiveOrganizationForOAuth(scope);
+  return authApiGetOrThrow<ListPage<OAuthClient>>(
+    "/admin/oauth-clients",
+    pageParams({ ...params, scope }),
+    signal ? { signal } : undefined,
+  );
 }
 
 export async function createClient(
@@ -193,6 +233,17 @@ export async function listResourceServers(
     orgParams(scope),
   );
   return res.resourceServers ?? [];
+}
+
+export async function listResourceServersPage(
+  params: ListPageParams = {},
+  signal?: AbortSignal,
+): Promise<ListPage<ResourceServer>> {
+  return authApiGetOrThrow<ListPage<ResourceServer>>(
+    "/admin/resource-servers",
+    pageParams(params),
+    signal ? { signal } : undefined,
+  );
 }
 
 export async function createResourceServer(
@@ -281,6 +332,17 @@ export async function listScopes(
     orgParams(scope),
   );
   return res.oauthScopes ?? [];
+}
+
+export async function listScopesPage(
+  params: ListPageParams = {},
+  signal?: AbortSignal,
+): Promise<ListPage<OAuthResourceScope>> {
+  return authApiGetOrThrow<ListPage<OAuthResourceScope>>(
+    "/admin/oauth-scopes",
+    pageParams(params),
+    signal ? { signal } : undefined,
+  );
 }
 
 export async function createScope(
