@@ -168,19 +168,23 @@ describe("RegistrationPoliciesContent", () => {
     fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "client-launch" } });
 
     // Pick the OAuth client from the picker instead of typing a raw id.
-    pressTrigger(screen.getByRole("button", { name: /^client$/i }));
-    fireEvent.change(await screen.findByPlaceholderText("Select an OAuth client"), { target: { value: "Content" } });
+    const clientPicker = await screen.findByPlaceholderText("Select an OAuth client");
+    pressTrigger(screen.getByRole("button", { name: /^toggle client$/i }));
+    fireEvent.focus(clientPicker);
+    fireEvent.change(clientPicker, { target: { value: "Content" } });
     await waitFor(() => expect(actions.listClientsPage).toHaveBeenCalledWith(
       expect.objectContaining({ q: "Content", limit: 20, offset: 0 }),
       expect.any(AbortSignal),
     ));
-    fireEvent.click(await screen.findByText("Content Web"));
+    fireEvent.click(await screen.findByRole("option", { name: /Content Web/ }));
 
     // Build an allowed scope via the catalog-aware scope builder.
     pressTrigger(screen.getByRole("button", { name: /allowed scopes/i }));
-    const scopeSearch = await screen.findByRole("searchbox", { name: /search allowed scopes/i });
+    const scopeSearch = await screen.findByRole("combobox", { name: /allowed scopes/i });
     fireEvent.change(scopeSearch, { target: { value: "content:read" } });
     fireEvent.keyDown(scopeSearch, { key: "Enter" });
+    fireEvent.keyDown(scopeSearch, { key: "Escape" });
+    fireEvent.blur(scopeSearch);
 
     // Set quota via the number field.
     const quota = screen.getByRole("textbox", { name: /quota limit/i });
@@ -205,7 +209,7 @@ describe("RegistrationPoliciesContent", () => {
     await waitFor(() => expect(actions.listClientsPage).toHaveBeenCalledWith(
       expect.objectContaining({ ids: ["cli_content_web"], limit: 1, offset: 0 }),
     ));
-    await waitFor(() => expect(screen.getByText("Content Web")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByPlaceholderText("Select an OAuth client")).toHaveDisplayValue("Content Web"));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Content launch" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => expect(actions.updateRegistrationPolicy).toHaveBeenCalledWith("regpol_content_beta", expect.objectContaining({

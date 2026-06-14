@@ -47,8 +47,8 @@
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.6.11",
-    "@idco/lib": "npm:@quanghuy1242/idco-lib@^0.1.15",
-    "@idco/ui": "npm:@quanghuy1242/idco-ui@^0.1.15",
+    "@idco/lib": "npm:@quanghuy1242/idco-lib@^0.1.18",
+    "@idco/ui": "npm:@quanghuy1242/idco-ui@^0.1.18",
     "better-auth": "1.6.11",
     "drizzle-orm": "0.45.2",
     "hono": "4.12.21",
