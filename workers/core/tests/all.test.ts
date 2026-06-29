@@ -24,6 +24,7 @@ await import("./auth/oauth-auth-code.test");
 await import("./auth/oauth-client-crud.test");
 await import("./auth/oauth-client-ownership.test");
 await import("./auth/oauth-client-resource-scope.test");
+await import("./auth/oauth-protocol-scopes.test");
 await import("./auth/m2m-token-issuance.test");
 await import("./auth/m2m-client-picker.test");
 await import("./auth/infra-m2m-client.test");

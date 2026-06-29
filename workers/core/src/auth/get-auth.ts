@@ -16,6 +16,7 @@ import {
 import { idResourceServer } from "./plugins/resource-server";
 import { idOAuthScopeCatalog } from "./plugins/oauth-scope-catalog";
 import { idOAuthM2MBridge } from "./plugins/oauth-m2m-bridge";
+import { idOAuthProtocolScopes } from "./plugins/oauth-protocol-scopes";
 import { idAdminSignInGuard } from "./plugins/admin-sign-in-guard";
 import { idScimDirectory } from "./plugins/scim-directory";
 import { idOAuthClientPicker } from "./plugins/oauth-client-picker";
@@ -169,6 +170,9 @@ export function getAuthOptions(
         },
       }),
       idOAuthM2MBridge(),
+      idOAuthProtocolScopes({
+        protocolScopes: authPluginConfig.oauthProtocolScopes,
+      }),
       idRegistration({
         authorize: authorizePlatformAccess,
       }),
