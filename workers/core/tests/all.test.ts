@@ -21,6 +21,7 @@ await import("./auth/cors-rate-contracts.test");
 await import("./auth/jwks-proof.test");
 await import("./auth/jwks.test");
 await import("./auth/authorization-context-selection.test");
+await import("./auth/oauth-context-selection.test");
 await import("./auth/oauth-auth-code.test");
 await import("./auth/oauth-client-crud.test");
 await import("./auth/oauth-client-ownership.test");
