@@ -49,6 +49,9 @@ export const MAX_TOKEN_TEAM_IDS = 128;
 /** OAuth context-selection cache TTL, in seconds. */
 export const OAUTH_CONTEXT_SELECTION_TTL_SECONDS = 300;
 
+/** TTL (ms) for the in-isolate post-login context-selection bridge that gives a reliable same-request read-after-write where KV cannot. */
+export const CONTEXT_SELECTION_CACHE_TTL_MS = 60_000;
+
 /** Admin login one-time-passcode lifetime, in seconds. */
 export const ADMIN_OTP_TTL_SECONDS = 300;
 

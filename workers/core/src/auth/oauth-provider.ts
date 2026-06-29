@@ -6,6 +6,10 @@ import {
   oauthTokenLifetimeConfig,
 } from "./config";
 import {
+  recallContextSelection,
+  rememberContextSelection,
+} from "./authorization-context-selection";
+import {
   assertClientResourceScope,
   resolveOAuthClientReferenceId,
 } from "./plugins/oauth-scope-catalog/grants";
@@ -107,6 +111,10 @@ export function createOAuthProviderPlugin(
         if (!hasProductScope(scopes)) return false;
         const selectedContext = headers.get("x-id-oauth-context");
         if (!selectedContext) return true;
+        // Bridge the selection to the same-request `consentReferenceId` via an
+        // in-isolate map (reliable read-after-write); KV is the durable
+        // fallback but is eventually consistent within a single request.
+        rememberContextSelection(session.id, selectedContext, Date.now());
         await env.KV.put(
           authorizationSelectionKey(session.id),
           selectedContext,
@@ -118,9 +126,9 @@ export function createOAuthProviderPlugin(
       },
       consentReferenceId: async ({ session, scopes }) => {
         if (!hasProductScope(scopes)) return undefined;
-        const selectedContext = await env.KV.get(
-          authorizationSelectionKey(session.id),
-        );
+        const selectedContext =
+          recallContextSelection(session.id, Date.now()) ??
+          (await env.KV.get(authorizationSelectionKey(session.id)));
         if (selectedContext === "direct-share") {
           return authPluginConfig.directShareReferenceId;
         }
